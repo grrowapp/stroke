@@ -18,23 +18,23 @@ const COMMENTS_MAX = 200
 const SUMMARY_MAX = 50000
 const RECORD_MAX = 500000
 const PROJECT_NAME_MAX = 100
+const PROPOSAL_MAX = 200000
 
 export const startSessionBody = z.object({
   overview: z.string().trim().min(1, '概要が要る。').max(OVERVIEW_MAX, '概要が長すぎる。'),
 })
 
-export const answerBody = z.object({
-  answer: z.discriminatedUnion('kind', [
-    z.object({
-      kind: z.literal('option'),
-      value: z.string().trim().min(1, '回答が要る。').max(OPTION_LABEL_MAX),
-    }),
-    z.object({
-      kind: z.literal('free'),
-      value: z.string().trim().min(1, '回答が要る。').max(FREE_ANSWER_MAX, '回答が長すぎる。'),
-    }),
-  ]),
-})
+/** U7 の入力。`{ kind, value }` そのまま（design.md: ストロークの問いも問い返しも同じ口）。 */
+export const answerBody = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('option'),
+    value: z.string().trim().min(1, '回答が要る。').max(OPTION_LABEL_MAX),
+  }),
+  z.object({
+    kind: z.literal('free'),
+    value: z.string().trim().min(1, '回答が要る。').max(FREE_ANSWER_MAX, '回答が長すぎる。'),
+  }),
+])
 
 /** design.md 決定10 の5色。画面が出すものと同じ範囲に閉じる。 */
 const highlightColorSchema = z.object({
@@ -78,6 +78,15 @@ export const sendBackBody = z.object({
 
 export const approveBody = z.object({
   projectName: z.string().trim().min(1, 'プロジェクト名が要る。').max(PROJECT_NAME_MAX),
+})
+
+/**
+ * A7 の入力。`projectName` は kebab-case のときだけ候補として採用する
+ * （kebab-case かどうかの判定は `project.ts` の `isKebabCase`）。ここでは形だけ検証する。
+ */
+export const proposalSubmitBody = z.object({
+  proposal: z.string().trim().min(1, 'proposal の本文が要る。').max(PROPOSAL_MAX, 'proposal が長すぎる。'),
+  projectName: z.string().trim().max(PROJECT_NAME_MAX).optional(),
 })
 
 /** 契約に合わないボディは 400。最初の問題だけを画面へ返す。 */

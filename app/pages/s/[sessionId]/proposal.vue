@@ -1,41 +1,47 @@
 <script setup lang="ts">
-// 画面2（proposal 確認）。ui.md の採用案 = B（右パネル常設）。
-// 決める操作（差し戻す・承認）はビュー切替と同じ上部固定バーに集約する。
+// 画面2(proposal 確認)。ui.md の採用案 = B(右パネル常設)。
+// 決める操作(差し戻す・承認)はビュー切替と同じ上部固定バーに集約する。
 // 差し戻し後の問い返しは画面1 へ戻さず、この画面の帯とモーダルで受ける。
 import DOMPurify from 'isomorphic-dompurify'
 import { marked } from 'marked'
-import type { SessionView } from '#shared/types'
+import type { Invocation, Phase, Stroke } from '#shared/types'
 
-// セッション uuid は URL に載る（/s/<uuid>/proposal）。cookie では持たない。
+// セッション uuid は URL に載る(/s/<uuid>/proposal)。cookie では持たない。
 const route = useRoute()
 const rawId = route.params.sessionId
 const sessionId = Array.isArray(rawId) ? (rawId[0] ?? '') : (rawId ?? '')
 
-const { data: session, refresh, error } = await useFetch<SessionView | null>(
-  `/api/sessions/${sessionId}`,
-  {
-    // 画面1 とキーを分ける。同じキーにすると、画面1 が作った asyncData の口
-    // （status: success）をそのまま拾い、画面2 に入っても取り直しが走らない。
-    // 把握完了で phase が動いた直後にこれを踏むと、stroking のままの中身が出る。
-    key: `proposal:${sessionId}`,
-    default: (): SessionView | null => null,
-  },
+const { data: status, error } = await useFetch<{ phase: Phase; invocation: Invocation }>(
+  `/api/${sessionId}`,
+  { key: `status:${sessionId}` },
 )
 
 // 契約: 404 は存在しないセッション。概要入力へ戻す。
-// <script setup> の直下では return できない（ES module のトップレベル return は構文エラー）ため、
+// <script setup> の直下では return できない(ES module のトップレベル return は構文エラー)ため、
 // リダイレクトを起こしたうえで以降を無害にする。notFound の間は本文を描画しない。
 const notFound = computed(() => error.value?.statusCode === 404)
 if (notFound.value) {
   await navigateTo('/', { replace: true })
 }
 
-const review = useProposalReview(sessionId, session, refresh)
+// エッジケース: proposal がまだ無い局面(stroking)での URL 直打ち・ブックマーク。
+// 画面2 には proposal が無いため、画面1 へ戻す。
+if (status.value && status.value.phase === 'stroking') {
+  await navigateTo(`/s/${sessionId}`)
+}
 
-/** パンくずの道。ストロークはサーバが持つため、取得したセッションをそのまま渡す。 */
-const strokes = computed(() => session.value?.strokes ?? [])
+const { data: strokesData } = await useFetch<{ strokes: Stroke[] }>(`/api/${sessionId}/strokes`, {
+  key: `strokes:${sessionId}`,
+})
+
+const review = useProposalReview(sessionId, {
+  phase: status.value?.phase ?? 'proposed',
+  strokes: strokesData.value?.strokes ?? [],
+})
+
 const {
   phase,
+  strokes,
   proposal,
   projectName,
   comments,
@@ -52,10 +58,10 @@ const {
 } = review
 
 // proposal は AI が書いた Markdown。整形した HTML は必ずサニタイズしてから流し込む。
-// isomorphic-dompurify はサーバ（jsdom）でもブラウザでも同じ口で動く。
+// isomorphic-dompurify はサーバ(jsdom)でもブラウザでも同じ口で動く。
 const html = computed(() => DOMPurify.sanitize(marked.parse(proposal.value, { async: false })))
 
-const hasProposal = computed(() => phase.value !== null && phase.value !== 'stroking' && !!proposal.value)
+const hasProposal = computed(() => !!proposal.value)
 const approved = computed(() => phase.value === 'approved')
 
 // 承認後は注釈も差し戻しもしないため、整形されたプレビューだけを見せる
@@ -95,7 +101,7 @@ const modes = [
             <div class="mx-1 h-5 w-px bg-[var(--ui-border)]" />
 
             <UButton size="sm" color="neutral" variant="subtle" :disabled="busy" @click="review.sendBack">
-              差し戻す（{{ comments.length }}）
+              差し戻す({{ comments.length }})
             </UButton>
             <UButton size="sm" :disabled="busy" @click="review.openApprove">承認して作る</UButton>
           </template>
@@ -178,7 +184,7 @@ const modes = [
         class="flex flex-col border-l border-default bg-elevated/40 lg:sticky lg:top-[57px] lg:h-[calc(100vh-57px)]"
       >
         <div class="border-b border-default px-5 py-4">
-          <h4 class="mb-3 text-sm font-medium">コメント（{{ comments.length }}）</h4>
+          <h4 class="mb-3 text-sm font-medium">コメント({{ comments.length }})</h4>
           <UButton block size="sm" @click="review.openGeneral">＋ 全体へのコメント</UButton>
         </div>
 

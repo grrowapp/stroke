@@ -1,13 +1,13 @@
-import type { AiOutcome } from './apply-outcome'
-import { parseProjectName, parseQuestionResult } from './ai-response'
-import { runClaude, type ClaudeMode } from './claude'
+import { readClaudeConfig } from './claude-config'
+import { runClaude, type ClaudeMode, type ClaudeRunResult } from './claude'
 import { sessionDir } from './paths'
 import { continuePrompt } from './prompt'
-import { readProposal, readProposalStamp } from './session-store'
+import { readState, writeState } from './session-store'
+import { waitForSubmission } from './submission-signal'
 
 export interface InvokeAiOptions {
   sessionId: string
-  /** 最初の呼び出しで渡すプロンプト。リトライでは送り直さない */
+  /** 最初の呼び出しで渡す固定テンプレート（`sessionPrompt`）。リトライでは送り直さない */
   prompt: string
   /** セッションの最初の呼び出しか。true なら `--session-id`、false なら `--resume` */
   first: boolean
@@ -16,45 +16,38 @@ export interface InvokeAiOptions {
 /** リトライ回数。MVP の割り切りで設定値にしない。 */
 const MAX_RETRIES = 2
 
+type AttemptOutcome =
+  | { kind: 'submitted' }
+  | { kind: 'failed', detail: string, sessionMissing: boolean }
+
 /**
- * AI を呼び、規定の構造として読み取れるものが得られるまでリトライする。
+ * AI を呼ぶ。呼び出し側は結果を待たない（design.md 決定2・6: HTTP は受理・返却して
+ * 即完結する）。結果はエージェントの提出（A5・A7）が endpoint へ直接届けるため、この関数の
+ * 返り値には載らない。
  *
- * 得られるものは2つに1つ。標準出力から問いが読み取れれば問い、読み取れず `proposal.md` が
- * 新しくなっていれば proposal。どちらでもなければ、その呼び出しは失敗として扱う。
- * 画面に出ない説明が回答の前提になってはならないため、構造で受け取れなかった応答を
- * 問いとして提示することはない（specs/stroke-session）。
+ * 呼び出し側は、この呼び出しを始める前に `beginRun(sessionId)` を済ませ、返ってきた
+ * promise に `.finally(() => endRun(sessionId))` を付けること（busy ガードの対称性）。
  *
- * - 失敗・タイムアウト・読み取れない、はどれも同じ経路に流す。
- * - 失敗した往復も AI 側の履歴に残るため、リトライでは入力を送り直さず続きを促す。
- * - 最初の呼び出し（`--session-id`）が失敗したときは、履歴に入っている可能性があるので
- *   まず `--resume` で継続を試み、セッションが無かったときだけ `--session-id` でやり直す。
- * - 回復した失敗は呼び出し側へ返さない。尽きたときだけ 502。
+ * 起動後タイムアウト時間内に endpoint への提出が無ければ、その試行を失敗として扱い、
+ * 既存のリトライ（続きを促す再起動・入力は送り直さない）へ流す（specs/ai-invocation）。
+ * 尽きたら `invocation: failed` を state.json に書く。502 は返さない。
  */
-export async function invokeAi(options: InvokeAiOptions): Promise<AiOutcome> {
+export async function invokeAi(options: InvokeAiOptions): Promise<void> {
   const { sessionId } = options
   const cwd = sessionDir(sessionId)
+  const timeoutMs = readClaudeConfig().timeoutMs
 
   let mode: ClaudeMode = options.first ? 'new' : 'resume'
   let prompt = options.prompt
   const failures: string[] = []
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
-    // 呼び出しのたびに取り直す。リトライの前の試行で書かれていることがある。
-    const before = await readProposalStamp(sessionId)
-    const run = await runClaude({ sessionId, cwd, prompt, mode })
+    const outcome = await attemptOnce({ sessionId, cwd, prompt, mode, timeoutMs })
 
-    if (run.ok) {
-      const outcome = await readOutcome(sessionId, run.result, before)
-      if (outcome) return outcome
+    if (outcome.kind === 'submitted') return
 
-      failures.push('応答を規定の構造として読み取れない')
-      mode = 'resume'
-      prompt = continuePrompt()
-      continue
-    }
-
-    failures.push(run.detail)
-    if (run.sessionMissing) {
+    failures.push(outcome.detail)
+    if (outcome.sessionMissing) {
       if (!options.first) {
         // 往復の途中で継続先を失った。ここから `--session-id` で始め直すと、概要も
         // 過去のストロークも無い会話へ入力だけを流し込むことになる。
@@ -64,45 +57,55 @@ export async function invokeAi(options: InvokeAiOptions): Promise<AiOutcome> {
       // 初回。継続先が無い = 履歴には何も入っていない。送り直してよい。
       mode = 'new'
       prompt = options.prompt
-    } else {
-      mode = 'resume'
-      prompt = continuePrompt()
+      continue
     }
+
+    mode = 'resume'
+    prompt = continuePrompt()
   }
 
   console.warn(`[stroke-board] AI 呼び出しが失敗: ${sessionId}`, failures)
-  throw createError({
-    statusCode: 502,
-    statusMessage: 'Bad Gateway',
-    message: 'AI から応答が得られなかった。同じ操作をもう一度試せる。',
-    data: { attempts: failures },
-  })
+  await markInvocationFailed(sessionId)
 }
 
 /**
- * 1回の呼び出しから得られたものを読み取る。得られなければ null。
- *
- * 問いを先に見る。proposal は `proposal.md` が新しくなったことで判定するため、
- * 問いを返しつつ過去の proposal がそのまま残っている場合と取り違えない。
+ * 1回の試行。提出到着とプロセスの終了を競わせ、先に決着した方で結果を決める。
+ * 提出が届けば即成功。プロセスが（成功・失敗いずれであれ）提出より先に終われば、
+ * その試行は失敗として扱う（提出が受け取り口であり、応答の中身は見ない）。
  */
-async function readOutcome(
-  sessionId: string,
-  result: string,
-  before: number | null,
-): Promise<AiOutcome | null> {
-  const question = parseQuestionResult(result)
-  if (question) return { kind: 'question', question }
+function attemptOnce(options: {
+  sessionId: string
+  cwd: string
+  prompt: string
+  mode: ClaudeMode
+  timeoutMs: number
+}): Promise<AttemptOutcome> {
+  const { sessionId, cwd, prompt, mode, timeoutMs } = options
 
-  const after = await readProposalStamp(sessionId)
-  if (after === null || after === before) return null
+  return new Promise((resolve) => {
+    let settled = false
+    const finish = (outcome: AttemptOutcome): void => {
+      if (settled) return
+      settled = true
+      resolve(outcome)
+    }
 
-  const proposal = await readProposal(sessionId)
-  if (proposal === undefined || proposal.trim() === '') return null
+    waitForSubmission(sessionId, timeoutMs).then((submitted) => {
+      if (submitted) finish({ kind: 'submitted' })
+    })
 
-  const projectName = parseProjectName(result)
-  return {
-    kind: 'proposal',
-    proposal,
-    ...(projectName ? { projectName } : {}),
-  }
+    runClaude({ sessionId, cwd, prompt, mode }).then((run: ClaudeRunResult) => {
+      if (run.ok) {
+        finish({ kind: 'failed', detail: '応答は成功したが提出が届かない', sessionMissing: false })
+      } else {
+        finish({ kind: 'failed', detail: run.detail, sessionMissing: run.sessionMissing })
+      }
+    })
+  })
+}
+
+async function markInvocationFailed(sessionId: string): Promise<void> {
+  const state = await readState(sessionId)
+  if (state.phase === 'approved') return
+  await writeState(sessionId, { ...state, invocation: 'failed' })
 }

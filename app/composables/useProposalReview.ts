@@ -1,15 +1,13 @@
-// 画面2（proposal 確認）の状態。表示の置き方はページが持ち、ここは状態と往復だけを持つ。
+// 画面2(proposal 確認)の状態。表示の置き方はページが持ち、ここは状態と往復だけを持つ。
 //
-// セッションの持ち主は useFetch が返す1つの ref（source）だけ。
-// 往復の結果もここへ書き戻し、写しを別に持たない。
+// 集約応答は無い。proposal と名前候補は W2、followup の問いは W1 から届き、strokes は
+// 決着ごとに U3 を読み直す(design.md: 画面は WS 受信と GET を組み合わせて組み立てる)。
 import type {
   Annotation,
   Answer,
-  ApproveResult,
   HighlightColor,
-  Question,
-  SessionView,
-  StrokeResult,
+  Phase,
+  Stroke,
 } from '#shared/types'
 import { useAnnotations } from '~/composables/useAnnotations'
 
@@ -39,7 +37,7 @@ function statusOf(error: unknown): number | undefined {
 
 /**
  * 409 の理由。サーバが `createError({ data: { reason } })` で載せたものを読む。
- * 印が無い 409 は理由を決めつけない（名前の衝突・AI 実行中・phase 不整合を区別できないため）。
+ * 印が無い 409 は理由を決めつけない(名前の衝突・AI 実行中・phase 不整合を区別できないため)。
  */
 function reasonOf(error: unknown): string | undefined {
   const body = (error as HttpError | null)?.data
@@ -60,65 +58,42 @@ function messageOf(error: unknown): string {
   return typeof e?.message === 'string' && e.message ? e.message : String(error)
 }
 
-/** AI が提案した名前。まだ提案が無い局面では空。 */
-function proposedName(view: SessionView | null): string {
-  if (!view) return ''
-  switch (view.phase) {
-    case 'stroking':
-      return ''
-    case 'proposed':
-      return view.projectName ?? ''
-    case 'approved':
-      return view.projectName
-  }
-}
-
 /**
  * @param sessionId セッション uuid。URL に載っているものを使う。
- * @param session 唯一のセッション置き場。往復の結果もここへ書き戻す。
- * @param refresh 往復が終わったときにセッションを取り直す手。ストロークが増えるとパンくずも変わるため。
+ * @param initial リロード時に U2 / U3 で読んだ初期値。
  */
 export function useProposalReview(
   sessionId: MaybeRefOrGetter<string>,
-  session: Ref<SessionView | null>,
-  refresh?: () => Promise<void>,
+  initial: { phase: Phase, strokes: Stroke[] },
 ) {
   const a = useAnnotations()
 
-  /** このセッションの API。`/api/sessions/<uuid>` */
-  const base = computed(() => `/api/sessions/${toValue(sessionId)}`)
+  /** このセッションの API。`/api/<uuid>` */
+  const base = computed(() => `/api/${toValue(sessionId)}`)
 
-  // --- セッションから導けるもの
+  const phase = ref<Phase>(initial.phase)
+  const strokes = ref<Stroke[]>(initial.strokes)
 
-  const phase = computed(() => session.value?.phase ?? null)
+  const { message: proposalMessage } = useProposalChannel(sessionId)
+  const { question: followupQuestion } = useQuestionChannel(sessionId)
+  const waitingRetry = useWaitingRetry(sessionId)
 
-  const proposal = computed(() => {
-    const v = session.value
-    if (!v) return ''
-    switch (v.phase) {
-      case 'stroking':
-        return ''
-      case 'proposed':
-      case 'approved':
-        return v.proposal
-    }
-  })
+  /** 今どちらの送信の決着を待っているか。settle 時にどちらの後始末をするか決める。 */
+  const pendingAction = ref<'send-back' | 'followup' | null>(null)
 
-  /** 差し戻しに対する AI の問い返し。null なら答えるものは無い。 */
-  const followupQuestion = computed<Question | null>(() =>
-    session.value?.phase === 'proposed' ? session.value.followupQuestion : null,
+  const proposal = computed(() => proposalMessage.value?.proposal ?? '')
+
+  /** 点滅する知らせを出すか。answer 待ちの followup が来ているかで決まる。 */
+  const awaitingFollowup = computed(
+    () => phase.value === 'proposed' && followupQuestion.value !== null,
   )
 
-  /** 点滅する知らせを出すか。問い返しが入っているかで決まる。 */
-  const awaitingFollowup = computed(() => followupQuestion.value !== null)
+  // --- プロジェクト名。ユーザーが書いたらそれが勝ち、proposal 更新で消さない。
 
-  // --- プロジェクト名。ユーザーが書いたらそれが勝ち、セッションの更新で消さない。
-
-  /** ユーザーが書いた名前。null なら未編集で、AI の提案をそのまま使う。 */
   const projectNameDraft = ref<string | null>(null)
 
   const projectName = computed<string>({
-    get: () => projectNameDraft.value ?? proposedName(session.value),
+    get: () => projectNameDraft.value ?? proposalMessage.value?.projectName ?? '',
     set: (v) => {
       projectNameDraft.value = v
     },
@@ -141,19 +116,57 @@ export function useProposalReview(
   const alertTitle = ref('')
   const alertMessage = ref<string | null>(null)
   const approveOpen = ref(false)
+  const approveBusy = ref(false)
   /** 衝突した名前。同じ名前のままでは承認を通さない。 */
   const conflictName = ref<string | null>(null)
 
   // 問い返し
   const followupOpen = ref(false)
-  const followupWaiting = ref(false)
   const answered = ref(0)
 
-  /** AI の応答待ち。待機中は追加送信させない。 */
-  const busy = ref(false)
+  /** 差し戻し送信〜決着までの全面待ち受け。 */
+  const sendingBack = computed(() => pendingAction.value === 'send-back' && waitingRetry.waiting.value)
+  /** followup 回答の送信〜決着までの、モーダル内の待ち受け。 */
+  const followupWaiting = computed(() => pendingAction.value === 'followup' && waitingRetry.waiting.value)
+  /** 承認ボタンの busy。差し戻し中は承認もできない。 */
+  const busy = computed(() => sendingBack.value || approveBusy.value)
 
-  /** 差し戻しの応答待ち。承認実行中の busy と区別し、これだけが待ち受け画面になる。 */
-  const sendingBack = ref(false)
+  /** proposal が更新されたら知らせる。初回の読み込み(null → 値)は「出し直し」に数えない。 */
+  watch(proposalMessage, (next, prev) => {
+    if (prev !== null && next !== null) notice.value = 'revised'
+  })
+
+  /** 送信の決着(待機の終わり)。strokes を読み直し、followup なら modal の続きを決める。 */
+  watch(
+    () => waitingRetry.waiting.value,
+    async (isWaiting, wasWaiting) => {
+      if (!wasWaiting || isWaiting) return
+      const action = pendingAction.value
+      pendingAction.value = null
+
+      const data = await $fetch<{ strokes: Stroke[] }>(`${base.value}/strokes`)
+      strokes.value = data.strokes
+
+      if (waitingRetry.failed.value) {
+        if (action !== 'followup') {
+          warn('AI からの応答が得られませんでした', 'もう一度差し戻してください。')
+        }
+        // followup の失敗は modal 側で追う(followupWaiting が false に戻るだけで、
+        // 問いは変わらないので modal は開いたまま同じ問いを再送できる)。
+        return
+      }
+
+      if (action === 'followup' && !awaitingFollowup.value) {
+        // 新しい followup は来なかった(= proposal が出し直された)。modal を閉じる。
+        followupOpen.value = false
+      }
+    },
+  )
+
+  function warn(title: string, message: string): void {
+    alertTitle.value = title
+    alertMessage.value = message
+  }
 
   /** 編集中のコメント。種別ごとに面が違うので、それぞれの面が自分の分だけを見る。 */
   function editingOf(type: Annotation['type']) {
@@ -179,42 +192,6 @@ export function useProposalReview(
   /** 全体へのコメントの編集対象。引用も色も無い面が使う */
   const editingGeneral = computed(() => editingOf('general'))
 
-  function warn(title: string, message: string): void {
-    alertTitle.value = title
-    alertMessage.value = message
-  }
-
-  /** 往復の結果をセッションへ書き戻す。書き込み口はここと approve の2箇所だけ。 */
-  function applyStrokeResult(result: StrokeResult): void {
-    const current = session.value
-    if (!current) return
-    const keep = { sessionId: current.sessionId, strokes: current.strokes }
-
-    switch (result.outcome) {
-      case 'question':
-        session.value = { ...keep, phase: 'stroking', question: result.question }
-        return
-      case 'followup':
-        session.value = {
-          ...keep,
-          phase: 'proposed',
-          proposal: result.proposal,
-          projectName: proposedName(current) || undefined,
-          followupQuestion: result.question,
-        }
-        return
-      case 'proposal':
-        session.value = {
-          ...keep,
-          phase: 'proposed',
-          proposal: result.proposal,
-          projectName: result.projectName ?? (proposedName(current) || undefined),
-          followupQuestion: null,
-        }
-        return
-    }
-  }
-
   // --- コメントを積む
 
   function onSelect(p: PendingSelection): void {
@@ -225,7 +202,7 @@ export function useProposalReview(
 
   /**
    * コメントを直す。本文上のハイライトからも、カードの「編集」からも来る。
-   * 面は種別で分かれる（本文へのコメントは引用と色つき、全体へのコメントは本文だけ）。
+   * 面は種別で分かれる(本文へのコメントは引用と色つき、全体へのコメントは本文だけ)。
    */
   function editComment(id: string): void {
     const c = a.comments.value.find((x) => x.id === id)
@@ -265,7 +242,6 @@ export function useProposalReview(
   }
 
   function saveGeneral(): void {
-    // 直しているなら本文を差し替える（type は変わらない）。そうでなければ新しく積む。
     if (editingId.value) {
       a.update(editingId.value, generalDraft.value)
     } else {
@@ -283,8 +259,7 @@ export function useProposalReview(
   // --- 差し戻し
 
   async function sendBack(): Promise<void> {
-    if (busy.value) return
-    // コメント0件はボタンを黙って無効にせず、止めて理由と付け方を出す。
+    if (waitingRetry.waiting.value) return
     if (!a.comments.value.length) {
       warn(
         '差し戻せません',
@@ -292,39 +267,18 @@ export function useProposalReview(
       )
       return
     }
-    busy.value = true
-    sendingBack.value = true
-    notice.value = null
+    pendingAction.value = 'send-back'
     try {
-      const result = await $fetch<StrokeResult>(`${base.value}/send-back`, {
-        method: 'POST',
-        body: a.buildPayload(),
-      })
+      await $fetch(`${base.value}/send-back`, { method: 'POST', body: a.buildPayload() })
       a.clear()
-      applyStrokeResult(result)
-
-      switch (result.outcome) {
-        case 'followup':
-          answered.value = 0
-          followupOpen.value = true
-          return
-        case 'proposal':
-          notice.value = 'revised'
-          await refresh?.()
-          return
-        case 'question':
-          await refresh?.()
-          return
-      }
+      waitingRetry.startWaiting()
     } catch (error) {
+      pendingAction.value = null
       if (statusOf(error) === 409) {
         warn('まだ前の応答を待っています', 'AI が応答を返すまで、続けて送ることはできません。')
       } else {
         warn('差し戻せませんでした', messageOf(error))
       }
-    } finally {
-      busy.value = false
-      sendingBack.value = false
     }
   }
 
@@ -335,39 +289,20 @@ export function useProposalReview(
   }
 
   async function answerFollowup(answer: Answer): Promise<void> {
-    if (followupWaiting.value) return
-    followupWaiting.value = true
+    const asked = followupQuestion.value
+    if (waitingRetry.waiting.value || !asked) return
+    pendingAction.value = 'followup'
     try {
-      const result = await $fetch<StrokeResult>(`${base.value}/answer`, {
-        method: 'POST',
-        body: { answer },
-      })
+      await $fetch(`${base.value}/answer`, { method: 'POST', body: answer })
       answered.value += 1
-      applyStrokeResult(result)
-
-      switch (result.outcome) {
-        case 'followup':
-          // 面は閉じず、次の問いが同じ面に出る。
-          return
-        case 'proposal':
-          // 問いが尽きた。面を閉じ、出し直された proposal を見せる。
-          followupOpen.value = false
-          notice.value = 'revised'
-          await refresh?.()
-          return
-        case 'question':
-          followupOpen.value = false
-          await refresh?.()
-          return
-      }
+      waitingRetry.startWaiting()
     } catch (error) {
+      pendingAction.value = null
       if (statusOf(error) === 409) {
         warn('まだ前の応答を待っています', 'AI が応答を返すまで、続けて送ることはできません。')
       } else {
         warn('答えを送れませんでした', messageOf(error))
       }
-    } finally {
-      followupWaiting.value = false
     }
   }
 
@@ -385,27 +320,17 @@ export function useProposalReview(
 
   async function approve(): Promise<void> {
     if (busy.value || approveBlocked.value) return
-    const current = session.value
-    if (!current || current.phase !== 'proposed') return
+    if (phase.value !== 'proposed') return
 
     const name = projectName.value.trim()
-    busy.value = true
+    approveBusy.value = true
     try {
-      await $fetch<ApproveResult>(`${base.value}/approve`, {
-        method: 'POST',
-        body: { projectName: name },
-      })
-      session.value = {
-        sessionId: current.sessionId,
-        strokes: current.strokes,
-        phase: 'approved',
-        proposal: current.proposal,
-        projectName: name,
-      }
+      await $fetch(`${base.value}/approve`, { method: 'POST', body: { projectName: name } })
+      phase.value = 'approved'
       approveOpen.value = false
       notice.value = null
     } catch (error) {
-      // サーバは 409 を3つの意味で返す（名前の衝突 / AI が実行中 / phase 不整合）。
+      // サーバは 409 を3つの意味で返す(名前の衝突 / AI が実行中 / phase 不整合)。
       // 名前を変えるまで承認を止めるのは、衝突と分かったときだけにする。
       if (statusOf(error) === 409 && reasonOf(error) === 'name-conflict') {
         conflictName.value = name
@@ -413,17 +338,19 @@ export function useProposalReview(
         warn('承認できませんでした', messageOf(error))
       }
     } finally {
-      busy.value = false
+      approveBusy.value = false
     }
   }
 
   return {
     // 本文と局面
     phase,
+    strokes,
     proposal,
     projectName,
     awaitingFollowup,
     followupQuestion,
+    followupWaiting,
     // コメント
     comments: a.comments,
     // 表示
@@ -447,7 +374,6 @@ export function useProposalReview(
     approveBlocked,
     // 問い返し
     followupOpen,
-    followupWaiting,
     answered,
     // 操作
     onSelect,

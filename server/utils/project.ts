@@ -79,6 +79,11 @@ export function assertProjectName(name: string): string {
   return trimmed
 }
 
+/** kebab-case かどうか。A7 の `projectName` を候補として採るかどうかの判定に使う。 */
+export function isKebabCase(value: string): boolean {
+  return /^[a-z0-9]+(-[a-z0-9]+)*$/.test(value)
+}
+
 function isErrnoCode(error: unknown, code: string): boolean {
   return typeof error === 'object' && error !== null && 'code' in error
     && (error as { code?: unknown }).code === code

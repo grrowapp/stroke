@@ -3267,7 +3267,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@vueuse/core@npm:14.4.0, @vueuse/core@npm:^14.1.0, @vueuse/core@npm:^14.3.0":
+"@vueuse/core@npm:14.4.0, @vueuse/core@npm:^14.1.0, @vueuse/core@npm:^14.3.0, @vueuse/core@npm:^14.4.0":
   version: 14.4.0
   resolution: "@vueuse/core@npm:14.4.0"
   dependencies:
@@ -8216,6 +8216,7 @@ __metadata:
     "@nuxt/ui": "npm:^4.10.0"
     "@tailwindcss/typography": "npm:^0.5.16"
     "@types/node": "npm:^26.2.0"
+    "@vueuse/core": "npm:^14.4.0"
     isomorphic-dompurify: "npm:^3.22.0"
     marked: "npm:^16.0.0"
     nuxt: "npm:^4.5.2"

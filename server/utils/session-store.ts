@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { z } from 'zod'
-import type { Question, Stroke } from '#shared/types'
+import type { Answer, Invocation, Question, SendBackPayload, Stroke } from '#shared/types'
 import { sessionDir, sessionFile } from './paths'
 import { questionSchema } from './question'
+import { sendBackBody } from './request-schemas'
 
 /**
  * `state.json` の中身。
@@ -11,21 +12,18 @@ import { questionSchema } from './question'
  * uuid はディレクトリ名なので持たない。会話の全文も持たない（`--resume` が持つ）。
  * proposal 本文は `proposal.md` を読めば得られるため、状態には持たない。
  *
- * 局面ごとに存在するものが違うので `phase` を判別子にした直和型で表す。
- * 「stroking なのに projectName がある」のような組み合わせを作れないようにする。
+ * `stroking` / `proposed` は「今の1問」と呼び出し実行状態を持つ点で同じ形（design.md
+ * 決定3・決定4: 問いと問い返しを区別せず、phase で受理の動きを変えない）。`approved` は
+ * 呼び出しが二度と起きないので、その2つを持たない。
  */
 export type SessionState =
   | {
-      phase: 'stroking'
-      /** 今ユーザーが答えるべき問い */
-      question: Question
-    }
-  | {
-      phase: 'proposed'
-      /** AI が提案した kebab-case のプロジェクト名。取れないことがある */
+      phase: 'stroking' | 'proposed'
+      /** 今ユーザーが答えるべき問い。エージェントの提出（A5）で更新される。まだ無ければ null */
+      currentQuestion: Question | null
+      /** AI が提案した kebab-case のプロジェクト名候補。取れないことがある */
       projectName?: string
-      /** 差し戻しに対する AI の問い返し。答えを待っていなければ null */
-      followupQuestion: Question | null
+      invocation: Invocation
     }
   | {
       phase: 'approved'
@@ -36,26 +34,22 @@ export type SessionState =
 const STATE_FILE = 'state.json'
 const STROKES_FILE = 'strokes.json'
 const PROPOSAL_FILE = 'proposal.md'
+const OVERVIEW_FILE = 'overview.txt'
+const SEND_BACK_FILE = 'send-back.json'
 
 const projectNameSchema = z.string().trim().min(1).max(100)
+const invocationSchema = z.enum(['running', 'idle', 'failed'])
 
-/** null / undefined は「待っている問いは無い」に倒す。 */
-const followupSchema = z.union([z.null(), z.undefined(), questionSchema]).transform(v => v ?? null)
+const activeStateFields = {
+  currentQuestion: z.union([z.null(), questionSchema]),
+  projectName: projectNameSchema.optional(),
+  invocation: invocationSchema,
+}
 
 const stateSchema = z.discriminatedUnion('phase', [
-  z.object({
-    phase: z.literal('stroking'),
-    question: questionSchema,
-  }),
-  z.object({
-    phase: z.literal('proposed'),
-    projectName: projectNameSchema.optional(),
-    followupQuestion: followupSchema,
-  }),
-  z.object({
-    phase: z.literal('approved'),
-    projectName: projectNameSchema,
-  }),
+  z.object({ phase: z.literal('stroking'), ...activeStateFields }),
+  z.object({ phase: z.literal('proposed'), ...activeStateFields }),
+  z.object({ phase: z.literal('approved'), projectName: projectNameSchema }),
 ])
 
 const answerSchema = z.discriminatedUnion('kind', [
@@ -63,18 +57,30 @@ const answerSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('free'), value: z.string().min(1) }),
 ])
 
-const strokesSchema = z.array(z.object({
-  question: questionSchema,
-  answer: answerSchema,
-}))
+const strokeSchema = z.discriminatedUnion('proposal', [
+  z.object({ proposal: z.literal(false), question: questionSchema, answer: answerSchema }),
+  z.object({ proposal: z.literal(true), question: z.null(), answer: z.null() }),
+])
 
-/** セッションディレクトリを1つ作り、uuid を返す。uuid は `--session-id` にも使う。 */
-export async function createSession(): Promise<string> {
+const strokesSchema = z.array(strokeSchema)
+
+/**
+ * セッションを開始する。概要を保存し、`state.json` を最初から書く（`stroking` / 問い無し /
+ * `invocation: running`）。呼び出し側はこの直後に最初の AI 呼び出しを始める前提。
+ *
+ * 旧実装と違い、最初の問いが得られるのを待たない（HTTP はステートレス・design.md）。
+ * そのため `state.json` は最初からここで書き、セッションはこの時点で「在る」ものとして扱う。
+ */
+export async function createSession(overview: string): Promise<string> {
   const sessionId = randomUUID()
   await mkdir(sessionDir(sessionId), { recursive: true })
+  await writeAtomic(sessionId, OVERVIEW_FILE, overview)
   await writeStrokes(sessionId, [])
-  // state.json は最初の問いが得られてから書く。最初の呼び出しが失敗して捨てられた
-  // ディレクトリを「在るセッション」として拾わないため。
+  await writeState(sessionId, {
+    phase: 'stroking',
+    currentQuestion: null,
+    invocation: 'running',
+  })
   return sessionId
 }
 
@@ -105,9 +111,35 @@ export async function writeState(sessionId: string, state: SessionState): Promis
   await writeAtomic(sessionId, STATE_FILE, `${JSON.stringify(state, null, 2)}\n`)
 }
 
+/** U1 で投稿された概要。A1 が読む。 */
+export async function readOverview(sessionId: string): Promise<string | undefined> {
+  try {
+    return await readFile(sessionFile(sessionId, OVERVIEW_FILE), 'utf8')
+  } catch {
+    return undefined
+  }
+}
+
+/** U9 で差し戻された指摘一式。A4 が読む。差し戻しがまだ無ければ undefined。 */
+export async function readSendBack(sessionId: string): Promise<SendBackPayload | undefined> {
+  let raw: string
+  try {
+    raw = await readFile(sessionFile(sessionId, SEND_BACK_FILE), 'utf8')
+  } catch {
+    return undefined
+  }
+  const parsed = sendBackBody.safeParse(readJson(raw, SEND_BACK_FILE, sessionId))
+  if (!parsed.success) throw corrupt(SEND_BACK_FILE, sessionId)
+  return parsed.data
+}
+
+export async function writeSendBack(sessionId: string, payload: SendBackPayload): Promise<void> {
+  await writeAtomic(sessionId, SEND_BACK_FILE, `${JSON.stringify(payload, null, 2)}\n`)
+}
+
 /**
- * 済んだストローク。画面に出した問い（提示した選択肢を含む）と、ユーザーが返した回答の
- * ペアだけを持つ。AI の思考や中間の出力は保存しない。
+ * 済んだストローク。`proposal: false` は問いと回答のペア行（問い返しの往復も含む）、
+ * `proposal: true` は proposal の初提出を示すマーカー行。
  */
 export async function readStrokes(sessionId: string): Promise<Stroke[]> {
   let raw: string
@@ -127,11 +159,31 @@ export async function appendStroke(sessionId: string, stroke: Stroke): Promise<v
   await writeStrokes(sessionId, strokes)
 }
 
+/** 今の1問への回答をペア行として追記する。U7 受理で呼ぶ。 */
+export async function appendAnswerStroke(
+  sessionId: string,
+  question: Question,
+  answer: Answer,
+): Promise<void> {
+  await appendStroke(sessionId, { proposal: false, question, answer })
+}
+
+/**
+ * proposal の初提出だけマーカー行を追記する。出し直しでは増やさない
+ * （strokes に `proposal: true` が既に無いかで「初めて」を判定する）。
+ */
+export async function markProposalStrokeIfFirst(sessionId: string): Promise<void> {
+  const strokes = await readStrokes(sessionId)
+  if (strokes.some((s) => s.proposal)) return
+  strokes.push({ proposal: true, question: null, answer: null })
+  await writeStrokes(sessionId, strokes)
+}
+
 async function writeStrokes(sessionId: string, strokes: Stroke[]): Promise<void> {
   await writeAtomic(sessionId, STROKES_FILE, `${JSON.stringify(strokes, null, 2)}\n`)
 }
 
-/** 最新の proposal 本文。AI がセッションディレクトリへ書いたもの。 */
+/** 最新の proposal 本文。A7 の受理でサーバが書く（decisions 7: 書き手はサーバの1つだけ）。 */
 export async function readProposal(sessionId: string): Promise<string | undefined> {
   try {
     return await readFile(sessionFile(sessionId, PROPOSAL_FILE), 'utf8')
@@ -140,20 +192,8 @@ export async function readProposal(sessionId: string): Promise<string | undefine
   }
 }
 
-/**
- * `proposal.md` の更新時刻。まだ無ければ null。
- *
- * AI が proposal を書いたかどうかは、呼び出しの前後でこれを比べて判定する。応答の本文から
- * 当てにいかないのは、proposal は**ファイルとして**書かれるものであり、標準出力に現れる
- * 保証が無いため。
- */
-export async function readProposalStamp(sessionId: string): Promise<number | null> {
-  try {
-    const s = await stat(sessionFile(sessionId, PROPOSAL_FILE))
-    return s.mtimeMs
-  } catch {
-    return null
-  }
+export async function writeProposal(sessionId: string, proposal: string): Promise<void> {
+  await writeAtomic(sessionId, PROPOSAL_FILE, proposal)
 }
 
 /**
