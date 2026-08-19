@@ -1,0 +1,15 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+@plugin "@tailwindcss/typography";
+
+/* 点滅で動作中/要注意を示す共有アニメーション。AI からの質問通知バナー、待機表示（WaitingIndicator）で使う */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.blink {
+  animation: blink 1.1s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .blink { animation: none; }
+}

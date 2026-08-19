@@ -1,0 +1,121 @@
+import { spawn } from 'node:child_process'
+import { readClaudeConfig } from './claude-config'
+
+/** 呼び出しモード。セッションの最初だけ `--session-id`、以降は `--resume`。 */
+export type ClaudeMode = 'new' | 'resume'
+
+export interface ClaudeRunOptions {
+  /** セッション uuid。ディレクトリ名と `--session-id` / `--resume` で同じものを使う */
+  sessionId: string
+  /** `claude -p` の cwd。AI が書く生成物はここへ落ちる */
+  cwd: string
+  /** prompt。`--` の後ろに位置引数として渡す */
+  prompt: string
+  mode: ClaudeMode
+}
+
+export type ClaudeRunResult =
+  /** `type:"result"` の `result` フィールド */
+  | { ok: true, result: string }
+  /** 失敗。`sessionMissing` は継続先のセッションが無かったことを指す */
+  | { ok: false, sessionMissing: boolean, detail: string }
+
+/** 継続しようとしたセッションが存在しないときに CLI が出す文言（実測）。 */
+const SESSION_MISSING = 'No conversation found with session ID'
+
+/**
+ * `claude -p` を子プロセスとして1回だけ起動する。リトライはここでは扱わない。
+ */
+export async function runClaude(options: ClaudeRunOptions): Promise<ClaudeRunResult> {
+  const config = readClaudeConfig()
+  const args = [
+    '-p',
+    '--output-format',
+    'json',
+    // ADR 0001: project を外すとスキルがロードされない。
+    '--setting-sources',
+    config.settingSources,
+    '--add-dir',
+    config.addDir,
+    '--model',
+    config.model,
+    options.mode === 'new' ? '--session-id' : '--resume',
+    options.sessionId,
+  ]
+
+  // 空なら渡さない（許可を絞りたい運用で空文字を入れられるようにしてある）。
+  const allowedTools = config.allowedTools.trim()
+  if (allowedTools !== '') {
+    args.push('--allowedTools', allowedTools)
+  }
+
+  // `--` で option の解釈を打ち切る。以降は位置引数として届くので、`--allowedTools` の
+  // ような可変長フラグの後ろに置いても飲み込まれない。フラグを増減しても影響しない。
+  args.push('--', options.prompt)
+
+  const timeoutMs = config.timeoutMs
+
+  return await new Promise<ClaudeRunResult>((resolve) => {
+    const child = spawn('claude', args, { cwd: options.cwd, stdio: ['ignore', 'pipe', 'pipe'] })
+
+    let stdout = ''
+    let stderr = ''
+    let timedOut = false
+    let settled = false
+
+    const timer = setTimeout(() => {
+      timedOut = true
+      child.kill('SIGKILL')
+    }, timeoutMs)
+
+    const finish = (result: ClaudeRunResult): void => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      resolve(result)
+    }
+
+    child.stdout.setEncoding('utf8')
+    child.stderr.setEncoding('utf8')
+    child.stdout.on('data', (chunk: string) => { stdout += chunk })
+    child.stderr.on('data', (chunk: string) => { stderr += chunk })
+
+    child.on('error', (error: Error) => {
+      finish({ ok: false, sessionMissing: false, detail: `claude を起動できない: ${error.message}` })
+    })
+
+    child.on('close', (code: number | null) => {
+      if (timedOut) {
+        finish({ ok: false, sessionMissing: false, detail: `タイムアウト (${timeoutMs}ms)` })
+        return
+      }
+      const missing = `${stderr}${stdout}`.includes(SESSION_MISSING)
+      if (code !== 0) {
+        finish({ ok: false, sessionMissing: missing, detail: stderr.trim() || `終了コード ${code}` })
+        return
+      }
+      const extracted = extractResult(stdout)
+      if (extracted === null) {
+        finish({ ok: false, sessionMissing: missing, detail: '応答から result を取り出せない' })
+        return
+      }
+      finish({ ok: true, result: extracted })
+    })
+
+  })
+}
+
+/** `--output-format json` の出力から `type:"result"` の `result` フィールドを取る。 */
+function extractResult(stdout: string): string | null {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(stdout)
+  } catch {
+    return null
+  }
+  if (typeof parsed !== 'object' || parsed === null) return null
+  const envelope = parsed as Record<string, unknown>
+  if (envelope.type !== 'result') return null
+  if (envelope.is_error === true || envelope.subtype !== 'success') return null
+  return typeof envelope.result === 'string' ? envelope.result : null
+}

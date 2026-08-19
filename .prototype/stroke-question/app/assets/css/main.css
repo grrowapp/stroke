@@ -1,0 +1,15 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+@plugin "@tailwindcss/typography";
+
+/* AI からの質問を知らせる点滅 */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.blink {
+  animation: blink 1.1s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .blink { animation: none; }
+}

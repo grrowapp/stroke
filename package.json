@@ -1,0 +1,27 @@
+{
+  "name": "stroke-board-frontier",
+  "private": true,
+  "type": "module",
+  "packageManager": "yarn@4.17.0",
+  "scripts": {
+    "dev": "nuxt dev --host 0.0.0.0",
+    "build": "nuxt build",
+    "preview": "nuxt preview",
+    "typecheck": "nuxt typecheck"
+  },
+  "dependencies": {
+    "@nuxt/ui": "^4.10.0",
+    "isomorphic-dompurify": "^3.22.0",
+    "marked": "^16.0.0",
+    "nuxt": "^4.5.2",
+    "vue": "^3.5.0",
+    "vue-router": "^4.5.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/typography": "^0.5.16",
+    "@types/node": "^26.2.0",
+    "typescript": "^5.9.0",
+    "vue-tsc": "^3.0.0"
+  }
+}

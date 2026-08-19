@@ -1,0 +1,40 @@
+schema: custom
+
+# Project context (optional)
+# This is shown to AI when creating artifacts.
+# Add your tech stack, conventions, style guides, domain knowledge, etc.
+context: |
+  stroke-board-frontier — stroke-board の MVP。最終的に stroke-board へマージされる。
+
+  artifact を書く前に、次の3つを必ず読むこと。
+
+  - `.scratch/stroke-board-frontier/decisions.md`
+    grilling セッションで確定した決定事項。プロダクト・画面・生成物・技術の全決定と、
+    保留事項・未確認事項が入っている。ここに書かれた決定を覆す提案をしないこと。
+  - `CONTEXT.md`
+    ドメイン用語集。ストローク / 把握完了 / proposal / 差し戻し / 承認 など。
+    artifact 内でドメイン概念を指すときは、この用語をそのまま使うこと。
+  - `docs/adr/`
+    後から変えにくい決定の記録。矛盾する提案をする場合は、その旨を明示すること。
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing
