@@ -25,7 +25,7 @@ export default defineNuxtConfig({
       // ADR 0001: 渡すのはリポジトリのルート。.claude や skills をパスに含めない。
       // 空白区切りで複数渡せる。1つ目が grilling / domain-modeling と opsx コマンドの置き場、
       // 2つ目がセッション API スキル（assets/.claude/skills/）の置き場。
-      addDir: '/home/vagrant/work/stroke-board/mvp /home/vagrant/work/stroke-board/opsx/assets',
+      addDir: '/home/vagrant/work/stroke-board/mvp /home/vagrant/work/stroke-board/mvp/assets',
       // AI に許すツール。取得・提出は endpoint への HTTP 発行（Bash で curl）で行う。
       // proposal.md / stroke.md は store 上の change へ AI 自身が書き、提出はファイルパスで
       // 渡す（design.md 決定7）ため Write / Read が要る。

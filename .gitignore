@@ -8,6 +8,8 @@ dist/
 .yarn/cache/
 .yarn/install-state.gz
 .claude/
+# セッション API スキルはアプリの配布物。開発者個人の .claude/ とは別に追跡する
+!assets/.claude/
 
 # セッションの change は実行時データ。ワークフロー定義だけを追跡する
 workflow/openspec/changes/
