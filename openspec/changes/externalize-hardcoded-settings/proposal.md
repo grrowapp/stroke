@@ -24,13 +24,10 @@
 
 ## Capabilities
 
-### New Capabilities
-
-- `runtime-configuration`: 設定値はコードに直書きせず、再ビルドなしに差し替えられ、差し替えられた値は起動の時点で検証され、不正なまま走り出さない、という規定
-
 ### Modified Capabilities
 
-- `ai-invocation`: 既存の「起動設定は再ビルドなしで変更できる」は AI の起動フラグだけを対象にしている。同じ性質の規定が `runtime-configuration` に一般形で入るため、重複しないよう対象を整理する
+- `configuration`: 設定値はコードに直書きせず、再ビルドなしに差し替えられ、差し替えられた値は起動の時点で検証され、不正なまま走り出さない、という規定を加える。この capability は `separate-build-time-settings` が「ビルド時に決まる設定は作り直すまで動作に現れない」で立てる。境界の両側を同じ場所に置く
+- `ai-invocation`: 既存の「起動設定は再ビルドなしで変更できる」は AI の起動フラグだけを対象にしている。同じ性質の規定が `configuration` に一般形で入るため、重複を解く。既存の要件は削除し、`configuration` の規定に一本化する
 
 ## Impact
 
@@ -52,7 +49,10 @@
 - `package.json` — ポートの二重管理の解消
 - `README.md` / `docs/session-workflow.md` — 設定できる値の記載
 
-**前提**: `remove-store-dependency` を先に済ませること。`storeId` が廃止され、セッションディレクトリの位置も確定するため、先に進めると `paths.ts` と `claude-config.ts` を二度書くことになる。
+**前提**: 先行する2件を済ませてから着手する。
+
+- `remove-store-dependency` — `storeId` が廃止され、セッションディレクトリの位置も確定する。先に進めると `paths.ts` と `claude-config.ts` を二度書くことになる
+- `separate-build-time-settings` — 実行時に差し替えられない設定がどれかが確定する。境界が引かれていないと、外に出しても効かない値を外に出そうとする。`configuration` capability もあちらが立てる
 
 **この change に含めないもの**: 洗い出しで見つかった、設定値ではない不具合。プロジェクト名の連番採番が上限のない無限ループであること、コメントが実在しないファイル名を指していること。どちらも `docs/known-issues.md` に記録し、別の change で扱う。
 
