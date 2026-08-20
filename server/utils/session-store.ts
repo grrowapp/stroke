@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { z } from 'zod'
 import type { Answer, Invocation, Question, SendBackPayload, Stroke } from '#shared/types'
+import { createSessionChange } from './openspec'
 import { sessionDir, sessionFile } from './paths'
 import { questionSchema } from './question'
 import { sendBackBody } from './request-schemas'
@@ -73,6 +74,9 @@ const strokesSchema = z.array(strokeSchema)
  */
 export async function createSession(overview: string): Promise<string> {
   const sessionId = randomUUID()
+  // セッション = ワークフロー定義の store 上の change（design.md 決定3）。作れなければ
+  // claude は従う指示を取得できないので、セッションディレクトリを作る前にここで落とす。
+  await createSessionChange(sessionId)
   await mkdir(sessionDir(sessionId), { recursive: true })
   await writeAtomic(sessionId, OVERVIEW_FILE, overview)
   await writeStrokes(sessionId, [])

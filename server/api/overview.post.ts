@@ -1,5 +1,5 @@
 import { invokeAi } from '../utils/ai'
-import { sessionPrompt } from '../utils/prompt'
+import { firstPrompt } from '../utils/prompt'
 import { parseBody, startSessionBody } from '../utils/request-schemas'
 import { beginRun, endRun } from '../utils/running'
 import { createSession } from '../utils/session-store'
@@ -15,7 +15,7 @@ export default defineEventHandler(async (event): Promise<{ sessionId: string }> 
   const sessionId = await createSession(overview)
 
   beginRun(sessionId)
-  invokeAi({ sessionId, prompt: sessionPrompt(sessionId), first: true })
+  invokeAi({ sessionId, prompt: firstPrompt(), first: true })
     .catch((error) => {
       console.error(`[stroke-board] AI 呼び出しの管理に失敗: ${sessionId}`, error)
     })

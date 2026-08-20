@@ -1,7 +1,7 @@
 import type { Answer, Question, Stroke } from '#shared/types'
 import { invokeAi } from '../../utils/ai'
 import { conflict } from '../../utils/conflict'
-import { sessionPrompt } from '../../utils/prompt'
+import { continuePrompt } from '../../utils/prompt'
 import { answerBody, parseBody } from '../../utils/request-schemas'
 import { beginRun, endRun } from '../../utils/running'
 import { requireSessionId } from '../../utils/session-param'
@@ -52,7 +52,7 @@ export default defineEventHandler(async (event) => {
     throw error
   }
 
-  invokeAi({ sessionId, prompt: sessionPrompt(sessionId), first: false })
+  invokeAi({ sessionId, prompt: continuePrompt(), first: false })
     .catch((error) => {
       console.error(`[stroke-board] AI 呼び出しの管理に失敗: ${sessionId}`, error)
     })
