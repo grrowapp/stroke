@@ -52,6 +52,19 @@ Claude Code 2.1.236 / openspec 1.9.0 で確認した。
 - `.gitignore` の `.claude/` は `assets/.claude/` も食う。`!assets/.claude/` を後に置くと
   再包含され、ルートの `.claude/`（開発者個人の設定）は無視されたまま残る
 
+### openspec ルートの解決手段は2つだけ
+
+`--store <id>` か、**cwd から上へ辿って最寄りの `openspec/`** か。それ以外は無い。
+
+- `--root` のようにパスを直接渡すオプションは無い（`--help` で確認）
+- ルートを指すための環境変数も無い。README にあるのは `OPENSPEC_TELEMETRY` / `DO_NOT_TRACK` だけ
+- **cwd に置いた `openspec` がシンボリックリンクでも解決する**。リンク先の定義で
+  `openspec new change` も `openspec instructions` も通ることを実測した
+- store id は1つにつき1チェックアウトしか登録できない。二重登録は `store_id_conflict` で拒否され、
+  切り替えには `openspec store unregister` が要る
+
+この制約が `remove-store-dependency` の前提。
+
 ## 定義を変えるとき
 
 `workflow/openspec/schemas/stroke-session/` を編集するだけでよい。サーバは定義を読まずキャッシュも持たないため、**起動済みの呼び出しには影響せず、次回の呼び出しから反映される**。

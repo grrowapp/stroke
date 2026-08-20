@@ -2,41 +2,28 @@
 
 **まだ change に起こしていないもの**だけを置く。change を作ったらここから消す（実体は `openspec/changes/<change-id>/` に移る）。作業単位の管理は `docs/agents/issue-tracker.md` のとおり OpenSpec の change が担う。
 
----
+## 既に change になっているもの
 
-## store `stroke-sessions` の root が別のワークツリーを指している
+着手はこの順。3件とも `paths.ts` と `claude-config.ts` に触れるので並列に進められない。
 
-登録されている root は `/home/vagrant/work/stroke-board/opsx/workflow`。実行時に読まれる定義はそちらで、このリポジトリの `workflow/` は git 追跡されているだけの複製になっている。「定義を複製しない」という決定に反した状態。
+1. `remove-store-dependency` — store 依存をやめ、cwd から openspec ルートを解決する
+2. `externalize-hardcoded-settings` — 再ビルドなしに変えられない値 62 箇所を runtimeConfig へ
+3. `add-session-lifecycle` — セッションを消せるようにする
 
-張り替えるなら次の2手。マシン全体のレジストリを書き換えるので、実行前に確認すること。
-
-```
-openspec store unregister stroke-sessions
-openspec store register workflow --id stroke-sessions --yes
-```
-
-## セッションのクリーンアップ手段が無い
-
-作られたセッションは2箇所に残り、消す endpoint も script も無い。
-
-- `/var/lib/stroke-board/sessions/<uuid>/`
-- `workflow/openspec/changes/<uuid>/`
-
-検証のたびに溜まる。change に起こす予定。
-
-## 絶対パス・ハードコードが runtimeConfig の外にある
-
-`server/utils/paths.ts`:
-
-```ts
-export const SESSIONS_ROOT = '/var/lib/stroke-board/sessions'
-export const PROJECTS_ROOT = '/opt/projects'
-```
-
-環境ごとに差し替えられない。change に起こす予定。
-
-`nuxt.config.ts` の `addDir` は `import.meta.dirname` からの導出に変更済みで、この件からは外れている。
+先頭がセッションディレクトリの位置を確定させ、次がその位置を設定値へ出し、最後がそれを消す処理を足す。
 
 ---
 
-**着手の順序**: 「絶対パスの runtimeConfig 化」→「セッションのクリーンアップ」。後者が使う `paths` の形が前者で確定するため。両者は `paths.ts` と `nuxt.config.ts` で衝突するので、並列に進めない。
+## WS の URL 正規表現が `/api/` 前提になっている
+
+`server/routes/api/[id]/ws/question.ts:11` と `server/routes/api/[id]/ws/proposal.ts:7` が、URL からセッション id を抜くのに `/api/<id>/ws/...` を直書きの正規表現でマッチしている。
+
+リバースプロキシで base path を前置して配信する（例: `/stroke-board/api/...`）とマッチせず `null` になり、**WS が無言で閉じる**。W1・W2 は問いと proposal を画面へ届ける唯一の経路なので、機能が完全に沈黙する。しかも接続が閉じるだけでエラーが出ないため、原因が分かりにくい。
+
+## プロジェクト名の連番採番に上限が無い
+
+`server/utils/project.ts:59-61` の `for (let n = 2; ; n++)` は終了条件を持たない。既存名が多いと際限なく回る。
+
+## コメントが実在しないファイルを指している
+
+`server/utils/paths.ts:6` と `server/plugins/00.startup-checks.ts:22` のコメントが `server/plugins/00.writable.ts` を指しているが、実体は `00.startup-checks.ts`。
