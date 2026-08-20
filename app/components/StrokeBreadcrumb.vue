@@ -1,17 +1,23 @@
 <script setup lang="ts">
 // 履歴のパンくず。画面1 と画面2 で同じものを使う。
 // 粒は通し番号（Q1, Q2, …）だけ。問いの文言を載せると幅が問いの長さに左右されるため載せない。
-// 粒を開くと、その問い・そのとき提示された選択肢・自分の回答の全文が出る。
+// proposal の初提出はマーカー行（`proposal: true`）として道に入り、番号を持たない。
+// 通し番号は問い返しも含む問いの粒だけを数える（マーカーは数えない）。
 import type { Stroke } from '#shared/types'
 
 const props = withDefaults(
   defineProps<{
-    /** 現在地。画面1 は次の問い、画面2 は proposal */
+    /** 現在地。画面1 は次の問い、画面2 は proposal（差し戻しの問い返し待ちなら question） */
     current?: 'question' | 'proposal'
     /** 済んだストローク。パンくずの道になる */
     strokes: Stroke[]
   }>(),
   { current: 'question' },
+)
+
+/** 問いの粒だけ（マーカーを除く）。通し番号・粒開きの対象はこちら。 */
+const questionStrokes = computed(() =>
+  props.strokes.filter((s): s is Extract<Stroke, { proposal: false }> => !s.proposal),
 )
 
 const openIndex = ref<number | null>(null)
@@ -21,12 +27,12 @@ function toggle(index: number) {
 }
 
 /** 開いている粒。閉じているときは null */
-const opened = computed<Stroke | null>(() =>
-  openIndex.value === null ? null : (props.strokes[openIndex.value] ?? null),
+const opened = computed(() =>
+  openIndex.value === null ? null : (questionStrokes.value[openIndex.value] ?? null),
 )
 
 /** その選択肢が選ばれたものか */
-function isPicked(stroke: Stroke, label: string): boolean {
+function isPicked(stroke: Extract<Stroke, { proposal: false }>, label: string): boolean {
   return stroke.answer.kind === 'option' && stroke.answer.value === label
 }
 </script>
@@ -38,27 +44,36 @@ function isPicked(stroke: Stroke, label: string): boolean {
 
       <template v-for="(stroke, i) in props.strokes" :key="i">
         <span class="text-muted/50">›</span>
+
+        <!-- proposal の初提出。マーカーは番号を持たず、開かない -->
+        <span
+          v-if="stroke.proposal"
+          class="rounded px-2 py-1 text-xs font-medium text-primary"
+        >proposal</span>
+
+        <!-- 問いの粒（問い返しも同じ形）。番号は questionStrokes 内の位置で数える -->
         <button
+          v-else
           type="button"
           class="rounded px-2 py-1 tabular-nums transition"
-          :class="openIndex === i ? 'bg-primary/10 text-primary' : 'text-toned hover:bg-elevated'"
-          @click="toggle(i)"
+          :class="openIndex === questionStrokes.indexOf(stroke)
+            ? 'bg-primary/10 text-primary'
+            : 'text-toned hover:bg-elevated'"
+          @click="toggle(questionStrokes.indexOf(stroke))"
         >
-          Q{{ i + 1 }}
+          Q{{ questionStrokes.indexOf(stroke) + 1 }}
         </button>
       </template>
 
       <span class="text-muted/50">›</span>
 
-      <!-- 画面1: 次の問いが現在地。proposal が起きたら画面2 へ送るので、ここに proposal は出ない -->
+      <!-- 現在地。画面1 は次の問い、画面2 は proposal（問い返し待ちなら次の問い） -->
       <span
         v-if="props.current === 'question'"
         class="rounded bg-elevated px-2 py-1 font-medium tabular-nums"
       >
-        Q{{ props.strokes.length + 1 }}
+        Q{{ questionStrokes.length + 1 }}
       </span>
-
-      <!-- 画面2: proposal が現在地 -->
       <span v-else class="rounded bg-elevated px-2 py-1 font-medium">proposal</span>
     </nav>
 

@@ -1,10 +1,34 @@
-node_modules/
+# Nuxt
 .nuxt/
 .output/
+.data/
+.nitro/
+.cache/
 dist/
-*.log
+
+# 依存
+node_modules/
+# nodeLinker: node-modules なので PnP 系（.pnp.*）は生じない
+.yarn/*
+!.yarn/patches/
+!.yarn/releases/
+!.yarn/plugins/
+!.yarn/versions/
+
+# 環境
 .env
+.env.*
+!.env.example
+
+# ログ・OS・エディタ
+*.log
 .DS_Store
-.yarn/cache/
-.yarn/install-state.gz
+*.local
+
+# 開発者個人の Claude Code 設定。エンドユーザーのセッションへ持ち込まない（ADR 0001）
 .claude/
+# ただしセッション API スキルはアプリの配布物なので追跡する
+!assets/.claude/
+
+# セッションの change は実行時データ。ワークフロー定義だけを追跡する（docs/session-workflow.md）
+workflow/openspec/changes/

@@ -15,8 +15,8 @@ export interface ClaudeRunOptions {
 }
 
 export type ClaudeRunResult =
-  /** `type:"result"` の `result` フィールド */
-  | { ok: true, result: string }
+  /** プロセスが成功として終わった。応答の中身はここでは扱わない（endpoint への提出が受け取り口）。 */
+  | { ok: true }
   /** 失敗。`sessionMissing` は継続先のセッションが無かったことを指す */
   | { ok: false, sessionMissing: boolean, detail: string }
 
@@ -35,13 +35,17 @@ export async function runClaude(options: ClaudeRunOptions): Promise<ClaudeRunRes
     // ADR 0001: project を外すとスキルがロードされない。
     '--setting-sources',
     config.settingSources,
-    '--add-dir',
-    config.addDir,
     '--model',
     config.model,
     options.mode === 'new' ? '--session-id' : '--resume',
     options.sessionId,
   ]
+
+  // ADR 0001: 渡すのはリポジトリのルート。grilling / domain-modeling を持つリポジトリと、
+  // セッション API スキルを持つ assets とで置き場が分かれるため、空白区切りで複数受ける。
+  for (const dir of config.addDir.trim().split(/\s+/).filter(d => d !== '')) {
+    args.push('--add-dir', dir)
+  }
 
   // 空なら渡さない（許可を絞りたい運用で空文字を入れられるようにしてある）。
   const allowedTools = config.allowedTools.trim()
@@ -56,7 +60,13 @@ export async function runClaude(options: ClaudeRunOptions): Promise<ClaudeRunRes
   const timeoutMs = config.timeoutMs
 
   return await new Promise<ClaudeRunResult>((resolve) => {
-    const child = spawn('claude', args, { cwd: options.cwd, stdio: ['ignore', 'pipe', 'pipe'] })
+    // 接続先は prompt に載せず環境変数で渡す（design.md 決定7）。セッション API スキルは
+    // フェンスの事前実行から `printenv` でこの値を読む。
+    const child = spawn('claude', args, {
+      cwd: options.cwd,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, STROKE_BASEURL: config.apiBaseUrl },
+    })
 
     let stdout = ''
     let stderr = ''
@@ -94,28 +104,29 @@ export async function runClaude(options: ClaudeRunOptions): Promise<ClaudeRunRes
         finish({ ok: false, sessionMissing: missing, detail: stderr.trim() || `終了コード ${code}` })
         return
       }
-      const extracted = extractResult(stdout)
-      if (extracted === null) {
-        finish({ ok: false, sessionMissing: missing, detail: '応答から result を取り出せない' })
+      if (!isSuccessResult(stdout)) {
+        finish({ ok: false, sessionMissing: missing, detail: '応答が成功として読み取れない' })
         return
       }
-      finish({ ok: true, result: extracted })
+      finish({ ok: true })
     })
 
   })
 }
 
-/** `--output-format json` の出力から `type:"result"` の `result` フィールドを取る。 */
-function extractResult(stdout: string): string | null {
+/**
+ * `--output-format json` の出力から、プロセスが成功として終わったかだけを見る。
+ * 応答の中身（`result` フィールド）は読み取らない（specs/ai-invocation: 標準出力は
+ * プロセスの成否の判定にのみ使う）。
+ */
+function isSuccessResult(stdout: string): boolean {
   let parsed: unknown
   try {
     parsed = JSON.parse(stdout)
   } catch {
-    return null
+    return false
   }
-  if (typeof parsed !== 'object' || parsed === null) return null
+  if (typeof parsed !== 'object' || parsed === null) return false
   const envelope = parsed as Record<string, unknown>
-  if (envelope.type !== 'result') return null
-  if (envelope.is_error === true || envelope.subtype !== 'success') return null
-  return typeof envelope.result === 'string' ? envelope.result : null
+  return envelope.type === 'result' && envelope.is_error !== true && envelope.subtype === 'success'
 }

@@ -6,12 +6,22 @@ import { z } from 'zod'
  */
 export interface ClaudeConfig {
   settingSources: string
+  /** `--add-dir` に渡すリポジトリのルート。空白区切りで複数渡せる */
   addDir: string
   /** 空白区切り。空なら `--allowedTools` を渡さない */
   allowedTools: string
   timeoutMs: number
   /** `claude -p --model`。エイリアス（sonnet 等）またはフルネームを渡す */
   model: string
+  /**
+   * エージェント向け endpoint の base URL（ホスト・ポート）。spawn 時に環境変数
+   * `STROKE_BASEURL` として渡し、セッション API スキルがそこから接続先を解決する
+   */
+  apiBaseUrl: string
+  /** ワークフロー定義を置いた OpenSpec store の id。セッションはこの store 上の change */
+  storeId: string
+  /** 初回の prompt で実行させる opsx コマンド（先頭の `/` を含まない名前） */
+  opsxCommand: string
 }
 
 const schema = z.object({
@@ -22,6 +32,9 @@ const schema = z.object({
   // （NaN のまま使うと setTimeout が即発火して、常にタイムアウト扱いになる）。
   timeoutMs: z.coerce.number().int().positive(),
   model: z.string().trim().min(1),
+  apiBaseUrl: z.string().trim().min(1),
+  storeId: z.string().trim().min(1),
+  opsxCommand: z.string().trim().min(1),
 })
 
 /** 設定を読んで検証する。壊れていれば投げる。起動時チェックと各呼び出しの両方から使う。 */

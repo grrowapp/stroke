@@ -1,7 +1,8 @@
 <script setup lang="ts">
-// 画面1（ストローク）。uuid は URL で持つ。
-// AI の最新の問い1つと回答欄だけを出し、往復は画面に積み上げない。済んだ分はパンくずで辿る。
-import type { Question, SessionView, Stroke, StrokeResult, Answer } from '#shared/types'
+// 画面1(ストローク)。uuid は URL で持つ。
+// 今の1問は W1(WS)で受信して描画する。往復の結果は endpoint への返り値には載らない
+// (design.md 決定2・6)。待機・失敗は U2 のポーリングで拾う(task 6.3)。
+import type { Answer, Invocation, Phase, Stroke } from '#shared/types'
 
 const route = useRoute()
 const sessionId = String(route.params.sessionId)
@@ -14,69 +15,68 @@ function statusOf(error: unknown): number | undefined {
   return undefined
 }
 
-const { data: session, error: loadError } = await useFetch<SessionView>(
-  `/api/sessions/${sessionId}`,
-  { key: `session:${sessionId}` },
+const { data: status, error: loadError } = await useFetch<{ phase: Phase; invocation: Invocation }>(
+  `/api/${sessionId}`,
+  { key: `status:${sessionId}` },
 )
 
 // `return navigateTo(...)` は書けない: <script setup> の直下の return は
-// @vue/compiler-sfc が "'return' outside of function" で弾く（実測）。
-// そのため await で送り、この下は view が無くても壊れない形にしてある。
+// @vue/compiler-sfc が "'return' outside of function" で弾く(実測)。
 const notFound = statusOf(loadError.value) === 404
-
-// 契約: 404 は存在しないセッション。概要入力へ戻す
 if (notFound) {
   await navigateTo('/')
 }
 
-const view = session.value
-
-// エッジケース: proposal が起きた後の URL 直打ち・ブックマーク・リロード。
-// 画面1 には答えるべき問いが無いため、画面1 を描かず画面2 を出す。
-if (view?.phase === 'proposed' || view?.phase === 'approved') {
+// U2 が問いを持たない局面(proposed 以降)は画面2 へ送る
+if (status.value && status.value.phase !== 'stroking') {
   await navigateTo(`/s/${sessionId}/proposal`)
 }
 
-// 問いがあるのは stroking のときだけ（上の分岐で他の phase は画面2 へ送っている）
-const stroking = view?.phase === 'stroking' ? view : null
+const { data: strokesData } = await useFetch<{ strokes: Stroke[] }>(`/api/${sessionId}/strokes`, {
+  key: `strokes:${sessionId}`,
+})
+const strokes = ref<Stroke[]>(strokesData.value?.strokes ?? [])
 
-const strokes = ref<Stroke[]>(view?.strokes ?? [])
-const question = ref<Question | null>(stroking?.question ?? null)
-const waiting = ref(false)
+const { question } = useQuestionChannel(sessionId)
+const waitingRetry = useWaitingRetry(sessionId)
+
 const errorMessage = ref(loadError.value && !notFound ? 'セッションを読み込めませんでした。' : '')
 
-/** 契約: 409 は AI が実行中の追加送信。待機表示のままにする。502 は AI から応答が得られなかった。 */
-function report(error: unknown): 'keep-waiting' | 'shown' {
-  const status = statusOf(error)
-  if (status === 409) return 'keep-waiting'
-  errorMessage.value =
-    status === 502
-      ? 'AI から応答が得られませんでした。もう一度送ってください。'
-      : '送信に失敗しました。もう一度送ってください。'
-  return 'shown'
+// 初期表示: reload 直後などで実行中・失敗のことがある(U2 の契約)
+if (status.value?.invocation === 'running') {
+  waitingRetry.startWaiting()
+} else if (status.value?.invocation === 'failed') {
+  waitingRetry.failed.value = true
 }
+
+// 新しい問いが届いたら待機を終える(通常はこちらが W1 の配信で先に決着する)
+watch(question, (q) => {
+  if (q) waitingRetry.stopWaiting()
+})
+
+// 待機が終わったのに新しい問いが届いていない = proposal が出た。phase を確かめて画面2へ。
+watch(
+  () => waitingRetry.waiting.value,
+  async (isWaiting, wasWaiting) => {
+    if (!wasWaiting || isWaiting || waitingRetry.failed.value) return
+    const current = await $fetch<{ phase: Phase }>(`/api/${sessionId}`)
+    if (current.phase !== 'stroking') {
+      await navigateTo(`/s/${sessionId}/proposal`)
+    }
+  },
+)
 
 async function answer(given: Answer) {
   const asked = question.value
-  if (waiting.value || !asked) return
-  waiting.value = true
+  if (waitingRetry.waiting.value || !asked) return
   errorMessage.value = ''
   try {
-    const result = await $fetch<StrokeResult>(`/api/sessions/${sessionId}/answer`, {
-      method: 'POST',
-      body: { answer: given },
-    })
-    strokes.value = [...strokes.value, { question: asked, answer: given }]
-    if (result.outcome === 'question') {
-      question.value = result.question
-    } else {
-      // 把握完了。AI が proposal を起こしたので画面2 へ移る
-      return navigateTo(`/s/${sessionId}/proposal`)
-    }
-  } catch (error) {
-    if (report(error) === 'keep-waiting') return
+    await $fetch(`/api/${sessionId}/answer`, { method: 'POST', body: given })
+    strokes.value = [...strokes.value, { proposal: false, question: asked, answer: given }]
+    waitingRetry.startWaiting()
+  } catch {
+    errorMessage.value = '送信に失敗しました。もう一度送ってください。'
   }
-  waiting.value = false
 }
 </script>
 
@@ -93,8 +93,16 @@ async function answer(given: Answer) {
       :title="errorMessage"
     />
 
+    <UAlert
+      v-if="waitingRetry.failed.value"
+      class="mb-6"
+      color="warning"
+      variant="subtle"
+      title="AI からの応答が得られませんでした。もう一度送信してください。"
+    />
+
     <!-- 応答待ち。待機中は問いも回答欄も出さないので追加送信できない -->
-    <WaitingIndicator v-if="waiting" message="AI が次を考えています…" class="py-32" />
+    <WaitingIndicator v-if="waitingRetry.waiting.value" message="AI が次を考えています…" class="py-32" />
 
     <StrokeQuestionCard v-else-if="question" :question="question" @answer="answer" />
   </div>
