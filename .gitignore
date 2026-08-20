@@ -8,3 +8,6 @@ dist/
 .yarn/cache/
 .yarn/install-state.gz
 .claude/
+
+# セッションの change は実行時データ。ワークフロー定義だけを追跡する
+workflow/openspec/changes/

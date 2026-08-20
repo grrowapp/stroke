@@ -35,13 +35,17 @@ export async function runClaude(options: ClaudeRunOptions): Promise<ClaudeRunRes
     // ADR 0001: project を外すとスキルがロードされない。
     '--setting-sources',
     config.settingSources,
-    '--add-dir',
-    config.addDir,
     '--model',
     config.model,
     options.mode === 'new' ? '--session-id' : '--resume',
     options.sessionId,
   ]
+
+  // ADR 0001: 渡すのはリポジトリのルート。grilling / domain-modeling を持つリポジトリと、
+  // セッション API スキルを持つ assets とで置き場が分かれるため、空白区切りで複数受ける。
+  for (const dir of config.addDir.trim().split(/\s+/).filter(d => d !== '')) {
+    args.push('--add-dir', dir)
+  }
 
   // 空なら渡さない（許可を絞りたい運用で空文字を入れられるようにしてある）。
   const allowedTools = config.allowedTools.trim()
@@ -56,7 +60,13 @@ export async function runClaude(options: ClaudeRunOptions): Promise<ClaudeRunRes
   const timeoutMs = config.timeoutMs
 
   return await new Promise<ClaudeRunResult>((resolve) => {
-    const child = spawn('claude', args, { cwd: options.cwd, stdio: ['ignore', 'pipe', 'pipe'] })
+    // 接続先は prompt に載せず環境変数で渡す（design.md 決定7）。セッション API スキルは
+    // フェンスの事前実行から `printenv` でこの値を読む。
+    const child = spawn('claude', args, {
+      cwd: options.cwd,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, STROKE_BASEURL: config.apiBaseUrl },
+    })
 
     let stdout = ''
     let stderr = ''

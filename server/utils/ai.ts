@@ -7,7 +7,7 @@ import { waitForSubmission } from './submission-signal'
 
 export interface InvokeAiOptions {
   sessionId: string
-  /** 最初の呼び出しで渡す固定テンプレート（`sessionPrompt`）。リトライでは送り直さない */
+  /** 渡す定型。初回は `firstPrompt`、2回目以降は `continuePrompt`（リトライも同文） */
   prompt: string
   /** セッションの最初の呼び出しか。true なら `--session-id`、false なら `--resume` */
   first: boolean
