@@ -62,14 +62,16 @@ function enter(project: ProjectSummary): void {
 }
 
 /**
- * 「未処理の通知」列。
+ * 「未処理」列。
  *
- * 通知の一覧はブラウザが WebSocket で受け取っているものをそのまま数える。サーバーへ
- * 問い合わせ直すと、一覧に出ている件数と食い違う瞬間ができる。
+ * 本家が今返している保留中の承認依頼の件数（サーバーが数えたもの）に、接続後に発生した
+ * 通知の件数を足す。前者だけだと接続後のタスクの動きが出ず、後者だけだと接続直後は
+ * 必ず0件になる。prototype はアクティブなプロジェクトに最初から件数を出しており、
+ * それは通知だけでは説明がつかない。
  */
 const { notifications } = useBoardSocket();
 
-const pendingCount = computed(() => {
+const notifiedCount = computed(() => {
   const counts = new Map<string, number>();
 
   for (const notification of notifications.value) {
@@ -79,8 +81,10 @@ const pendingCount = computed(() => {
   return counts;
 });
 
-function unread(project: ProjectSummary): number {
-  return project.projectId === null ? 0 : (pendingCount.value.get(project.projectId) ?? 0);
+/** 未接続では本家から取れないので数えられない */
+function unread(project: ProjectSummary): number | null {
+  if (project.projectId === null || project.pendingApprovals === null) return null;
+  return project.pendingApprovals + (notifiedCount.value.get(project.projectId) ?? 0);
 }
 </script>
 
@@ -217,7 +221,7 @@ function unread(project: ProjectSummary): number {
               </span>
             </td>
             <td data-testid="project-unread">
-              <span v-if="unread(project) > 0" class="sb-badge">{{ unread(project) }}</span>
+              <span v-if="(unread(project) ?? 0) > 0" class="sb-badge">{{ unread(project) }}</span>
               <span v-else class="text-[var(--text-muted)]">—</span>
             </td>
             <td class="text-[12px] text-[var(--text-secondary)]" data-testid="project-last-modified">

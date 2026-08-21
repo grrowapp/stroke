@@ -7,19 +7,46 @@
  *
  * 表の様式とアイコンは prototype（archive の navigation.prototype.html）に合わせる。
  */
-import { computed, definePageMeta, navigateTo, useHead } from '#imports';
+import { computed, definePageMeta, navigateTo, useFetch, useHead, watch } from '#imports';
 
 import SbIcon from '~/components/ui/SbIcon.vue';
 import { useBoardSocket } from '~/composables/useBoardSocket';
 import { formatRelativeTime } from '~/composables/useRelativeTime';
-import type { Notification } from '#shared/types';
+import type { Notification, ProjectDirectoryResponse } from '#shared/types';
 
 definePageMeta({ layout: 'portal' });
 useHead({ title: '通知 — stroke-board' });
 
-const { notifications } = useBoardSocket();
+const { notifications, upstreamConnected } = useBoardSocket();
 
 const rows = computed(() => notifications.value);
+
+/**
+ * 通知が0件のときに、今どうなっているかを出すためだけに使う。
+ *
+ * 通知は接続後に起きた変化しか出せない（本家は接続時に今の状態を送るだけで、それ以前に
+ * 何が起きたかを送らない）。そのため起動直後の通知画面は必ず空になる。一方で承認待ちは
+ * その時点で既に起きていることがある。「見に行かないと分からない」を解くのがこの
+ * プロダクトの目的なので、空だからといって何も起きていないかのように見せない。
+ */
+const { data: directory, refresh } = await useFetch<ProjectDirectoryResponse>('/api/projects');
+
+// 本家が戻ったら取り直す。切断中に取った値は「取れなかった」ままになっている
+watch(upstreamConnected, (connected) => {
+  if (connected) void refresh();
+});
+
+const pendingProjects = computed(() => {
+  if (directory.value?.directory.status !== 'ok') return [];
+
+  return directory.value.directory.projects.filter(
+    (project) => (project.pendingApprovals ?? 0) > 0,
+  );
+});
+
+const pendingTotal = computed(() =>
+  pendingProjects.value.reduce((total, project) => total + (project.pendingApprovals ?? 0), 0),
+);
 
 const categoryLabel: Record<Notification['category'], string> = {
   approval: '承認',
@@ -42,9 +69,38 @@ function open(notification: Notification): void {
   <section>
     <h1 class="sb-page-title">通知</h1>
 
-    <p v-if="rows.length === 0" class="sb-placeholder" data-testid="notifications-empty">
-      通知はまだありません。本家で承認依頼が出るか、タスクの状態が変わると、ここに並びます。
-    </p>
+    <div v-if="rows.length === 0" data-testid="notifications-empty">
+      <!--
+        通知は接続後の変化しか出せない。それを「何も起きていない」と読ませないために、
+        今の承認待ちをここに出す。
+      -->
+      <div v-if="pendingTotal > 0" class="sb-card mb-3" data-testid="pending-now">
+        <div class="text-[13px] font-semibold">
+          承認待ちが {{ pendingTotal }} 件あります
+        </div>
+        <ul class="mt-2 space-y-1">
+          <li v-for="project in pendingProjects" :key="project.workflowRootPath">
+            <NuxtLink
+              :to="`/projects/${project.projectId}/approvals`"
+              class="sb-navitem justify-between"
+              data-testid="pending-now-row"
+              :data-name="project.name"
+            >
+              <span class="inline-flex items-center gap-1.5">
+                <SbIcon name="folder" :size="14" />
+                {{ project.name }}
+              </span>
+              <span class="sb-badge">{{ project.pendingApprovals }}</span>
+            </NuxtLink>
+          </li>
+        </ul>
+      </div>
+
+      <p class="sb-placeholder">
+        通知はまだありません。通知は stroke-board が本家に繋いだ後に起きた変化から出ます。
+        本家で承認依頼が出るか、タスクの状態が変わると、ここに並びます。
+      </p>
+    </div>
 
     <table v-else class="sb-table" data-testid="notifications-table">
       <thead>

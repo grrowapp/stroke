@@ -78,13 +78,24 @@ const EXPECTED_PROGRESS_REQUESTS = 2;
  * プロジェクトの基準がまだのうちに通知を起こすと取りこぼす。スタブが受けた
  * `tasks/progress` の回数で、両方の基準が揃ったことを確定的に待つ。
  */
-export async function resetBoard(page: Page): Promise<void> {
+export async function resetBoard(
+  page: Page,
+  options: {
+    /**
+     * 切断している間に本家の状態を動かす。ここで起こした変化は接続時の基準に取り込まれ、
+     * 通知にならない。「stroke-board が繋ぐ前から起きていたこと」を作るのに使う。
+     */
+    whileDisconnected?: () => Promise<void>;
+  } = {},
+): Promise<void> {
   await stub.reset();
 
   writeFileSync(REGISTRY_PATH, '{}');
   await page.goto('/');
   await expect(page.getByTestId('upstream-connection')).toHaveAttribute('data-connected', 'false');
   await expect(page.getByTestId('notification-row')).toHaveCount(0);
+
+  await options.whileDisconnected?.();
 
   writeFileSync(REGISTRY_PATH, registryContent());
   await expect(page.getByTestId('upstream-connection')).toHaveAttribute('data-connected', 'true');

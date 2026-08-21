@@ -227,3 +227,81 @@ test.describe('通知一覧の各列が prototype と同じ様式になってい
     expect(style.color).toBe('rgb(203, 213, 225)');
   });
 });
+
+/**
+ * 起動直後でも「今の承認待ち」が見えること。
+ *
+ * 通知は接続後に起きた変化しか出せないので、起動直後の通知画面は必ず空になる。それを
+ * 「何も起きていない」と読ませると、「どのプロジェクトで承認待ちが起きたかを見に行かないと
+ * 分からない」という解くべき問題がそのまま残る（product.md の Purpose）。
+ */
+test.describe('通知が0件でも今の承認待ちは見える', () => {
+  test.beforeEach(async ({ page }) => {
+    await resetBoard(page);
+  });
+
+  test('保留中が無ければ何も出さない', async ({ page }) => {
+    await expect(page.getByTestId('notifications-empty')).toBeVisible();
+    await expect(page.getByTestId('pending-now')).toHaveCount(0);
+  });
+
+  test('繋ぐ前から待っていた承認は通知にならないが、件数として出る', async ({ page }) => {
+    await resetBoard(page, {
+      whileDisconnected: () =>
+        stub.requestApproval(ALPHA, {
+          id: 'standing1',
+          title: '前から待っている承認',
+          filePath: '.spec-workflow/steering/product.md',
+          category: 'steering',
+          categoryName: 'steering',
+        }),
+    });
+
+    // 接続時の基準に取り込まれるので通知は出ない
+    await expect(page.getByTestId('notification-row')).toHaveCount(0);
+
+    await expect(page.getByTestId('pending-now')).toContainText('1 件');
+    await expect(page.getByTestId('pending-now-row')).toHaveAttribute('data-name', 'alpha');
+  });
+
+  test('そこから承認画面へ入れる', async ({ page }) => {
+    await resetBoard(page, {
+      whileDisconnected: () =>
+        stub.requestApproval(ALPHA, {
+          id: 'standing2',
+          title: '前から待っている承認',
+          filePath: '.spec-workflow/steering/tech.md',
+          category: 'steering',
+          categoryName: 'steering',
+        }),
+    });
+
+    await page.getByTestId('pending-now-row').click();
+    await expect(page).toHaveURL(new RegExp(`/projects/${ALPHA}/approvals$`));
+  });
+
+  test('プロジェクト一覧の未処理にも出る', async ({ page }) => {
+    await resetBoard(page, {
+      whileDisconnected: () =>
+        stub.requestApproval(ALPHA, {
+          id: 'standing3',
+          title: '前から待っている承認',
+          filePath: '.spec-workflow/steering/tech.md',
+          category: 'steering',
+          categoryName: 'steering',
+        }),
+    });
+
+    await page.goto('/projects');
+
+    const row = page.getByTestId('project-row').filter({ hasText: 'alpha' });
+    await expect(row.getByTestId('project-unread')).toHaveText('1');
+  });
+
+  test('未接続のプロジェクトは数えられないので — のまま', async ({ page }) => {
+    await page.goto('/projects');
+
+    const row = page.getByTestId('project-row').filter({ hasText: 'idle-project' });
+    await expect(row.getByTestId('project-unread')).toHaveText('—');
+  });
+});

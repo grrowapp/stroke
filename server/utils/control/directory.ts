@@ -17,6 +17,12 @@ export interface RegistryLookup {
 }
 
 /**
+ * projectId ごとの保留中の承認依頼の件数。取れなかったプロジェクトは持たない。
+ * 未接続のプロジェクトは本家 API から取れないので、そもそも問い合わせない。
+ */
+export type PendingApprovalCounts = ReadonlyMap<string, number>;
+
+/**
  * 一覧を組み立てる。
  *
  * 並びはアクティブが上、未接続が下。同じ区分の中では名前順にして、走査の返り順に
@@ -25,6 +31,7 @@ export interface RegistryLookup {
 export function buildProjectDirectory(
   scan: ScanResult,
   registry: RegistryLookup,
+  pendingApprovals: PendingApprovalCounts = new Map(),
 ): ProjectDirectory {
   if (scan.status === 'not-configured') return { status: 'not-configured' };
 
@@ -45,6 +52,8 @@ export function buildProjectDirectory(
       // アクティブの実体は生きた PID なので、その値をそのまま出す
       pid: entry?.instances[0]?.pid ?? null,
       lastModified: project.lastModified,
+      // 未接続では本家 API から取れない。取れなかったことと0件を混ぜない
+      pendingApprovals: entry === undefined ? null : (pendingApprovals.get(entry.projectId) ?? null),
     };
   });
 
