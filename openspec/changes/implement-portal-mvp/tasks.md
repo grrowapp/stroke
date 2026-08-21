@@ -4,12 +4,12 @@
 
 ## 1. 足場
 
-- [ ] 1.1 `git init` して feature ブランチを切り、`.gitignore` を置く（`node_modules` / `.nuxt` / `.output` / `.env`）
-- [ ] 1.2 yarn 4 で Nuxt4 を初期化する。`nuxt` / `@nuxt/ui` / `tailwindcss` / `zod` を入れ、`yarn.lock` をコミットする
-- [ ] 1.3 `nuxt.config.ts` に SSR 有効・`imports: { autoImport: false }`・`components: { dirs: [] }` を設定する。`#imports` からの明示 import が通ることを1ファイルで確認する
-- [ ] 1.4 `package.json` に `dev` / `build` / `preview` / `typecheck` / `test` / `test:e2e` を置き、`vitest` と `@playwright/test` を入れる
-- [ ] 1.5 `nuxt typecheck` と `nuxt build` が通り、`node .output/server/index.mjs` で起動することを確認する
-- [ ] 1.6 本家 URL と監視する親パスを環境変数から読む設定を1か所に作る。ソースに埋めない（specs/upstream-connection）
+- [x] 1.1 `git init` して feature ブランチを切り、`.gitignore` を置く（`node_modules` / `.nuxt` / `.output` / `.env`）
+- [x] 1.2 yarn 4 で Nuxt4 を初期化する。`nuxt` / `@nuxt/ui` / `tailwindcss` / `zod` を入れ、`yarn.lock` をコミットする
+- [x] 1.3 `nuxt.config.ts` に SSR 有効・`imports: { autoImport: false }`・`components: { dirs: [] }` を設定する。`#imports` からの明示 import が通ることを1ファイルで確認する
+- [x] 1.4 `package.json` に `dev` / `build` / `preview` / `typecheck` / `test` / `test:e2e` を置き、`vitest` と `@playwright/test` を入れる
+- [x] 1.5 `nuxt typecheck` と `nuxt build` が通り、`node .output/server/index.mjs` で起動することを確認する
+- [x] 1.6 本家 URL と監視する親パスを環境変数から読む設定を1か所に作る。ソースに埋めない（specs/upstream-connection）
 
 ## 2. 本家の形の確認と記録
 
