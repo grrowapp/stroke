@@ -9,6 +9,9 @@ export default defineNuxtConfig({
 
   modules: ['@nuxt/ui'],
 
+  // ブラウザへの通知配信に使う。本家 WebSocket に繋ぐのは Nitro だけで、ブラウザは繋がない
+  nitro: { experimental: { websocket: true } },
+
   css: ['~/assets/css/main.css'],
 
   // auto-import を使わない。composable / util は `#imports` から明示的に import する。

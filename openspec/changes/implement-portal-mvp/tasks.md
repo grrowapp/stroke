@@ -32,21 +32,21 @@ design.md の Risks が求めているもの。ここがずれると 4章以降�
 
 ## 4. 制御層 — プロジェクト（`server/utils/control/`）
 
-- [ ] 4.1 走査結果と registry entry を `workflowRootPath` で突き合わせ、アクティブ / 未接続 を判定する（design.md 決定1）。同一 `workflowRootPath` に entry が複数ある場合は先頭の `projectId` を使う
-- [ ] 4.2 一覧を「アクティブが上・未接続が下」で並べ、表示名を走査ディレクトリ名にして返す（specs/project-directory）
-- [ ] 4.3 ブラウザ向けの `GET /api/projects` を作り、4.2 の結果と親パス未設定 / 0件 / 走査失敗 を区別できる形で返す
-- [ ] 4.4 4.1〜4.2 のユニットテストを書く。アクティブが0件・プロジェクトが0件・同一 `workflowRootPath` に entry が複数 の各ケースを含める
+- [x] 4.1 走査結果と registry entry を `workflowRootPath` で突き合わせ、アクティブ / 未接続 を判定する（design.md 決定1）。同一 `workflowRootPath` に entry が複数ある場合は先頭の `projectId` を使う
+- [x] 4.2 一覧を「アクティブが上・未接続が下」で並べ、表示名を走査ディレクトリ名にして返す（specs/project-directory）
+- [x] 4.3 ブラウザ向けの `GET /api/projects` を作り、4.2 の結果と親パス未設定 / 0件 / 走査失敗 を区別できる形で返す
+- [x] 4.4 4.1〜4.2 のユニットテストを書く。アクティブが0件・プロジェクトが0件・同一 `workflowRootPath` に entry が複数 の各ケースを含める
 
 ## 5. 制御層 — 通知
 
-- [ ] 5.1 プロジェクトごとの基準（保留中の承認依頼 ID 集合、spec ごとの `{total, completed, inProgress}`）をメモリに持つ入れ物を作る
-- [ ] 5.2 接続時に基準を作る処理を書く。`initial` の `approvals` と、tasks を持つ spec ごとの `GET .../tasks/progress` を1回ずつ（design.md 決定4）
-- [ ] 5.3 `task-status-update` と前回値を比較して タスク完了 / 全件完了 / タスク着手 を判定する（design.md 決定5）。完了と全件完了が同時に成立したら2件出す
-- [ ] 5.4 `approval-update` と前回値を比較して 承認依頼の発生 を判定する。`category` と `categoryName` を通知に持たせる
-- [ ] 5.5 5.3〜5.4 のユニットテストを書く。**状態遷移ごとに1テスト**（`tech.md` の Testing Requirements）。接続直後に通知が出ないこと、同じスナップショットが2回届いても通知が出ないこと、ステアリング更新と承認の消滅で通知が出ないことを含める
-- [ ] 5.6 通知の一覧をメモリに持ち、発生時刻の降順・上限200件で保持する（design.md 決定6）
-- [ ] 5.7 アクティブ集合の変化に追従して本家への接続を張り替える起動時プラグインを書く（design.md 決定8）。増えたら接続して基準を作り、消えたら切断して基準を捨てる
-- [ ] 5.8 ブラウザ向け WebSocket ルートを作り、接続中のブラウザへ通知を配信する。現在の一覧も送る（specs/notification-feed）
+- [x] 5.1 プロジェクトごとの基準（保留中の承認依頼 ID 集合、spec ごとの `{total, completed, inProgress}`）をメモリに持つ入れ物を作る
+- [x] 5.2 接続時に基準を作る処理を書く。`initial` の `approvals` と、tasks を持つ spec ごとの `GET .../tasks/progress` を1回ずつ（design.md 決定4）
+- [x] 5.3 `task-status-update` と前回値を比較して タスク完了 / 全件完了 / タスク着手 を判定する（design.md 決定5）。完了と全件完了が同時に成立したら2件出す
+- [x] 5.4 `approval-update` と前回値を比較して 承認依頼の発生 を判定する。`category` と `categoryName` を通知に持たせる
+- [x] 5.5 5.3〜5.4 のユニットテストを書く。**状態遷移ごとに1テスト**（`tech.md` の Testing Requirements）。接続直後に通知が出ないこと、同じスナップショットが2回届いても通知が出ないこと、ステアリング更新と承認の消滅で通知が出ないことを含める
+- [x] 5.6 通知の一覧をメモリに持ち、発生時刻の降順・上限200件で保持する（design.md 決定6）
+- [x] 5.7 アクティブ集合の変化に追従して本家への接続を張り替える起動時プラグインを書く（design.md 決定8）。増えたら接続して基準を作り、消えたら切断して基準を捨てる
+- [x] 5.8 ブラウザ向け WebSocket ルートを作り、接続中のブラウザへ通知を配信する。現在の一覧も送る（specs/notification-feed）
 
 ## 6. 上層の画面
 
