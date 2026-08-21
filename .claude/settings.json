@@ -1,0 +1,43 @@
+{
+  "permissions": {
+    "allow": [
+      "AskUserQuestion",
+      "Read(//opt/projects/**/.spec-workflow/templates/**)",
+      "Read(//opt/projects/**/.spec-workflow/user-templates/**)",
+      "Bash(curl -X PUT 'http://localhost:5000/api/projects/*/specs/*/requirements' *)",
+      "Bash(curl -X PUT 'http://localhost:5000/api/projects/*/specs/*/design' *)",
+      "Bash(curl -X PUT 'http://localhost:5000/api/projects/*/specs/*/tasks' *)",
+      "Bash(curl 'http://localhost:5000/api/projects/*/specs/*' *)",
+      "Bash(curl 'http://localhost:5000/api/projects/*/steering/*' *)",
+      "Bash(openspec *)",
+      "Edit(/openspec/**)",
+      "Edit(/docs/adr/**)",
+      "Read(/.claude/**)",
+      "Bash(npx -y mdts --port 8522 *)",
+      "mcp__specworkflow",
+      "Agent",
+      "Bash(grep *)"
+    ],
+    "deny": [
+      "Bash(sed *)",
+      "Bash(awk *)",
+      "Read(/prompt/**)",
+      "Edit(//opt/projects/**)",
+      "Edit(./.claude/**)",
+      "Edit(.mcp.json)",
+      "Edit(/openspec/changes/**/.openspec.yaml)"
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "/home/vagrant/.claude/plugins/cache/grrow-official-marketplace/grrow-plugins-statusline/0.1.44/bin/statusline",
+    "padding": 0
+  },
+  "enabledPlugins": {
+    "claude-md-management@claude-plugins-official": true,
+    "ralph-loop@claude-plugins-official": true,
+    "ralph-speckit@smart-ralph": true,
+    "ralph-specum@smart-ralph": true,
+    "deep-project@piercelamb-plugins": true
+  }
+}

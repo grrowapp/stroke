@@ -26,8 +26,11 @@ node_modules/
 *.local
 
 # 開発者個人の Claude Code 設定。エンドユーザーのセッションへ持ち込まない（ADR 0001）
-.claude/
-# ただしセッション API スキルはアプリの配布物なので追跡する
+# ディレクトリごと無視すると中身が走査されず下の例外が効かないため `/*` で中身を無視する
+.claude/*
+# ただし permission 設定はリポジトリ共通なので追跡する
+!.claude/settings.json
+# セッション API スキルはアプリの配布物なので追跡する
 !assets/.claude/
 
 # セッションの change は実行時データ。ワークフロー定義だけを追跡する（docs/session-workflow.md）
