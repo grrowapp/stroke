@@ -28,7 +28,17 @@ interface Watched {
   projectName: string;
   socket: UpstreamSocket;
   baseline: ProjectBaseline;
-  connected: boolean;
+  /** WebSocket が開いているか */
+  open: boolean;
+  /**
+   * 基準を作り終えたか。
+   *
+   * 開いただけでは通知を出せない。`initial` を受けて基準を取り込むまでは、次に届く変化を
+   * 「増えた」と判定できないためである（specs/notification-feed）。画面に出す接続状態も
+   * これに合わせる。「接続済み」と出ているのに通知が出ない時間があると、取りこぼしたのか
+   * 準備中なのかが利用者に区別できない。
+   */
+  ready: boolean;
 }
 
 export interface MonitorOptions {
@@ -50,10 +60,10 @@ export class UpstreamMonitor {
     this.rest = new UpstreamRestClient(options.upstreamBaseUrl);
   }
 
-  /** 本家に1つでも繋がっているか。ヘッダーの接続状態に出す */
+  /** 本家に1つでも繋がって基準が整っているか。ヘッダーの接続状態に出す */
   get connected(): boolean {
     for (const watched of this.watched.values()) {
-      if (watched.connected) return true;
+      if (watched.ready) return true;
     }
     return false;
   }
@@ -64,7 +74,11 @@ export class UpstreamMonitor {
    * 増えたら接続して基準を作り、消えたら切断して基準を捨てる。居続けるものには何もしない
    * （design.md 決定8）。
    */
-  sync(projects: ProjectSummary[]): void {
+  /** 監視対象が入れ替わったら true。呼び出し側が一覧を配信し直すのに使う */
+  sync(projects: ProjectSummary[]): boolean {
+    const before = this.connected;
+    let changed = false;
+
     const active = new Map(
       projects
         .filter((project) => project.connection === 'active' && project.projectId !== null)
@@ -76,13 +90,22 @@ export class UpstreamMonitor {
 
       watched.socket.close();
       this.watched.delete(projectId);
+      // 監視対象から外れたプロジェクトの通知は残さない。飛び先へ入れなくなるため
       this.feed.dropProject(projectId);
+      changed = true;
     }
 
     for (const [projectId, projectName] of active) {
       if (this.watched.has(projectId)) continue;
       this.watch(projectId, projectName);
+      changed = true;
     }
+
+    // 外したことで接続状態が変わる。socket の close イベントは既に監視対象から
+    // 消えた後に届くので、そこからは配信されない
+    if (this.connected !== before) this.options.onConnectionChange?.(this.connected);
+
+    return changed;
   }
 
   /** すべての接続を閉じる */
@@ -103,19 +126,38 @@ export class UpstreamMonitor {
       onError: (reason) => this.options.onMalformed?.(projectId, reason),
     });
 
-    this.watched.set(projectId, { projectId, projectName, socket, baseline, connected: false });
+    this.watched.set(projectId, {
+      projectId,
+      projectName,
+      socket,
+      baseline,
+      open: false,
+      ready: false,
+    });
     socket.connect();
   }
 
-  private setConnected(projectId: string, connected: boolean): void {
+  private setConnected(projectId: string, open: boolean): void {
     const watched = this.watched.get(projectId);
     if (watched === undefined) return;
 
     const before = this.connected;
-    watched.connected = connected;
+    watched.open = open;
 
-    // 再接続したら基準を作り直す。切断中の変化は取り戻せない
-    if (connected) watched.baseline = createBaseline();
+    if (open) {
+      // 再接続したら基準を作り直す。切断中の変化は取り戻せない。
+      // 基準ができるまで ready にしない
+      watched.baseline = createBaseline();
+    } else {
+      watched.ready = false;
+    }
+
+    if (this.connected !== before) this.options.onConnectionChange?.(this.connected);
+  }
+
+  private setReady(watched: Watched): void {
+    const before = this.connected;
+    watched.ready = watched.open;
 
     if (this.connected !== before) this.options.onConnectionChange?.(this.connected);
   }
@@ -180,6 +222,9 @@ export class UpstreamMonitor {
         if (progress.ok) seedTasks(watched.baseline, spec.name, progress.value);
       }),
     );
+
+    // ここで初めて通知を出せる状態になる
+    this.setReady(watched);
   }
 
   private contextOf(watched: Watched) {

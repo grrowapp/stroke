@@ -31,7 +31,17 @@ export interface ServerConfig {
    * 未設定でも既定値に落ちるため null にはならない。
    */
   specWorkflowHome: string;
+  /**
+   * アクティブ集合を見直す間隔（ミリ秒）。
+   *
+   * 本家の状態変化は WebSocket で受けるのでポーリングしない。ここで見ているのは
+   * 「どのプロジェクトが本家に登録されたか」だけで、これは registry のファイル状態であり
+   * WebSocket では届かない。
+   */
+  syncIntervalMs: number;
 }
+
+const DEFAULT_SYNC_INTERVAL_MS = 30_000;
 
 /**
  * 本家 `getGlobalDir()` と同じ解決規則。
@@ -63,5 +73,11 @@ export function readServerConfig(): ServerConfig {
     upstreamBaseUrl: upstreamBaseUrl?.replace(TRAILING_SLASHES, '') ?? null,
     projectsParentPath: normalize(runtimeConfig.projectsParentPath),
     specWorkflowHome: resolveSpecWorkflowHome(normalize(runtimeConfig.specWorkflowHome)),
+    syncIntervalMs: toPositiveInteger(runtimeConfig.syncIntervalMs) ?? DEFAULT_SYNC_INTERVAL_MS,
   };
+}
+
+function toPositiveInteger(raw: unknown): number | null {
+  const parsed = Number(normalize(typeof raw === 'number' ? String(raw) : raw));
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }

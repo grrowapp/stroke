@@ -1,12 +1,17 @@
 <script setup lang="ts">
-// auto-import を使わないため `#imports` から明示的に取る（structure.md の Import Patterns）。
 import { useHead } from '#imports';
 
-useHead({ title: 'stroke-board' });
+import NotificationToaster from '~/components/notification/NotificationToaster.vue';
+
+useHead({ title: 'stroke-board', htmlAttrs: { lang: 'ja' } });
 </script>
 
 <template>
   <UApp>
-    <NuxtPage />
+    <NuxtLayout>
+      <NuxtPage />
+    </NuxtLayout>
+    <!-- 上層でも下層でも出る。画面遷移で消えない位置に置く -->
+    <NotificationToaster />
   </UApp>
 </template>

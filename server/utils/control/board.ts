@@ -30,11 +30,26 @@ export function addPeer(peer: Peer): void {
   peers.add(peer);
 
   // 接続直後に今の一覧を渡す。ここでトーストは出さない（specs/notification-toast）
-  send(peer, {
+  send(peer, snapshot());
+}
+
+/**
+ * 開いているブラウザへ一覧を送り直す。
+ *
+ * 監視対象から外れたプロジェクトの通知はサーバー側で落とすが、それだけでは既に開いて
+ * いるブラウザに残り続ける。行を押しても入れない先を指したままになるので、落としたことを
+ * 伝える。
+ */
+export function broadcastSnapshot(): void {
+  broadcast(snapshot());
+}
+
+function snapshot(): BoardMessage {
+  return {
     type: 'snapshot',
     notifications: monitor?.feed.list() ?? [],
     upstreamConnected: monitor?.connected ?? false,
-  });
+  };
 }
 
 export function removePeer(peer: Peer): void {

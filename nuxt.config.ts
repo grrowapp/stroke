@@ -31,5 +31,8 @@ export default defineNuxtConfig({
     upstreamBaseUrl: '',
     projectsParentPath: '',
     specWorkflowHome: '',
+
+    // アクティブ集合を見直す間隔（ミリ秒）。NUXT_SYNC_INTERVAL_MS
+    syncIntervalMs: '30000',
   },
 });

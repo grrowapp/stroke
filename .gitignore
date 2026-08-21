@@ -34,3 +34,6 @@ playwright-report/
 # .claude/ は /home/vagrant/.agents/skills/ へのマシンローカルな絶対パス symlink を含む
 .claude/
 .session_init/
+
+# E2E の作業領域
+.e2e-tmp/

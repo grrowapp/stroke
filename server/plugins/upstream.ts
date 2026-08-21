@@ -8,20 +8,16 @@
 import { defineNitroPlugin } from 'nitropack/runtime';
 
 import { readServerConfig } from '../utils/config';
-import { broadcastConnection, broadcastNotification, registerMonitor } from '../utils/control/board';
+import {
+  broadcastConnection,
+  broadcastNotification,
+  broadcastSnapshot,
+  registerMonitor,
+} from '../utils/control/board';
 import { buildProjectDirectory } from '../utils/control/directory';
 import { UpstreamMonitor } from '../utils/control/monitor';
 import { readRegistry } from '../utils/upstream/registry';
 import { scanProjects } from '../utils/upstream/scan';
-
-/**
- * アクティブ集合を見直す間隔。
- *
- * 本家の状態変化は WebSocket で受けるのでポーリングしない。ここで見ているのは
- * 「どのプロジェクトが本家に登録されたか」だけで、これは本家 registry のファイル状態であり
- * WebSocket では届かない（`projects-update` は接続済みのものにしか来ない）。
- */
-const SYNC_INTERVAL_MS = 30_000;
 
 export default defineNitroPlugin((nitro) => {
   const config = readServerConfig();
@@ -54,11 +50,14 @@ export default defineNitroPlugin((nitro) => {
       readable: registry.status === 'ok',
     });
 
-    monitor.sync(directory.status === 'ok' ? directory.projects : []);
+    const changed = monitor.sync(directory.status === 'ok' ? directory.projects : []);
+
+    // 監視対象が入れ替わったら、開いているブラウザの一覧も揃え直す
+    if (changed) broadcastSnapshot();
   };
 
   void sync();
-  const timer = setInterval(() => void sync(), SYNC_INTERVAL_MS);
+  const timer = setInterval(() => void sync(), config.syncIntervalMs);
 
   nitro.hooks.hook('close', () => {
     clearInterval(timer);
