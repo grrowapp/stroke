@@ -5,10 +5,11 @@
  * 列は プロジェクト / 種別 / 内容 / 最終更新 の4つ（specs/notification-feed）。
  * 行を選ぶと対象が開く。開くだけで、承認や却下はしない。
  *
- * 表の様式は prototype（archive の navigation.prototype.html）に合わせる。
+ * 表の様式とアイコンは prototype（archive の navigation.prototype.html）に合わせる。
  */
 import { computed, definePageMeta, navigateTo, useHead } from '#imports';
 
+import SbIcon from '~/components/ui/SbIcon.vue';
 import { useBoardSocket } from '~/composables/useBoardSocket';
 import { formatRelativeTime } from '~/composables/useRelativeTime';
 import type { Notification } from '#shared/types';
@@ -36,7 +37,7 @@ function open(notification: Notification): void {
 
 <template>
   <section>
-    <h1 class="mb-3 text-lg font-semibold">通知</h1>
+    <h1 class="sb-page-title">通知</h1>
 
     <p v-if="rows.length === 0" class="sb-placeholder" data-testid="notifications-empty">
       通知はまだありません。本家で承認依頼が出るか、タスクの状態が変わると、ここに並びます。
@@ -45,7 +46,7 @@ function open(notification: Notification): void {
     <table v-else class="sb-table" data-testid="notifications-table">
       <thead>
         <tr>
-          <th scope="col" class="w-40">プロジェクト</th>
+          <th scope="col" class="w-44">プロジェクト</th>
           <th scope="col" class="w-24">種別</th>
           <th scope="col">内容</th>
           <th scope="col" class="w-28">最終更新</th>
@@ -67,21 +68,22 @@ function open(notification: Notification): void {
             -->
             <button
               type="button"
-              class="text-left hover:text-[var(--interactive-primary)] focus-visible:outline focus-visible:outline-2"
+              class="inline-flex items-center gap-1.5 text-left text-[var(--text-secondary)] hover:text-[var(--interactive-primary)] focus-visible:outline focus-visible:outline-2"
               data-testid="notification-open"
               @click="open(row)"
             >
+              <SbIcon name="folder" :size="14" />
               {{ row.projectName }}
             </button>
           </td>
-          <td>
-            <span class="sb-chip">{{ categoryLabel[row.category] }}</span>
-          </td>
+          <td class="text-[var(--text-muted)]">{{ categoryLabel[row.category] }}</td>
           <td>
             <div>{{ row.title }}</div>
-            <div class="text-[var(--text-muted)] text-[12px]">{{ row.subject }}</div>
+            <div class="text-[12px] text-[var(--text-secondary)]">{{ row.subject }}</div>
           </td>
-          <td class="text-[var(--text-muted)]">{{ formatRelativeTime(row.occurredAt) }}</td>
+          <td class="text-[12px] text-[var(--text-secondary)]">
+            {{ formatRelativeTime(row.occurredAt) }}
+          </td>
         </tr>
       </tbody>
     </table>

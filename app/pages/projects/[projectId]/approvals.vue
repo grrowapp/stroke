@@ -32,7 +32,7 @@ const categoryLabel: Record<string, string> = { spec: '仕様', steering: 'ス�
 
 <template>
   <section>
-    <h1 class="mb-3 text-lg font-semibold">承認</h1>
+    <h1 class="sb-page-title">承認</h1>
 
     <p v-if="error" class="sb-placeholder" data-testid="approvals-error">
       承認依頼を取得できませんでした。本家に繋がっていない可能性があります。

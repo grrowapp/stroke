@@ -46,7 +46,7 @@ const statusColor: Record<string, string> = {
 
 <template>
   <section>
-    <h1 class="mb-3 text-lg font-semibold">タスク</h1>
+    <h1 class="sb-page-title">タスク</h1>
 
     <p v-if="withTasks.length === 0" class="sb-placeholder" data-testid="tasks-empty">
       タスクを持つ仕様書がありません。

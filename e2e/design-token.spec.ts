@@ -173,3 +173,116 @@ test.describe('本家の design token に合っている', () => {
     expect(style.color).toBe('rgb(99, 102, 241)');
   });
 });
+
+/**
+ * アイコンは prototype のものをそのまま使う（アイコンセットの選定は決めていない）。
+ * 期待値は prototype の HTML から直接読む。ここに path を書き写すと、prototype が
+ * 変わったときにテストだけが古い形で通り続ける。
+ */
+const PROTOTYPE_HTML = join(
+  process.cwd(),
+  'openspec/changes/archive/2026-08-20-steering-dashboard-portal/prototype/navigation.prototype.html',
+);
+
+function prototypeIconPaths(): Record<string, string> {
+  const html = readFileSync(PROTOTYPE_HTML, 'utf-8');
+  const block = html.match(/const P=\{([\s\S]*?)\n\};/);
+
+  if (block === null) throw new Error('prototype にアイコン定義が無い');
+
+  return Object.fromEntries(
+    [...block[1]!.matchAll(/(\w+):'([^']+)'/g)].map((match) => [match[1]!, match[2]!]),
+  );
+}
+
+test.describe('アイコンは prototype のものを使っている', () => {
+  test('prototype から 8 種類のパスが読める', () => {
+    const paths = prototypeIconPaths();
+    expect(Object.keys(paths).sort()).toEqual([
+      'back',
+      'bell',
+      'down',
+      'folder',
+      'grid',
+      'link',
+      'plus',
+      'x',
+    ]);
+  });
+
+  test('上層のタブは bell と grid', async ({ page }) => {
+    await page.goto('/');
+
+    const expected = prototypeIconPaths();
+
+    for (const [testId, name] of [
+      ['tab-notifications', 'bell'],
+      ['tab-projects', 'grid'],
+    ] as const) {
+      const d = await page
+        .getByTestId(testId)
+        .locator(`svg[data-icon="${name}"] path`)
+        .getAttribute('d');
+
+      expect(d, `${testId} のアイコンが prototype と違う`).toBe(expected[name]);
+    }
+  });
+
+  test('プロジェクトの行は folder', async ({ page }) => {
+    await page.goto('/projects');
+
+    const d = await page
+      .getByTestId('project-row')
+      .first()
+      .locator('svg[data-icon="folder"] path')
+      .getAttribute('d');
+
+    expect(d).toBe(prototypeIconPaths().folder);
+  });
+
+  test('登録は link、作成は plus', async ({ page }) => {
+    await page.goto('/projects');
+
+    const expected = prototypeIconPaths();
+
+    for (const [testId, name] of [
+      ['register-project', 'link'],
+      ['create-project', 'plus'],
+    ] as const) {
+      const d = await page
+        .getByTestId(testId)
+        .locator(`svg[data-icon="${name}"] path`)
+        .getAttribute('d');
+
+      expect(d, `${testId} のアイコンが prototype と違う`).toBe(expected[name]);
+    }
+  });
+
+  test('下層の戻る導線は back、プロジェクト名は folder', async ({ page }) => {
+    await page.goto('/projects/ALPHAID000000001/specs');
+
+    const expected = prototypeIconPaths();
+
+    const back = await page
+      .getByTestId('back-to-portal')
+      .locator('svg[data-icon="back"] path')
+      .getAttribute('d');
+    expect(back).toBe(expected.back);
+
+    const folder = await page
+      .getByTestId('workspace-project-name')
+      .locator('svg[data-icon="folder"] path')
+      .getAttribute('d');
+    expect(folder).toBe(expected.folder);
+  });
+
+  test('下層のサイドバーは prototype と同じ幅', async ({ page }) => {
+    await page.goto('/projects/ALPHAID000000001/specs');
+
+    const width = await page
+      .getByTestId('workspace-sidebar')
+      .evaluate((element) => getComputedStyle(element).width);
+
+    expect(width).toBe('170px');
+  });
+});

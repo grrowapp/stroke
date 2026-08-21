@@ -119,6 +119,28 @@ body {
     background: var(--surface-panel);
   }
 
+  /* タブの並ぶ bar。prototype は padding:0 14px / gap:2px */
+  .sb-tabbar {
+    padding: 0 14px;
+    gap: 2px;
+  }
+
+  /* 下層のサイドバー。prototype は幅 170px / padding 10px / パネル面 */
+  .sb-sidebar {
+    width: 170px;
+    flex-shrink: 0;
+    padding: 10px;
+    border-right: 1px solid var(--border-default);
+    background: var(--surface-panel);
+  }
+
+  /* 画面の見出し。prototype の pageTitle は 15px / 600 / margin-bottom 12px */
+  .sb-page-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+
   /* 一覧。枠と角丸を持ち、中身が枠から出ない */
   .sb-table {
     width: 100%;
@@ -260,6 +282,13 @@ body {
     background: transparent;
     color: var(--text-secondary);
     border: 1px solid var(--border-default);
+  }
+
+  /* prototype の `.btn`（塗り）。登録は ghost、作成は塗りで出ている */
+  .sb-btn-primary {
+    background: var(--interactive-primary);
+    color: #fff;
+    border-color: var(--interactive-primary);
   }
 
   .sb-btn:disabled {

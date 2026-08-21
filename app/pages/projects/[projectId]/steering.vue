@@ -24,7 +24,7 @@ const documents = computed(() => {
 
 <template>
   <section>
-    <h1 class="mb-3 text-lg font-semibold">ステアリング</h1>
+    <h1 class="sb-page-title">ステアリング</h1>
 
     <table class="sb-table" data-testid="steering-list">
       <thead>

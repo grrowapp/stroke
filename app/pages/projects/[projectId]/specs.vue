@@ -24,7 +24,7 @@ function phases(spec: (typeof specs.value)[number]) {
 
 <template>
   <section>
-    <h1 class="mb-3 text-lg font-semibold">仕様書</h1>
+    <h1 class="sb-page-title">仕様書</h1>
 
     <p v-if="error" class="sb-placeholder" data-testid="specs-error">
       仕様書を取得できませんでした。本家に繋がっていない可能性があります。

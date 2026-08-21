@@ -2,13 +2,15 @@
 /**
  * 下層（プロジェクト単位）のシェル。
  *
- * ナビゲーションは画面左の縦並び。上層はヘッダー直下の横並びタブなので、形を見た時点で
- * どちらの階層にいるかが分かる（specs/project-workspace）。
+ * prototype の案A をそのまま写している。ヘッダーに「← ポータルへ戻る」、フォルダアイコン付き
+ * のプロジェクト名、状態チップ、右端に接続 dot。サイドバーは幅 170px / padding 10px /
+ * パネル面。
  *
  * プロジェクト切替の口はここに置かない。別のプロジェクトへ移るときは上層を経由する。
  */
 import { computed, useFetch, useRoute } from '#imports';
 
+import SbIcon from '~/components/ui/SbIcon.vue';
 import { useBoardSocket } from '~/composables/useBoardSocket';
 
 const route = useRoute();
@@ -25,6 +27,7 @@ const { data: info, error } = await useFetch(() => `/api/projects/${projectId.va
  * `!== null` で判定すると常に真になるので真偽値で見る。
  */
 const unresolved = computed(() => Boolean(error.value));
+const connected = computed(() => upstreamConnected.value && !unresolved.value);
 
 const sections = [
   { to: 'specs', label: '仕様書' },
@@ -37,32 +40,30 @@ const sections = [
 <template>
   <div class="min-h-screen bg-[var(--surface-base)] text-[var(--text-primary)]">
     <header class="sb-bar">
-      <NuxtLink
-        to="/"
-        class="text-[13px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-        data-testid="back-to-portal"
-      >
-        ← ポータルへ戻る
+      <NuxtLink to="/" class="sb-navitem pl-0" data-testid="back-to-portal">
+        <SbIcon name="back" :size="16" />
+        ポータルへ戻る
       </NuxtLink>
-      <span class="text-base font-semibold" data-testid="workspace-project-name">
+
+      <span class="inline-flex items-center gap-1.5 font-semibold" data-testid="workspace-project-name">
+        <SbIcon name="folder" :size="14" />
         {{ info?.projectName ?? projectId }}
       </span>
+
+      <span class="sb-chip">{{ connected ? 'アクティブ' : '未接続' }}</span>
+
       <span
-        class="sb-chip"
+        class="ml-auto inline-block size-2 rounded-full"
+        :style="{ background: connected ? 'var(--status-success)' : 'var(--text-faint)' }"
+        :title="connected ? '本家に接続済み' : '本家に未接続'"
         data-testid="workspace-connection"
-        :data-connected="upstreamConnected && !unresolved"
-      >
-        {{ unresolved || !upstreamConnected ? '未接続' : 'アクティブ' }}
-      </span>
+        :data-connected="connected"
+      />
     </header>
 
     <div class="flex">
-      <nav
-        class="w-44 shrink-0 border-r border-[var(--border-default)] bg-[var(--surface-panel)] p-2"
-        aria-label="プロジェクト"
-        data-testid="workspace-sidebar"
-      >
-        <ul class="space-y-0.5">
+      <nav class="sb-sidebar" aria-label="プロジェクト" data-testid="workspace-sidebar">
+        <ul>
           <li v-for="section in sections" :key="section.to">
             <NuxtLink
               :to="`/projects/${projectId}/${section.to}`"

@@ -8,6 +8,7 @@
  */
 import { onBeforeUnmount, ref } from '#imports';
 
+import SbIcon from '~/components/ui/SbIcon.vue';
 import { useBoardSocket } from '~/composables/useBoardSocket';
 import type { Notification, NotificationTone } from '#shared/types';
 
@@ -97,7 +98,7 @@ onBeforeUnmount(() => {
         data-testid="toast-dismiss"
         @click="dismiss(toast.id)"
       >
-        ×
+        <SbIcon name="x" :size="16" />
       </button>
     </div>
   </div>
