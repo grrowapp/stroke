@@ -35,7 +35,13 @@ export const stub = {
   reset: () => control('reset'),
 
   /** stroke-board がスタブへ出したリクエストの計数。基準が揃ったかの判定に使う */
-  stats: () => control<{ sockets: number; progressRequests: number }>('stats'),
+  stats: () =>
+    control<{
+      sockets: number;
+      progressRequests: number;
+      /** 直近に届いた承認への応答。何を送ったかを確かめるのに使う */
+      lastApprovalAction: { id: string; action: string; response: string | null } | null;
+    }>('stats'),
 
   /** 完了数を1つ増やす */
   completeTask: (projectId: string, specName = 'auth-spec') =>

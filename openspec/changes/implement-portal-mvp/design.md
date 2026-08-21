@@ -155,9 +155,17 @@ registry の `projectName`（例 `stroke-board · base2`）を使わない理由
 
 **採らなかった案**: 走査ディレクトリ名を URL に使う。本家 API を呼ぶには結局 `projectId` への解決が要り、停止中は解決できないという性質は変わらない。名前の衝突とエスケープの問題が増えるだけになる。
 
-### 11. 書き込み系の口をコードに作らない
+### 11. 書き込みは承認への応答だけに限る
 
-本家の REST には `PUT /specs/:name/:document`、`POST /approvals/:id/:action`、`PUT /tasks/:taskId/status` などの書き込み系が存在する。接点層の REST クライアントには**これらを呼ぶ関数を置かない**。呼べる関数が無ければ、上位から誤って呼ばれることもない。
+**改訂（承認・却下を入れると決めたとき）**。当初は「書き込み系の口をコードに作らない」としていたが、承認・却下を本家の API 経由で行うと決めたため、書き込みを1つだけ通す形に変えた。
+
+本家の REST には `PUT /specs/:name/:document`、`POST /approvals/:id/:action`、`PUT /tasks/:taskId/status` などの書き込み系が存在する。接点層の REST クライアントに置くのは **`POST /approvals/:id/:action` を呼ぶ関数1つだけ**とし、他は呼ぶ関数を置かない。呼べる関数が無ければ、上位から誤って呼ばれることもない。
+
+承認への応答を通してよいと判断した根拠は、**書き込む主体が stroke-board ではなく本家である**こと。ファイルに触るのは本家の `approvalStorage` で、こちらは本家に依頼するだけなので、「`.spec-workflow/` に書き込む主体を二重に作らない」という product.md の理由は保たれる。
+
+`needs-revision`（差し戻し）は出さない。本家のそれは注釈コメントを前提にした流れで、stroke-board はコメントを持たないため。
+
+**担保の仕方**: `server/utils/upstream/read-only.test.ts` が、接点層で `POST` を使う箇所が1つだけであること、`PUT` / `PATCH` / `DELETE` が無いこと、公開メソッドの一覧が想定どおりであることを検査する。書き込み口を増やすにはこのテストを通す必要がある。
 
 同様に `POST /api/projects/add` と `DELETE /api/projects/:projectId` も置かない。登録・作成の中身が未決であり（`product.md` の Open Questions）、この change では非活性の入口までしか作らないため。
 

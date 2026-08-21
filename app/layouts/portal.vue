@@ -6,14 +6,15 @@
  * ヘッダーの bar、その下にタブの bar（padding:0 14px / gap:2px）、本体は padding:16px。
  * 下層は左サイドバーで、形そのものを変えることでどちらの階層にいるかが見て分かる。
  */
-import SbIcon from '~/components/ui/SbIcon.vue';
-import { useBoardSocket } from '~/composables/useBoardSocket';
+import SbIcon from '~/components/shared/SbIcon.vue';
+import { useBoardSocket } from '~/composables/shared/useBoardSocket';
 
 const { notifications, upstreamConnected } = useBoardSocket();
 </script>
 
 <template>
-  <div class="min-h-screen bg-[var(--surface-base)] text-[var(--text-primary)]">
+  <!-- prototype 案A の `.frame`。header / タブ行 / 本体を縦に積み、本体が残りを取る -->
+  <div class="flex min-h-screen flex-col bg-[var(--surface-base)] text-[var(--text-primary)]">
     <header class="sb-bar">
       <span class="text-base font-semibold">stroke-board</span>
       <!-- 本家との接続状態。prototype の dot（8px の丸） -->
@@ -49,7 +50,7 @@ const { notifications, upstreamConnected } = useBoardSocket();
       </NuxtLink>
     </nav>
 
-    <main class="p-4">
+    <main class="min-h-0 flex-1 overflow-auto p-4">
       <slot />
     </main>
   </div>

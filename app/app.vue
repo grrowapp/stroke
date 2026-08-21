@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useHead } from '#imports';
 
-import NotificationToaster from '~/components/notification/NotificationToaster.vue';
+import NotificationToaster from '~/components/shared/NotificationToaster.vue';
 
 useHead({ title: 'stroke-board', htmlAttrs: { lang: 'ja' } });
 </script>

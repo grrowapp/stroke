@@ -25,14 +25,21 @@ export default defineNuxtConfig({
 
   typescript: { typeCheck: false, strict: true },
 
-  runtimeConfig: {
-    // 本家に触るために要る3つ。値は環境変数から入る。読み方は server/utils/config.ts に閉じる。
-    // NUXT_UPSTREAM_BASE_URL / NUXT_PROJECTS_PARENT_PATH / NUXT_SPEC_WORKFLOW_HOME
-    upstreamBaseUrl: '',
-    projectsParentPath: '',
-    specWorkflowHome: '',
+  // DevTools は画面の上に自前のバーとボタンを重ねる。本家にも prototype にも無いものなので、
+  // 見た目を突き合わせる邪魔になる。切っておく
+  devtools: { enabled: false },
 
-    // アクティブ集合を見直す間隔（ミリ秒）。NUXT_SYNC_INTERVAL_MS
+  // 起動の待ち受け。3000 はこのマシンで別のプロセスが使っているのでずらしてある。
+  // 別マシンのブラウザから開くため、localhost ではなく全インタフェースで待つ
+  devServer: { host: '0.0.0.0', port: 3100 },
+
+  runtimeConfig: {
+    // 本家に触るために要る3つ。読み方は server/utils/config.ts に閉じる。
+    upstreamBaseUrl: 'http://127.0.0.1:5000',
+    projectsParentPath: '/opt/projects',
+    specWorkflowHome: '/opt/projects/.spec-workflow-mcp',
+
+    // アクティブ集合を見直す間隔（ミリ秒）
     syncIntervalMs: '30000',
   },
 });

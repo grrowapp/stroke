@@ -11,9 +11,9 @@
  */
 import { computed, definePageMeta, navigateTo, useFetch, useHead } from '#imports';
 
-import SbIcon from '~/components/ui/SbIcon.vue';
-import { useBoardSocket } from '~/composables/useBoardSocket';
-import { formatRelativeTime } from '~/composables/useRelativeTime';
+import SbIcon from '~/components/shared/SbIcon.vue';
+import { useBoardSocket } from '~/composables/shared/useBoardSocket';
+import { formatRelativeTime } from '~/composables/shared/useRelativeTime';
 import type {
   ActionAvailability,
   ProjectDirectoryResponse,

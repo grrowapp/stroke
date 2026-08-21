@@ -24,7 +24,7 @@ const sockets = new Set();
  * `GET .../tasks/progress` を1回ずつ呼ぶ（design.md 決定4）。その回数が揃えば基準が
  * 揃ったことになる。時間で待つと環境によってぶれる。
  */
-const stats = { progressRequests: 0 };
+const stats = { progressRequests: 0, lastApprovalAction: null };
 
 function task(id, description, status) {
   return {
@@ -135,7 +135,11 @@ function handleControl(rest, body) {
       return { ok: true };
 
     case 'stats':
-      return { sockets: sockets.size, progressRequests: stats.progressRequests };
+      return {
+        sockets: sockets.size,
+        progressRequests: stats.progressRequests,
+        lastApprovalAction: stats.lastApprovalAction,
+      };
 
     case 'complete-task': {
       // 完了数を1つ増やす。`task-completed` と、全件なら `all-tasks-completed` が出るはず
@@ -213,7 +217,7 @@ function handleControl(rest, body) {
   }
 }
 
-function handleApi(segments, respond) {
+function handleApi(segments, respond, method = 'GET', body = null) {
   if (segments.join('/') === 'api/projects/list') return respond(200, projectList());
 
   if (segments[0] !== 'api' || segments[1] !== 'projects' || segments.length < 3) return false;
@@ -266,6 +270,34 @@ function handleApi(segments, respond) {
     });
   }
 
+  /*
+   * 承認への応答。本家は `POST /api/projects/:id/approvals/:id/:action` を受け、
+   * 応答を保存したうえで保留中から外す。承認と却下の区別は保留中から消えたことでしか
+   * 観測できない（ADR-0002）ので、スタブも同じく消すだけにする。
+   */
+  if (method === 'POST' && rest[0] === 'approvals' && rest.length === 3) {
+    const [, approvalId, action] = rest;
+
+    if (!['approve', 'reject', 'needs-revision'].includes(action)) {
+      return respond(400, { error: 'Invalid action' });
+    }
+
+    const target = project.approvals.find((item) => item.id === approvalId);
+    if (target === undefined) return respond(404, { error: 'Approval not found' });
+
+    // テストから「何を送ったか」を確かめられるように残す
+    stats.lastApprovalAction = { id: approvalId, action, response: body?.response ?? null };
+
+    project.approvals = project.approvals.filter((item) => item.id !== approvalId);
+    broadcast(segments[2], {
+      type: 'approval-update',
+      projectId: segments[2],
+      data: project.approvals,
+    });
+
+    return respond(200, { success: true });
+  }
+
   if (rest[0] === 'approvals' && rest.length === 1) return respond(200, project.approvals);
 
   if (rest[0] === 'approvals' && rest[2] === 'content') {
@@ -274,7 +306,35 @@ function handleApi(segments, respond) {
     return respond(200, { content: `# ${approval.title}\n\n本文` });
   }
 
-  if (rest[0] === 'steering') return respond(200, { content: `# ${rest[1]}\n\n本文` });
+  /*
+   * ステアリングだけ markdown の要素を一通り持たせてある。本文が markdown として
+   * 描かれていること（見出し・箇条書き・表・コードブロック）と、文書に混ざった生 HTML を
+   * 描かないことを E2E で押さえるため。
+   */
+  if (rest[0] === 'steering') {
+    return respond(200, {
+      content: [
+        `# ${rest[1]}`,
+        '',
+        '本文と `インラインコード`。',
+        '',
+        '- 箇条書き1',
+        '- 箇条書き2',
+        '',
+        '| 見出しA | 見出しB |',
+        '| --- | --- |',
+        '| 値1 | 値2 |',
+        '',
+        '```ts',
+        "const x = 'コードブロック';",
+        '```',
+        '',
+        '<img src=x onerror="window.__xss = true">',
+        '',
+        '<script>window.__xss = true;</script>',
+      ].join('\n'),
+    });
+  }
 
   return false;
 }
@@ -304,7 +364,8 @@ const server = createServer(async (request, response) => {
     }
   }
 
-  if (handleApi(segments, respond) !== false) return;
+  const body = request.method === 'POST' ? await readJson(request) : null;
+  if (handleApi(segments, respond, request.method, body) !== false) return;
 
   respond(404, { error: 'not found' });
 });

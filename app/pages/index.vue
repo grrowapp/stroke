@@ -9,9 +9,9 @@
  */
 import { computed, definePageMeta, navigateTo, useFetch, useHead, watch } from '#imports';
 
-import SbIcon from '~/components/ui/SbIcon.vue';
-import { useBoardSocket } from '~/composables/useBoardSocket';
-import { formatRelativeTime } from '~/composables/useRelativeTime';
+import SbIcon from '~/components/shared/SbIcon.vue';
+import { useBoardSocket } from '~/composables/shared/useBoardSocket';
+import { formatRelativeTime } from '~/composables/shared/useRelativeTime';
 import type { Notification, ProjectDirectoryResponse } from '#shared/types';
 
 definePageMeta({ layout: 'portal' });
@@ -69,40 +69,11 @@ function open(notification: Notification): void {
   <section>
     <h1 class="sb-page-title">通知</h1>
 
-    <div v-if="rows.length === 0" data-testid="notifications-empty">
-      <!--
-        通知は接続後の変化しか出せない。それを「何も起きていない」と読ませないために、
-        今の承認待ちをここに出す。
-      -->
-      <div v-if="pendingTotal > 0" class="sb-card mb-3" data-testid="pending-now">
-        <div class="text-[13px] font-semibold">
-          承認待ちが {{ pendingTotal }} 件あります
-        </div>
-        <ul class="mt-2 space-y-1">
-          <li v-for="project in pendingProjects" :key="project.workflowRootPath">
-            <NuxtLink
-              :to="`/projects/${project.projectId}/approvals`"
-              class="sb-navitem justify-between"
-              data-testid="pending-now-row"
-              :data-name="project.name"
-            >
-              <span class="inline-flex items-center gap-1.5">
-                <SbIcon name="folder" :size="14" />
-                {{ project.name }}
-              </span>
-              <span class="sb-badge">{{ project.pendingApprovals }}</span>
-            </NuxtLink>
-          </li>
-        </ul>
-      </div>
-
-      <p class="sb-placeholder">
-        通知はまだありません。通知は stroke-board が本家に繋いだ後に起きた変化から出ます。
-        本家で承認依頼が出るか、タスクの状態が変わると、ここに並びます。
-      </p>
-    </div>
-
-    <table v-else class="sb-table" data-testid="notifications-table">
+    <!--
+      0件でも表そのものは残す。prototype の通知画面は4列の表で、表ごと消すと
+      「何の一覧を見ているのか」が画面から消える。中身が無いことは表の下に出す。
+    -->
+    <table class="sb-table" data-testid="notifications-table">
       <thead>
         <tr>
           <th scope="col" class="w-44">プロジェクト</th>
@@ -147,5 +118,38 @@ function open(notification: Notification): void {
         </tr>
       </tbody>
     </table>
+
+    <div v-if="rows.length === 0" class="mt-3" data-testid="notifications-empty">
+      <!--
+        通知は接続後の変化しか出せない。それを「何も起きていない」と読ませないために、
+        今の承認待ちをここに出す。
+      -->
+      <div v-if="pendingTotal > 0" class="sb-card mb-3" data-testid="pending-now">
+        <div class="text-[13px] font-semibold">
+          承認待ちが {{ pendingTotal }} 件あります
+        </div>
+        <ul class="mt-2 space-y-1">
+          <li v-for="project in pendingProjects" :key="project.workflowRootPath">
+            <NuxtLink
+              :to="`/projects/${project.projectId}/approvals`"
+              class="sb-navitem justify-between"
+              data-testid="pending-now-row"
+              :data-name="project.name"
+            >
+              <span class="inline-flex items-center gap-1.5">
+                <SbIcon name="folder" :size="14" />
+                {{ project.name }}
+              </span>
+              <span class="sb-badge">{{ project.pendingApprovals }}</span>
+            </NuxtLink>
+          </li>
+        </ul>
+      </div>
+
+      <p class="sb-placeholder">
+        通知はまだありません。通知は stroke-board が本家に繋いだ後に起きた変化から出ます。
+        本家で承認依頼が出るか、タスクの状態が変わると、ここに並びます。
+      </p>
+    </div>
   </section>
 </template>

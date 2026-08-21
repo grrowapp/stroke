@@ -46,8 +46,16 @@
   --status-info: #3b82f6;
   --status-info-muted: rgba(59, 130, 246, 0.15);
   --status-pending: #94a3b8;
+  --status-pending-muted: rgba(148, 163, 184, 0.15);
   --status-in-progress: #a78bfa;
   --status-in-progress-muted: rgba(167, 139, 250, 0.15);
+
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.7;
+
+  --transition-fast: 150ms ease;
+  --transition-normal: 200ms ease;
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
   --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.3);
@@ -100,8 +108,19 @@
   --ui-text-dimmed: var(--text-faint);
 }
 
+/*
+ * 本家の body（theme.css）は面と文字色を自分で持つ。Nuxt UI は body の色を
+ * `--ui-text`（= text-secondary 相当）にするので、そのままだと本文の既定色が一段暗くなり、
+ * 画面全体の印象が本家とずれる。本家の宣言に合わせる。
+ */
 body {
+  background: var(--surface-base);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
   font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /*
@@ -308,5 +327,392 @@ body {
   .sb-btn:disabled {
     opacity: 0.45;
     cursor: not-allowed;
+  }
+}
+
+/*
+ * ここから下は「下層」の様式。出どころが上と違う。
+ *
+ * prototype は下層について `projContent` に破線の枠を置いただけで、「下層の中身は
+ * この問いの対象外」と明記している。つまり下層の様式の出どころは本家しかない。
+ * 値は本家 v2.2.7 の `src/dashboard_frontend/src/modules/theme/tailwind.css` と
+ * `theme.css`、および各ページの実装から取っている。
+ *
+ * 上層（prototype 準拠）のクラスと混ぜない。混ぜると、どちらに寄せているのかが
+ * 後から読めなくなる。
+ */
+@layer components {
+  /*
+   * 下層は画面まるごとこの枠に載る（SteeringPage / SpecsPage の Content）。
+   * 本家の `.card` は影を持つが、ページの枠として使っているこの箱には影が付いていない
+   * （稼働中の本家で実測: box-shadow は none）。実物に合わせて影は持たせない。
+   */
+  .sb-panel {
+    background: var(--surface-panel);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+  }
+
+  /* 画面の見出しブロック。本家は h2 が `text-lg sm:text-xl`、副題が text-sm の secondary */
+  .sb-panel-title {
+    font-size: var(--text-lg);
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  @media (min-width: 640px) {
+    .sb-panel-title {
+      font-size: var(--text-xl);
+    }
+  }
+
+  .sb-panel-subtitle {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    margin-top: 4px;
+  }
+
+  /*
+   * 本家の表。上層の `.sb-table`（prototype 由来）とは寸法も罫線の引き方も違う。
+   * 本家は行間を `divide-y` で引き、セルは px-4 py-4、見出しは px-4 py-3。
+   */
+  .sb-datatable {
+    width: 100%;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .sb-datatable thead {
+    background: var(--surface-sunken);
+  }
+
+  .sb-datatable th {
+    text-align: left;
+    padding: 12px 16px;
+    font-size: var(--text-xs);
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .sb-datatable td {
+    padding: 16px;
+    font-size: var(--text-sm);
+    vertical-align: middle;
+  }
+
+  .sb-datatable tbody tr + tr td {
+    border-top: 1px solid var(--border-default);
+  }
+
+  .sb-datatable tbody tr {
+    transition: background var(--transition-fast);
+  }
+
+  .sb-datatable tbody tr.sb-datarow:hover {
+    background: var(--surface-hover);
+    cursor: pointer;
+  }
+
+  /* 押せない行。ここだけは prototype と同じ考え方（不透明度で示す） */
+  .sb-datatable tbody tr.sb-datarow-off {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  /*
+   * 行頭のアイコンタイル。本家は `w-10 h-10 bg-blue-100 dark:bg-blue-900/20 rounded-lg`
+   * に `w-5 h-5 text-blue-600 dark:text-blue-400` のアイコンを載せている。
+   */
+  .sb-icon-tile {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* 本家は `dark:bg-blue-900/20` と `dark:text-blue-400`。Tailwind の階調をそのまま使う */
+    background: color-mix(in oklab, var(--color-blue-900) 20%, transparent);
+    color: var(--color-blue-400);
+  }
+
+  .sb-icon-tile > svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  /*
+   * 本家の `.status-badge`。muted 背景 + 同系色の文字で、枠は持たない。
+   * 上層の `.sb-chip`（prototype 由来・枠あり）とは別物なので置き換えない。
+   */
+  .sb-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    font-size: var(--text-xs);
+    font-weight: 500;
+    line-height: 1.4;
+    white-space: nowrap;
+  }
+
+  .sb-status-badge-success {
+    background: var(--status-success-muted);
+    color: var(--status-success);
+  }
+
+  .sb-status-badge-warning {
+    background: var(--status-warning-muted);
+    color: var(--status-warning);
+  }
+
+  .sb-status-badge-error {
+    background: var(--status-error-muted);
+    color: var(--status-error);
+  }
+
+  .sb-status-badge-info {
+    background: var(--status-info-muted);
+    color: var(--status-info);
+  }
+
+  .sb-status-badge-pending {
+    background: var(--status-pending-muted);
+    color: var(--status-pending);
+  }
+
+  .sb-status-badge-in-progress {
+    background: var(--status-in-progress-muted);
+    color: var(--status-in-progress);
+  }
+
+  /*
+   * 下層のボタン。本家の `.btn`（tailwind.css）そのまま。
+   * 上層の `.sb-btn`（prototype 由来・padding 7px / font-weight 600）とは寸法が違うので
+   * 分けてある。下層で prototype のボタンを使うと本家と1px ずつずれる。
+   */
+  .sb-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid transparent;
+    background: var(--interactive-primary);
+    color: #fff;
+    font-size: var(--text-sm);
+    /*
+     * 本家のボタンは Tailwind の `text-sm` を当てており、字送りも一緒に付いてくる
+     * （`--text-sm--line-height` = 1.25/0.875）。font-size だけ真似ると body の 1.5 を
+     * 継承して 1px 高くなる。
+     */
+    line-height: calc(1.25 / 0.875);
+    font-weight: 500;
+    cursor: pointer;
+    transition: background var(--transition-fast);
+  }
+
+  .sb-action:hover {
+    background: var(--interactive-primary-hover);
+  }
+
+  .sb-action:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* 本家の `.btn-secondary`。塗らないボタン */
+  .sb-action-secondary {
+    background: var(--interactive-secondary);
+    border-color: var(--border-default);
+    color: var(--text-secondary);
+  }
+
+  .sb-action-secondary:hover {
+    background: var(--interactive-secondary-hover);
+    border-color: var(--border-strong);
+  }
+
+  /*
+   * 承認と却下の色。
+   *
+   * 本家の JSX には `btn bg-green-600` / `btn bg-red-600` と書いてあるが、本家自身の
+   * `.btn` が素のクラスとして `background: var(--interactive-primary)` を持つため、
+   * Tailwind の `bg-*` が打ち消される。稼働中の本家で実測すると3つとも indigo
+   * （`rgb(99,102,241)`）で、緑にも赤にもなっていない。`.p-3` と同じ現象。
+   *
+   * 書いてある方ではなく、実際にそう見えている方に合わせる。したがって承認・却下も
+   * 既定の `.sb-action`（indigo）のままにし、色の指定を持たせない。
+   * `ui.md` の「アクセントは indigo 1色に集約し、種別ごとに色を撒かない」とも揃う。
+   */
+
+  /*
+   * タスクの状態。本家 `TasksPage.tsx` の statusPill は、背景をパネル面のまま置いて
+   * 色は 8px の点だけに持たせる（`statusConfig` の `dotColor`）。状態ごとに面を塗らない
+   * のは、`ui.md` の「種別ごとに色を撒かない」と同じ考え方。
+   *
+   * 本家はこれを押すと状態を変えられるボタンにしているが、stroke-board は読むだけなので
+   * 押せない要素として置く（specs/project-workspace）。
+   */
+  .sb-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-default);
+    background: var(--surface-panel);
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
+    white-space: nowrap;
+  }
+
+  .sb-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 9999px;
+    flex-shrink: 0;
+  }
+
+  /* 本家の `.progress-track` / `.progress-fill`。高さ 6px・単色・グラデーション無し */
+  .sb-progress-track {
+    height: 6px;
+    background: var(--surface-inset);
+    border-radius: 9999px;
+    overflow: hidden;
+  }
+
+  .sb-progress-fill {
+    height: 100%;
+    background: var(--interactive-primary);
+    transition: width 200ms ease;
+  }
+
+  .sb-progress-fill-success {
+    background: var(--status-success);
+  }
+
+  /*
+   * 空の状態。本家は中央寄せの `py-12` に 48px のアイコン・`text-lg` の見出し・
+   * `text-sm` の説明を積む（SteeringPage / SpecsPage の Empty State）。
+   * 破線の枠は本家に無い（prototype が「対象外」を示すために置いていたもの）。
+   */
+  .sb-empty {
+    text-align: center;
+    padding: 48px 16px;
+  }
+
+  .sb-empty > svg {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 16px;
+    color: var(--text-muted);
+  }
+
+  .sb-empty-title {
+    font-size: var(--text-lg);
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+  }
+
+  .sb-empty-description {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+  }
+
+  /*
+   * 文書の本文。本家の `.markdown-content`（theme.css）をそのまま写している。
+   * 本文だけ `--text-lg`（16px）で、行間も本文用に広い（1.7）。一覧の 12px とは別。
+   */
+  .sb-markdown {
+    line-height: var(--leading-relaxed);
+    font-size: var(--text-lg);
+    color: var(--text-primary);
+  }
+
+  .sb-markdown h1,
+  .sb-markdown h2,
+  .sb-markdown h3,
+  .sb-markdown h4 {
+    margin: 16px 0 8px;
+    font-weight: 600;
+  }
+
+  .sb-markdown pre {
+    padding: 12px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    overflow: auto;
+    background: var(--surface-inset);
+    font-family: var(--font-mono);
+  }
+
+  .sb-markdown code {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+  }
+
+  .sb-markdown :not(pre) > code {
+    padding: 2px 6px;
+    background: var(--surface-inset);
+    border-radius: var(--radius-sm);
+  }
+
+  .sb-markdown table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  .sb-markdown table th,
+  .sb-markdown table td {
+    border: 1px solid var(--border-default);
+    padding: 8px 12px;
+    text-align: left;
+  }
+
+  .sb-markdown table th {
+    background: var(--surface-inset);
+    font-weight: 500;
+  }
+
+  /*
+   * 本家の markdown-content は箇条書きと引用の指定を持たない（ブラウザ既定に任せている）。
+   * Tailwind の preflight が list-style と margin を消すので、既定相当をここで戻す。
+   * これは本家に無い指定を足しているのではなく、本家と同じ見え方に揃えるための埋め合わせ。
+   */
+  .sb-markdown ul,
+  .sb-markdown ol {
+    margin: 8px 0;
+    padding-left: 24px;
+    list-style: revert;
+  }
+
+  .sb-markdown p {
+    margin: 8px 0;
+  }
+
+  .sb-markdown blockquote {
+    margin: 8px 0;
+    padding-left: 12px;
+    border-left: 3px solid var(--border-default);
+    color: var(--text-secondary);
+  }
+
+  .sb-markdown a {
+    color: var(--interactive-primary);
+    text-decoration: underline;
+  }
+
+  .sb-markdown hr {
+    margin: 16px 0;
+    border-top: 1px solid var(--border-default);
   }
 }

@@ -9,7 +9,8 @@ import { computed, definePageMeta, useRoute } from '#imports';
 
 import DocumentView from '~/components/workspace/DocumentView.vue';
 import EmptyState from '~/components/workspace/EmptyState.vue';
-import { useApprovalContent, useProjectId, usePendingApprovals } from '~/composables/useProjectApi';
+import WorkspacePanel from '~/components/workspace/WorkspacePanel.vue';
+import { useApprovalContent, useProjectId, usePendingApprovals } from '~/composables/workspace/useProjectApi';
 
 definePageMeta({ layout: 'workspace' });
 
@@ -28,24 +29,33 @@ const CATEGORY: Record<string, string> = { spec: '仕様', steering: 'ステア�
 </script>
 
 <template>
-  <section>
-    <!--
-      本家は保留中のものしか返さないため、既に処理済みの承認依頼はここに来ない。
-      承認されたのか却下されたのかは観測できない（docs/adr/0002）。
-    -->
-    <EmptyState v-if="approval === null" testid="approval-resolved">
+  <!--
+    本家は保留中のものしか返さないため、既に処理済みの承認依頼はここに来ない。
+    承認されたのか却下されたのかは観測できない（docs/adr/0002）。
+  -->
+  <WorkspacePanel v-if="approval === null" title="承認">
+    <EmptyState testid="approval-resolved" icon="check-circle" title="保留中の一覧にありません">
       この承認依頼は保留中の一覧にありません。既に処理済みの可能性があります。
     </EmptyState>
+  </WorkspacePanel>
 
-    <template v-else>
-      <h1 class="sb-page-title mb-2">{{ approval.title }}</h1>
-
-      <div class="mb-3 flex items-center gap-2" data-testid="approval-meta">
-        <span class="sb-chip">{{ CATEGORY[approval.category] ?? approval.category }}</span>
-        <span class="font-mono text-[11px] text-[var(--text-muted)]">{{ approval.filePath }}</span>
-      </div>
-
-      <DocumentView :content="document?.content" missing="対象の文書を取得できませんでした。" />
+  <WorkspacePanel v-else :title="approval.title" subtitle="対象文書。承認と却下の操作は置かない">
+    <template #actions>
+      <span
+        class="sb-status-badge sb-status-badge-info"
+        data-testid="approval-category"
+      >
+        {{ CATEGORY[approval.category] ?? approval.category }}
+      </span>
     </template>
-  </section>
+
+    <p
+      class="mb-4 font-mono text-[var(--text-muted)] break-all"
+      data-testid="approval-meta"
+    >
+      {{ approval.filePath }}
+    </p>
+
+    <DocumentView :content="document?.content" missing="対象の文書を取得できませんでした。" />
+  </WorkspacePanel>
 </template>

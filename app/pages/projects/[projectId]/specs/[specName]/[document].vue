@@ -3,7 +3,8 @@
 import { computed, createError, definePageMeta, useRoute } from '#imports';
 
 import DocumentView from '~/components/workspace/DocumentView.vue';
-import { useProjectId, useSpecDocuments } from '~/composables/useProjectApi';
+import WorkspacePanel from '~/components/workspace/WorkspacePanel.vue';
+import { useProjectId, useSpecDocuments } from '~/composables/workspace/useProjectApi';
 
 definePageMeta({ layout: 'workspace' });
 
@@ -25,10 +26,10 @@ const current = computed(() => data.value?.[documentKey.value as DocumentKey] ??
 </script>
 
 <template>
-  <section>
-    <h1 class="sb-page-title">
-      {{ specName }} / {{ DOCUMENTS[documentKey as DocumentKey] }}
-    </h1>
+  <WorkspacePanel
+    :title="DOCUMENTS[documentKey as DocumentKey]"
+    :subtitle="specName"
+  >
     <DocumentView :content="current?.content" />
-  </section>
+  </WorkspacePanel>
 </template>

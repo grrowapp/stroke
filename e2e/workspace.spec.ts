@@ -221,7 +221,7 @@ test.describe('承認', () => {
     await expect(page).toHaveURL(new RegExp(`/projects/${ALPHA}/approvals/w1$`));
   });
 
-  test('対象文書の中身が読める。承認・却下の操作は無い', async ({ page }) => {
+  test('対象文書の中身が読める', async ({ page }) => {
     await stub.requestApproval(ALPHA, {
       id: 'w2',
       title: 'ステアリング: tech.md の承認',
@@ -234,12 +234,64 @@ test.describe('承認', () => {
 
     await expect(page.getByTestId('approval-meta')).toContainText('.spec-workflow/steering/tech.md');
     await expect(page.getByTestId('document-content')).toContainText('本文');
-    await expect(page.getByRole('button', { name: /^(承認|却下|Approve|Reject)$/ })).toHaveCount(0);
   });
 
   test('既に処理済みの承認依頼はその旨が出る', async ({ page }) => {
     await page.goto(`/projects/${ALPHA}/approvals/gone`);
     await expect(page.getByTestId('approval-resolved')).toBeVisible();
+  });
+});
+
+/**
+ * 承認と却下は本家の `POST /approvals/:id/:action` を呼ぶ。ファイルに書くのは本家で、
+ * stroke-board は依頼するだけ（ADR-0001）。
+ */
+test.describe('承認と却下', () => {
+  test.beforeEach(async ({ page }) => {
+    await resetBoard(page);
+    await stub.requestApproval(ALPHA, {
+      id: 'act1',
+      title: 'ステアリング: product.md の承認',
+      filePath: '.spec-workflow/steering/product.md',
+      category: 'steering',
+      categoryName: 'steering',
+    });
+    await page.goto(`/projects/${ALPHA}/approvals`);
+    await expect(page.getByTestId('record-row')).toHaveCount(1);
+  });
+
+  test('承認すると本家へ approve が届き、保留中から消える', async ({ page }) => {
+    await page.getByTestId('approval-approve').click();
+
+    await expect(page.getByTestId('approvals-empty')).toBeVisible();
+
+    const { lastApprovalAction } = await stub.stats();
+    expect(lastApprovalAction?.action).toBe('approve');
+    expect(lastApprovalAction?.id).toBe('act1');
+  });
+
+  test('却下は理由を入れてから送る', async ({ page }) => {
+    await page.getByTestId('approval-reject').click();
+    await expect(page.getByTestId('approval-reject-form')).toBeVisible();
+
+    // 理由が空のうちは送れない
+    await expect(page.getByTestId('approval-reject-submit')).toBeDisabled();
+
+    await page.getByTestId('approval-reject-reason').fill('観点が足りない');
+    await page.getByTestId('approval-reject-submit').click();
+
+    await expect(page.getByTestId('approvals-empty')).toBeVisible();
+
+    const { lastApprovalAction } = await stub.stats();
+    expect(lastApprovalAction?.action).toBe('reject');
+    // 理由は本家に応答として残る
+    expect(lastApprovalAction?.response).toBe('観点が足りない');
+  });
+
+  test('操作を押しても対象の画面へは飛ばない', async ({ page }) => {
+    await page.getByTestId('approval-reject').click();
+
+    await expect(page).toHaveURL(new RegExp(`/projects/${ALPHA}/approvals$`));
   });
 });
 

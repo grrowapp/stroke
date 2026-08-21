@@ -10,8 +10,9 @@
  */
 import { computed, useFetch, useRoute } from '#imports';
 
-import SbIcon from '~/components/ui/SbIcon.vue';
-import { useBoardSocket } from '~/composables/useBoardSocket';
+import SbIcon from '~/components/shared/SbIcon.vue';
+import EmptyState from '~/components/workspace/EmptyState.vue';
+import { useBoardSocket } from '~/composables/shared/useBoardSocket';
 
 const route = useRoute();
 const projectId = computed(() => String(route.params.projectId ?? ''));
@@ -44,7 +45,12 @@ function linkOf(to: string): string {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[var(--surface-base)] text-[var(--text-primary)]">
+  <!--
+    prototype 案A の `.frame` と同じ組み方。縦に header と body を積み、body が残りを
+    すべて取る（`.body { flex:1 }`）。ここを詰めないとサイドバーが中身の高さで切れて、
+    画面の途中で終わってしまう。本家のサイドバーも `lg:h-screen` で全高。
+  -->
+  <div class="flex min-h-screen flex-col bg-[var(--surface-base)] text-[var(--text-primary)]">
     <header class="sb-bar">
       <NuxtLink to="/" class="sb-navitem pl-0" data-testid="back-to-portal">
         <SbIcon name="back" :size="16" />
@@ -69,7 +75,7 @@ function linkOf(to: string): string {
       />
     </header>
 
-    <div class="flex">
+    <div class="flex min-h-0 flex-1">
       <nav class="sb-sidebar" aria-label="プロジェクト" data-testid="workspace-sidebar">
         <ul>
           <li v-for="section in sections" :key="section.to">
@@ -86,10 +92,13 @@ function linkOf(to: string): string {
         </ul>
       </nav>
 
-      <main class="min-w-0 flex-1 p-4">
-        <p v-if="unresolved" class="sb-placeholder" data-testid="workspace-unresolved">
-          このプロジェクトは本家に繋がっていません。ポータルから選び直してください。
-        </p>
+      <!-- 本家の本文余白は px-6 py-6（App.tsx の main）。サイドバーは prototype の 170px -->
+      <main class="min-w-0 flex-1 overflow-auto px-6 py-6">
+        <div v-if="unresolved" class="sb-panel">
+          <EmptyState testid="workspace-unresolved" title="未接続" icon="check-circle">
+            このプロジェクトは本家に繋がっていません。ポータルから選び直してください。
+          </EmptyState>
+        </div>
         <slot v-else />
       </main>
     </div>

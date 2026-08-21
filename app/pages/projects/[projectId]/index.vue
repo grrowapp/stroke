@@ -4,8 +4,14 @@
  *
  * それぞれの画面に何件あるかを出す。入ってすぐ空の画面に着くと、繋がっていないのか
  * 中身が無いのかが分からない。
+ *
+ * 数の出し方は本家の統計カード（`TasksPage.tsx` の stats）に合わせる。小さなアイコン
+ * タイル + 見出し、その下に大きな数、さらに下に説明。
  */
 import { computed, definePageMeta, useFetch, useRoute } from '#imports';
+
+import UpstreamIcon from '~/components/shared/UpstreamIcon.vue';
+import WorkspacePanel from '~/components/workspace/WorkspacePanel.vue';
 
 definePageMeta({ layout: 'workspace' });
 
@@ -27,24 +33,28 @@ const sections = computed(() => [
   {
     to: 'specs',
     label: '仕様書',
+    icon: 'document' as const,
     count: (specs.value ?? []).length,
     unit: '本',
   },
   {
     to: 'steering',
     label: 'ステアリング',
+    icon: 'steering' as const,
     count: steeringCount.value,
     unit: '/ 3 本',
   },
   {
     to: 'tasks',
     label: 'タスク',
+    icon: 'tasks' as const,
     count: (specs.value ?? []).filter((spec) => spec.phases.tasks.exists).length,
     unit: '本の仕様書',
   },
   {
     to: 'approvals',
     label: '承認',
+    icon: 'check-circle' as const,
     count: (approvals.value ?? []).length,
     unit: '件が保留中',
   },
@@ -52,10 +62,13 @@ const sections = computed(() => [
 </script>
 
 <template>
-  <section>
-    <h1 class="sb-page-title">{{ info?.projectName ?? projectId }}</h1>
-
-    <dl class="sb-card mb-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[13px]">
+  <WorkspacePanel
+    :title="info?.projectName ?? projectId"
+    subtitle="本家が持っているものを読むだけの画面。書き込む口はどこにも無い"
+  >
+    <dl
+      class="mb-6 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-sunken)] p-4"
+    >
       <dt class="text-[var(--text-muted)]">プロジェクト ID</dt>
       <dd class="font-mono" data-testid="overview-project-id">{{ projectId }}</dd>
       <dt class="text-[var(--text-muted)]">パス</dt>
@@ -64,20 +77,25 @@ const sections = computed(() => [
       <dd class="font-mono" data-testid="overview-version">{{ info?.version ?? '—' }}</dd>
     </dl>
 
-    <ul class="grid grid-cols-2 gap-3" data-testid="overview-sections">
+    <ul class="grid grid-cols-2 gap-4" data-testid="overview-sections">
       <li v-for="section in sections" :key="section.to">
         <NuxtLink
           :to="`/projects/${projectId}/${section.to}`"
-          class="sb-card block hover:border-[var(--border-strong)]"
+          class="block rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-panel)] p-4 transition-colors hover:border-[var(--border-strong)]"
           :data-testid="`overview-${section.to}`"
         >
-          <div class="text-[13px] font-semibold">{{ section.label }}</div>
-          <div class="mt-1 text-[12px] text-[var(--text-muted)]">
-            <span class="text-[var(--text-primary)]">{{ section.count }}</span>
-            {{ section.unit }}
+          <div class="mb-3 flex items-center gap-3">
+            <span class="sb-icon-tile !h-8 !w-8">
+              <UpstreamIcon :name="section.icon" class="!h-4 !w-4" />
+            </span>
+            <span class="font-medium text-[var(--text-secondary)]">{{ section.label }}</span>
           </div>
+          <div class="mb-1 text-xl font-semibold text-[var(--text-primary)]">
+            {{ section.count }}
+          </div>
+          <div class="text-[var(--text-muted)]">{{ section.unit }}</div>
         </NuxtLink>
       </li>
     </ul>
-  </section>
+  </WorkspacePanel>
 </template>

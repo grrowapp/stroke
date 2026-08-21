@@ -3,8 +3,9 @@
 import { computed, createError, definePageMeta, useRoute } from '#imports';
 
 import DocumentView from '~/components/workspace/DocumentView.vue';
-import { useProjectId, useSteeringDocument } from '~/composables/useProjectApi';
-import { isSteeringName } from '~/composables/useSteeringDocuments';
+import WorkspacePanel from '~/components/workspace/WorkspacePanel.vue';
+import { useProjectId, useSteeringDocument } from '~/composables/workspace/useProjectApi';
+import { isSteeringName } from '~/composables/workspace/useSteeringDocuments';
 
 definePageMeta({ layout: 'workspace' });
 
@@ -21,11 +22,10 @@ const { data } = await useSteeringDocument(projectId, name);
 </script>
 
 <template>
-  <section>
-    <h1 class="sb-page-title font-mono">{{ name }}.md</h1>
+  <WorkspacePanel :title="`${name}.md`" subtitle="ステアリング">
     <DocumentView
       :content="data?.content"
       missing="このステアリング文書はまだ作られていません。"
     />
-  </section>
+  </WorkspacePanel>
 </template>

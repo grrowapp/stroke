@@ -6287,6 +6287,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"md4x@npm:^0.0.29":
+  version: 0.0.29
+  resolution: "md4x@npm:0.0.29"
+  bin:
+    md4x: lib/cli.mjs
+  checksum: 10c0/84a8e91b366ebe27eaa2b7186aaa62f4c0c446216998f9d149e374e808b84201930a931cc9bb5f33d298972bdb5658c46bdf6e7b9b1203c0b37bb1405bc394f5
+  languageName: node
+  linkType: hard
+
 "mdn-data@npm:2.0.28":
   version: 2.0.28
   resolution: "mdn-data@npm:2.0.28"
@@ -8411,6 +8420,7 @@ __metadata:
     "@vue/compiler-dom": "npm:^3.5.41"
     "@vue/test-utils": "npm:^2.4.11"
     happy-dom: "npm:^20.11.6"
+    md4x: "npm:^0.0.29"
     nuxt: "npm:^4.5"
     tailwindcss: "npm:^4.3.2"
     typescript: "npm:~5.9"

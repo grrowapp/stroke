@@ -4,7 +4,9 @@ import { computed, definePageMeta } from '#imports';
 
 import EmptyState from '~/components/workspace/EmptyState.vue';
 import RecordList from '~/components/workspace/RecordList.vue';
-import { useProjectId, useSpecs } from '~/composables/useProjectApi';
+import WorkspacePanel from '~/components/workspace/WorkspacePanel.vue';
+import { useProjectId, useSpecs } from '~/composables/workspace/useProjectApi';
+import { formatRelativeTime } from '~/composables/shared/useRelativeTime';
 
 definePageMeta({ layout: 'workspace' });
 
@@ -17,22 +19,24 @@ const items = computed(() =>
     .map((spec) => ({
       key: spec.name,
       label: spec.name,
-      chip:
-        spec.taskProgress === undefined
-          ? undefined
-          : `${spec.taskProgress.completed} / ${spec.taskProgress.total}`,
+      icon: 'tasks' as const,
+      progress: spec.taskProgress,
+      meta: formatRelativeTime(spec.lastModified),
       to: `/projects/${projectId.value}/tasks/${spec.name}`,
     })),
 );
 </script>
 
 <template>
-  <section>
-    <h1 class="sb-page-title">タスク</h1>
-
-    <EmptyState v-if="items.length === 0" testid="tasks-empty">
+  <WorkspacePanel title="タスク" subtitle="タスクを持つ仕様書。状態を変える操作は置かない">
+    <!-- 0件でも表は残す（本家の Empty State と同じ扱い） -->
+    <RecordList
+      :items="items"
+      testid="tasks-list"
+      :labels="{ name: '仕様書', status: '進捗', meta: '最終更新' }"
+    />
+    <EmptyState v-if="items.length === 0" testid="tasks-empty" icon="tasks" title="タスクがありません">
       タスクを持つ仕様書がありません。
     </EmptyState>
-    <RecordList v-else :items="items" testid="tasks-list" />
-  </section>
+  </WorkspacePanel>
 </template>

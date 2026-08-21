@@ -1,10 +1,13 @@
 /**
- * 本家 REST の読み取りクライアント。
+ * 本家 REST のクライアント。
  *
- * **書き込み系の関数をここに置かない**（design.md 決定11）。本家には
- * `PUT /specs/:name/:document` や `POST /approvals/:id/:action` が実在するが、
- * 呼べる関数が無ければ上位から誤って呼ばれることもない。認証を持たないまま外部公開する
- * 以上、読み取り専用であることをコードの形で担保する。
+ * **書き込みは承認への応答（`POST /approvals/:id/:action`）だけ**に限る。本家には
+ * 仕様書の保存・タスクの状態更新・プロジェクトの登録と解除も実在するが、呼べる関数を
+ * 置かない。呼べる関数が無ければ上位から誤って呼ばれない。
+ *
+ * 承認への応答を通す理由は、書き込むのが stroke-board ではなく本家だからである。
+ * ファイルに触るのは本家の `approvalStorage` で、こちらは本家に依頼するだけなので、
+ * 「`.spec-workflow/` に書き込む主体を二重に作らない」（ADR-0001）は保たれる。
  *
  * 定期ポーリングもしない。ここを呼ぶのは、画面が要求したときと、接続時に通知の基準を
  * 作るときだけである（tech.md の Performance Requirements）。
@@ -26,6 +29,13 @@ import {
   type SpecDocuments,
   type TaskProgress,
 } from './schema';
+
+/**
+ * 承認への応答。本家が受けるのは3つだが、stroke-board が出すのは approve と reject だけ。
+ * `needs-revision` は本家の注釈コメントを前提にした流れで、こちらはコメントを持たない。
+ */
+export const APPROVAL_ACTIONS = ['approve', 'reject'] as const;
+export type ApprovalAction = (typeof APPROVAL_ACTIONS)[number];
 
 /** ステアリング文書は常にこの3本。本家に一覧 API は無い */
 export const STEERING_DOCUMENTS = ['product', 'tech', 'structure'] as const;
@@ -90,6 +100,44 @@ export class UpstreamRestClient {
       `/api/projects/${enc(projectId)}/approvals/${enc(approvalId)}/content`,
       documentContentSchema,
     );
+  }
+
+  /**
+   * `POST /api/projects/:projectId/approvals/:id/:action` — 承認への応答。
+   *
+   * 本家は `approve` / `reject` / `needs-revision` を受け、body の `response` を
+   * 応答本文として保存する（`src/dashboard/multi-server.ts`）。`needs-revision` は
+   * 注釈コメントを前提にした流れなので、コメントを持たない stroke-board からは出さない。
+   *
+   * 本家の応答は `{ success: true }`。中身を使わないので形の検証は状態コードに任せる。
+   */
+  async respondToApproval(
+    projectId: string,
+    approvalId: string,
+    action: ApprovalAction,
+    response: string,
+  ): Promise<UpstreamResult<null>> {
+    const path = `/api/projects/${enc(projectId)}/approvals/${enc(approvalId)}/${action}`;
+
+    if (this.baseUrl === null) {
+      return { ok: false, failure: { kind: 'not-configured' } };
+    }
+
+    try {
+      await ofetch(path, {
+        baseURL: this.baseUrl,
+        method: 'POST',
+        body: { response },
+        retry: 0,
+      });
+    } catch (error) {
+      if (statusOf(error) === 404) {
+        return { ok: false, failure: { kind: 'not-found', path } };
+      }
+      return { ok: false, failure: { kind: 'unreachable', path, reason: toReason(error) } };
+    }
+
+    return { ok: true, value: null };
   }
 
   /**
