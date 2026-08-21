@@ -180,6 +180,7 @@ function unread(project: ProjectSummary): number | null {
             data-testid="project-row"
             :data-connection="project.connection"
             :data-name="project.name"
+            @click="enter(project)"
           >
             <td>
               <!--
@@ -191,7 +192,7 @@ function unread(project: ProjectSummary): number | null {
                 type="button"
                 class="inline-flex items-center gap-1.5 text-left hover:text-[var(--interactive-primary)] focus-visible:outline focus-visible:outline-2"
                 data-testid="project-enter"
-                @click="enter(project)"
+                @click.stop="enter(project)"
               >
                 <SbIcon name="folder" :size="14" />
                 {{ project.name }}

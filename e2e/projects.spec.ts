@@ -133,3 +133,49 @@ test.describe('登録・作成が行えない理由が画面に出る', () => {
     expect(body.actions.create.reason).toBe('target-undecided');
   });
 });
+
+/**
+ * 行全体が押せること。
+ *
+ * prototype は `<tr class="hit" data-open="...">` で行全体をクリック対象にしている。
+ * cursor:pointer とホバー反転が付いているのに名前のテキストしか押せないと、行のどこを
+ * 押しても開くように見えて開かない。
+ */
+test.describe('行全体が押せる', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/projects');
+  });
+
+  test('アクティブな行は状態のセルを押しても開く', async ({ page }) => {
+    await page
+      .getByTestId('project-row')
+      .filter({ hasText: 'alpha' })
+      .locator('td')
+      .nth(1)
+      .click();
+
+    await expect(page).toHaveURL(/\/projects\/ALPHAID000000001$/);
+  });
+
+  test('アクティブな行は最終更新のセルを押しても開く', async ({ page }) => {
+    await page
+      .getByTestId('project-row')
+      .filter({ hasText: 'beta' })
+      .locator('td')
+      .nth(3)
+      .click();
+
+    await expect(page).toHaveURL(/\/projects\/BETAID0000000002$/);
+  });
+
+  test('未接続の行はどこを押しても開かない', async ({ page }) => {
+    await page
+      .getByTestId('project-row')
+      .filter({ hasText: 'idle-project' })
+      .locator('td')
+      .nth(1)
+      .click();
+
+    await expect(page).toHaveURL(/\/projects$/);
+  });
+});

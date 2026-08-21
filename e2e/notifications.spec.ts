@@ -305,3 +305,21 @@ test.describe('通知が0件でも今の承認待ちは見える', () => {
     await expect(row.getByTestId('project-unread')).toHaveText('—');
   });
 });
+
+test.describe('通知も行全体が押せる', () => {
+  test.beforeEach(async ({ page }) => {
+    await resetBoard(page);
+    await stub.completeTask(ALPHA);
+    await expect(page.getByTestId('notification-row')).toHaveCount(1);
+  });
+
+  test('内容のセルを押しても対象が開く', async ({ page }) => {
+    await page.getByTestId('notification-row').locator('td').nth(2).click();
+    await expect(page).toHaveURL(new RegExp(`/projects/${ALPHA}/tasks/auth-spec$`));
+  });
+
+  test('最終更新のセルを押しても対象が開く', async ({ page }) => {
+    await page.getByTestId('notification-row').locator('td').nth(3).click();
+    await expect(page).toHaveURL(new RegExp(`/projects/${ALPHA}/tasks/auth-spec$`));
+  });
+});

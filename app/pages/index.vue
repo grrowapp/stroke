@@ -119,6 +119,7 @@ function open(notification: Notification): void {
           data-testid="notification-row"
           :data-kind="row.kind"
           :data-target="row.target"
+          @click="open(row)"
         >
           <td>
             <!--
@@ -129,7 +130,7 @@ function open(notification: Notification): void {
               type="button"
               class="inline-flex items-center gap-1.5 text-left text-[12px] text-[var(--text-secondary)] hover:text-[var(--interactive-primary)] focus-visible:outline focus-visible:outline-2"
               data-testid="notification-open"
-              @click="open(row)"
+              @click.stop="open(row)"
             >
               <SbIcon name="folder" :size="14" />
               {{ row.projectName }}
