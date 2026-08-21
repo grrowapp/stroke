@@ -13,6 +13,7 @@
     "postinstall": "nuxt prepare",
     "typecheck": "nuxt typecheck",
     "test": "vitest run",
+    "test:live": "vitest run --config vitest.live.config.ts",
     "test:e2e": "playwright test"
   },
   "dependencies": {

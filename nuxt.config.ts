@@ -23,9 +23,10 @@ export default defineNuxtConfig({
   typescript: { typeCheck: false, strict: true },
 
   runtimeConfig: {
-    // 本家ダッシュボードの URL と監視する親パス。値は環境変数から入る。
-    // NUXT_UPSTREAM_BASE_URL / NUXT_PROJECTS_PARENT_PATH
+    // 本家に触るために要る3つ。値は環境変数から入る。読み方は server/utils/config.ts に閉じる。
+    // NUXT_UPSTREAM_BASE_URL / NUXT_PROJECTS_PARENT_PATH / NUXT_SPEC_WORKFLOW_HOME
     upstreamBaseUrl: '',
     projectsParentPath: '',
+    specWorkflowHome: '',
   },
 });

@@ -23,12 +23,12 @@ design.md の Risks が求めているもの。ここがずれると 4章以降�
 
 本家に触るのはこの章だけ。書き込み系の関数は一切置かない（design.md 決定11）。
 
-- [ ] 3.1 親パスを直下1階層だけ走査し、`.spec-workflow` を持つディレクトリを返す（specs/project-directory）。親パス未設定・親パスが読めない・0件 を呼び出し側が区別できる形で返す
-- [ ] 3.2 `activeProjects.json` を読み、`{projectId, projectPath, workflowRootPath, projectName, instances}` として返す
-- [ ] 3.3 本家 REST の読み取りクライアントを作る。`GET /api/projects/:projectId/info` / `.../specs` / `.../specs/:name/all` / `.../specs/:name/tasks/progress` / `.../steering/:name` / `.../approvals` / `.../approvals/:id/content` のみ
-- [ ] 3.4 本家 WebSocket クライアントを作る。`ws://<host>/ws?projectId=<id>` に接続し、切断時は指数バックオフ（初回1秒・上限30秒）で再接続する
-- [ ] 3.5 本家から受け取るペイロードの zod スキーマを書き、3.3 と 3.4 の出口で検証する。形が合わないものは通さず記録に残す（specs/upstream-connection）
-- [ ] 3.6 3.1〜3.5 のユニットテストを書く。特に 3.1 の3状態の区別と、3.5 が形の違うペイロードを弾くこと
+- [x] 3.1 親パスを直下1階層だけ走査し、`.spec-workflow` を持つディレクトリを返す（specs/project-directory）。親パス未設定・親パスが読めない・0件 を呼び出し側が区別できる形で返す
+- [x] 3.2 `activeProjects.json` を読み、`{projectId, projectPath, workflowRootPath, projectName, instances}` として返す
+- [x] 3.3 本家 REST の読み取りクライアントを作る。`GET /api/projects/:projectId/info` / `.../specs` / `.../specs/:name/all` / `.../specs/:name/tasks/progress` / `.../steering/:name` / `.../approvals` / `.../approvals/:id/content` のみ
+- [x] 3.4 本家 WebSocket クライアントを作る。`ws://<host>/ws?projectId=<id>` に接続し、切断時は指数バックオフ（初回1秒・上限30秒）で再接続する
+- [x] 3.5 本家から受け取るペイロードの zod スキーマを書き、3.3 と 3.4 の出口で検証する。形が合わないものは通さず記録に残す（specs/upstream-connection）
+- [x] 3.6 3.1〜3.5 のユニットテストを書く。特に 3.1 の3状態の区別と、3.5 が形の違うペイロードを弾くこと
 
 ## 4. 制御層 — プロジェクト（`server/utils/control/`）
 
