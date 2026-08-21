@@ -12,7 +12,3 @@
 ## プロジェクト名の連番採番に上限が無い
 
 `server/utils/project.ts:59-61` の `for (let n = 2; ; n++)` は終了条件を持たない。既存名が多いと際限なく回る。
-
-## コメントが実在しないファイルを指している
-
-`server/utils/paths.ts:6` と `server/plugins/00.startup-checks.ts:22` のコメントが `server/plugins/00.writable.ts` を指しているが、実体は `00.startup-checks.ts`。

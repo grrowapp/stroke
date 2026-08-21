@@ -3,7 +3,7 @@ import { join } from 'node:path'
 /**
  * セッションディレクトリの置き場。`claude -p` の cwd になる。
  * `/var/lib` は実行ユーザーでは書き込み不可なので、この配下の作成と所有権付与は
- * アプリ外の配置作業（docs/adr 参照）。起動時チェックは server/plugins/00.writable.ts。
+ * アプリ外の配置作業（docs/adr 参照）。起動時チェックは server/plugins/00.startup-checks.ts。
  */
 export const SESSIONS_ROOT = '/var/lib/stroke-board/sessions'
 

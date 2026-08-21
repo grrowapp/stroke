@@ -1,6 +1,7 @@
 import { invokeAi } from '../../utils/ai'
 import { conflict } from '../../utils/conflict'
 import { beginRun, endRun } from '../../utils/running'
+import { missingPrerequisites } from '../../utils/readiness'
 import { requireSessionId } from '../../utils/session-param'
 import { readState, writeState } from '../../utils/session-store'
 
@@ -12,6 +13,18 @@ import { readState, writeState } from '../../utils/session-store'
  */
 export default defineEventHandler(async (event) => {
   const sessionId = await requireSessionId(event)
+
+  // 前提が欠けている間は起動を受け付けない（specs/api/invoke-agent）。判定はここで行い、
+  // 起動時の結果を持ち越さない（design.md 決定2）。409 とは別にする: 画面は 409 を
+  // 「待てば通る」と読むが（utils/conflict）、こちらは環境か設定を直すまで通らない。
+  const missing = await missingPrerequisites()
+  if (missing.length > 0) {
+    throw createError({
+      statusCode: 503,
+      statusMessage: 'Service Unavailable',
+      message: `AI を起動できる状態にない: ${missing.join(' / ')}`,
+    })
+  }
 
   const state = await readState(sessionId)
   if (state.phase === 'approved') {
