@@ -3,7 +3,7 @@ import { z } from 'zod'
 /**
  * 画面から届くリクエストボディの形。
  *
- * 契約（shared/api-contract.md）に無い形は 400 で弾く。長さの上限は、単一ユーザーの MVP で
+ * 契約（docs/api-contract.md）に無い形は 400 で弾く。長さの上限は、単一ユーザーの MVP で
  * 起きうる範囲より十分広く、かつ子プロセスへ渡す prompt が無制限に膨らまない程度に置く。
  */
 
@@ -17,7 +17,6 @@ const NEXT_STEPS_MAX = 50
 const COMMENTS_MAX = 200
 const SUMMARY_MAX = 50000
 const RECORD_MAX = 500000
-const PROJECT_NAME_MAX = 100
 const PROPOSAL_MAX = 200000
 
 export const startSessionBody = z.object({
@@ -77,7 +76,7 @@ export const sendBackBody = z.object({
 })
 
 export const approveBody = z.object({
-  projectName: z.string().trim().min(1, 'プロジェクト名が要る。').max(PROJECT_NAME_MAX),
+  projectName: z.string().trim().min(1, 'プロジェクト名が要る。'),
 })
 
 /**
@@ -86,7 +85,7 @@ export const approveBody = z.object({
  */
 export const proposalSubmitBody = z.object({
   proposal: z.string().trim().min(1, 'proposal の本文が要る。').max(PROPOSAL_MAX, 'proposal が長すぎる。'),
-  projectName: z.string().trim().max(PROJECT_NAME_MAX).optional(),
+  projectName: z.string().trim().optional(),
 })
 
 /** 契約に合わないボディは 400。最初の問題だけを画面へ返す。 */

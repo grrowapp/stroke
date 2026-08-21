@@ -271,13 +271,22 @@ export function useProposalReview(
     try {
       await $fetch(`${base.value}/send-back`, { method: 'POST', body: a.buildPayload() })
       a.clear()
+    } catch (error) {
+      pendingAction.value = null
+      warn('差し戻せませんでした', messageOf(error))
+      return
+    }
+    // 受理と起動は分かれている(specs/api/send-back)。成功応答の直後に起動を要求する
+    // (design.md 決定6)。busy(409)は invoke-agent 側が返す。
+    try {
+      await $fetch(`${base.value}/invoke-agent`)
       waitingRetry.startWaiting()
     } catch (error) {
       pendingAction.value = null
       if (statusOf(error) === 409) {
         warn('まだ前の応答を待っています', 'AI が応答を返すまで、続けて送ることはできません。')
       } else {
-        warn('差し戻せませんでした', messageOf(error))
+        warn('AI を起動できませんでした', messageOf(error))
       }
     }
   }
@@ -295,13 +304,22 @@ export function useProposalReview(
     try {
       await $fetch(`${base.value}/answer`, { method: 'POST', body: answer })
       answered.value += 1
+    } catch (error) {
+      pendingAction.value = null
+      warn('答えを送れませんでした', messageOf(error))
+      return
+    }
+    // 受理と起動は分かれている(specs/api/answer)。成功応答の直後に起動を要求する
+    // (design.md 決定6)。busy(409)は invoke-agent 側が返す。
+    try {
+      await $fetch(`${base.value}/invoke-agent`)
       waitingRetry.startWaiting()
     } catch (error) {
       pendingAction.value = null
       if (statusOf(error) === 409) {
         warn('まだ前の応答を待っています', 'AI が応答を返すまで、続けて送ることはできません。')
       } else {
-        warn('答えを送れませんでした', messageOf(error))
+        warn('AI を起動できませんでした', messageOf(error))
       }
     }
   }

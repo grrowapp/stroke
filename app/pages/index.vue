@@ -9,17 +9,31 @@ async function start(overview: string) {
   if (waiting.value) return
   waiting.value = true
   errorMessage.value = ''
+
+  let sessionId: string
   try {
-    const { sessionId } = await $fetch<{ sessionId: string }>('/api/overview', {
+    const created = await $fetch<{ sessionId: string }>('/api/overview', {
       method: 'POST',
       body: { overview },
     })
-    await navigateTo(`/s/${sessionId}`)
-    return
+    sessionId = created.sessionId
   } catch {
     errorMessage.value = 'セッションを開始できませんでした。もう一度投稿してください。'
+    waiting.value = false
+    return
   }
-  waiting.value = false
+
+  // 受理と起動は分かれている(specs/api/overview)。成功応答の直後に起動を要求する
+  // (design.md 決定6)。起動に失敗しても、セッション自体は作られている。
+  try {
+    await $fetch(`/api/${sessionId}/invoke-agent`)
+  } catch {
+    errorMessage.value = 'AI を起動できませんでした。もう一度投稿してください。'
+    waiting.value = false
+    return
+  }
+
+  await navigateTo(`/s/${sessionId}`)
 }
 </script>
 

@@ -72,10 +72,19 @@ async function answer(given: Answer) {
   errorMessage.value = ''
   try {
     await $fetch(`/api/${sessionId}/answer`, { method: 'POST', body: given })
-    strokes.value = [...strokes.value, { proposal: false, question: asked, answer: given }]
-    waitingRetry.startWaiting()
   } catch {
     errorMessage.value = '送信に失敗しました。もう一度送ってください。'
+    return
+  }
+  strokes.value = [...strokes.value, { proposal: false, question: asked, answer: given }]
+
+  // 受理と起動は分かれている(specs/api/answer)。成功応答の直後に起動を要求する
+  // (design.md 決定6)。
+  try {
+    await $fetch(`/api/${sessionId}/invoke-agent`)
+    waitingRetry.startWaiting()
+  } catch {
+    errorMessage.value = 'AI を起動できませんでした。'
   }
 }
 </script>

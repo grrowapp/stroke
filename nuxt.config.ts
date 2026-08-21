@@ -1,3 +1,5 @@
+import { DEFAULT_API_BASE_URL } from './server/utils/api-base-url'
+
 export default defineNuxtConfig({
   modules: ['@nuxt/ui'],
   css: ['~/assets/css/main.css'],
@@ -42,14 +44,18 @@ export default defineNuxtConfig({
       // エージェント向け endpoint の base URL。spawn 時に環境変数 STROKE_BASEURL として
       // 渡し、セッション API スキルがそこから接続先を解決する（prompt には載せない）。
       // NUXT_CLAUDE_API_BASE_URL で上書きできる（dev サーバーは 3001 固定）。
-      apiBaseUrl: 'http://127.0.0.1:3001',
-      // ワークフロー定義を置いた OpenSpec store の id（`openspec store register` 済み）。
-      // セッションはこの store 上の change として作られる（design.md 決定3）。
-      // NUXT_CLAUDE_STORE_ID で上書きできる。
-      storeId: 'stroke-sessions',
-      // 初回の prompt で実行させる opsx コマンド。ワークフローの入口はここだけで決まる。
-      // NUXT_CLAUDE_OPSX_COMMAND で上書きできる。
-      opsxCommand: 'opsx:continue',
+      // 既定値の出どころは server/utils/api-base-url.ts（script と共有）。
+      apiBaseUrl: DEFAULT_API_BASE_URL,
+      // セッションの openspec/config.yaml に書くワークフロースキーマ名。実体は
+      // user レベル（~/.local/share/openspec/schemas/）に配置されたものが解決される。
+      // NUXT_CLAUDE_WORKFLOW_SCHEMA で上書きできる。
+      workflowSchema: 'flontier-strokeflow',
+      // AI へ渡す定型。本文をコードに持たない（specs/ai-invocation: 定型は設定値として
+      // 外に出す）。初回はスキル起動＋最低限の固定指示、継続は続きを促すだけ（入力は
+      // prompt に載せず、エージェントが取得スキルで読む）。
+      // NUXT_CLAUDE_FIRST_PROMPT / NUXT_CLAUDE_CONTINUE_PROMPT で上書きできる。
+      firstPrompt: '/openspec-ff-change draft-proposal\n\nスキルの指示に従って作業を実施する。',
+      continuePrompt: '続きを進めろ。状況は取得スキルで確認してから判断しろ。',
     },
   },
 })

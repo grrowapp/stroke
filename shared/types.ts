@@ -117,3 +117,13 @@ export interface ProposalMessage {
   proposal: string
   projectName: string | null
 }
+
+/**
+ * U12 `GET /api/sessions` の1件分。`updatedAt` は `state.json` の mtime（ISO 8601）。
+ * `state.json` が読めないセッションは phase を `unknown` として載せる。
+ */
+export interface SessionSummary {
+  id: string
+  phase: Phase | 'unknown'
+  updatedAt: string
+}

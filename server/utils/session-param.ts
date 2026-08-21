@@ -1,5 +1,6 @@
 import type { H3Event } from 'h3'
-import { isSessionId, sessionExists } from './session-store'
+import { isSessionId } from './session-core'
+import { sessionExists } from './session-store'
 
 /**
  * URL のパスパラメータからセッション uuid を取る。

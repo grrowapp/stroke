@@ -1,17 +1,11 @@
 import { readClaudeConfig } from './claude-config'
 import { runClaude, type ClaudeMode, type ClaudeRunResult } from './claude'
 import { sessionDir } from './paths'
-import { continuePrompt } from './prompt'
+import { initSessionOpenspec } from './openspec'
+import { continuePrompt, firstPrompt } from './prompt'
+import { listSessionsCore } from './session-core'
 import { readState, writeState } from './session-store'
 import { waitForSubmission } from './submission-signal'
-
-export interface InvokeAiOptions {
-  sessionId: string
-  /** 渡す定型。初回は `firstPrompt`、2回目以降は `continuePrompt`（リトライも同文） */
-  prompt: string
-  /** セッションの最初の呼び出しか。true なら `--session-id`、false なら `--resume` */
-  first: boolean
-}
 
 /** リトライ回数。MVP の割り切りで設定値にしない。 */
 const MAX_RETRIES = 2
@@ -25,6 +19,9 @@ type AttemptOutcome =
  * 即完結する）。結果はエージェントの提出（A5・A7）が endpoint へ直接届けるため、この関数の
  * 返り値には載らない。
  *
+ * 初回か継続か・渡す定型は呼び出し側から受け取らない。一覧 API の実体
+ * （`listSessionsCore`）を叩き、符合する id があれば有効（= 継続）、無ければ初回と判定する。
+ *
  * 呼び出し側は、この呼び出しを始める前に `beginRun(sessionId)` を済ませ、返ってきた
  * promise に `.finally(() => endRun(sessionId))` を付けること（busy ガードの対称性）。
  *
@@ -32,13 +29,31 @@ type AttemptOutcome =
  * 既存のリトライ（続きを促す再起動・入力は送り直さない）へ流す（specs/ai-invocation）。
  * 尽きたら `invocation: failed` を state.json に書く。502 は返さない。
  */
-export async function invokeAi(options: InvokeAiOptions): Promise<void> {
-  const { sessionId } = options
+export async function invokeAi(sessionId: string): Promise<void> {
   const cwd = sessionDir(sessionId)
-  const timeoutMs = readClaudeConfig().timeoutMs
+  const config = readClaudeConfig()
+  const timeoutMs = config.timeoutMs
 
-  let mode: ClaudeMode = options.first ? 'new' : 'resume'
-  let prompt = options.prompt
+  // 初回判定: 一覧 API の実体を叩き、符合する id があれば有効（= 継続）、無ければ初回。
+  // 一覧はディレクトリ・openspec・config.yaml（スキーマ書き込み済み）の検査を
+  // 全部パスしたものだけを載せる。
+  const valid = (await listSessionsCore()).some((s) => s.id === sessionId)
+  const first = !valid
+
+  if (first) {
+    // 実行環境（openspec ルート初期化 + config.yaml）は invokeAi が初回に自分で作る
+    // （ユーザー決定）。これを終えると一覧の検査を通るので、以降の判定は継続になる。
+    try {
+      await initSessionOpenspec(cwd, config.workflowSchema)
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      console.warn(`[stroke-board] AI 呼び出しが失敗: ${sessionId}`, [`実行環境を作れない: ${detail}`])
+      await markInvocationFailed(sessionId)
+      return
+    }
+  }
+  let mode: ClaudeMode = first ? 'new' : 'resume'
+  let prompt = first ? firstPrompt() : continuePrompt()
   const failures: string[] = []
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
@@ -48,7 +63,7 @@ export async function invokeAi(options: InvokeAiOptions): Promise<void> {
 
     failures.push(outcome.detail)
     if (outcome.sessionMissing) {
-      if (!options.first) {
+      if (!first) {
         // 往復の途中で継続先を失った。ここから `--session-id` で始め直すと、概要も
         // 過去のストロークも無い会話へ入力だけを流し込むことになる。
         failures.push('継続先のセッションが失われた（初回ではないので作り直さない）')
@@ -56,7 +71,7 @@ export async function invokeAi(options: InvokeAiOptions): Promise<void> {
       }
       // 初回。継続先が無い = 履歴には何も入っていない。送り直してよい。
       mode = 'new'
-      prompt = options.prompt
+      prompt = firstPrompt()
       continue
     }
 

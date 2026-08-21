@@ -4,13 +4,8 @@
 
 ## 既に change になっているもの
 
-着手はこの順。3件とも `paths.ts` と `claude-config.ts` に触れるので並列に進められない。
-
-1. `remove-store-dependency` — store 依存をやめ、cwd から openspec ルートを解決する
-2. `externalize-hardcoded-settings` — 直書きされた設定値 62 箇所を残らず runtimeConfig へ。WS の URL からセッション id を抜く正規表現も含むので、サブパス配信で接続が無言で閉じる問題もここで解ける
-3. `add-session-lifecycle` — セッションを消せるようにする
-
-先頭がセッションディレクトリの位置を確定させ、次がその位置を設定値へ出し、最後がそれを消す処理を足す。
+1. `add-session-management-command` — セッション管理の口（endpoint / script）と store を外す実行仕様の変更。旧 `remove-store-dependency` を統合済み
+2. `remove-project-name-length-limit` — プロジェクト名の長さ上限の撤廃
 
 ---
 

@@ -1,27 +1,23 @@
 import { execFile } from 'node:child_process'
+import { writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { promisify } from 'node:util'
-import { readClaudeConfig } from './claude-config'
 
 const execFileAsync = promisify(execFile)
 
 /**
- * セッションはワークフロー定義を置いた store 上の change（design.md 決定3）。
- * セッションを作った時点でここに change を作っておき、claude は cwd に依らず
- * `--store <id>` で参照する。
+ * セッションディレクトリを openspec ルートとして初期化する。
  *
- * スキーマは store の `config.yaml` が既定として持つので指定しない（実測: `--schema` を
- * 省いても `stroke-session` で作られる）。
+ * cwd = セッションディレクトリで `openspec init --tools none` を実行し、`config.yaml` を
+ * スキーマ名で上書きする。スキーマの実体は user レベル（`~/.local/share/openspec/schemas/`）
+ * から解決される。store はどのコードパスからも使わない。
+ *
+ * change はここでは作らない。初回呼び出しの `openspec-ff-change` スキルが
+ * `openspec new change` から実行する（design.md 決定1・2）。
+ *
+ * Nitro に依存しない。失敗は素の Error のまま呼び出し側（session-core）へ届ける。
  */
-export async function createSessionChange(sessionId: string): Promise<void> {
-  const { storeId } = readClaudeConfig()
-
-  try {
-    await execFileAsync('openspec', ['new', 'change', sessionId, '--store', storeId, '--json'])
-  } catch (error) {
-    throw createError({
-      statusCode: 500,
-      statusMessage: 'Internal Server Error',
-      message: `セッションの change を作れなかった: ${error instanceof Error ? error.message : String(error)}`,
-    })
-  }
+export async function initSessionOpenspec(sessionDir: string, schemaName: string): Promise<void> {
+  await execFileAsync('openspec', ['init', '--tools', 'none'], { cwd: sessionDir })
+  await writeFile(join(sessionDir, 'openspec', 'config.yaml'), `schema: ${schemaName}\n`, 'utf8')
 }

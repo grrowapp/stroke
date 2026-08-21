@@ -1,11 +1,20 @@
-import { randomUUID } from 'node:crypto'
-import { mkdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import { z } from 'zod'
 import type { Answer, Invocation, Question, SendBackPayload, Stroke } from '#shared/types'
-import { createSessionChange } from './openspec'
-import { sessionDir, sessionFile } from './paths'
+import { sessionFile } from './paths'
 import { questionSchema } from './question'
 import { sendBackBody } from './request-schemas'
+import {
+  OVERVIEW_FILE,
+  PROPOSAL_FILE,
+  SEND_BACK_FILE,
+  STATE_FILE,
+  STROKES_FILE,
+  SessionCoreError,
+  createSessionCore,
+  sessionExistsCore,
+  writeAtomic as writeAtomicCore,
+} from './session-core'
 
 /**
  * `state.json` の中身。
@@ -32,13 +41,7 @@ export type SessionState =
       projectName: string
     }
 
-const STATE_FILE = 'state.json'
-const STROKES_FILE = 'strokes.json'
-const PROPOSAL_FILE = 'proposal.md'
-const OVERVIEW_FILE = 'overview.txt'
-const SEND_BACK_FILE = 'send-back.json'
-
-const projectNameSchema = z.string().trim().min(1).max(100)
+const projectNameSchema = z.string().trim().min(1)
 const invocationSchema = z.enum(['running', 'idle', 'failed'])
 
 const activeStateFields = {
@@ -67,41 +70,35 @@ const strokesSchema = z.array(strokeSchema)
 
 /**
  * セッションを開始する。概要を保存し、`state.json` を最初から書く（`stroking` / 問い無し /
- * `invocation: running`）。呼び出し側はこの直後に最初の AI 呼び出しを始める前提。
+ * `invocation: idle`）。AI の起動は受理に含まれず、フロントが受理後に invoke-agent へ
+ * 要求したとき `running` になる（specs/api/overview・specs/api/invoke-agent）。
+ * openspec ルートの初期化もここではやらない（invokeAi が初回に行う）。
  *
- * 旧実装と違い、最初の問いが得られるのを待たない（HTTP はステートレス・design.md）。
- * そのため `state.json` は最初からここで書き、セッションはこの時点で「在る」ものとして扱う。
+ * 最初の問いが得られるのを待たない（HTTP はステートレス・design.md）。
+ * `state.json` は最初からここで書き、セッションはこの時点で「在る」ものとして扱う。
  */
 export async function createSession(overview: string): Promise<string> {
-  const sessionId = randomUUID()
-  // セッション = ワークフロー定義の store 上の change（design.md 決定3）。作れなければ
-  // claude は従う指示を取得できないので、セッションディレクトリを作る前にここで落とす。
-  await createSessionChange(sessionId)
-  await mkdir(sessionDir(sessionId), { recursive: true })
-  await writeAtomic(sessionId, OVERVIEW_FILE, overview)
-  await writeStrokes(sessionId, [])
-  await writeState(sessionId, {
-    phase: 'stroking',
-    currentQuestion: null,
-    invocation: 'running',
-  })
-  return sessionId
+  // 実体は core（design.md 決定3: endpoint と script で同じ実装を呼ぶ）。
+  try {
+    return await createSessionCore(overview, 'idle')
+  } catch (error) {
+    throw sessionErrorToHttp(error)
+  }
 }
 
 /** セッションとして成立しているか。`state.json` が在ることをもって在るとする。 */
 export async function sessionExists(sessionId: string): Promise<boolean> {
-  if (!isSessionId(sessionId)) return false
-  try {
-    const s = await stat(sessionFile(sessionId, STATE_FILE))
-    return s.isFile()
-  } catch {
-    return false
-  }
+  return sessionExistsCore(sessionId)
 }
 
-/** uuid の形をしていないものはディレクトリ名として受け付けない。 */
-export function isSessionId(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value)
+/** core の失敗を HTTP へ写す。endpoint 側の共通の出口。 */
+export function sessionErrorToHttp(error: unknown) {
+  const notFound = error instanceof SessionCoreError && error.kind === 'not-found'
+  return createError({
+    statusCode: notFound ? 404 : 500,
+    statusMessage: notFound ? 'Not Found' : 'Internal Server Error',
+    message: error instanceof Error ? error.message : String(error),
+  })
 }
 
 export async function readState(sessionId: string): Promise<SessionState> {
@@ -200,23 +197,12 @@ export async function writeProposal(sessionId: string, proposal: string): Promis
   await writeAtomic(sessionId, PROPOSAL_FILE, proposal)
 }
 
-/**
- * 書きかけを残さない。同じディレクトリへ書いてから rename するので、
- * 読み手が見るのは常に前の版か新しい版のどちらかになる。
- */
+/** 原子的な書き込みの実体は core。失敗はここで HTTP へ写す。 */
 async function writeAtomic(sessionId: string, name: string, contents: string): Promise<void> {
-  const target = sessionFile(sessionId, name)
-  const temp = `${target}.${randomUUID()}.tmp`
   try {
-    await writeFile(temp, contents, 'utf8')
-    await rename(temp, target)
+    await writeAtomicCore(sessionId, name, contents)
   } catch (error) {
-    await unlink(temp).catch(() => {})
-    throw createError({
-      statusCode: 500,
-      statusMessage: 'Internal Server Error',
-      message: `${name} を書けなかった: ${error instanceof Error ? error.message : String(error)}`,
-    })
+    throw sessionErrorToHttp(error)
   }
 }
 
