@@ -14,16 +14,44 @@ import { computed, definePageMeta, navigateTo, useFetch, useHead } from '#import
 import SbIcon from '~/components/ui/SbIcon.vue';
 import { useBoardSocket } from '~/composables/useBoardSocket';
 import { formatRelativeTime } from '~/composables/useRelativeTime';
-import type { ProjectDirectory, ProjectSummary } from '#shared/types';
+import type {
+  ActionAvailability,
+  ProjectDirectoryResponse,
+  ProjectSummary,
+} from '#shared/types';
 
 definePageMeta({ layout: 'portal' });
 useHead({ title: 'プロジェクト一覧 — stroke-board' });
 
-const { data, status } = await useFetch<ProjectDirectory>('/api/projects');
+const { data, status } = await useFetch<ProjectDirectoryResponse>('/api/projects');
 
-const directory = computed(() => data.value);
+const directory = computed(() => data.value?.directory);
+const actions = computed(() => data.value?.actions);
 const projects = computed<ProjectSummary[]>(() =>
   directory.value?.status === 'ok' ? directory.value.projects : [],
+);
+
+/**
+ * 操作が使えない理由。
+ *
+ * 非活性にするだけだと、画面から「なぜ使えないのか」が消える。interview Q39・Q40 は
+ * どちらも「その状態は画面に出る」で決着している。
+ */
+const REASON_TEXT: Record<'target-undecided' | 'meaning-undecided', string> = {
+  'target-undecided':
+    '作成の実処理を担う接続先の別プロジェクトに繋がっていません。stroke-board が持つのは入口だけで、接続が無い間は作成できません。',
+  'meaning-undecided':
+    '登録が何を指すか（本家への登録なのか、走査対象の親パスを足すのか）が決まっていません。',
+};
+
+function reasonOf(action: ActionAvailability | undefined): string | null {
+  return action === undefined || action.available ? null : REASON_TEXT[action.reason];
+}
+
+const blockedReasons = computed(() =>
+  [reasonOf(actions.value?.create), reasonOf(actions.value?.register)].filter(
+    (reason): reason is string => reason !== null,
+  ),
 );
 
 function enter(project: ProjectSummary): void {
@@ -62,13 +90,13 @@ function unread(project: ProjectSummary): number {
       <div class="ml-auto flex gap-2">
         <!--
           登録・作成は一覧画面の操作として持つ。独立したメニュー項目にはしない。
-          実処理は接続先の別プロジェクトが担い、その中身が未決なので非活性のままにする。
+          使えるかどうかはサーバーが返す状態で決める。画面側で非活性をベタ書きしない。
         -->
         <button
           type="button"
-          disabled
+          :disabled="!actions?.register.available"
           class="sb-btn"
-          title="登録の実処理は未実装です"
+          :title="reasonOf(actions?.register) ?? ''"
           data-testid="register-project"
         >
           <SbIcon name="link" :size="14" />
@@ -76,9 +104,9 @@ function unread(project: ProjectSummary): number {
         </button>
         <button
           type="button"
-          disabled
+          :disabled="!actions?.create.available"
           class="sb-btn sb-btn-primary"
-          title="作成の実処理は接続先の別プロジェクトが担います"
+          :title="reasonOf(actions?.create) ?? ''"
           data-testid="create-project"
         >
           <SbIcon name="plus" :size="14" />
@@ -86,6 +114,24 @@ function unread(project: ProjectSummary): number {
         </button>
       </div>
     </div>
+
+    <!--
+      使えない理由を画面に出す。interview Q39・Q40 はどちらも「その状態は画面に出る」で
+      決着している。title 属性はポインタを載せないと読めないので、これだけでは満たさない。
+    -->
+    <ul
+      v-if="blockedReasons.length > 0"
+      class="mb-3 space-y-1"
+      data-testid="actions-blocked"
+    >
+      <li
+        v-for="reason in blockedReasons"
+        :key="reason"
+        class="text-[12px] text-[var(--text-muted)]"
+      >
+        {{ reason }}
+      </li>
+    </ul>
 
     <p v-if="status === 'pending'" class="sb-placeholder">読み込み中…</p>
 

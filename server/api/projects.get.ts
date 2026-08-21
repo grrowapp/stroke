@@ -8,12 +8,13 @@
 import { defineEventHandler } from 'h3';
 
 import { readServerConfig } from '../utils/config';
+import { resolveDirectoryActions } from '../utils/control/actions';
 import { buildProjectDirectory } from '../utils/control/directory';
 import { readRegistry } from '../utils/upstream/registry';
 import { scanProjects } from '../utils/upstream/scan';
-import type { ProjectDirectory } from '#shared/types';
+import type { ProjectDirectoryResponse } from '#shared/types';
 
-export default defineEventHandler(async (): Promise<ProjectDirectory> => {
+export default defineEventHandler(async (): Promise<ProjectDirectoryResponse> => {
   const config = readServerConfig();
 
   const [scan, registry] = await Promise.all([
@@ -21,8 +22,11 @@ export default defineEventHandler(async (): Promise<ProjectDirectory> => {
     readRegistry(config.specWorkflowHome),
   ]);
 
-  return buildProjectDirectory(scan, {
-    entries: registry.status === 'ok' ? registry.entries : [],
-    readable: registry.status === 'ok',
-  });
+  return {
+    directory: buildProjectDirectory(scan, {
+      entries: registry.status === 'ok' ? registry.entries : [],
+      readable: registry.status === 'ok',
+    }),
+    actions: resolveDirectoryActions(),
+  };
 });

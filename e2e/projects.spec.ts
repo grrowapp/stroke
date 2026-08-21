@@ -97,3 +97,39 @@ test.describe('一覧の列は prototype と同じ', () => {
     await expect(row.getByTestId('project-last-modified')).not.toHaveText('—');
   });
 });
+
+/**
+ * 作成の接続先（interview Q40）。stroke-board は入口だけを持ち、接続が無ければ作成は
+ * 行えず、その状態は画面に出る。
+ */
+test.describe('登録・作成が行えない理由が画面に出る', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/projects');
+  });
+
+  test('接続先に繋がっていないため作成できないことが文言で分かる', async ({ page }) => {
+    await expect(page.getByTestId('actions-blocked')).toContainText('接続先の別プロジェクト');
+  });
+
+  test('登録の理由は作成とは別に出る', async ({ page }) => {
+    const reasons = await page.getByTestId('actions-blocked').locator('li').allTextContents();
+
+    expect(reasons).toHaveLength(2);
+    expect(new Set(reasons).size).toBe(2);
+    expect(reasons.some((reason) => reason.includes('登録が何を指すか'))).toBe(true);
+  });
+
+  test('理由は title 属性だけでなく画面の文言として出ている', async ({ page }) => {
+    await expect(page.getByTestId('actions-blocked')).toBeVisible();
+  });
+
+  test('可否はサーバーが返す状態から決まる', async ({ request }) => {
+    const response = await request.get('/api/projects');
+    const body = (await response.json()) as {
+      actions: { create: { available: boolean; reason?: string } };
+    };
+
+    expect(body.actions.create.available).toBe(false);
+    expect(body.actions.create.reason).toBe('target-undecided');
+  });
+});
