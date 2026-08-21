@@ -4,6 +4,8 @@
  *
  * 列は プロジェクト / 種別 / 内容 / 最終更新 の4つ（specs/notification-feed）。
  * 行を選ぶと対象が開く。開くだけで、承認や却下はしない。
+ *
+ * 表の様式は prototype（archive の navigation.prototype.html）に合わせる。
  */
 import { computed, definePageMeta, navigateTo, useHead } from '#imports';
 
@@ -34,50 +36,52 @@ function open(notification: Notification): void {
 
 <template>
   <section>
-    <h1 class="mb-4 text-lg font-semibold text-highlighted">通知</h1>
+    <h1 class="mb-3 text-lg font-semibold">通知</h1>
 
-    <p v-if="rows.length === 0" class="text-muted" data-testid="notifications-empty">
+    <p v-if="rows.length === 0" class="sb-placeholder" data-testid="notifications-empty">
       通知はまだありません。本家で承認依頼が出るか、タスクの状態が変わると、ここに並びます。
     </p>
 
-    <table v-else class="w-full border-collapse text-sm" data-testid="notifications-table">
+    <table v-else class="sb-table" data-testid="notifications-table">
       <thead>
-        <tr class="border-b border-default text-left text-muted">
-          <th scope="col" class="px-3 py-2 font-medium">プロジェクト</th>
-          <th scope="col" class="px-3 py-2 font-medium">種別</th>
-          <th scope="col" class="px-3 py-2 font-medium">内容</th>
-          <th scope="col" class="px-3 py-2 font-medium">最終更新</th>
+        <tr>
+          <th scope="col" class="w-40">プロジェクト</th>
+          <th scope="col" class="w-24">種別</th>
+          <th scope="col">内容</th>
+          <th scope="col" class="w-28">最終更新</th>
         </tr>
       </thead>
       <tbody>
         <tr
           v-for="row in rows"
           :key="row.id"
-          class="border-b border-default hover:bg-elevated focus-within:bg-elevated"
+          class="sb-row-hit"
           data-testid="notification-row"
           :data-kind="row.kind"
           :data-target="row.target"
         >
-          <td class="px-3 py-2">
+          <td>
             <!--
-              行そのものではなくリンクにして、キーボードだけで辿って開けるようにする
+              行そのものではなくボタンにして、キーボードだけで辿って開けるようにする
               （specs/notification-feed）。
             -->
             <button
               type="button"
-              class="text-left hover:text-highlighted focus-visible:outline focus-visible:outline-2"
+              class="text-left hover:text-[var(--interactive-primary)] focus-visible:outline focus-visible:outline-2"
               data-testid="notification-open"
               @click="open(row)"
             >
               {{ row.projectName }}
             </button>
           </td>
-          <td class="px-3 py-2 text-muted">{{ categoryLabel[row.category] }}</td>
-          <td class="px-3 py-2">
-            <div class="text-highlighted">{{ row.title }}</div>
-            <div class="text-muted">{{ row.subject }}</div>
+          <td>
+            <span class="sb-chip">{{ categoryLabel[row.category] }}</span>
           </td>
-          <td class="px-3 py-2 text-muted">{{ formatRelativeTime(row.occurredAt) }}</td>
+          <td>
+            <div>{{ row.title }}</div>
+            <div class="text-[var(--text-muted)] text-[12px]">{{ row.subject }}</div>
+          </td>
+          <td class="text-[var(--text-muted)]">{{ formatRelativeTime(row.occurredAt) }}</td>
         </tr>
       </tbody>
     </table>

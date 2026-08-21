@@ -24,19 +24,29 @@ const documents = computed(() => {
 
 <template>
   <section>
-    <h1 class="mb-4 text-lg font-semibold text-highlighted">ステアリング</h1>
+    <h1 class="mb-3 text-lg font-semibold">ステアリング</h1>
 
-    <ul class="space-y-2" data-testid="steering-list">
-      <li
-        v-for="document in documents"
-        :key="document.name"
-        class="flex items-center justify-between rounded border border-default px-3 py-2"
-        data-testid="steering-row"
-        :data-exists="document.exists"
-      >
-        <span :class="document.exists ? 'text-highlighted' : 'text-muted'">{{ document.label }}</span>
-        <span class="text-sm text-muted">{{ document.exists ? 'あり' : '未作成' }}</span>
-      </li>
-    </ul>
+    <table class="sb-table" data-testid="steering-list">
+      <thead>
+        <tr>
+          <th scope="col">文書</th>
+          <th scope="col" class="w-32">状態</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr
+          v-for="document in documents"
+          :key="document.name"
+          :class="document.exists ? '' : 'sb-row-off'"
+          data-testid="steering-row"
+          :data-exists="document.exists"
+        >
+          <td class="font-mono">{{ document.label }}</td>
+          <td>
+            <span class="sb-chip">{{ document.exists ? 'あり' : '未作成' }}</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
   </section>
 </template>

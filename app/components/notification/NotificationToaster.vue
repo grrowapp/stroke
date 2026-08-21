@@ -34,12 +34,31 @@ function dismiss(id: string): void {
   toasts.value = toasts.value.filter((toast) => toast.id !== id);
 }
 
-/** 本家は info / success / warning / error の4色。ここだけ indigo 集約の外に置く */
-const toneClass: Record<NotificationTone, string> = {
-  info: 'bg-blue-900/20 border-blue-800 text-blue-200',
-  success: 'bg-green-900/20 border-green-800 text-green-200',
-  warning: 'bg-yellow-900/20 border-yellow-800 text-yellow-200',
-  error: 'bg-red-900/20 border-red-800 text-red-200',
+/**
+ * 本家は info / success / warning / error の4色。ここだけ indigo 集約の外に置く。
+ * 値は本家の `--status-*` をそのまま使う（ui.md の Visual Language）。
+ */
+const toneStyle: Record<NotificationTone, { background: string; borderColor: string; color: string }> = {
+  info: {
+    background: 'var(--status-info-muted)',
+    borderColor: 'var(--status-info)',
+    color: 'var(--status-info)',
+  },
+  success: {
+    background: 'var(--status-success-muted)',
+    borderColor: 'var(--status-success)',
+    color: 'var(--status-success)',
+  },
+  warning: {
+    background: 'var(--status-warning-muted)',
+    borderColor: 'var(--status-warning)',
+    color: 'var(--status-warning)',
+  },
+  error: {
+    background: 'var(--status-error-muted)',
+    borderColor: 'var(--status-error)',
+    color: 'var(--status-error)',
+  },
 };
 
 onBeforeUnmount(() => {
@@ -62,13 +81,13 @@ onBeforeUnmount(() => {
     <div
       v-for="toast in toasts"
       :key="toast.id"
-      class="flex items-start gap-2 rounded-md border px-3 py-2 shadow-lg"
-      :class="toneClass[toast.tone]"
+      class="flex items-start gap-2 rounded-md border px-3 py-2"
+      :style="{ ...toneStyle[toast.tone], boxShadow: 'var(--shadow-overlay)' }"
       data-testid="toast"
       :data-tone="toast.tone"
     >
       <!-- 中身は1行テキストのみ。件名と本文の区別もリンクも持たない -->
-      <p class="text-sm font-medium break-words flex-1">
+      <p class="flex-1 text-[13px] font-medium break-words">
         {{ toast.projectName }}: {{ toast.title }}
       </p>
       <button

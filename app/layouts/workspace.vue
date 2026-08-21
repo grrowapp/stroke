@@ -35,39 +35,39 @@ const sections = [
 </script>
 
 <template>
-  <div class="min-h-screen bg-default text-default">
-    <header class="flex items-center gap-4 border-b border-default px-6 py-3">
+  <div class="min-h-screen bg-[var(--surface-base)] text-[var(--text-primary)]">
+    <header class="sb-bar">
       <NuxtLink
         to="/"
-        class="text-sm text-muted hover:text-highlighted focus-visible:outline focus-visible:outline-2"
+        class="text-[13px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
         data-testid="back-to-portal"
       >
         ← ポータルへ戻る
       </NuxtLink>
-      <span class="font-semibold text-highlighted" data-testid="workspace-project-name">
+      <span class="text-base font-semibold" data-testid="workspace-project-name">
         {{ info?.projectName ?? projectId }}
       </span>
       <span
-        class="ml-auto text-sm text-muted"
+        class="sb-chip"
         data-testid="workspace-connection"
         :data-connected="upstreamConnected && !unresolved"
       >
-        {{ unresolved ? '未接続' : upstreamConnected ? 'アクティブ' : '未接続' }}
+        {{ unresolved || !upstreamConnected ? '未接続' : 'アクティブ' }}
       </span>
     </header>
 
     <div class="flex">
       <nav
-        class="w-44 shrink-0 border-r border-default p-3"
+        class="w-44 shrink-0 border-r border-[var(--border-default)] bg-[var(--surface-panel)] p-2"
         aria-label="プロジェクト"
         data-testid="workspace-sidebar"
       >
-        <ul class="space-y-1">
+        <ul class="space-y-0.5">
           <li v-for="section in sections" :key="section.to">
             <NuxtLink
               :to="`/projects/${projectId}/${section.to}`"
-              class="block rounded px-2 py-1 text-sm hover:text-highlighted"
-              active-class="bg-elevated text-highlighted"
+              class="sb-navitem"
+              active-class="sb-navitem-on"
               :data-testid="`sidebar-${section.to}`"
             >
               {{ section.label }}
@@ -76,8 +76,8 @@ const sections = [
         </ul>
       </nav>
 
-      <main class="flex-1 px-6 py-5">
-        <p v-if="unresolved" class="text-muted" data-testid="workspace-unresolved">
+      <main class="min-w-0 flex-1 p-4">
+        <p v-if="unresolved" class="sb-placeholder" data-testid="workspace-unresolved">
           このプロジェクトは本家に繋がっていません。ポータルから選び直してください。
         </p>
         <slot v-else />

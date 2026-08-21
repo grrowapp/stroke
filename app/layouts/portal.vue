@@ -3,7 +3,9 @@
  * 上層（プロジェクト横断ポータル）のシェル。
  *
  * ナビゲーションはヘッダー直下の横並びタブ。下層は左サイドバーで、形そのものを変えることで
- * どちらの階層にいるかが見て分かるようにする（specs/project-workspace）。
+ * どちらの階層にいるかが見て分かる（specs/project-workspace）。
+ *
+ * 見た目は prototype（archive の navigation.prototype.html）の案A に合わせる。
  */
 import { useBoardSocket } from '~/composables/useBoardSocket';
 
@@ -11,43 +13,38 @@ const { notifications, upstreamConnected } = useBoardSocket();
 </script>
 
 <template>
-  <div class="min-h-screen bg-default text-default">
-    <header class="flex items-center justify-between border-b border-default px-6 py-3">
-      <span class="font-semibold text-highlighted">stroke-board</span>
+  <div class="min-h-screen bg-[var(--surface-base)] text-[var(--text-primary)]">
+    <header class="sb-bar">
+      <span class="text-base font-semibold">stroke-board</span>
       <span
-        class="flex items-center gap-2 text-sm text-muted"
+        class="ml-auto flex items-center gap-2 text-[13px] text-[var(--text-muted)]"
         data-testid="upstream-connection"
         :data-connected="upstreamConnected"
       >
         <span
           class="inline-block size-2 rounded-full"
-          :class="upstreamConnected ? 'bg-primary' : 'bg-current opacity-40'"
+          :style="{
+            background: upstreamConnected ? 'var(--interactive-primary)' : 'var(--text-faint)',
+          }"
         />
         {{ upstreamConnected ? '接続済み' : '未接続' }}
       </span>
     </header>
 
-    <nav class="flex gap-1 border-b border-default px-6" aria-label="ポータル">
-      <NuxtLink
-        to="/"
-        class="px-3 py-2 text-sm border-b-2 border-transparent hover:text-highlighted"
-        active-class="border-primary text-highlighted"
-        data-testid="tab-notifications"
-      >
+    <nav
+      class="flex gap-1 border-b border-[var(--border-default)] bg-[var(--surface-panel)] px-3"
+      aria-label="ポータル"
+    >
+      <NuxtLink to="/" class="sb-tab" active-class="sb-tab-on" data-testid="tab-notifications">
         通知
-        <span v-if="notifications.length > 0" class="ml-1 text-muted">{{ notifications.length }}</span>
+        <span v-if="notifications.length > 0" class="sb-badge ml-1">{{ notifications.length }}</span>
       </NuxtLink>
-      <NuxtLink
-        to="/projects"
-        class="px-3 py-2 text-sm border-b-2 border-transparent hover:text-highlighted"
-        active-class="border-primary text-highlighted"
-        data-testid="tab-projects"
-      >
+      <NuxtLink to="/projects" class="sb-tab" active-class="sb-tab-on" data-testid="tab-projects">
         プロジェクト一覧
       </NuxtLink>
     </nav>
 
-    <main class="px-6 py-5">
+    <main class="p-4">
       <slot />
     </main>
   </div>

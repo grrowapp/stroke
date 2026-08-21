@@ -27,61 +27,77 @@ const { data: progress, error } = await useFetch(
   { immediate: selected.value !== null },
 );
 
-/** 2.2.5 は blocked を持たない。表示できるものだけ出す（ADR-0004） */
+/** 2.2.5 は blocked を持たない。2.2.7 で追加されたもの（ADR-0004） */
 const statusLabel: Record<string, string> = {
   pending: '未着手',
   'in-progress': '着手中',
   completed: '完了',
   blocked: 'ブロック',
 };
+
+/** 状態の色は本家の --status-* に合わせる。ここは本家が色を撒いている数少ない場所 */
+const statusColor: Record<string, string> = {
+  pending: 'var(--status-pending)',
+  'in-progress': 'var(--status-in-progress)',
+  completed: 'var(--status-success)',
+  blocked: 'var(--status-warning)',
+};
 </script>
 
 <template>
   <section>
-    <h1 class="mb-4 text-lg font-semibold text-highlighted">タスク</h1>
+    <h1 class="mb-3 text-lg font-semibold">タスク</h1>
 
-    <p v-if="withTasks.length === 0" class="text-muted" data-testid="tasks-empty">
+    <p v-if="withTasks.length === 0" class="sb-placeholder" data-testid="tasks-empty">
       タスクを持つ仕様書がありません。
     </p>
 
     <template v-else>
-      <div class="mb-3 flex flex-wrap gap-2" data-testid="tasks-spec-picker">
+      <div class="mb-3 flex flex-wrap items-center gap-2" data-testid="tasks-spec-picker">
         <button
           v-for="spec in withTasks"
           :key="spec.name"
           type="button"
-          class="rounded border border-default px-2 py-1 text-sm"
-          :class="selected === spec.name ? 'bg-elevated text-highlighted' : 'text-muted'"
+          class="sb-navitem"
+          :class="selected === spec.name ? 'sb-navitem-on' : ''"
           data-testid="tasks-spec"
           @click="selected = spec.name"
         >
           {{ spec.name }}
         </button>
+
+        <span v-if="progress" class="sb-chip ml-auto" data-testid="tasks-summary">
+          {{ progress.completed }} / {{ progress.total }} 完了
+        </span>
       </div>
 
-      <p v-if="error" class="text-muted" data-testid="tasks-error">
+      <p v-if="error" class="sb-placeholder" data-testid="tasks-error">
         タスクを取得できませんでした。対象が削除された可能性があります。
       </p>
 
-      <template v-else-if="progress">
-        <p class="mb-3 text-sm text-muted" data-testid="tasks-summary">
-          {{ progress.completed }} / {{ progress.total }} 完了
-        </p>
-
-        <ul class="space-y-1" data-testid="tasks-list">
-          <li
-            v-for="task in progress.taskList"
-            :key="task.id"
-            class="flex items-center gap-3 rounded border border-default px-3 py-2 text-sm"
-            data-testid="task-row"
-            :data-status="task.status"
-          >
-            <span class="w-20 shrink-0 text-muted">{{ statusLabel[task.status] ?? task.status }}</span>
-            <span class="w-12 shrink-0 text-muted">{{ task.id }}</span>
-            <span class="text-highlighted">{{ task.description }}</span>
-          </li>
-        </ul>
-      </template>
+      <table v-else-if="progress" class="sb-table" data-testid="tasks-list">
+        <thead>
+          <tr>
+            <th scope="col" class="w-24">状態</th>
+            <th scope="col" class="w-16">ID</th>
+            <th scope="col">タスク</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="task in progress.taskList" :key="task.id" data-testid="task-row" :data-status="task.status">
+            <td>
+              <span
+                class="sb-chip"
+                :style="{ color: statusColor[task.status], borderColor: statusColor[task.status] }"
+              >
+                {{ statusLabel[task.status] ?? task.status }}
+              </span>
+            </td>
+            <td class="font-mono text-[var(--text-muted)]">{{ task.id }}</td>
+            <td>{{ task.description }}</td>
+          </tr>
+        </tbody>
+      </table>
     </template>
   </section>
 </template>

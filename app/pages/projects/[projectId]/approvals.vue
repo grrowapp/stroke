@@ -32,30 +32,37 @@ const categoryLabel: Record<string, string> = { spec: '仕様', steering: 'ス�
 
 <template>
   <section>
-    <h1 class="mb-4 text-lg font-semibold text-highlighted">承認</h1>
+    <h1 class="mb-3 text-lg font-semibold">承認</h1>
 
-    <p v-if="error" class="text-muted" data-testid="approvals-error">
+    <p v-if="error" class="sb-placeholder" data-testid="approvals-error">
       承認依頼を取得できませんでした。本家に繋がっていない可能性があります。
     </p>
 
-    <p v-else-if="pending.length === 0" class="text-muted" data-testid="approvals-empty">
+    <p v-else-if="pending.length === 0" class="sb-placeholder" data-testid="approvals-empty">
       保留中の承認依頼はありません。処理済みのものは本家が返さないため、ここには残りません。
     </p>
 
-    <div v-else class="flex gap-6">
+    <div v-else class="flex gap-4">
       <ul class="w-72 shrink-0 space-y-2" data-testid="approvals-list">
         <li v-for="approval in pending" :key="approval.id">
           <button
             type="button"
-            class="w-full rounded border border-default px-3 py-2 text-left text-sm"
-            :class="selected === approval.id ? 'bg-elevated text-highlighted' : 'text-muted'"
+            class="sb-card w-full text-left"
+            :style="
+              selected === approval.id
+                ? { borderColor: 'var(--interactive-primary)', background: 'var(--accent-primary-muted)' }
+                : undefined
+            "
             data-testid="approval-row"
             :data-category="approval.category"
             @click="selected = approval.id"
           >
-            <div class="text-highlighted">{{ approval.title }}</div>
-            <div class="text-muted">
-              {{ categoryLabel[approval.category] ?? approval.category }} / {{ approval.filePath }}
+            <div class="text-[13px] font-semibold">{{ approval.title }}</div>
+            <div class="mt-1 flex items-center gap-2">
+              <span class="sb-chip">{{ categoryLabel[approval.category] ?? approval.category }}</span>
+              <span class="truncate font-mono text-[11px] text-[var(--text-muted)]">
+                {{ approval.filePath }}
+              </span>
             </div>
           </button>
         </li>
@@ -64,7 +71,7 @@ const categoryLabel: Record<string, string> = { spec: '仕様', steering: 'ス�
       <article class="min-w-0 flex-1">
         <pre
           v-if="document"
-          class="overflow-x-auto whitespace-pre-wrap rounded border border-default p-3 text-sm"
+          class="sb-card overflow-x-auto whitespace-pre-wrap font-mono text-[12px] leading-relaxed"
           data-testid="approval-content"
         >{{ document.content }}</pre>
       </article>

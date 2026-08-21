@@ -11,32 +11,51 @@ const projectId = computed(() => String(route.params.projectId ?? ''));
 
 const { data, error } = await useFetch(() => `/api/projects/${projectId.value}/specs`);
 const specs = computed(() => data.value ?? []);
+
+/** 各フェーズの有無。無いものは無彩色で示す（ui.md の Visual Language） */
+function phases(spec: (typeof specs.value)[number]) {
+  return [
+    { label: '要件', exists: spec.phases.requirements.exists },
+    { label: '設計', exists: spec.phases.design.exists },
+    { label: 'タスク', exists: spec.phases.tasks.exists },
+  ];
+}
 </script>
 
 <template>
   <section>
-    <h1 class="mb-4 text-lg font-semibold text-highlighted">仕様書</h1>
+    <h1 class="mb-3 text-lg font-semibold">仕様書</h1>
 
-    <p v-if="error" class="text-muted" data-testid="specs-error">
+    <p v-if="error" class="sb-placeholder" data-testid="specs-error">
       仕様書を取得できませんでした。本家に繋がっていない可能性があります。
     </p>
-    <p v-else-if="specs.length === 0" class="text-muted" data-testid="specs-empty">
+    <p v-else-if="specs.length === 0" class="sb-placeholder" data-testid="specs-empty">
       仕様書がまだありません。
     </p>
-    <ul v-else class="space-y-2" data-testid="specs-list">
-      <li
-        v-for="spec in specs"
-        :key="spec.name"
-        class="rounded border border-default px-3 py-2"
-        data-testid="spec-row"
-      >
-        <div class="text-highlighted">{{ spec.name }}</div>
-        <div class="text-sm text-muted">
-          要件 {{ spec.phases.requirements.exists ? '有' : '無' }} /
-          設計 {{ spec.phases.design.exists ? '有' : '無' }} /
-          タスク {{ spec.phases.tasks.exists ? '有' : '無' }}
-        </div>
-      </li>
-    </ul>
+    <table v-else class="sb-table" data-testid="specs-list">
+      <thead>
+        <tr>
+          <th scope="col">仕様書</th>
+          <th scope="col" class="w-64">フェーズ</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="spec in specs" :key="spec.name" data-testid="spec-row">
+          <td>{{ spec.name }}</td>
+          <td>
+            <span class="flex gap-1.5">
+              <span
+                v-for="phase in phases(spec)"
+                :key="phase.label"
+                class="sb-chip"
+                :style="phase.exists ? undefined : { opacity: 0.45 }"
+              >
+                {{ phase.label }}{{ phase.exists ? '' : '（未）' }}
+              </span>
+            </span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
   </section>
 </template>
