@@ -286,3 +286,56 @@ test.describe('アイコンは prototype のものを使っている', () => {
     expect(width).toBe('170px');
   });
 });
+
+test.describe('表の中身が prototype と同じ様式になっている', () => {
+  test('プロジェクト一覧: アクティブは緑のチップ、未接続は無彩色', async ({ page }) => {
+    await page.goto('/projects');
+
+    const active = await page
+      .getByTestId('project-row')
+      .filter({ hasText: 'alpha' })
+      .locator('.sb-chip')
+      .evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+          color: style.color,
+          fontSize: style.fontSize,
+          // prototype の chipOn は border を宣言していないので枠幅 0
+          borderWidth: style.borderTopWidth,
+          background: style.backgroundColor,
+        };
+      });
+
+    const idle = await page
+      .getByTestId('project-row')
+      .filter({ hasText: 'idle-project' })
+      .locator('.sb-chip')
+      .evaluate((element) => {
+        const style = getComputedStyle(element);
+        return { color: style.color, fontSize: style.fontSize };
+      });
+
+    // prototype の chipOn は --status-success(#22c55e)、chipOff は --text-muted(#94a3b8)
+    expect(active.color).toBe('rgb(34, 197, 94)');
+    expect(active.fontSize).toBe('11px');
+    expect(active.borderWidth).toBe('0px');
+    expect(idle.color).toBe('rgb(148, 163, 184)');
+    expect(idle.fontSize).toBe('11px');
+  });
+
+  test('プロジェクト一覧: PID と最終更新は 12px の secondary', async ({ page }) => {
+    await page.goto('/projects');
+
+    const row = page.getByTestId('project-row').filter({ hasText: 'alpha' });
+
+    for (const testId of ['project-pid', 'project-last-modified']) {
+      const style = await row.getByTestId(testId).evaluate((element) => {
+        const own = getComputedStyle(element);
+        return { fontSize: own.fontSize, color: own.color };
+      });
+
+      expect(style.fontSize, `${testId} の文字サイズ`).toBe('12px');
+      expect(style.color, `${testId} の色`).toBe('rgb(203, 213, 225)');
+    }
+  });
+});

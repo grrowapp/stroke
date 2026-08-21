@@ -58,3 +58,42 @@ test.describe('プロジェクト一覧', () => {
     await expect(page.getByTestId('create-project')).toBeDisabled();
   });
 });
+
+/**
+ * prototype（archive の navigation.prototype.html の案A）の projTable と同じ列を持つこと。
+ */
+test.describe('一覧の列は prototype と同じ', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/projects');
+  });
+
+  test('4列ある', async ({ page }) => {
+    const headers = await page.locator('[data-testid="projects-table"] th').allTextContents();
+    expect(headers.map((header) => header.trim())).toEqual([
+      'プロジェクト',
+      '状態',
+      '未処理の通知',
+      '最終更新',
+    ]);
+  });
+
+  test('アクティブな行は状態列に PID を出す', async ({ page }) => {
+    const row = page.getByTestId('project-row').filter({ hasText: 'alpha' });
+    await expect(row.getByTestId('project-pid')).toContainText('PID');
+  });
+
+  test('未接続の行に PID は出ない', async ({ page }) => {
+    const row = page.getByTestId('project-row').filter({ hasText: 'idle-project' });
+    await expect(row.getByTestId('project-pid')).toHaveCount(0);
+  });
+
+  test('未処理の通知が無ければ — を出す', async ({ page }) => {
+    const row = page.getByTestId('project-row').filter({ hasText: 'idle-project' });
+    await expect(row.getByTestId('project-unread')).toHaveText('—');
+  });
+
+  test('最終更新は未接続でも出る。本家 API から取れない情報なので走査で拾う', async ({ page }) => {
+    const row = page.getByTestId('project-row').filter({ hasText: 'idle-project' });
+    await expect(row.getByTestId('project-last-modified')).not.toHaveText('—');
+  });
+});

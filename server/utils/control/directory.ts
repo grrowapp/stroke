@@ -42,6 +42,9 @@ export function buildProjectDirectory(
       workflowRootPath: project.workflowRootPath,
       connection: entry === undefined ? 'disconnected' : 'active',
       projectId: entry?.projectId ?? null,
+      // アクティブの実体は生きた PID なので、その値をそのまま出す
+      pid: entry?.instances[0]?.pid ?? null,
+      lastModified: project.lastModified,
     };
   });
 

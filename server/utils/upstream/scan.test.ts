@@ -126,3 +126,39 @@ describe('親パスの走査', () => {
     expect(result.projects[0]!.workflowRootPath).toBe(root);
   });
 });
+
+describe('最終更新', () => {
+  it('.spec-workflow の更新時刻を返す', async () => {
+    const parent = await makeParent();
+    await makeProject(parent, 'alpha');
+
+    const result = await scanProjects(parent);
+    if (result.status !== 'ok') throw new Error('前提が崩れた');
+
+    const lastModified = result.projects[0]!.lastModified;
+    expect(lastModified).not.toBeNull();
+    expect(Number.isNaN(Date.parse(lastModified!))).toBe(false);
+  });
+
+  it('配下のディレクトリが増えると新しくなる', async () => {
+    const parent = await makeParent();
+    const root = await makeProject(parent, 'alpha');
+
+    const before = (await scanProjects(parent)) as Extract<
+      Awaited<ReturnType<typeof scanProjects>>,
+      { status: 'ok' }
+    >;
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    await mkdir(join(root, '.spec-workflow', 'specs'), { recursive: true });
+
+    const after = (await scanProjects(parent)) as Extract<
+      Awaited<ReturnType<typeof scanProjects>>,
+      { status: 'ok' }
+    >;
+
+    expect(Date.parse(after.projects[0]!.lastModified!)).toBeGreaterThanOrEqual(
+      Date.parse(before.projects[0]!.lastModified!),
+    );
+  });
+});

@@ -12,6 +12,8 @@
 import { computed, definePageMeta, navigateTo, useFetch, useHead } from '#imports';
 
 import SbIcon from '~/components/ui/SbIcon.vue';
+import { useBoardSocket } from '~/composables/useBoardSocket';
+import { formatRelativeTime } from '~/composables/useRelativeTime';
 import type { ProjectDirectory, ProjectSummary } from '#shared/types';
 
 definePageMeta({ layout: 'portal' });
@@ -28,6 +30,28 @@ function enter(project: ProjectSummary): void {
   if (project.connection !== 'active' || project.projectId === null) return;
   // 入場先は下層のサイドバーの先頭画面（specs/project-directory）
   void navigateTo(`/projects/${project.projectId}/specs`);
+}
+
+/**
+ * 「未処理の通知」列。
+ *
+ * 通知の一覧はブラウザが WebSocket で受け取っているものをそのまま数える。サーバーへ
+ * 問い合わせ直すと、一覧に出ている件数と食い違う瞬間ができる。
+ */
+const { notifications } = useBoardSocket();
+
+const pendingCount = computed(() => {
+  const counts = new Map<string, number>();
+
+  for (const notification of notifications.value) {
+    counts.set(notification.projectId, (counts.get(notification.projectId) ?? 0) + 1);
+  }
+
+  return counts;
+});
+
+function unread(project: ProjectSummary): number {
+  return project.projectId === null ? 0 : (pendingCount.value.get(project.projectId) ?? 0);
 }
 </script>
 
@@ -92,7 +116,9 @@ function enter(project: ProjectSummary): void {
         <thead>
           <tr>
             <th scope="col">プロジェクト</th>
-            <th scope="col" class="w-32">状態</th>
+            <th scope="col" class="w-56">状態</th>
+            <th scope="col" class="w-32">未処理の通知</th>
+            <th scope="col" class="w-28">最終更新</th>
           </tr>
         </thead>
         <tbody>
@@ -129,9 +155,26 @@ function enter(project: ProjectSummary): void {
               </span>
             </td>
             <td>
-              <span class="sb-chip">
-                {{ project.connection === 'active' ? 'アクティブ' : '未接続' }}
+              <span class="inline-flex items-center gap-1.5">
+                <span class="sb-chip" :class="project.connection === 'active' ? 'sb-chip-on' : ''">
+                  {{ project.connection === 'active' ? 'アクティブ' : '未接続' }}
+                </span>
+                <!-- アクティブの実体は生きた PID。何をもってアクティブなのかを出す -->
+                <span
+                  v-if="project.pid !== null"
+                  class="text-[12px] text-[var(--text-secondary)]"
+                  data-testid="project-pid"
+                >
+                  PID {{ project.pid }}
+                </span>
               </span>
+            </td>
+            <td data-testid="project-unread">
+              <span v-if="unread(project) > 0" class="sb-badge">{{ unread(project) }}</span>
+              <span v-else class="text-[var(--text-muted)]">—</span>
+            </td>
+            <td class="text-[12px] text-[var(--text-secondary)]" data-testid="project-last-modified">
+              {{ project.lastModified === null ? '—' : formatRelativeTime(project.lastModified) }}
             </td>
           </tr>
         </tbody>

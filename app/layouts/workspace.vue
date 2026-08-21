@@ -50,7 +50,9 @@ const sections = [
         {{ info?.projectName ?? projectId }}
       </span>
 
-      <span class="sb-chip">{{ connected ? 'アクティブ' : '未接続' }}</span>
+      <span class="sb-chip" :class="connected ? 'sb-chip-on' : ''">
+        {{ connected ? 'アクティブ' : '未接続' }}
+      </span>
 
       <span
         class="ml-auto inline-block size-2 rounded-full"

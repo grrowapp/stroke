@@ -11,7 +11,7 @@
  * 走査結果から `projectId` は計算できない（design.md 決定1）。
  */
 
-import { readdir } from 'node:fs/promises';
+import { readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 
 const SPEC_WORKFLOW_DIR = '.spec-workflow';
@@ -22,7 +22,21 @@ export interface ScannedProject {
   name: string;
   /** `.spec-workflow` を持つディレクトリの絶対パス。registry の `workflowRootPath` にあたる */
   workflowRootPath: string;
+  /**
+   * `.spec-workflow` 配下の直下エントリで一番新しい更新時刻（ISO8601）。取れなければ null。
+   *
+   * 未接続のプロジェクトについては、本家 API から何も取れないためこれが唯一の手がかりになる。
+   * ファイルシステムを直接読んだ値であって、本家の情報を組み替えたものではない
+   * （docs/adr/0001）。
+   *
+   * 限界: `specs/` `approvals/` `steering/` の各ディレクトリの mtime を見ているため、
+   * 中のファイルを書き換えただけでは動かない。エントリの増減で動く。
+   */
+  lastModified: string | null;
 }
+
+/** `.spec-workflow` 直下のうち、更新時刻を見るディレクトリ */
+const WATCHED_ENTRIES = ['specs', 'approvals', 'steering'];
 
 /**
  * 走査の結果。
@@ -67,7 +81,11 @@ export async function scanProjects(parentPath: string | null): Promise<ScanResul
     const workflowRootPath = join(parentPath, entry.name);
 
     if (await hasSpecWorkflow(workflowRootPath)) {
-      projects.push({ name: entry.name, workflowRootPath });
+      projects.push({
+        name: entry.name,
+        workflowRootPath,
+        lastModified: await latestChange(workflowRootPath),
+      });
     }
   }
 
@@ -82,4 +100,24 @@ async function hasSpecWorkflow(directoryPath: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/** 監視対象ディレクトリのうち一番新しい mtime。1つも取れなければ null */
+async function latestChange(workflowRootPath: string): Promise<string | null> {
+  const specWorkflow = join(workflowRootPath, SPEC_WORKFLOW_DIR);
+
+  const times = await Promise.all(
+    [specWorkflow, ...WATCHED_ENTRIES.map((entry) => join(specWorkflow, entry))].map(
+      async (path) => {
+        try {
+          return (await stat(path)).mtimeMs;
+        } catch {
+          return null;
+        }
+      },
+    ),
+  );
+
+  const known = times.filter((time): time is number => time !== null);
+  return known.length === 0 ? null : new Date(Math.max(...known)).toISOString();
 }

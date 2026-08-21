@@ -150,3 +150,80 @@ test.describe('通知', () => {
     expect(kinds[0]).toBe('task-started');
   });
 });
+
+test.describe('通知が起きるとプロジェクト一覧の未処理件数に出る', () => {
+  test.beforeEach(async ({ page }) => {
+    await resetBoard(page);
+  });
+
+  test('通知が発生したプロジェクトの行にバッジが出る', async ({ page }) => {
+    await stub.completeTask(ALPHA);
+    await expect(page.getByTestId('notification-row')).toHaveCount(1);
+
+    await page.getByTestId('tab-projects').click();
+
+    const row = page.getByTestId('project-row').filter({ hasText: 'alpha' });
+    await expect(row.getByTestId('project-unread')).toHaveText('1');
+  });
+
+  test('通知が無いプロジェクトの行は — のまま', async ({ page }) => {
+    await stub.completeTask(ALPHA);
+    await expect(page.getByTestId('notification-row')).toHaveCount(1);
+
+    await page.getByTestId('tab-projects').click();
+
+    const row = page.getByTestId('project-row').filter({ hasText: 'beta' });
+    await expect(row.getByTestId('project-unread')).toHaveText('—');
+  });
+});
+
+test.describe('通知一覧の各列が prototype と同じ様式になっている', () => {
+  test.beforeEach(async ({ page }) => {
+    await resetBoard(page);
+    await stub.completeTask(ALPHA);
+    await expect(page.getByTestId('notification-row')).toHaveCount(1);
+  });
+
+  test('プロジェクト列は 12px の secondary', async ({ page }) => {
+    const style = await page.getByTestId('notification-open').evaluate((element) => {
+      const own = getComputedStyle(element);
+      return { fontSize: own.fontSize, color: own.color };
+    });
+
+    expect(style.fontSize).toBe('12px');
+    expect(style.color).toBe('rgb(203, 213, 225)');
+  });
+
+  test('種別列は無彩色の文字。チップにはしない', async ({ page }) => {
+    const cell = page.getByTestId('notification-row').locator('td').nth(1);
+
+    await expect(cell.locator('.sb-chip')).toHaveCount(0);
+    expect(await cell.evaluate((element) => getComputedStyle(element).color)).toBe(
+      'rgb(148, 163, 184)',
+    );
+  });
+
+  test('内容列は上段が件名、下段が spec 名の 12px', async ({ page }) => {
+    const cell = page.getByTestId('notification-row').locator('td').nth(2);
+
+    const sizes = await cell.locator('div').evaluateAll((divs) =>
+      divs.map((div) => getComputedStyle(div).fontSize),
+    );
+
+    expect(sizes).toEqual(['13px', '12px']);
+  });
+
+  test('最終更新列は 12px の secondary', async ({ page }) => {
+    const style = await page
+      .getByTestId('notification-row')
+      .locator('td')
+      .nth(3)
+      .evaluate((element) => {
+        const own = getComputedStyle(element);
+        return { fontSize: own.fontSize, color: own.color };
+      });
+
+    expect(style.fontSize).toBe('12px');
+    expect(style.color).toBe('rgb(203, 213, 225)');
+  });
+});

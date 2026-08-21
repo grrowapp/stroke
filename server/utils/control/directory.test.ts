@@ -4,11 +4,17 @@ import { buildProjectDirectory } from './directory';
 import type { RegistryEntry } from '../upstream/registry';
 import type { ScanResult } from '../upstream/scan';
 
+const SCANNED_AT = '2026-08-21T09:00:00.000Z';
+
 function scanned(...names: string[]): ScanResult {
   return {
     status: 'ok',
     parentPath: '/opt/projects',
-    projects: names.map((name) => ({ name, workflowRootPath: `/opt/projects/${name}` })),
+    projects: names.map((name) => ({
+      name,
+      workflowRootPath: `/opt/projects/${name}`,
+      lastModified: SCANNED_AT,
+    })),
   };
 }
 
@@ -148,5 +154,54 @@ describe('プロジェクト一覧の組み立て', () => {
       if (result.status !== 'ok') throw new Error('前提が崩れた');
       expect(result.projects[0]!.name).toBe('stroke-board');
     });
+  });
+});
+
+describe('prototype が持つ4列ぶんの中身を返す', () => {
+  it('アクティブなら PID を出す。アクティブの実体は生きた PID である', () => {
+    const result = buildProjectDirectory(
+      scanned('alpha'),
+      lookup([
+        entry({
+          workflowRootPath: '/opt/projects/alpha',
+          instances: [{ pid: 41822, registeredAt: '2026-08-21T00:00:00.000Z' }],
+        }),
+      ]),
+    );
+
+    if (result.status !== 'ok') throw new Error('前提が崩れた');
+    expect(result.projects[0]!.pid).toBe(41822);
+  });
+
+  it('未接続では PID が引けない', () => {
+    const result = buildProjectDirectory(scanned('idle'), lookup());
+
+    if (result.status !== 'ok') throw new Error('前提が崩れた');
+    expect(result.projects[0]!.pid).toBeNull();
+  });
+
+  it('instances が複数ある場合は先頭の PID を使う', () => {
+    const result = buildProjectDirectory(
+      scanned('shared'),
+      lookup([
+        entry({
+          workflowRootPath: '/opt/projects/shared',
+          instances: [
+            { pid: 1, registeredAt: '2026-08-21T00:00:00.000Z' },
+            { pid: 2, registeredAt: '2026-08-21T00:00:00.000Z' },
+          ],
+        }),
+      ]),
+    );
+
+    if (result.status !== 'ok') throw new Error('前提が崩れた');
+    expect(result.projects[0]!.pid).toBe(1);
+  });
+
+  it('最終更新は走査で得た値をそのまま渡す。未接続でも出せる', () => {
+    const result = buildProjectDirectory(scanned('idle'), lookup());
+
+    if (result.status !== 'ok') throw new Error('前提が崩れた');
+    expect(result.projects[0]!.lastModified).toBe(SCANNED_AT);
   });
 });

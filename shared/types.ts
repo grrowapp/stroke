@@ -20,6 +20,16 @@ export interface ProjectSummary {
    * 未接続では registry にエントリが無いため null になる（design.md 決定1）。
    */
   projectId: string | null;
+  /**
+   * 本家の MCP サーバーのプロセス ID。アクティブなときだけ引ける。
+   * アクティブとは registry entry に生きた PID があることなので、その実体を出す。
+   */
+  pid: number | null;
+  /**
+   * `.spec-workflow` 配下の更新時刻（ISO8601）。取れなければ null。
+   * 未接続のプロジェクトは本家 API から何も取れないため、ここだけが手がかりになる。
+   */
+  lastModified: string | null;
 }
 
 /**

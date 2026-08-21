@@ -68,7 +68,7 @@ function open(notification: Notification): void {
             -->
             <button
               type="button"
-              class="inline-flex items-center gap-1.5 text-left text-[var(--text-secondary)] hover:text-[var(--interactive-primary)] focus-visible:outline focus-visible:outline-2"
+              class="inline-flex items-center gap-1.5 text-left text-[12px] text-[var(--text-secondary)] hover:text-[var(--interactive-primary)] focus-visible:outline focus-visible:outline-2"
               data-testid="notification-open"
               @click="open(row)"
             >

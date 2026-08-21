@@ -184,8 +184,11 @@ body {
   }
 
   /*
-   * 状態チップ。アクティブ / 未接続の区別は色ではなく文言と行の不透明度で示す
-   * （ui.md の Visual Language）。だから両方とも無彩色にする。
+   * 状態チップ。prototype の `.chipOff`（無彩色・枠あり）が既定。
+   *
+   * ui.md の Visual Language には「アクティブ / 未接続の区別は色ではなく、チップの文言と
+   * 行の非活性で示す」とあるが、同じ ui.md が採用した prototype（案A）はアクティブを
+   * 緑で出している。両者は食い違っており、prototype の実物に合わせる。
    */
   .sb-chip {
     display: inline-block;
@@ -196,6 +199,17 @@ body {
     background: var(--surface-sunken);
     color: var(--text-muted);
     border: 1px solid var(--border-default);
+  }
+
+  /*
+   * prototype の `.chipOn`。緑を 18% 敷く。
+   * prototype は border を宣言していないので枠幅は 0。色だけ透明にすると 1px ぶん
+   * 大きくなり、chipOff と並んだときに高さが揃わない。
+   */
+  .sb-chip-on {
+    background: color-mix(in srgb, var(--status-success) 18%, transparent);
+    color: var(--status-success);
+    border-width: 0;
   }
 
   /* 件数バッジ。アクセントは indigo 1色に集約する */
