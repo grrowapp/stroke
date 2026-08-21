@@ -239,6 +239,17 @@ function handleApi(segments, respond) {
 
   if (rest[0] === 'specs' && rest.length === 1) return respond(200, project.specs);
 
+  // 仕様書の本文。無い文書は null で返る。design を欠かしてあるのは、
+  // 未作成の文書を開けないことを E2E で押さえるため
+  if (rest[0] === 'specs' && rest[2] === 'all') {
+    const lastModified = '2026-08-21T00:00:00.000Z';
+    return respond(200, {
+      requirements: { content: `# ${rest[1]} 要件定義\n\n本文`, lastModified },
+      design: null,
+      tasks: { content: `# ${rest[1]} タスク\n\n- [x] 1.1 ログインを作る`, lastModified },
+    });
+  }
+
   if (rest[0] === 'specs' && rest[2] === 'tasks' && rest[3] === 'progress') {
     const tasks = project.tasksBySpec.get(rest[1]);
     if (tasks === undefined) return respond(404, { error: 'Spec or tasks not found' });

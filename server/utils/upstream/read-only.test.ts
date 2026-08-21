@@ -98,6 +98,7 @@ describe('接点層は読み取り専用である', () => {
       'constructor',
       'getApprovalContent',
       'getProjectInfo',
+      'getSpecDocuments',
       'getSteeringDocument',
       'getTaskProgress',
       'listPendingApprovals',

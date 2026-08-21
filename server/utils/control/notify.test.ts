@@ -36,6 +36,7 @@ function notification(overrides: Partial<Notification> = {}): Notification {
     subject: 'auth',
     occurredAt: '2026-08-21T09:00:00.000Z',
     target: 'tasks',
+    targetId: 'auth',
     ...overrides,
   };
 }

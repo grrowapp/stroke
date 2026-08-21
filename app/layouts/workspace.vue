@@ -30,11 +30,17 @@ const unresolved = computed(() => Boolean(error.value));
 const connected = computed(() => upstreamConnected.value && !unresolved.value);
 
 const sections = [
+  { to: '', label: '概要' },
   { to: 'specs', label: '仕様書' },
   { to: 'steering', label: 'ステアリング' },
   { to: 'tasks', label: 'タスク' },
   { to: 'approvals', label: '承認' },
 ] as const;
+
+/** 概要だけは完全一致でないと、下層のどこにいても選択中に見えてしまう */
+function linkOf(to: string): string {
+  return to === '' ? `/projects/${projectId.value}` : `/projects/${projectId.value}/${to}`;
+}
 </script>
 
 <template>
@@ -68,10 +74,11 @@ const sections = [
         <ul>
           <li v-for="section in sections" :key="section.to">
             <NuxtLink
-              :to="`/projects/${projectId}/${section.to}`"
+              :to="linkOf(section.to)"
               class="sb-navitem"
-              active-class="sb-navitem-on"
-              :data-testid="`sidebar-${section.to}`"
+              :active-class="section.to === '' ? '' : 'sb-navitem-on'"
+              exact-active-class="sb-navitem-on"
+              :data-testid="`sidebar-${section.to || 'overview'}`"
             >
               {{ section.label }}
             </NuxtLink>

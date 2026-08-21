@@ -37,6 +37,8 @@ export function toTaskNotification(change: TaskChange, context: NotificationCont
     subject: change.specName,
     occurredAt: context.occurredAt,
     target: 'tasks' as const,
+    // タスクの通知はその spec のタスク画面へ着地させる
+    targetId: change.specName,
   };
 
   switch (change.kind) {
@@ -82,6 +84,8 @@ export function toApprovalNotification(
     subject: change.approval.categoryName,
     occurredAt: context.occurredAt,
     target: 'approvals',
+    // 承認の通知はその承認依頼そのものへ着地させる
+    targetId: change.approval.id,
   };
 }
 

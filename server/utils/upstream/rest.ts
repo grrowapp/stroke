@@ -18,10 +18,12 @@ import {
   documentContentSchema,
   projectInfoSchema,
   specDataSchema,
+  specDocumentsSchema,
   taskProgressSchema,
   type ApprovalRequest,
   type ProjectInfo,
   type SpecData,
+  type SpecDocuments,
   type TaskProgress,
 } from './schema';
 
@@ -48,6 +50,14 @@ export class UpstreamRestClient {
   /** `GET /api/projects/:projectId/specs` */
   listSpecs(projectId: string): Promise<UpstreamResult<SpecData[]>> {
     return this.read(`/api/projects/${enc(projectId)}/specs`, specDataSchema.array());
+  }
+
+  /** `GET /api/projects/:projectId/specs/:name/all` — requirements / design / tasks の本文 */
+  getSpecDocuments(projectId: string, specName: string): Promise<UpstreamResult<SpecDocuments>> {
+    return this.read(
+      `/api/projects/${enc(projectId)}/specs/${enc(specName)}/all`,
+      specDocumentsSchema,
+    );
   }
 
   /** `GET /api/projects/:projectId/specs/:name/tasks/progress` — 通知の基準を作るのに使う */

@@ -128,6 +128,17 @@ export const taskProgressSchema = z.object({
 /** `GET /api/projects/:projectId/steering/:name` と `.../approvals/:id/content` */
 export const documentContentSchema = z.object({ content: z.string() });
 
+/**
+ * `GET /api/projects/:projectId/specs/:name/all`
+ *
+ * requirements / design / tasks の3本を返す。無い文書は null で返る。
+ */
+export const specDocumentsSchema = z.object({
+  requirements: z.object({ content: z.string(), lastModified: z.string() }).nullable(),
+  design: z.object({ content: z.string(), lastModified: z.string() }).nullable(),
+  tasks: z.object({ content: z.string(), lastModified: z.string() }).nullable(),
+});
+
 // --- WebSocket ---
 
 /** 接続直後に届く。ここから通知の基準を作る（design.md 決定4） */
@@ -191,6 +202,7 @@ export type TaskSummary = z.infer<typeof taskSummarySchema>;
 export type SpecData = z.infer<typeof specDataSchema>;
 export type ApprovalRequest = z.infer<typeof approvalRequestSchema>;
 export type ProjectInfo = z.infer<typeof projectInfoSchema>;
+export type SpecDocuments = z.infer<typeof specDocumentsSchema>;
 export type TaskProgress = z.infer<typeof taskProgressSchema>;
 export type InitialMessage = z.infer<typeof initialMessageSchema>;
 export type TaskStatusUpdateMessage = z.infer<typeof taskStatusUpdateMessageSchema>;

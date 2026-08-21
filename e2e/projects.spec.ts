@@ -49,7 +49,7 @@ test.describe('プロジェクト一覧', () => {
   test('アクティブな行から下層へ入れる', async ({ page }) => {
     await page.getByTestId('project-row').filter({ hasText: 'alpha' }).getByTestId('project-enter').click();
 
-    await expect(page).toHaveURL(/\/projects\/ALPHAID000000001\/specs$/);
+    await expect(page).toHaveURL(/\/projects\/ALPHAID000000001$/);
     await expect(page.getByTestId('workspace-sidebar')).toBeVisible();
   });
 

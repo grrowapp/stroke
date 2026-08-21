@@ -56,8 +56,9 @@ const blockedReasons = computed(() =>
 
 function enter(project: ProjectSummary): void {
   if (project.connection !== 'active' || project.projectId === null) return;
-  // 入場先は下層のサイドバーの先頭画面（specs/project-directory）
-  void navigateTo(`/projects/${project.projectId}/specs`);
+  // 入場先はプロジェクトの概要。いきなり空の一覧に着くと、繋がっていないのか
+  // 中身が無いのかが分からない
+  void navigateTo(`/projects/${project.projectId}`);
 }
 
 /**

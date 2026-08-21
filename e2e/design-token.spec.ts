@@ -159,10 +159,10 @@ test.describe('本家の design token に合っている', () => {
   });
 
   test('下層の選択中の項目は本家のアクティブ表現になっている', async ({ page }) => {
-    await page.goto('/projects/ALPHAID000000001/specs');
+    await page.goto('/projects/ALPHAID000000001');
 
     const style = await page
-      .getByTestId('sidebar-specs')
+      .getByTestId('sidebar-overview')
       .evaluate((element) => {
         const own = getComputedStyle(element);
         return { background: own.backgroundColor, color: own.color };
@@ -259,7 +259,7 @@ test.describe('アイコンは prototype のものを使っている', () => {
   });
 
   test('下層の戻る導線は back、プロジェクト名は folder', async ({ page }) => {
-    await page.goto('/projects/ALPHAID000000001/specs');
+    await page.goto('/projects/ALPHAID000000001');
 
     const expected = prototypeIconPaths();
 
@@ -277,7 +277,7 @@ test.describe('アイコンは prototype のものを使っている', () => {
   });
 
   test('下層のサイドバーは prototype と同じ幅', async ({ page }) => {
-    await page.goto('/projects/ALPHAID000000001/specs');
+    await page.goto('/projects/ALPHAID000000001');
 
     const width = await page
       .getByTestId('workspace-sidebar')

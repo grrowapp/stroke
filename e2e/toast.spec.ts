@@ -84,7 +84,7 @@ test.describe('通知トースト', () => {
   });
 
   test('下層にいてもトーストは出る', async ({ page }) => {
-    await page.goto(`/projects/${ALPHA}/specs`);
+    await page.goto(`/projects/${ALPHA}`);
     // 画面を移ると WebSocket を張り直すので、繋がるまで待ってから起こす
     await expect(page.getByTestId('workspace-connection')).toHaveAttribute('data-connected', 'true');
 

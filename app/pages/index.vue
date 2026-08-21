@@ -31,7 +31,10 @@ const categoryLabel: Record<Notification['category'], string> = {
  * 開いた先でスクロールもハイライトもしない。
  */
 function open(notification: Notification): void {
-  void navigateTo(`/projects/${notification.projectId}/${notification.target}`);
+  // 対象そのものの URL へ着地させる。一覧に着けてから探させない
+  void navigateTo(
+    `/projects/${notification.projectId}/${notification.target}/${notification.targetId}`,
+  );
 }
 </script>
 

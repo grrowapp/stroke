@@ -102,6 +102,13 @@ export interface Notification {
   occurredAt: string;
   /** 行を選んだときに開く先 */
   target: NotificationTarget;
+  /**
+   * 飛び先の中で対象を指す名前。承認なら承認 ID、タスクなら spec 名。
+   *
+   * 本家のダッシュボードは対象を URL で指せない。stroke-board がそれを繰り返さないよう、
+   * 通知からは対象そのものの URL へ着地させる（product.md の Purpose）。
+   */
+  targetId: string;
 }
 
 /** ブラウザ向け WebSocket が送るもの */
@@ -109,3 +116,77 @@ export type BoardMessage =
   | { type: 'snapshot'; notifications: Notification[]; upstreamConnected: boolean }
   | { type: 'notification'; notification: Notification }
   | { type: 'upstream-connection'; connected: boolean };
+
+// --- 下層の画面が見る形 ---
+//
+// 本家の型をそのまま画面へ流さない（structure.md の Module Boundaries）。ここに置いた
+// ものだけが画面から見える。形は本家の実測に対応しているが、画面はこちらだけを見る。
+
+export interface ProjectInfoDto {
+  projectId: string;
+  projectName: string;
+  projectPath: string;
+  steering: {
+    exists: boolean;
+    documents: { product: boolean; tech: boolean; structure: boolean };
+    lastModified?: string;
+  };
+  version: string;
+}
+
+export interface SpecPhaseDto {
+  exists: boolean;
+  approved?: boolean;
+  lastModified?: string;
+}
+
+export interface SpecSummaryDto {
+  name: string;
+  description?: string;
+  createdAt: string;
+  lastModified: string;
+  phases: {
+    requirements: SpecPhaseDto;
+    design: SpecPhaseDto;
+    tasks: SpecPhaseDto;
+    implementation: SpecPhaseDto;
+  };
+  taskProgress?: { total: number; completed: number; pending: number };
+}
+
+/** 無い文書は null で返る */
+export type SpecDocumentsDto = Record<
+  'requirements' | 'design' | 'tasks',
+  { content: string; lastModified: string } | null
+>;
+
+export interface TaskDto {
+  id: string;
+  description: string;
+  status: string;
+  isHeader: boolean;
+}
+
+export interface TaskProgressDto {
+  total: number;
+  completed: number;
+  /** 着手中のタスクの ID。無ければ null */
+  inProgress: string | null;
+  progress: number;
+  taskList: TaskDto[];
+  lastModified?: string;
+}
+
+export interface ApprovalDto {
+  id: string;
+  title: string;
+  /** プロジェクトルートからの相対パス */
+  filePath: string;
+  category: 'spec' | 'steering';
+  categoryName: string;
+  createdAt: string;
+}
+
+export interface DocumentContentDto {
+  content: string;
+}
