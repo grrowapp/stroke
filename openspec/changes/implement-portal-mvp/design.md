@@ -14,19 +14,25 @@
 
 ### 本家の形（実測）
 
-本 change の判断の土台になる事実。手元 checkout の **v2.2.7** のソースで確認した。基準の v2.2.5 はタグが無く差分を取れていない（🔶 未検証）。
+本 change の判断の土台になる事実。**稼働中の v2.2.5 に対して実測した**（`GET /api/projects/:id/info` の `version` が `"2.2.5"`）。取得物は `evidence/upstream-v2.2.5.md` に置いた。
 
 | 対象 | 実測した形 |
 |---|---|
-| registry entry | `{projectId, projectPath, workflowRootPath, projectName, instances[]}`（`src/core/project-registry.ts`） |
+| registry entry | `{projectId, projectPath, workflowRootPath, projectName, instances[]}`（`activeProjects.json`） |
 | `projectId` の作り方 | `SHA-1(projectPath)` の base64url 先頭16文字。**`workflowRootPath` からではなく workspace のパスから作られる** |
-| WebSocket | `ws://<host>/ws?projectId=<id>`。接続直後に `initial`（`{specs, approvals}`）と `projects-update` |
-| `task-status-update` | `{specName, taskList, summary, inProgress}`。`summary` は `{total, completed, inProgress, pending, blocked, headers}` |
+| `GET /api/projects/list` / `projects-update` | `{projectId, projectName, projectPath, instances[]}`。**`workflowRootPath` を含まない** |
+| WebSocket | `ws://<host>/ws?projectId=<id>`。接続直後に `projects-update` → `initial`（`{specs, approvals}`）の順 |
+| `task-status-update` | `{specName, taskList, summary, inProgress}`。`summary` は `{total, completed, inProgress, pending, headers}` |
+| タスクの状態 | `completed` / `in-progress` / `pending` の3値のみ。マーカーは `x` → completed、`-` → in-progress、**それ以外はすべて pending** |
 | `approval-update` | 保留中の承認依頼の配列 |
 | `spec-update` / `steering-update` | 再描画用の同期信号 |
-| `ApprovalRequest` | `{id, title, filePath, type, status, createdAt, category: 'spec'｜'steering', categoryName, ...}` |
+| `ApprovalRequest`（pending） | `{id, title, filePath, type, status, createdAt, category: 'spec'｜'steering', categoryName}`。**`filePath` はプロジェクトルートからの相対パス**。`annotations` / `comments` / `metadata` / `respondedAt` は optional で pending では出ない |
 | ステアリング | 常に product / tech / structure の3本。存在は `GET /api/projects/:projectId/info` の `steering`、中身は `GET /api/projects/:projectId/steering/:name` |
 | タスク進捗 | `GET /api/projects/:projectId/specs/:name/tasks/progress` が `{total, completed, inProgress, progress, taskList, lastModified}` を返す |
+
+🔴 **v2.2.7 との差**: v2.2.7 の `summary` は `blocked` を持ち、タスク状態に `blocked`（マーカー `~`）がある。**v2.2.5 にはどちらも無い。** zod スキーマは v2.2.5 の形に合わせる。
+
+🔴 **ADR-0002 の記述の誤り**: ADR-0002 は v2.2.5 の記録として「`- [~]` を blocked に変換する」と書いているが、それは v2.2.7 の挙動で、v2.2.5 では `pending` になる。ADR の修正は別途ユーザーの判断を仰ぐ。
 
 ## Goals / Non-Goals
 
@@ -55,7 +61,8 @@
 - 一致する entry が無ければ **未接続**。`projectId` は不明のままでよい（未接続は入場できないため必要にならない）
 
 **採らなかった案**: 走査結果から `projectId` を計算する。`projectPath` が分からないため計算できない。
-**採らなかった案**: `GET /api/projects/list` を母集合にする。未接続プロジェクトが返らない（ADR-0002）。
+**採らなかった案**: `GET /api/projects/list` を母集合にする。未接続プロジェクトが返らない（ADR-0002）。実測でも `/opt/projects` 直下の9件に対し、本家 API から見えたのは2件だけだった。
+**採らなかった案**: `GET /api/projects/list` から `workflowRootPath` を取る。この応答には含まれない（実測）。`activeProjects.json` が唯一の出どころになる。
 
 🔶 `SPEC_WORKFLOW_SHARED_ROOT` を使った worktree 共有では、複数の workspace が1つの `workflowRootPath` を共有しうる。その場合、走査した1ディレクトリに registry entry が複数対応する。`.spec-workflow` の中身は同一なのでどれを使っても同じ内容が読める。**先頭の entry の `projectId` を使う**。
 
@@ -154,9 +161,13 @@ registry の `projectName`（例 `stroke-board · base2`）を使わない理由
 
 ### 12. design token は CSS カスタムプロパティで持ち、Nuxt UI をその上に載せる
 
-本家 v2.2.5 の token（`--surface-base` などの実測値は `ui.md` の Visual Language）を CSS カスタムプロパティとして定義し、Nuxt UI のテーマからそれを参照する。
+本家 v2.2.5 の token（`--surface-base` などの実測値は `ui.md` の Visual Language）を CSS カスタムプロパティとして定義し、Nuxt UI のセマンティック変数（`--ui-bg` / `--ui-border` / `--ui-text-*` / `--ui-primary`）からそれを参照する。
 
-Nuxt UI のテーマ機構で本家の token を再現できるかは未検証（`tech.md` の Known Limitations）。**実装の最初のタスクでこれを確認する。** 再現できない場合は、本家準拠の範囲を決め直す判断がそこで要る。
+**再現できることを確認済み**（`evidence/upstream-v2.2.5.md`）。実測6値すべてが描画結果と一致した。`tech.md` の Known Limitations に挙がっていた未検証項目はこれで解消した。
+
+本家の token は Tailwind の slate + indigo と同じ系統だが、Tailwind v4 が階調を oklch に振り直しているため v3 由来の本家 hex とは一致しない。色系統だけ `app.config.ts` で合わせ、実測値のある箇所はセマンティック変数を上書きして正確に合わせる。実測が無い階調は Tailwind の slate に委ね、発明した値を入れない。
+
+Nuxt UI はダークモードで `--ui-primary` を primary-400 に落とすが、本家のアクセントは indigo-500 固定なので `.dark` で上書きする。
 
 ### 13. MVP では通知音を鳴らさない
 
@@ -169,11 +180,11 @@ MVP は日本語のみ（proposal の「MVP から外すもの」）。`ui.md` �
 ## Risks / Trade-offs
 
 - **本家の内部実装に依存しており、更新で壊れる** → 接点層に閉じ込め、基準バージョンを明示し、実測を ADR に残す。ペイロードは zod で検証し、形が変わったら黙って通さず記録に残す
-- **確認した本家ソースが v2.2.7 で、基準の v2.2.5 と差分を取れていない** → 実装の最初に、稼働中の本家に対して `initial` / `task-status-update` / `approval-update` の実ペイロードを1回確認する。ずれていたら決定4・5を見直す
+- **v2.2.5 と v2.2.7 で `summary` とタスク状態が違う（実測で判明）** → zod スキーマは v2.2.5 に合わせ、`blocked` を要求しない。本家を上げるときはここが最初に壊れる。`evidence/upstream-v2.2.5.md` に取得物を残してある
 - **worktree 共有時に1ディレクトリへ複数 entry が対応する** → 先頭の entry を使う（決定1）。`.spec-workflow` が同一なので読める内容は変わらないが、表示上どの workspace かは区別できない。区別が必要になったら一覧の単位を決め直す
 - **切断中に起きた変化が通知にならない** → 永続化しないことの帰結として受け入れる（`tech.md` に既知の制約として記載済み）。再接続後は基準を作り直す
 - **死んだ PID がアクティブとして残る** → 本家の制約であり stroke-board では解消できない（ADR-0002）。選べるのに繋がらない行が出うる
-- **Nuxt UI で本家 token を再現できない可能性** → 最初のタスクで確認し、できなければ本家準拠の範囲をユーザーと決め直す。後続タスクを全部積んでから気づく形にしない
+- ~~**Nuxt UI で本家 token を再現できない可能性**~~ → 解消。実測6値すべてが一致した（決定12）
 - **認証なしで外部公開する** → 書き込み系の関数を接点層に置かないことで、読み取り専用であることをコードの形で担保する（決定11）
 
 ## Migration Plan

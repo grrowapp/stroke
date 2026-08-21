@@ -15,9 +15,9 @@
 
 design.md の Risks が求めているもの。ここがずれると 4章以降が全部ずれる。
 
-- [ ] 2.1 稼働中の本家に対して WebSocket を張り、`initial` / `task-status-update` / `approval-update` の実ペイロードを1回取得する。design.md の「本家の形（実測）」の表と突き合わせ、ずれがあれば design.md を直してから先へ進む
-- [ ] 2.2 `ApprovalRequest` の `category: 'spec' | 'steering'` と、承認依頼の飛び先が承認画面であることを `docs/adr/` に追記する。ADR-0002 の「ステアリング文書の更新は検出できない」から「ステアリングは通知に関係しない」と読み違えられるため
-- [ ] 2.3 Nuxt UI のテーマ機構で本家 v2.2.5 の design token（`ui.md` の Visual Language の実測値）を再現できるかを確認する。再現できない場合は先へ進まず、本家準拠の範囲をユーザーと決め直す
+- [x] 2.1 稼働中の本家に対して WebSocket を張り、`initial` / `task-status-update` / `approval-update` の実ペイロードを1回取得する。design.md の「本家の形（実測）」の表と突き合わせ、ずれがあれば design.md を直してから先へ進む
+- [x] 2.2 `ApprovalRequest` の `category: 'spec' | 'steering'` と、承認依頼の飛び先が承認画面であることを `docs/adr/` に追記する。ADR-0002 の「ステアリング文書の更新は検出できない」から「ステアリングは通知に関係しない」と読み違えられるため
+- [x] 2.3 Nuxt UI のテーマ機構で本家 v2.2.5 の design token（`ui.md` の Visual Language の実測値）を再現できるかを確認する。再現できない場合は先へ進まず、本家準拠の範囲をユーザーと決め直す
 
 ## 3. 接点層（`server/utils/upstream/`）
 

@@ -17,6 +17,9 @@ export default defineNuxtConfig({
   imports: { autoImport: false },
   components: { dirs: [] },
 
+  // 既定はダークテーマ。本家の ThemeProvider の初期値が 'dark' である（ui.md の Visual Language）
+  colorMode: { preference: 'dark', fallback: 'dark' },
+
   typescript: { typeCheck: false, strict: true },
 
   runtimeConfig: {

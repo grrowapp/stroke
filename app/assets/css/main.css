@@ -1,2 +1,49 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
+
+/*
+ * 本家 spec-workflow-mcp v2.2.5 の design token。
+ * 稼働中の実物から実測した値（archive の steering-dashboard-portal/ui.md の Visual Language）。
+ * ここにあるのは実測できた6値だけで、測っていない階調は足していない。
+ */
+:root {
+  --surface-base: #0f172a;
+  --surface-panel: #1e293b;
+  --surface-sunken: #0f172a;
+  --border-default: #334155;
+  --interactive-primary: #6366f1;
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+}
+
+/*
+ * Nuxt UI のセマンティック変数へ本家の実測値を流し込む。
+ *
+ * 本家の token は Tailwind の slate + indigo と同じ系統で、色系統そのものは
+ * app.config.ts の colors.neutral / colors.primary で合わせてある。ただし Tailwind v4 は
+ * 階調を oklch に振り直しており、v3 由来の本家 hex とわずかにずれる。実測した値が
+ * ある箇所はこちらで上書きして正確に合わせ、実測が無い階調は Tailwind の slate に委ねる。
+ *
+ * 変数名は @nuxt/ui@4.10.0 の dist/runtime/index.css で定義されているものに合わせている。
+ */
+.dark {
+  /*
+   * Nuxt UI はダークモードで --ui-primary に primary-400 を割り当てるが、本家のアクセントは
+   * indigo-500(#6366f1) 固定で明暗によって振らない。実測値をそのまま入れて合わせる。
+   */
+  --ui-primary: var(--interactive-primary);
+
+  --ui-bg: var(--surface-base);
+  --ui-bg-muted: var(--surface-panel);
+  --ui-bg-elevated: var(--surface-panel);
+  --ui-bg-accented: var(--surface-sunken);
+  --ui-border: var(--border-default);
+  --ui-border-muted: var(--border-default);
+  --ui-border-accented: var(--border-default);
+  --ui-text-highlighted: var(--text-primary);
+  --ui-text: var(--text-secondary);
+  --ui-text-toned: var(--text-secondary);
+  --ui-text-muted: var(--text-muted);
+  --ui-text-dimmed: var(--text-muted);
+}
