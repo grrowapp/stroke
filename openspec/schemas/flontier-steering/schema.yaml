@@ -1,0 +1,201 @@
+name: flontier-steering
+version: 1
+description: Steering-first workflow - interview → ui → proposal → tasks
+
+artifacts:
+  - id: interview
+    generates: interview.md
+    description: The one interview - everything the repository cannot supply
+    template: interview.md
+    instruction: |
+      Interview the user and record it.
+
+      This workflow exists to produce the project's steering documents. This artifact is where
+      everything they need that the repository cannot answer gets settled. Later artifacts read
+      this file; they do not re-open it.
+
+      Start by reading, not asking:
+
+      - `.spec-workflow/steering/` - product.md, tech.md, structure.md. Whatever is there is the
+        baseline: confirm it still holds and cover what this pass changes, rather than
+        gathering it again from scratch.
+      - CONTEXT.md, CLAUDE.md, `docs/adr/`, and the code itself.
+
+      Then open with what you found:
+
+      - Where the repository has material, put your reading to the user and have them correct it.
+        Do not ask them to recite what is already written down.
+      - Where it has nothing, ask which steering documents are to be written and for what - that
+        answer sets the scope of everything after it, and the interview covers the whole project
+        rather than a diff.
+
+      Record that opening exchange as the first entry, so the later artifacts know whether they
+      are describing a whole project or a change to one.
+
+      Only then run the rounds. Use the `grilling` and `domain-modeling` skills and follow them.
+      Put every question through the AskUserQuestion tool. Facts are yours to look up; the
+      decisions are the user's.
+
+      Do not defer a question to a later artifact - what goes unstated here gets invented
+      downstream. Mark what you could not verify as an assumption. Finish when the frontier is
+      empty, not when you have enough to start writing.
+    requires: []
+  - id: ui
+    generates: ui.md
+    description: Interface decisions, settled against a prototype (only when there is a UI)
+    template: ui.md
+    instruction: |
+      CONDITIONAL: create this only if the change puts a user-facing interface in front of
+      someone - a screen, a page, a view. interview.md settles this. A library, a CLI, a
+      service, or a change that touches no surface does not need it; record a deliberate skip
+      and move on to the proposal.
+
+      When it does apply, do not settle the interface by description alone. Invoke the
+      `prototype` skill, take its UI branch, and put several radically different variations in
+      front of the user. Decide from what they pick, then record the outcome here. A layout
+      argued in prose and never seen is a guess.
+
+      How to run it:
+      - Build the variations from what interview.md settled about the interface. Showing the
+        user a prototype is not a licence to re-open the interview.
+      - Name the question the prototype answers before building it.
+      - The prototype is throwaway. What survives is this document.
+
+      Sections: see the template. A section that does not apply is marked as such, not left
+      blank.
+
+      Reference interview.md for who this is for and what it is built on. The proposal comes
+      after this and reads it.
+    requires:
+      - interview
+
+  - id: steering
+    generates: proposal.md
+    description: Initial proposal document outlining the change
+    template: proposal.md
+    instruction: |
+      Settle what the project is, what it is built on, and how it is laid out, so the
+      steering documents can be written from it.
+
+      Write this from interview.md. Do not re-open the interview.
+
+      All three steering documents are drawn from this one: product.md from Why, Who,
+      Outcome, Capabilities, Out of Scope, Principles & Constraints, Risks and
+      Dependencies; tech.md from Technology; structure.md from Structure. Nothing else
+      stands between this document and them, so write every section so it holds for the
+      project rather than for this pass.
+
+      Sections:
+      - **Why**: 1-2 sentences on the problem or opportunity. What problem does this solve? Why now? Name the evidence.
+      - **Who**: The primary persona - role, context, pain points, current behaviour - and the jobs they are hiring this for: what they are trying to get done, how they want to feel, how they want to be seen. Mark unverified traits as assumptions; do not invent users.
+      - **Outcome**: The measurable outcome - metric plus target.
+      - **What Gets Built**: Bullet list of what will be built. Be specific about capabilities. Mark breaking changes with **BREAKING**.
+      - **Capabilities**: What the project can do, one line each, in the user's terms rather than the implementation's. These become product.md's Key Features, so name the capability, not the module that provides it.
+      - **Out of Scope**: What will not be built, and why. The project-level boundary.
+      - **Principles & Constraints**: The rules the project holds itself to, in three tiers - MUST (non-negotiable: security, legal, compatibility promises), SHOULD (strong recommendations, overridable with a stated reason), MAY (preferences and conventions). One line each, written so a reader can tell whether a change breaks it.
+      - **Risks**: What could go wrong and what would be done about it, one line per risk paired with its mitigation. Project-level, not per-task hazards.
+      - **Open Questions**: Unresolved items, including anything Why could not evidence. Omit if none.
+      - **Dependencies**: What this stands on - external services and APIs, libraries and runtimes, existing assets it must interoperate with, infrastructure, work it waits on.
+
+      **Technology** is what this is built on, written as decisions rather than an inventory.
+      For each choice that had a real alternative: what was picked, what was turned down,
+      what made the difference. Say what is already known not to work.
+
+      It has an order. What is settled first constrains everything after it, so work down
+      this tree rather than filling headings in the order they appear:
+
+          Project Type
+            ├─ is growth a real question for this kind of project?
+            │    yes → ask the user how it is expected to grow, then
+            │            Growth ─┬→ Application Architecture
+            │                    └→ Performance targets
+            │    no  → leave growth out entirely; do not carry an empty heading
+            ├─ Application Architecture
+            │    ├─ Primary Language and runtime
+            │    │    ├─ Key Dependencies ─→ Compatibility (platform, dependency versions)
+            │    │    ├─ Build and development tooling
+            │    │    ├─ Code quality tooling
+            │    │    └─ Testing approach
+            │    └─ Security posture
+            └─ Deployment and distribution
+
+          Version control and branching strategy depend on none of the above.
+          Every decision above feeds the decision log and the known limitations.
+
+      **Structure** is how the code is cut up and what holds the cuts in place - where the
+      boundaries sit, what each side owns, what may not cross, and the conventions that keep
+      the result legible to someone who did not write it. Reasons, not a folder listing.
+
+      It follows from the decisions above, in this order:
+
+          Application Architecture
+            └─ Module boundaries ─┬→ Directory organization ─→ Import patterns
+                                  └─ Organizing principles
+
+          Primary Language
+            ├─ Naming conventions
+            ├─ Import patterns
+            ├─ In-file structure patterns
+            └─ Size limits
+
+          Documentation expectations depend on none of the above.
+
+      This workflow writes no spec deltas, so each change sets `skip_specs: true` in its
+      `.openspec.yaml` - `openspec validate` rejects a zero-delta change without it.
+
+      Keep it concise (1-2 pages).
+
+      This is the foundation - the tasks and the steering documents build on this.
+    requires:
+      - interview
+      - ui
+  - id: tasks
+    generates: tasks.md
+    description: Implementation checklist with trackable tasks
+    template: tasks.md
+    instruction: |
+      Turn the proposal into the list of steering documents to be written, one task each.
+
+      Before writing tasks, check the proposal for Open Questions. If any of them
+      would change what the steering documents say, resolve them with the user first -
+      do not bake an unstated assumption into the task list.
+
+      **IMPORTANT: Follow the template below exactly.** The apply phase parses
+      checkbox format to track progress. Tasks not using `- [ ]` won't be tracked.
+
+      Guidelines:
+      - Group related tasks under ## numbered headings
+      - Each task MUST be a checkbox: `- [ ] X.Y Task description`
+      - Tasks should be small enough to complete in one session
+      - Order tasks by dependency (what must be done first?)
+
+      Example:
+      ```
+      ## 1. Steering
+
+      - [ ] 1.1 Write product.md, tech.md and structure.md with write-steering
+      ```
+
+      Never write them by hand: one task invokes `write-steering` for all three, and is
+      done only once the approval comes back.
+      Where the documents already exist the task is an update - say which sections move.
+      Anything write-steering does not cover comes after it, and only if the proposal
+      asks for it.
+    requires:
+      - proposal
+apply:
+  requires:
+    - tasks
+  tracks: tasks.md
+  instruction: |
+    Invoke the `write-steering-v2` skill and follow it to write product.md, tech.md and
+    structure.md from proposal.md. The skill carries the templates, the approval flow,
+    and the versioning that follows approval.
+
+    Before marking a task complete, check the document you just wrote:
+    - It is there, checked the way the skill says to check for it, and it follows its
+      template's headings with no placeholder or empty section left.
+    - Its approval came back approved through the approvals tool. Saying it was approved
+      is not an approval.
+
+    A failure gets fixed and re-checked in this run, not deferred.

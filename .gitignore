@@ -1,0 +1,36 @@
+# Nuxt
+.nuxt/
+.output/
+.data/
+.nitro/
+.cache/
+dist/
+
+# 依存
+node_modules/
+# nodeLinker: node-modules なので PnP 系（.pnp.*）は生じない
+.yarn/*
+!.yarn/patches/
+!.yarn/releases/
+!.yarn/plugins/
+!.yarn/versions/
+
+# 環境
+.env
+.env.*
+!.env.example
+
+# ログ・OS・エディタ
+*.log
+.DS_Store
+*.local
+*.swp
+
+# テスト
+test-results/
+playwright-report/
+
+# ローカル専用
+# .claude/ は /home/vagrant/.agents/skills/ へのマシンローカルな絶対パス symlink を含む
+.claude/
+.session_init/

@@ -1,0 +1,97 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway. 本番コードではない。
+  列構成は指定済み: プロジェクト / 種別 / 内容 / 最終更新。
+  残る問い: 1行が「1イベント」か「1対象ドキュメント」か。同じ列構成で両方出して見比べる。
+  載せているデータは、稼働中の v2.2.5 に WebSocket で繋いで実測できた情報だけ。
+-->
+<html lang="ja" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>行の単位</title>
+<link rel="stylesheet" href="./assets/spec-workflow.css">
+</head>
+<body>
+<div id="root"></div>
+<script>
+const SVG=(d,cls='w-5 h-5')=>`<svg class="${cls}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${d}"></path></svg>`;
+const P={
+  tasks:'M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4',
+  approvals:'M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z',
+  folder:'M3 7a2 2 0 012-2h4l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z',
+};
+const ICON={approval:P.approvals,task:P.tasks};
+const KIND={approval:'承認',task:'タスク'};
+
+/* 同じ対象に複数の通知が来ている状況を含めてある（stroke / auth-spec / tasks.md が3件） */
+const N=[
+ {proj:'stroke',       kind:'approval', title:'Requirements Document Review', spec:'auth-spec',     doc:'requirements.md', to:'承認待ち',    ago:'2分前'},
+ {proj:'stroke-guard', kind:'task',     title:'タスク 3.2',                   spec:'wexec-handler', doc:'tasks.md',        to:'completed',   ago:'11分前'},
+ {proj:'stroke-board', kind:'approval', title:'Design Document Review',       spec:'event-relay',   doc:'design.md',       to:'承認待ち',    ago:'25分前'},
+ {proj:'stroke',       kind:'task',     title:'タスク 1.3',                   spec:'auth-spec',     doc:'tasks.md',        to:'completed',   ago:'40分前'},
+ {proj:'stroke',       kind:'task',     title:'タスク 1.2',                   spec:'auth-spec',     doc:'tasks.md',        to:'completed',   ago:'55分前'},
+ {proj:'stroke',       kind:'task',     title:'タスク 1.1',                   spec:'auth-spec',     doc:'tasks.md',        to:'in-progress', ago:'1時間前'},
+ {proj:'stroke-board', kind:'task',     title:'タスク 2.4',                   spec:'event-relay',   doc:'tasks.md',        to:'completed',   ago:'1時間前'},
+ {proj:'stroke-guard', kind:'approval', title:'Tasks Document Review',        spec:'wexec-handler', doc:'tasks.md',        to:'承認待ち',    ago:'2時間前'},
+];
+
+const th=t=>`<th class="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">${t}</th>`;
+const tbl=(head,body)=>`<div class="overflow-x-auto"><table class="min-w-full border border-[var(--border-default)] rounded-lg overflow-hidden">
+  <thead class="bg-[var(--surface-sunken)]"><tr>${head}</tr></thead>
+  <tbody class="bg-[var(--surface-panel)] divide-y divide-[var(--border-default)]">${body}</tbody></table></div>`;
+const tr=i=>`<tr class="hover:bg-[var(--surface-hover)] cursor-pointer transition-colors">${i}</tr>`;
+const chip=k=>`<div class="flex-shrink-0 w-10 h-10 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">${SVG(ICON[k],'w-5 h-5 text-blue-600 dark:text-blue-400')}</div>`;
+const proj=p=>`<span class="inline-flex items-center gap-1.5 text-sm text-[var(--text-secondary)]">${SVG(P.folder,'w-4 h-4 text-[var(--text-muted)]')}${p}</span>`;
+
+const HEAD = th('プロジェクト')+th('種別')+th('内容')+th('最終更新');
+
+/* 単位1 — 1行 = 1イベント */
+const unitEvent = tbl(HEAD, N.map(n=>tr(
+  `<td class="px-4 py-4">${proj(n.proj)}</td>`+
+  `<td class="px-4 py-4"><span class="text-sm text-[var(--text-muted)]">${KIND[n.kind]}</span></td>`+
+  `<td class="px-4 py-4"><div class="flex items-center gap-3">${chip(n.kind)}
+    <div><div class="text-sm font-medium text-[var(--text-primary)]">${n.title}</div>
+    <div class="text-sm text-[var(--text-secondary)]">${n.spec}</div></div></div></td>`+
+  `<td class="px-4 py-4 text-sm text-[var(--text-secondary)]">${n.ago}</td>`)).join(''));
+
+/* 単位2 — 1行 = 1対象ドキュメント（同じ対象の通知は畳み、最新だけ出す） */
+const unitDoc = (()=>{
+  const m=new Map();
+  for(const n of N){ const k=`${n.proj}|${n.spec}|${n.doc}`; if(!m.has(k)) m.set(k,[]); m.get(k).push(n); }
+  return tbl(HEAD, [...m.values()].map(items=>{
+    const l=items[0];
+    return tr(
+      `<td class="px-4 py-4">${proj(l.proj)}</td>`+
+      `<td class="px-4 py-4"><span class="text-sm text-[var(--text-muted)]">${KIND[l.kind]}</span></td>`+
+      `<td class="px-4 py-4"><div class="flex items-center gap-3">${chip(l.kind)}
+        <div><div class="text-sm font-medium text-[var(--text-primary)]">${l.title}${items.length>1?`<span class="ml-2 text-xs text-[var(--text-muted)]">ほか${items.length-1}件</span>`:''}</div>
+        <div class="text-sm text-[var(--text-secondary)]">${l.spec} / ${l.doc}</div></div></div></td>`+
+      `<td class="px-4 py-4 text-sm text-[var(--text-secondary)]">${l.ago}</td>`);
+  }).join(''));
+})();
+
+const section=(no,name,note,inner)=>`
+<div class="bg-[var(--surface-panel)] border border-[var(--border-default)] rounded-lg p-4">
+  <div class="mb-4 flex items-baseline gap-3">
+    <span class="text-xs px-2 py-1 rounded-full bg-[color-mix(in_srgb,var(--interactive-primary)_15%,transparent)] text-[var(--interactive-primary)] font-medium">単位${no}</span>
+    <h2 class="text-lg font-semibold text-[var(--text-primary)]">${name}</h2>
+  </div>
+  <p class="text-sm text-[var(--text-secondary)] mb-4">${note}</p>${inner}</div>`;
+
+document.getElementById('root').innerHTML = `
+<div class="min-h-screen bg-[var(--surface-base)] text-[var(--text-primary)]">
+  <header class="sticky top-0 z-10 backdrop-blur supports-[backdrop-filter]:bg-[var(--surface-panel)]/60 border-b border-[var(--border-default)]">
+    <div class="w-full px-6 py-3 flex items-center gap-3">
+      <span class="text-lg font-semibold">1行が指すもの</span>
+      <span class="text-xs px-2 py-1 bg-[var(--surface-inset)] text-[var(--text-muted)] rounded-full">列は指定どおり プロジェクト / 種別 / 内容 / 最終更新 で固定</span>
+    </div>
+  </header>
+  <main class="w-full px-6 py-6"><div class="grid gap-6">
+    ${section(1,'1行 = 1イベント','起きたことを起きた順に全部並べる。stroke / auth-spec の tasks.md に 3 件来ているので 3 行に出る。履歴が残る代わりに行が増え続ける。',unitEvent)}
+    ${section(2,'1行 = 1対象ドキュメント','同じ対象への通知を畳んで最新だけ出す。上の 3 件が 1 行になり「ほか2件」と付く。行が増えない代わりに個々の履歴は消える。',unitDoc)}
+  </div></main>
+</div>`;
+</script>
+</body>
+</html>

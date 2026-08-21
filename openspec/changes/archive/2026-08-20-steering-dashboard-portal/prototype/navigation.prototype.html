@@ -1,0 +1,447 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway. 本番コードではない。
+  問い: 上層（プロジェクト横断ポータル）と下層（プロジェクト単位の画面群）をどう行き来させるか。
+        interview Q34/Q35 で「同じナビゲーションには並べない」ことは決着済み。残るのは形と位置。
+
+  この版で変わった前提:
+   - 上層 = 通知 / プロジェクト一覧 の2つ。登録と作成は独立メニューにせず、一覧画面の操作にまとめた
+   - プロジェクトは アクティブ / 非アクティブ を持つ。活性が上、非活性が下。非活性は選択できない
+   - 下層 = 仕様書 / ステアリング / タスク / 承認 / 設定
+
+  本家ソースで確認した事実（src/core/project-registry.ts, src/dashboard/multi-server.ts）:
+   - アクティブ = registry entry の instances に生きた PID がある状態
+   - cleanupStaleProjects() は生きた instance が無いプロジェクトを registry ごと削除する
+     → 本家 GET /api/projects/list はアクティブなものしか返さない。
+        非アクティブを一覧に出すには stroke-board 側が登録簿を持つ必要がある（Q16 と衝突・要決着）
+   - 登録 = 既存パスを加える POST /api/projects/add が実在。作成に相当する機能は本家に無い
+  通知の中身は、稼働中の v2.2.5 に WebSocket で繋いで実測できた情報だけ。
+-->
+<html lang="ja" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ナビゲーションの形と位置</title>
+<link rel="stylesheet" href="./assets/spec-workflow.css">
+<style>
+  body { margin:0; background: var(--surface-base); color: var(--text-primary); }
+  .frame { position:relative; border:1px solid var(--border-default); border-radius:8px; overflow:hidden;
+           background: var(--surface-base); height:500px; display:flex; flex-direction:column; }
+  .bar { display:flex; align-items:center; gap:12px; padding:10px 14px;
+         border-bottom:1px solid var(--border-default); background: var(--surface-panel); }
+  .body { flex:1; display:flex; min-height:0; }
+  .main { flex:1; overflow:auto; padding:16px; min-width:0; }
+  .hit { cursor:pointer; }
+  .hit:hover { background: var(--surface-hover); }
+  .off { opacity:.45; cursor:not-allowed; }
+  table { width:100%; border-collapse:collapse; border:1px solid var(--border-default); border-radius:8px; overflow:hidden; }
+  th { text-align:left; font-size:11px; letter-spacing:.06em; text-transform:uppercase;
+       color: var(--text-muted); font-weight:500; padding:8px 12px; background: var(--surface-sunken); }
+  td { padding:9px 12px; font-size:13px; border-top:1px solid var(--border-default);
+       background: var(--surface-panel); vertical-align:middle; }
+  .muted { color: var(--text-muted); }
+  .sub { color: var(--text-secondary); font-size:12px; }
+  .badge { min-width:16px; height:16px; padding:0 4px; border-radius:8px; font-size:10px; line-height:16px;
+           text-align:center; background: var(--interactive-primary); color:#fff; font-weight:600; display:inline-block; }
+  .chip { font-size:11px; padding:2px 8px; border-radius:999px;
+          background: color-mix(in srgb, var(--interactive-primary) 15%, transparent);
+          color: var(--interactive-primary); font-weight:600; }
+  .chipOn { font-size:11px; padding:2px 8px; border-radius:999px; font-weight:600;
+            background: color-mix(in srgb, #22c55e 18%, transparent); color:#22c55e; }
+  .chipOff { font-size:11px; padding:2px 8px; border-radius:999px; font-weight:600;
+             background: var(--surface-sunken); color: var(--text-muted); border:1px solid var(--border-default); }
+  .navitem { display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:6px;
+             font-size:13px; color: var(--text-secondary); cursor:pointer; white-space:nowrap; }
+  .navitem:hover { background: var(--surface-hover); }
+  .navitem.on { background: color-mix(in srgb, var(--interactive-primary) 10%, transparent);
+                color: var(--interactive-primary); font-weight:600; }
+  .tab { padding:9px 12px; font-size:13px; color: var(--text-secondary); cursor:pointer;
+         border-bottom:2px solid transparent; white-space:nowrap; }
+  .tab.on { color: var(--interactive-primary); font-weight:600; border-bottom-color: var(--interactive-primary); }
+  .placeholder { border:1px dashed var(--border-default); border-radius:8px; padding:22px;
+                 color: var(--text-muted); font-size:13px; text-align:center; }
+  .btn { display:inline-flex; align-items:center; gap:6px; padding:7px 12px; border-radius:6px; font-size:12px;
+         font-weight:600; background: var(--interactive-primary); color:#fff; cursor:pointer; }
+  .btn.ghost { background:transparent; color: var(--text-secondary); border:1px solid var(--border-default); }
+  .card { border:1px solid var(--border-default); border-radius:8px; padding:12px; background: var(--surface-panel); }
+  .field { margin-bottom:12px; }
+  .field label { display:block; font-size:12px; color: var(--text-secondary); margin-bottom:4px; }
+  .field .input { border:1px solid var(--border-default); border-radius:6px; padding:8px 10px;
+                  font-size:13px; color: var(--text-muted); background: var(--surface-sunken); }
+  .overlay { position:absolute; inset:0; background: rgba(0,0,0,.55); display:flex;
+             align-items:flex-start; justify-content:center; padding-top:48px; z-index:20; }
+  .sheet { width:min(460px,86%); background: var(--surface-panel); border:1px solid var(--border-default);
+           border-radius:10px; padding:16px; box-shadow:0 12px 40px rgba(0,0,0,.5); }
+  .drawer { position:absolute; top:0; right:0; bottom:0; width:min(400px,80%); background: var(--surface-panel);
+            border-left:1px solid var(--border-default); z-index:20; display:flex; flex-direction:column;
+            box-shadow:-12px 0 40px rgba(0,0,0,.45); }
+  h2 { font-size:16px; margin:0; }
+  .case { background: var(--surface-panel); border:1px solid var(--border-default);
+          border-radius:10px; padding:16px; }
+  .note { font-size:13px; color: var(--text-secondary); margin:8px 0 14px; }
+  .tradeoff { font-size:12px; color: var(--text-muted); margin-top:10px; }
+  .sectionTitle { font-size:13px; font-weight:600; margin:0 0 8px; display:flex; align-items:center; gap:8px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const SVG=(d,s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${d}"/></svg>`;
+const P={
+  bell:'M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0',
+  folder:'M3 7a2 2 0 012-2h4l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z',
+  plus:'M12 5v14M5 12h14',
+  link:'M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71',
+  back:'M15 18l-6-6 6-6',
+  down:'M6 9l6 6 6-6',
+  grid:'M4 5h6v6H4zM14 5h6v6h-6zM4 15h6v4H4zM14 15h6v4h-6z',
+  x:'M18 6L6 18M6 6l12 12',
+};
+
+/* アクティブ = registry entry の instances に生きた PID がある（本家 project-registry.ts で確認） */
+const PROJECTS=[
+  {id:'stroke',       name:'stroke',       n:3, active:true,  pid:'PID 41822', ago:'2分前'},
+  {id:'stroke-guard', name:'stroke-guard', n:2, active:true,  pid:'PID 41977', ago:'11分前'},
+  {id:'stroke-board', name:'stroke-board', n:2, active:true,  pid:'PID 42130', ago:'25分前'},
+  {id:'old-proto',    name:'old-proto',    n:0, active:false, pid:'—',         ago:'3日前'},
+  {id:'sandbox',      name:'sandbox',      n:0, active:false, pid:'—',         ago:'先週'},
+];
+const ACTIVE=PROJECTS.filter(p=>p.active);
+const SORTED=[...PROJECTS].sort((a,b)=>(b.active-a.active));
+const TOP=[
+  {id:'notif', label:'通知',           icon:P.bell, badge:7},
+  {id:'list',  label:'プロジェクト一覧', icon:P.grid},
+];
+const MENU=['仕様書','ステアリング','タスク','承認','設定'];
+
+/* 実測できた通知だけ。列は確定済み: プロジェクト / 種別 / 内容 / 最終更新 */
+const N=[
+ {proj:'stroke',       kind:'承認',   title:'Requirements Document Review', spec:'auth-spec',     ago:'2分前'},
+ {proj:'stroke-guard', kind:'タスク', title:'タスク 3.2',                   spec:'wexec-handler', ago:'11分前'},
+ {proj:'stroke-board', kind:'承認',   title:'Design Document Review',       spec:'event-relay',   ago:'25分前'},
+ {proj:'stroke',       kind:'タスク', title:'タスク 1.1',                   spec:'auth-spec',     ago:'1時間前'},
+];
+
+const pageTitle=t=>`<div style="font-size:15px;font-weight:600;margin-bottom:12px">${t}</div>`;
+const dot=`<span title="本家との接続状態" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block"></span>`;
+
+const notifTable=()=>`<table><thead><tr>
+  <th>プロジェクト</th><th>種別</th><th>内容</th><th>最終更新</th>
+</tr></thead><tbody>${N.map(n=>`<tr class="hit">
+  <td><span style="display:inline-flex;align-items:center;gap:6px" class="sub">${SVG(P.folder,14)}${n.proj}</span></td>
+  <td class="muted">${n.kind}</td>
+  <td><div>${n.title}</div><div class="sub">${n.spec}</div></td>
+  <td class="sub">${n.ago}</td>
+</tr>`).join('')}</tbody></table>`;
+
+/* プロジェクト一覧 — 登録と作成はこの画面の操作。活性が上、非活性が下で選択不可 */
+const listActions=c=>`<div style="display:flex;gap:8px;margin-left:auto">
+  <div class="btn ghost" data-modal="${c}:register">${SVG(P.link,14)}登録</div>
+  <div class="btn" data-modal="${c}:new">${SVG(P.plus,14)}作成</div>
+</div>`;
+
+const projTable=(c)=>`
+  <div style="display:flex;align-items:center;margin-bottom:10px">
+    <div class="sectionTitle" style="margin:0">プロジェクト</div>${listActions(c)}
+  </div>
+  <table><thead><tr>
+    <th>プロジェクト</th><th>状態</th><th>未処理の通知</th><th>最終更新</th>
+  </tr></thead><tbody>${SORTED.map(p=>p.active?`<tr class="hit" data-open="${c}:${p.id}">
+    <td><span style="display:inline-flex;align-items:center;gap:6px">${SVG(P.folder,14)}${p.name}</span></td>
+    <td><span class="chipOn">アクティブ</span> <span class="sub">${p.pid}</span></td>
+    <td>${p.n?`<span class="badge">${p.n}</span>`:'<span class="muted">—</span>'}</td>
+    <td class="sub">${p.ago}</td>
+  </tr>`:`<tr class="off">
+    <td><span style="display:inline-flex;align-items:center;gap:6px">${SVG(P.folder,14)}${p.name}</span></td>
+    <td><span class="chipOff">未接続</span></td>
+    <td class="muted">—</td>
+    <td class="sub">${p.ago}</td>
+  </tr>`).join('')}</tbody></table>
+  <div class="sub" style="margin-top:8px">未接続 = MCP サーバーが繋がっていない。選択できない。</div>`;
+
+const projCards=(c)=>`
+  <div style="display:flex;align-items:center;margin-bottom:10px">
+    <div class="sectionTitle" style="margin:0">プロジェクト</div>${listActions(c)}
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px">
+    ${SORTED.map(p=>`<div class="card ${p.active?'hit':'off'}" ${p.active?`data-open="${c}:${p.id}"`:''}>
+      <div style="display:flex;align-items:center;gap:6px;font-weight:600;font-size:13px">${SVG(P.folder,14)}${p.name}</div>
+      <div style="margin-top:8px;display:flex;align-items:center;gap:6px">
+        ${p.active?'<span class="chipOn">アクティブ</span>':'<span class="chipOff">未接続</span>'}
+        ${p.n?`<span class="badge">${p.n}</span>`:''}
+      </div>
+      <div class="sub" style="margin-top:6px">${p.ago}</div>
+    </div>`).join('')}
+  </div>`;
+
+const registerForm=()=>`
+  <div style="font-weight:600;margin-bottom:12px">プロジェクトを登録</div>
+  <div class="field"><label>プロジェクトのパス</label><div class="input">~/work/</div></div>
+  <div class="btn">登録</div>
+  <div class="sub" style="margin-top:12px">既にあるプロジェクトを監視対象に加える。本家の <code>POST /api/projects/add</code> に対応（実測済み）。</div>`;
+
+const newForm=()=>`
+  <div style="font-weight:600;margin-bottom:12px">プロジェクトを作成</div>
+  <div class="field"><label>プロジェクト名</label><div class="input">新しいプロジェクト名</div></div>
+  <div class="field"><label>場所</label><div class="input">~/work/</div></div>
+  <div class="field"><label>接続するプロジェクト</label><div class="input">選択してください</div></div>
+  <div class="btn">作成</div>
+  <div class="sub" style="margin-top:12px">中身（何をどう作るか）はこの問いの対象外。接続で有効化される想定。</div>`;
+
+const topContent=(topId,c)=>topId==='notif'
+  ? pageTitle('通知')+notifTable()
+  : pageTitle('プロジェクト一覧')+projTable(c);
+
+const projContent=(p,item)=>pageTitle(p.name+' / '+MENU[item])+
+  `<div class="placeholder">${p.name} / ${MENU[item]}<br><span style="font-size:11px">下層の中身はこの問いの対象外</span></div>`;
+
+const modalFor=(c)=>state.modal&&state.modal.c===c
+  ? `<div class="overlay" data-modal-close="1"><div class="sheet">${state.modal.kind==='register'?registerForm():newForm()}</div></div>` : '';
+
+/* ── 案A: 階層でナビの形を変える ────────────────────────────── */
+const A=(s)=>{
+  if(s.layer==='top') return `
+    <div class="frame">${modalFor('A')}
+      <div class="bar"><span style="font-weight:600">stroke-board</span><span style="margin-left:auto">${dot}</span></div>
+      <div class="bar" style="padding:0 14px;gap:2px">
+        ${TOP.map(t=>`<div class="tab ${s.top===t.id?'on':''}" data-a-top="${t.id}">
+          <span style="display:inline-flex;align-items:center;gap:6px">${SVG(t.icon,14)}${t.label}${t.badge?`<span class="badge">${t.badge}</span>`:''}</span></div>`).join('')}
+      </div>
+      <div class="body"><div class="main">${topContent(s.top,'A')}</div></div>
+    </div>`;
+  const p=PROJECTS.find(x=>x.id===s.proj);
+  return `
+    <div class="frame">
+      <div class="bar">
+        <div class="navitem" data-a-back="1" style="padding-left:0">${SVG(P.back,16)}ポータルへ戻る</div>
+        <span style="font-weight:600;display:inline-flex;align-items:center;gap:6px">${SVG(P.folder,14)}${p.name}</span>
+        <span class="chipOn">アクティブ</span>
+        <span style="margin-left:auto">${dot}</span>
+      </div>
+      <div class="body">
+        <div style="width:170px;border-right:1px solid var(--border-default);padding:10px;background:var(--surface-panel)">
+          ${MENU.map((m,i)=>`<div class="navitem ${i===s.item?'on':''}" data-a-item="${i}">${m}</div>`).join('')}
+        </div>
+        <div class="main">${projContent(p,s.item)}</div>
+      </div>
+    </div>`;
+};
+
+/* ── 案B: ヘッダーのスイッチャー ─────────────────────────────
+   タブ行の位置は上層でも下層でも同じ。中身だけ入れ替わる。非活性は選べない。 */
+const B=(s)=>{
+  const isTop=s.sel==='all';
+  const p=isTop?null:PROJECTS.find(x=>x.id===s.sel);
+  const tabs=isTop?TOP.map(t=>({id:t.id,label:t.label,badge:t.badge})):MENU.map((m,i)=>({id:String(i),label:m}));
+  const cur=isTop?s.top:String(s.item);
+  return `
+    <div class="frame">${modalFor('B')}
+      <div class="bar">
+        <div style="position:relative">
+          <div class="navitem hit" data-b-toggle="1" style="border:1px solid var(--border-default);font-weight:600;color:var(--text-primary)">
+            ${SVG(isTop?P.grid:P.folder,14)}${isTop?'ポータル（すべてのプロジェクト）':p.name}${SVG(P.down,14)}
+          </div>
+          ${s.open?`<div style="position:absolute;top:36px;left:0;z-index:15;width:260px;background:var(--surface-panel);border:1px solid var(--border-default);border-radius:8px;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.4)">
+            <div class="navitem ${isTop?'on':''}" data-b-sel="all">${SVG(P.grid,14)}ポータル（すべて）<span style="margin-left:auto" class="badge">7</span></div>
+            <div style="height:1px;background:var(--border-default);margin:6px 2px"></div>
+            ${SORTED.map(x=>x.active
+              ?`<div class="navitem ${s.sel===x.id?'on':''}" data-b-sel="${x.id}">${SVG(P.folder,14)}${x.name}${x.n?`<span style="margin-left:auto" class="badge">${x.n}</span>`:''}</div>`
+              :`<div class="navitem off">${SVG(P.folder,14)}${x.name}<span style="margin-left:auto" class="chipOff">未接続</span></div>`).join('')}
+          </div>`:''}
+        </div>
+        <span style="margin-left:auto">${dot}</span>
+      </div>
+      <div class="bar" style="padding:0 14px;gap:2px">
+        ${tabs.map(t=>`<div class="tab ${cur===t.id?'on':''}" data-b-tab="${t.id}">${t.label}${t.badge?` <span class="badge">${t.badge}</span>`:''}</div>`).join('')}
+      </div>
+      <div class="body"><div class="main">${isTop?topContent(s.top,'B'):projContent(p,s.item)}</div></div>
+    </div>`;
+};
+
+/* ── 案C: 左端のレール ──────────────────────────────────── */
+const C=(s)=>{
+  const isTop=s.sel==='all';
+  const p=isTop?null:PROJECTS.find(x=>x.id===s.sel);
+  const rail=(on,inner,badge,attr,title,off)=>`<div ${off?'':attr} title="${title}" class="${off?'off':'hit'}" style="position:relative;width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;background:${on?'color-mix(in srgb, var(--interactive-primary) 15%, transparent)':'transparent'};color:${on?'var(--interactive-primary)':'var(--text-secondary)'};font-size:12px;font-weight:700">
+      ${inner}${badge?`<span class="badge" style="position:absolute;top:-4px;right:-4px">${badge}</span>`:''}</div>`;
+  return `
+    <div class="frame">${modalFor('C')}
+      <div class="body">
+        <div style="width:56px;border-right:1px solid var(--border-default);background:var(--surface-sunken);padding:10px 0">
+          ${TOP.map(t=>rail(isTop&&s.top===t.id,SVG(t.icon,18),t.badge,`data-c-top="${t.id}"`,t.label,false)).join('')}
+          <div style="height:1px;background:var(--border-default);margin:4px 12px 10px"></div>
+          ${SORTED.map(x=>rail(s.sel===x.id,x.name.replace('stroke','s').slice(0,2),x.n,`data-c-sel="${x.id}"`,x.name+(x.active?'':'（未接続）'),!x.active)).join('')}
+        </div>
+        ${isTop?'':`<div style="width:170px;border-right:1px solid var(--border-default);background:var(--surface-panel);padding:12px 10px">
+          <div style="font-size:12px;font-weight:600;margin:0 0 10px 4px;display:flex;align-items:center;gap:6px">${SVG(P.folder,14)}${p.name}</div>
+          ${MENU.map((m,i)=>`<div class="navitem ${i===s.item?'on':''}" data-c-item="${i}">${m}</div>`).join('')}
+        </div>`}
+        <div style="flex:1;display:flex;flex-direction:column;min-width:0">
+          <div class="bar"><span style="font-weight:600">${isTop?TOP.find(t=>t.id===s.top).label:p.name+' / '+MENU[s.item]}</span><span style="margin-left:auto">${dot}</span></div>
+          <div class="main">${isTop?topContent(s.top,'C'):projContent(p,s.item)}</div>
+        </div>
+      </div>
+    </div>`;
+};
+
+/* ── 案D: ホーム1画面（上層にナビゲーションを置かない） ───────────
+   上層は1画面。上に通知、下にプロジェクト。スクロールで両方見える。
+   プロジェクトカードを押すと下層に入れ替わる。戻り口はヘッダーのタイトル。 */
+const D=(s)=>{
+  if(s.layer==='top') return `
+    <div class="frame">${modalFor('D')}
+      <div class="bar"><span style="font-weight:600">stroke-board</span><span style="margin-left:auto">${dot}</span></div>
+      <div class="body"><div class="main">
+        <div class="sectionTitle">${SVG(P.bell,14)}通知<span class="badge">7</span></div>
+        ${notifTable()}
+        <div style="height:20px"></div>
+        ${projCards('D')}
+      </div></div>
+    </div>`;
+  const p=PROJECTS.find(x=>x.id===s.proj);
+  return `
+    <div class="frame">
+      <div class="bar">
+        <span class="navitem" data-d-back="1" style="padding-left:0;font-weight:600;color:var(--text-primary)">${SVG(P.back,16)}stroke-board</span>
+        <span style="font-weight:600;display:inline-flex;align-items:center;gap:6px">${SVG(P.folder,14)}${p.name}</span>
+        <span style="margin-left:auto">${dot}</span>
+      </div>
+      <div class="body">
+        <div style="width:170px;border-right:1px solid var(--border-default);padding:10px;background:var(--surface-panel)">
+          ${MENU.map((m,i)=>`<div class="navitem ${i===s.item?'on':''}" data-d-item="${i}">${m}</div>`).join('')}
+        </div>
+        <div class="main">${projContent(p,s.item)}</div>
+      </div>
+    </div>`;
+};
+
+/* ── 案E: 上層を画面ではなくオーバーレイにする ───────────────
+   常に下層にいる。通知はヘッダーのベルから右ドロワー、
+   プロジェクト一覧はプロジェクト名から全面シート。上層は「画面」を持たない。 */
+const E=(s)=>{
+  const p=PROJECTS.find(x=>x.id===s.proj);
+  return `
+    <div class="frame">
+      ${s.sheet?`<div class="overlay" data-e-close="1"><div class="sheet" style="width:min(560px,92%)">
+        ${projTable('E')}
+      </div></div>`:''}
+      ${s.drawer?`<div class="drawer">
+        <div class="bar"><span style="font-weight:600">通知</span><span class="badge">7</span>
+          <span class="navitem" data-e-close="1" style="margin-left:auto">${SVG(P.x,16)}</span></div>
+        <div class="main">${N.map(n=>`<div class="card hit" style="margin-bottom:8px">
+          <div class="sub" style="display:flex;align-items:center;gap:6px">${SVG(P.folder,13)}${n.proj}<span class="muted">${n.kind}</span><span style="margin-left:auto">${n.ago}</span></div>
+          <div style="font-size:13px;margin-top:4px">${n.title}</div>
+          <div class="sub">${n.spec}</div></div>`).join('')}</div>
+      </div>`:''}
+      <div class="bar">
+        <div class="navitem hit" data-e-sheet="1" style="border:1px solid var(--border-default);font-weight:600;color:var(--text-primary)">
+          ${SVG(P.folder,14)}${p.name}${SVG(P.down,14)}
+        </div>
+        <span class="chipOn">アクティブ</span>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
+          <div class="navitem hit" data-e-drawer="1" style="position:relative">${SVG(P.bell,18)}<span class="badge" style="position:absolute;top:-2px;right:-2px">7</span></div>
+          ${dot}
+        </div>
+      </div>
+      <div class="body">
+        <div style="width:170px;border-right:1px solid var(--border-default);padding:10px;background:var(--surface-panel)">
+          ${MENU.map((m,i)=>`<div class="navitem ${i===s.item?'on':''}" data-e-item="${i}">${m}</div>`).join('')}
+        </div>
+        <div class="main">${projContent(p,s.item)}</div>
+      </div>
+    </div>`;
+};
+
+const state={
+  A:{layer:'top', top:'notif', proj:null, item:0},
+  B:{sel:'all', open:false, top:'notif', item:0},
+  C:{sel:'all', top:'notif', item:0},
+  D:{layer:'top', proj:null, item:0},
+  E:{proj:'stroke', item:0, sheet:false, drawer:false},
+  modal:null,
+};
+
+const CASES=[
+  {id:'A', name:'階層でナビの形を変える', render:A,
+   note:'上層は上部タブ（通知 / プロジェクト一覧）。プロジェクトに入ると画面が丸ごと入れ替わり、下層は左サイドバー。戻り口はヘッダー左。',
+   trade:'ナビの形が違うので、どちらの階層にいるか一目で分かる。／ 別プロジェクトへ移るには必ず上層を経由する。'},
+  {id:'B', name:'ヘッダーのスイッチャー', render:B,
+   note:'シェルは1つ。ヘッダー左のセレクタが階層を切り替え、タブ行は同じ位置のまま中身だけ入れ替わる。セレクタ内で未接続は非活性。',
+   trade:'切替口が1箇所に集まり、プロジェクト間の移動が最短。／ タブの位置が同じなので、今どちらの階層かはセレクタの表示だけが手がかり。'},
+  {id:'C', name:'左端のレール', render:C,
+   note:'レール上段が上層の2項目、区切り線の下がプロジェクト。未接続はレール上で非活性。プロジェクトを選んだときだけ第2カラムが開く。',
+   trade:'どこに通知が溜まっているかが常に見える／プロジェクト間を直接移れる。／ 未接続プロジェクトが常にレールを占める。横幅を常時 56+170px 使う。'},
+  {id:'D', name:'ホーム1画面（ナビゲーションなし）', render:D,
+   note:'上層はナビゲーションを持たず、通知とプロジェクトを1画面に縦に並べる。プロジェクトカードを押すと下層へ。戻り口はヘッダーのタイトル。',
+   trade:'上層に「どこを見るか」の選択が要らない。／ 通知が増えるとプロジェクトがスクロールの下に沈む。上層が育つと破綻する。'},
+  {id:'E', name:'上層をオーバーレイにする', render:E,
+   note:'常に下層にいる。通知はヘッダーのベルから右ドロワー、プロジェクト一覧はプロジェクト名から全面シート。上層は画面を持たない。',
+   trade:'作業中の画面を離れずに通知もプロジェクト切替もできる。／ 通知の一覧が狭いドロワーに入るので、4列の表が窮屈。上層に居続けることができない。'},
+];
+
+function render(){
+  document.getElementById('root').innerHTML=`
+  <div style="padding:20px 24px 40px">
+    <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:6px;flex-wrap:wrap">
+      <span style="font-size:18px;font-weight:600">ナビゲーションの形と位置</span>
+      <span class="chip">上層 = 通知 / プロジェクト一覧</span>
+      <span class="chip">登録・作成は一覧画面の操作</span>
+      <span class="chip">下層 = 仕様書 / ステアリング / タスク / 承認 / 設定</span>
+    </div>
+    <div class="note">5案とも実際にクリックして往復できる（一覧の行やカード → 下層）。未接続のプロジェクトは選択できない。決めたいのは行き来のさせ方だけで、各画面の中身はこの問いの対象外。</div>
+    <div style="display:grid;gap:20px">
+      ${CASES.map(c=>`<div class="case">
+        <div style="display:flex;align-items:baseline;gap:10px"><span class="chip">案${c.id}</span><h2>${c.name}</h2></div>
+        <div class="note">${c.note}</div>
+        ${c.render(state[c.id])}
+        <div class="tradeoff">${c.trade}</div>
+      </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+document.addEventListener('click',e=>{
+  const md=e.target.closest('[data-modal]');
+  if(md){ const [c,kind]=md.getAttribute('data-modal').split(':'); state.modal={c,kind}; return render(); }
+  if(e.target.closest('[data-modal-close]') && !e.target.closest('.sheet')){ state.modal=null; return render(); }
+
+  const open=e.target.closest('[data-open]');
+  if(open){
+    const [c,id]=open.getAttribute('data-open').split(':');
+    if(c==='A') state.A={layer:'proj',top:state.A.top,proj:id,item:0};
+    if(c==='B') state.B={...state.B,sel:id,open:false,item:0};
+    if(c==='C') state.C={...state.C,sel:id,item:0};
+    if(c==='D') state.D={layer:'proj',proj:id,item:0};
+    if(c==='E') state.E={proj:id,item:0,sheet:false,drawer:false};
+    return render();
+  }
+
+  const at=e.target.closest('[data-a-top]');   if(at){ state.A.top=at.getAttribute('data-a-top'); return render(); }
+  const ab=e.target.closest('[data-a-back]');  if(ab){ state.A.layer='top'; state.A.proj=null; return render(); }
+  const ai=e.target.closest('[data-a-item]');  if(ai){ state.A.item=+ai.getAttribute('data-a-item'); return render(); }
+
+  const bt=e.target.closest('[data-b-toggle]');if(bt){ state.B.open=!state.B.open; return render(); }
+  const bs=e.target.closest('[data-b-sel]');   if(bs){ state.B={...state.B,sel:bs.getAttribute('data-b-sel'),open:false,item:0}; return render(); }
+  const bb=e.target.closest('[data-b-tab]');
+  if(bb){ const v=bb.getAttribute('data-b-tab'); if(state.B.sel==='all') state.B.top=v; else state.B.item=+v; return render(); }
+
+  const ct=e.target.closest('[data-c-top]');   if(ct){ state.C={...state.C,sel:'all',top:ct.getAttribute('data-c-top')}; return render(); }
+  const cs=e.target.closest('[data-c-sel]');   if(cs){ state.C={...state.C,sel:cs.getAttribute('data-c-sel'),item:0}; return render(); }
+  const ci=e.target.closest('[data-c-item]');  if(ci){ state.C.item=+ci.getAttribute('data-c-item'); return render(); }
+
+  const db=e.target.closest('[data-d-back]');  if(db){ state.D={layer:'top',proj:null,item:0}; return render(); }
+  const di=e.target.closest('[data-d-item]');  if(di){ state.D.item=+di.getAttribute('data-d-item'); return render(); }
+
+  const es=e.target.closest('[data-e-sheet]'); if(es){ state.E.sheet=!state.E.sheet; state.E.drawer=false; return render(); }
+  const ed=e.target.closest('[data-e-drawer]');if(ed){ state.E.drawer=!state.E.drawer; state.E.sheet=false; return render(); }
+  const ec=e.target.closest('[data-e-close]');
+  if(ec && !e.target.closest('.sheet')){ state.E.sheet=false; state.E.drawer=false; return render(); }
+  const ei=e.target.closest('[data-e-item]');  if(ei){ state.E.item=+ei.getAttribute('data-e-item'); return render(); }
+
+  if(state.B.open){ state.B.open=false; render(); }
+});
+
+render();
+</script>
+</body>
+</html>

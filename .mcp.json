@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "specworkflow": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@pimzino/spec-workflow-mcp@latest",
+        "/home/vagrant/work/stroke-board/base2"
+      ],
+      "env": {
+        "SPEC_WORKFLOW_HOME": "/opt/projects/.spec-workflow-mcp",
+        "SPEC_WORKFLOW_SHARED_ROOT": "/opt/projects/stroke-board"
+      }
+    }
+  }
+}

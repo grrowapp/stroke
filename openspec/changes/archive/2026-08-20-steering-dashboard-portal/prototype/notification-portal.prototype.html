@@ -1,0 +1,297 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway. 本番コードではない。
+  質問: 通知集約ポータルの情報構造と、イベント発生時のブラウザ内通知の出し方はどれが正しいか。
+  ?variant=A|B|C で切替。下部バーの ← → とキーボード矢印でも切替。
+
+  見た目は「合わせた」のではなく、稼働中の spec-workflow-mcp v2.2.5 から
+  CSS バンドル(assets/spec-workflow.css)と DOM のクラス文字列をそのまま持ってきている。
+  サイドバー・ヘッダー・カード・テーブルのマークアップは本家の実 DOM のコピー。
+
+  通知の粒度は本家 WebSocket の実 payload から「差分計算後に導出できる範囲」に限定してある。
+-->
+<html lang="ja" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>stroke-board 通知ポータル プロトタイプ</title>
+<link rel="stylesheet" href="./assets/spec-workflow.css">
+<style>
+  /* プロトタイプ専用の切替バーだけ。意図的にデザインから浮かせてある */
+  .proto-sw{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;background:#020617;color:#fff;
+    border:1px solid var(--border-strong);border-radius:9999px;display:flex;align-items:center;gap:12px;
+    padding:6px 8px;box-shadow:0 8px 24px rgba(0,0,0,.6);z-index:9999;font-size:12px}
+  .proto-sw button{background:var(--surface-hover);border:none;color:#fff;width:28px;height:28px;border-radius:9999px;cursor:pointer}
+  .proto-sw .lbl{min-width:250px;text-align:center}
+  .proto-sw .fire{background:var(--interactive-primary);width:auto;height:auto;padding:6px 14px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<div class="proto-sw">
+  <button id="prev">←</button><span class="lbl" id="lbl"></span><button id="next">→</button>
+  <button class="fire" id="fire">イベント発火</button>
+</div>
+
+<script>
+/* ---------- 本家の実 DOM から取ったアイコン ---------- */
+const SVG = (d, cls='w-5 h-5') =>
+  `<svg class="${cls}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${d}"></path></svg>`;
+const P = {
+  stats:'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
+  steering:'M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z',
+  doc:'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+  tasks:'M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4',
+  approvals:'M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z',
+  settings:'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z',
+  bell:'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.158c0 .538-.214 1.055-.595 1.437L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9',
+  eye1:'M15 12a3 3 0 11-6 0 3 3 0 016 0z',
+  eye2:'M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z',
+  chevron:'M19 9l-7 7-7-7',
+  burger:'M4 6h16M4 12h16M4 18h16',
+  collapse:'M11 19l-7-7 7-7m8 14l-7-7 7-7',
+  x:'M6 18L18 6M6 6l12 12',
+};
+const eye = (cls='w-5 h-5 text-gray-400') =>
+  `<svg class="${cls}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${P.eye1}"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${P.eye2}"></path></svg>`;
+
+/* ---------- データ ----------
+   本家 WebSocket の実 payload から、差分計算後に導出できる範囲だけを通知にしてある。 */
+const KIND = { approval:'承認', task:'タスク' };
+/* 稼働中の v2.2.5 に WebSocket で実際に繋ぎ、ファイルを操作して観測した結果だけを載せている。
+   観測できなかったもの（ステアリング文書の更新 / 承認と却下の区別 / 一括操作の判別）は入れていない。 */
+const NOTIFS = [
+ {id:1,kind:'approval',ev:'approval-update',title:'requirements.md の承認依頼',spec:'demo-spec',doc:'requirements.md',when:'Aug 19, 05:05 AM',state:'承認待ち',
+  note:'pending 配列に新しい ID が現れたことで検出。件名は approval.title、リンク先は approval.filePath。実測で取得を確認。'},
+ {id:2,kind:'task',ev:'task-status-update',title:'タスク 1.1 が完了',spec:'demo-spec',doc:'tasks.md',when:'Aug 19, 05:03 AM',state:'pending → completed',
+  note:'taskList の [{id:"1.1",status:"completed"}] を前回値と比較して検出。specName は payload に直接入っている。'},
+ {id:3,kind:'approval',ev:'approval-update',title:'design.md の承認依頼',spec:'demo-spec',doc:'design.md',when:'Aug 19, 05:04 AM',state:'承認待ち',
+  note:'同上。pending 配列の ID 増加で検出。'},
+ {id:4,kind:'task',ev:'task-status-update',title:'タスク 1.2 が進行中',spec:'demo-spec',doc:'tasks.md',when:'Aug 19, 05:02 AM',state:'pending → in-progress',
+  note:'taskList の status 変化として検出。'},
+];
+
+const VARIANTS = { A:'A — 2ペイン インボックス', B:'B — 種別レーン', C:'C — 全幅テーブル' };
+let variant = new URLSearchParams(location.search).get('variant') || 'A';
+if (!VARIANTS[variant]) variant = 'A';
+let selected = 1, firing = false, filter = 'all';
+
+/* ---------- 本家の実 DOM をそのまま使う外枠 ---------- */
+/* 本家の並び（統計 / ステアリング / 仕様書 / タスク / 実装ログ / 承認 / 設定）から
+   非対応の 統計・実装ログ を外し、先頭に 通知 を足したもの。作らないものは並べない。 */
+const NAV = [
+  {l:'通知',        icon:P.bell,      href:'#/notifications', on:true, count:4},
+  {l:'ステアリング', icon:P.steering,  href:'#/steering'},
+  {l:'仕様書',      icon:P.doc,       href:'#/specs'},
+  {l:'タスク',      icon:P.tasks,     href:'#/tasks'},
+  {l:'承認',        icon:P.approvals, href:'#/approvals'},
+  {l:'設定',        icon:P.settings,  href:'#/settings'},
+];
+
+const navItem = n => {
+  const state = n.on
+    ? 'bg-[color-mix(in_srgb,var(--interactive-primary)_10%,transparent)] text-[var(--interactive-primary)]'
+    : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]';
+  return `<a class="flex items-center gap-3 py-2 px-3 rounded-md transition-colors ${state}" href="${n.href||'#'}"${n.on?' aria-current="page"':''}>`
+    + `<div class="flex-shrink-0">${SVG(n.icon)}</div>`
+    + `<span class="text-sm font-medium">${n.l}</span>`
+    + (n.count?`<span class="ml-auto text-xs">${n.count}</span>`:'')
+    + `</a>`;
+};
+
+const shell = main => `
+<div class="min-h-screen bg-[var(--surface-base)] text-[var(--text-primary)] lg:flex">
+  <div class="fixed lg:sticky inset-y-0 lg:top-0 left-0 z-50 lg:z-auto lg:w-64 w-64 lg:h-screen bg-[var(--surface-panel)] border-r border-[var(--border-default)] flex flex-col transition-all duration-200 ease-in-out">
+    <div class="hidden lg:flex items-center justify-between p-4 border-b border-[var(--border-default)]">
+      <h2 class="text-lg font-semibold text-[var(--text-primary)]">stroke-board</h2>
+      <button class="p-1.5 rounded-md hover:bg-[var(--surface-hover)] text-[var(--text-secondary)] ml-auto" title="Collapse sidebar">${SVG(P.collapse)}</button>
+    </div>
+    <nav class="flex-1 overflow-y-auto p-4 space-y-1">${NAV.map(navItem).join('')}</nav>
+    <div class="p-4 border-t border-[var(--border-default)] text-xs text-[var(--text-muted)] leading-relaxed">
+      PROTOTYPE ・ 本家から <b>統計</b> と <b>実装ログ</b> を落とし、<b>通知</b> を足した構成
+    </div>
+  </div>
+  <div class="flex-1 flex flex-col min-w-0">
+    <header class="sticky top-0 z-10 backdrop-blur supports-[backdrop-filter]:bg-[var(--surface-panel)]/60 border-b border-[var(--border-default)]">
+      <div class="w-full px-6 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-4">
+          <button class="lg:hidden p-2 rounded-md text-[var(--text-muted)] hover:bg-[var(--surface-hover)] transition-colors">${SVG(P.burger)}</button>
+          <div class="px-3 py-2"><span class="text-sm font-semibold text-[var(--text-primary)]">notification-portal</span></div>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="text-xs px-2 py-1 bg-[var(--surface-inset)] text-[var(--text-muted)] rounded-full" title="接続先">localhost:3456 / v2.2.5</span>
+          <span class="inline-block w-2.5 h-2.5 rounded-full bg-[var(--status-success)]" title="接続中"></span>
+        </div>
+      </div>
+    </header>
+    <main class="w-full px-6 py-6"><div class="grid gap-4">${main}</div></main>
+  </div>
+</div>`;
+
+/* 本家の card: bg-[var(--surface-panel)] border border-[var(--border-default)] rounded-lg p-4 */
+const card = (title, sub, inner) => `
+<div class="bg-[var(--surface-panel)] border border-[var(--border-default)] rounded-lg p-4">
+  <div class="mb-4">
+    <h2 class="text-lg sm:text-xl font-semibold text-[var(--text-primary)]">${title}</h2>
+    <p class="text-sm text-[var(--text-secondary)] mt-1">${sub}</p>
+  </div>
+  ${inner}
+</div>`;
+
+/* 本家の行アイコン: w-10 h-10 bg-blue-100 dark:bg-blue-900/20 rounded-lg + text-blue-600 dark:text-blue-400 */
+const rowIcon = `<div class="flex-shrink-0 w-10 h-10 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">${SVG(P.doc,'w-5 h-5 text-blue-600 dark:text-blue-400')}</div>`;
+/* 本家の「No tasks」等は素のテキスト。バッジではない */
+const plain = t => `<span class="text-sm text-[var(--text-muted)]">${t}</span>`;
+
+const tabBtn = (key, label, count) =>
+  `<button data-filter="${key}" class="py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+    filter===key ? 'border-[var(--interactive-primary)] text-[var(--interactive-primary)]'
+                 : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-default)]'}">${label} (${count})</button>`;
+
+/* ---------- A: 2ペイン インボックス ---------- */
+function variantA(){
+  const s = NOTIFS.find(n=>n.id===selected) || NOTIFS[0];
+  const list = NOTIFS.map(n=>`
+    <div data-id="${n.id}" class="px-4 py-4 cursor-pointer transition-colors ${
+      n.id===selected ? 'bg-[color-mix(in_srgb,var(--interactive-primary)_10%,transparent)]' : 'hover:bg-[var(--surface-hover)]'}">
+      <div class="flex items-center">${rowIcon}
+        <div class="ml-4 min-w-0">
+          <div class="text-sm font-medium ${n.id===selected?'text-[var(--interactive-primary)]':'text-[var(--text-primary)]'}">${n.title}</div>
+          <div class="text-sm text-[var(--text-secondary)]">${n.spec} / ${n.doc}</div>
+          <div class="text-sm text-[var(--text-muted)] mt-1">${KIND[n.kind]} ・ ${n.when}</div>
+        </div>
+      </div>
+    </div>`).join('');
+  const inner = `
+    <div class="flex border border-[var(--border-default)] rounded-lg overflow-hidden">
+      <div class="w-96 flex-shrink-0 border-r border-[var(--border-default)] divide-y divide-[var(--border-default)] bg-[var(--surface-panel)]">${list}</div>
+      <div class="flex-1 p-6 min-w-0">
+        <h3 class="text-lg font-semibold text-[var(--text-primary)]">${s.title}</h3>
+        <div class="text-sm text-[var(--text-secondary)] mt-2">${KIND[s.kind]} ・ <span class="text-[var(--text-muted)]">${s.ev}</span></div>
+        <div class="text-sm text-[var(--text-secondary)]">${s.spec} / ${s.doc} ・ ${s.when} ・ ${s.state}</div>
+        <p class="text-xs text-[var(--text-muted)] mt-2">導出: ${s.note}</p>
+        <div class="mt-4 p-4 rounded-lg bg-[var(--surface-inset)] border border-[var(--border-default)] text-sm text-[var(--text-secondary)] whitespace-pre-wrap"># ${s.doc}
+
+本家 API から読んだ本文がここに出る。
+stroke-board は書き込まない。</div>
+        <div class="flex justify-end mt-4">
+          <button class="px-4 py-2 rounded-lg bg-[var(--interactive-primary)] text-white text-sm font-medium hover:bg-[var(--interactive-primary-hover)] transition-colors">ドキュメントを開く</button>
+        </div>
+      </div>
+    </div>`;
+  return shell(card('通知','一覧と中身を行き来しながら消し込む', inner)
+    + (firing ? `
+    <div class="fixed right-6 bottom-24 w-96 bg-[var(--surface-elevated)] border border-[var(--border-default)] rounded-lg p-4 shadow-lg z-50">
+      <div class="text-sm text-[var(--text-muted)]">承認 ・ approval-update</div>
+      <div class="text-sm font-medium text-[var(--text-primary)] mt-1">requirements.md の承認依頼</div>
+      <div class="text-sm text-[var(--text-secondary)]">notification-portal / requirements.md</div>
+      <div class="flex justify-end gap-2 mt-3">
+        <button data-dismiss class="px-3 py-1.5 rounded-lg border border-[var(--border-default)] text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]">閉じる</button>
+        <button data-dismiss class="px-3 py-1.5 rounded-lg bg-[var(--interactive-primary)] text-white text-sm font-medium">開く</button>
+      </div>
+    </div>` : ''));
+}
+
+/* ---------- B: 種別レーン ---------- */
+function variantB(){
+  const lane = k => {
+    const items = NOTIFS.filter(n=>n.kind===k);
+    return `<div class="bg-[var(--surface-panel)] border border-[var(--border-default)] rounded-lg overflow-hidden">
+      <div class="px-4 py-3 bg-[var(--surface-sunken)] flex items-center border-b border-[var(--border-default)]">
+        <span class="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">${KIND[k]}</span>
+        <span class="ml-auto text-xs text-[var(--text-muted)]">${items.length}</span>
+      </div>
+      <div class="divide-y divide-[var(--border-default)]">${items.map(n=>`
+        <div class="px-4 py-4 hover:bg-[var(--surface-hover)] cursor-pointer transition-colors">
+          <div class="flex items-center">${rowIcon}
+            <div class="ml-4 min-w-0">
+              <div class="text-sm font-medium text-[var(--text-primary)]">${n.title}</div>
+              <div class="text-sm text-[var(--text-secondary)]">${n.spec} / ${n.doc}</div>
+              <div class="text-sm text-[var(--text-muted)] mt-1">${n.ev} ・ ${n.when}</div>
+            </div>
+          </div>
+        </div>`).join('')}</div>
+    </div>`;
+  };
+  return shell(card('通知','種別ごとに分けて、どこが溜まっているかを見る',
+      `<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">${Object.keys(KIND).map(lane).join('')}</div>`)
+    + (firing ? `
+    <div class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+      <div class="bg-[var(--surface-elevated)] border border-[var(--border-default)] rounded-lg p-6 w-[480px] shadow-lg">
+        <div class="text-sm text-[var(--text-muted)]">承認 ・ approval-update</div>
+        <h3 class="text-lg font-semibold text-[var(--text-primary)] mt-2">requirements.md の承認依頼</h3>
+        <div class="text-sm text-[var(--text-secondary)] mt-1">notification-portal / requirements.md ・ たった今</div>
+        <div class="flex justify-end gap-2 mt-5">
+          <button data-dismiss class="px-4 py-2 rounded-lg border border-[var(--border-default)] text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]">あとで</button>
+          <button data-dismiss class="px-4 py-2 rounded-lg bg-[var(--interactive-primary)] text-white text-sm font-medium">ドキュメントを開く</button>
+        </div>
+      </div>
+    </div>` : ''));
+}
+
+/* ---------- C: 全幅テーブル（本家 Specs のテーブルと同じ組み） ---------- */
+function variantC(){
+  const shown = NOTIFS.filter(n=>filter==='all'||n.kind===filter);
+  const th = t => `<th class="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">${t}</th>`;
+  const rows = shown.map(n=>`
+    <tr class="hover:bg-[var(--surface-hover)] cursor-pointer transition-colors">
+      <td class="px-4 py-4"><div class="flex items-center">${rowIcon}
+        <div class="ml-4"><div class="text-sm font-medium text-[var(--text-primary)]">${n.title}</div>
+        <div class="text-sm text-[var(--text-secondary)]">${n.spec} / ${n.doc}</div></div></div></td>
+      <td class="px-4 py-4">${plain(KIND[n.kind])}</td>
+      <td class="px-4 py-4">${plain(n.ev)}</td>
+      <td class="px-4 py-4 text-sm text-[var(--text-secondary)]">${n.when}</td>
+      <td class="px-4 py-4"><div class="flex items-center gap-2">${eye()}</div></td>
+    </tr>`).join('');
+  const inner = `
+    <div>
+      <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 py-2">
+        <nav class="flex space-x-8">
+          ${tabBtn('all','すべて',NOTIFS.length)}
+          ${Object.keys(KIND).map(k=>tabBtn(k,KIND[k],NOTIFS.filter(n=>n.kind===k).length)).join('')}
+        </nav>
+      </div>
+      <div class="mt-4 overflow-x-auto">
+        <table class="min-w-full border border-[var(--border-default)] rounded-lg overflow-hidden">
+          <thead class="bg-[var(--surface-sunken)]"><tr>${th('内容')}${th('種別')}${th('イベント')}${th('発生時刻')}${th('操作')}</tr></thead>
+          <tbody class="bg-[var(--surface-panel)] divide-y divide-[var(--border-default)]">${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+  return shell(card('通知','行を押すと詳細を挟まず直接ドキュメントへ', inner)
+    + (firing ? `
+    <div class="fixed top-0 left-0 right-0 bg-[var(--surface-panel)] border-b border-[var(--border-default)] px-6 py-3 flex items-center gap-4 shadow-lg z-50">
+      ${plain('承認')}
+      <span class="flex-1 text-sm"><span class="font-medium text-[var(--text-primary)]">requirements.md の承認依頼</span>
+        <span class="text-[var(--text-secondary)]">— notification-portal</span></span>
+      <button data-dismiss class="px-4 py-2 rounded-lg bg-[var(--interactive-primary)] text-white text-sm font-medium">開く</button>
+      <button data-dismiss class="p-2 rounded-md text-[var(--text-muted)] hover:bg-[var(--surface-hover)]">${SVG(P.x)}</button>
+    </div>` : ''));
+}
+
+function render(){
+  document.getElementById('root').innerHTML =
+    variant==='A' ? variantA() : variant==='B' ? variantB() : variantC();
+  document.getElementById('lbl').textContent = VARIANTS[variant];
+  document.querySelectorAll('[data-id]').forEach(el=>el.onclick=()=>{selected=+el.dataset.id;render();});
+  document.querySelectorAll('[data-filter]').forEach(el=>el.onclick=()=>{filter=el.dataset.filter;render();});
+  document.querySelectorAll('[data-dismiss]').forEach(el=>el.onclick=()=>{firing=false;render();});
+}
+function go(d){
+  const ks=Object.keys(VARIANTS);
+  variant=ks[(ks.indexOf(variant)+d+ks.length)%ks.length];
+  const u=new URL(location.href); u.searchParams.set('variant',variant); history.replaceState({},'',u);
+  render();
+}
+document.getElementById('prev').onclick=()=>go(-1);
+document.getElementById('next').onclick=()=>go(1);
+document.getElementById('fire').onclick=()=>{firing=true;render();};
+addEventListener('keydown',e=>{
+  const t=e.target.tagName;
+  if(t==='INPUT'||t==='TEXTAREA'||e.target.isContentEditable)return;
+  if(e.key==='ArrowLeft')go(-1); if(e.key==='ArrowRight')go(1);
+});
+render();
+</script>
+</body>
+</html>
