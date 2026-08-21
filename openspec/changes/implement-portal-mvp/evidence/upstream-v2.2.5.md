@@ -188,3 +188,86 @@ Nuxt UI はダークモードで `--ui-primary` に `--ui-color-primary-400`
 
 ダークモードは `.dark` クラスで切り替わる（`@variant dark (&:where(.dark, .dark *))`）。
 既定をダークにするため `nuxt.config.ts` に `colorMode: { preference: 'dark', fallback: 'dark' }` を置いた。
+
+---
+
+# 基準を 2.2.7 に変更した（追記）
+
+上の実測は稼働中の **2.2.5** に対して行ったものだが、その後 stroke-board の基準は
+**2.2.7** に変更された（[ADR-0004](../../../../docs/adr/0004-baseline-is-2-2-7.md)）。
+上の記録は破棄しない。2.2.5 と 2.2.7 の接点面の差分が `blocked` まわりだけであり、
+それ以外は両バージョンで同一だからである。
+
+## 訂正: タグの不在は根拠にならない
+
+当初「`v2.2.x` のタグが無いから 2.2.7 は未公開」と書いたが、これは誤り。
+remote 側にも `v0.0.25` と `v0.0.28` の2つしかタグが無く、**このプロジェクトは
+リリースにタグを打っていない**。2.0.x〜2.2.5 はいずれもタグ無しで npm に公開されている。
+
+```
+$ git ls-remote --tags origin
+0983f7ae... refs/tags/v0.0.25
+5ae75534... refs/tags/v0.0.28
+```
+
+バージョンの判別は `package.json` の `version` で行う。
+
+## `d37b076..HEAD` の差分（接点面のみ）
+
+```
+$ git diff --stat d37b076..HEAD -- \
+    src/core/task-parser.ts src/core/project-registry.ts src/dashboard/multi-server.ts \
+    src/dashboard/approval-storage.ts src/types.ts src/core/parser.ts
+
+ src/core/task-parser.ts           | 84 ++++++++++++++++++++++++++++---------
+ src/dashboard/approval-storage.ts | 31 ++++++++++++---
+ src/dashboard/multi-server.ts     | 10 ++---
+```
+
+`src/core/project-registry.ts` / `src/types.ts` / `src/core/parser.ts` は差分ゼロ。
+registry の構造と `SpecData` は 2.2.5 と 2.2.7 で同一である。
+
+### `src/core/task-parser.ts` — stroke-board に効く唯一の差分
+
+```diff
+-  status: 'pending' | 'in-progress' | 'completed';
++  status: 'pending' | 'in-progress' | 'completed' | 'blocked';
++  blockedReason?: string;
+   completed: boolean;
+   inProgress: boolean;
++  blocked: boolean;
+```
+
+```diff
+   summary: {
+     total: number;
+     completed: number;
+     inProgress: number;
+     pending: number;
++    blocked: number;
+     headers: number;
+   };
+```
+
+```diff
+-    if (lines[i].match(/^\s*[-*]\s+\[([ x\-])\]/)) {
++    if (lines[i].match(/^\s*[-*]\s+\[([ x\-~])\]/)) {
+```
+
+`_Blocked: <理由>_` を拾って `blockedReason` に入れる処理も追加されている。
+
+### `src/dashboard/multi-server.ts` — 影響なし
+
+差分は `PUT /api/projects/:projectId/specs/:name/tasks/:taskId/status` だけ。
+書き込み系であり、stroke-board は呼ばない（design.md 決定11）。
+
+### `src/dashboard/approval-storage.ts` — 影響なし
+
+`categoryName` のパストラバーサル対策のみ。`ApprovalRequest` の形は変わっていない。
+
+## 未観測のもの
+
+**2.2.7 の実ペイロードは一度も観測していない。** この環境で動いているダッシュボードは
+2.2.5 で、`~` を含む `tasks.md` に対する `task-status-update` を実物で見るには
+2.2.7 のダッシュボードを起動する必要がある。上の差分はソースの差分であって、
+稼働中の実測ではない。

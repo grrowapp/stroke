@@ -8,13 +8,15 @@
 
 - **層と依存の向き** — 画面 → 制御 → 接点 の一方向。ディレクトリ配置と命名は steering の `structure.md` に従う
 - **技術** — Nuxt4（SSR あり）/ Nuxt UI / TailwindCSS / zod / Vitest / Playwright、yarn 4。steering の `tech.md`
-- **本家の基準** — spec-workflow-mcp v2.2.5。公開 API だけでなくペイロードの形・registry の構造・PID による生存判定にも依存する。`docs/adr/0002-upstream-observed-behaviour.md`
+- **本家の基準** — spec-workflow-mcp **2.2.7**（`docs/adr/0004-baseline-is-2-2-7.md`）。公開 API だけでなくペイロードの形・registry の構造・PID による生存判定にも依存する。実測は `docs/adr/0002-upstream-observed-behaviour.md`
 - **加工の禁止** — 本家から受け取った情報を再構成する仕様を勝手に足さない。`docs/adr/0001-do-not-derive-from-upstream-data.md`
 - **base2 は git リポジトリではない** — `git init` から始まる
 
 ### 本家の形（実測）
 
-本 change の判断の土台になる事実。**稼働中の v2.2.5 に対して実測した**（`GET /api/projects/:id/info` の `version` が `"2.2.5"`）。取得物は `evidence/upstream-v2.2.5.md` に置いた。
+本 change の判断の土台になる事実。基準は **2.2.7**（ADR-0004）だが、この環境で動いているのは 2.2.5 なので、**実測は稼働中の 2.2.5 に対して行い、2.2.7 との差分をソース差分で埋めた**。取得物は `evidence/upstream-v2.2.5.md` に置いた。
+
+2.2.5 → 2.2.7 の差分は接点面では `blocked` まわりだけで、registry の構造・`SpecData`・`ApprovalRequest`・WebSocket のメッセージ種別・読み取り系 REST はすべて同一（ADR-0004）。したがって下の表は両バージョンで成立する。
 
 | 対象 | 実測した形 |
 |---|---|
@@ -22,17 +24,17 @@
 | `projectId` の作り方 | `SHA-1(projectPath)` の base64url 先頭16文字。**`workflowRootPath` からではなく workspace のパスから作られる** |
 | `GET /api/projects/list` / `projects-update` | `{projectId, projectName, projectPath, instances[]}`。**`workflowRootPath` を含まない** |
 | WebSocket | `ws://<host>/ws?projectId=<id>`。接続直後に `projects-update` → `initial`（`{specs, approvals}`）の順 |
-| `task-status-update` | `{specName, taskList, summary, inProgress}`。`summary` は `{total, completed, inProgress, pending, headers}` |
-| タスクの状態 | `completed` / `in-progress` / `pending` の3値のみ。マーカーは `x` → completed、`-` → in-progress、**それ以外はすべて pending** |
+| `task-status-update` | `{specName, taskList, summary, inProgress}`。`summary` は `{total, completed, inProgress, pending, blocked, headers}`。**`blocked` は 2.2.7 で追加されたもので 2.2.5 には無い** |
+| タスクの状態 | `pending` / `in-progress` / `completed` / `blocked` の4値。マーカーは `x` → completed、`-` → in-progress、`~` → blocked、それ以外は pending。**`blocked` は 2.2.7 のみ。2.2.5 では `~` も pending になる** |
 | `approval-update` | 保留中の承認依頼の配列 |
 | `spec-update` / `steering-update` | 再描画用の同期信号 |
 | `ApprovalRequest`（pending） | `{id, title, filePath, type, status, createdAt, category: 'spec'｜'steering', categoryName}`。**`filePath` はプロジェクトルートからの相対パス**。`annotations` / `comments` / `metadata` / `respondedAt` は optional で pending では出ない |
 | ステアリング | 常に product / tech / structure の3本。存在は `GET /api/projects/:projectId/info` の `steering`、中身は `GET /api/projects/:projectId/steering/:name` |
 | タスク進捗 | `GET /api/projects/:projectId/specs/:name/tasks/progress` が `{total, completed, inProgress, progress, taskList, lastModified}` を返す |
 
-🔴 **v2.2.7 との差**: v2.2.7 の `summary` は `blocked` を持ち、タスク状態に `blocked`（マーカー `~`）がある。**v2.2.5 にはどちらも無い。** zod スキーマは v2.2.5 の形に合わせる。
+**zod での扱い**: 基準は 2.2.7 だが、この環境で動いているのは 2.2.5 である。`blocked` / `summary.blocked` / `blockedReason` は **optional** として受ける。必須にすると手元のダッシュボードのペイロードが1件も通らない。逆に 2.2.5 の形しか許さないと、本家を上げた瞬間に全部弾く。両方通す形にする（ADR-0004）。
 
-🔴 **ADR-0002 の記述の誤り**: ADR-0002 は v2.2.5 の記録として「`- [~]` を blocked に変換する」と書いているが、それは v2.2.7 の挙動で、v2.2.5 では `pending` になる。ADR の修正は別途ユーザーの判断を仰ぐ。
+`blocked` は通知の判定に使わない。通知は本家 `NotificationProvider` と同じ4種のままで、そこに blocked は含まれない。タスク画面の表示にのみ効く。
 
 ## Goals / Non-Goals
 
@@ -180,7 +182,8 @@ MVP は日本語のみ（proposal の「MVP から外すもの」）。`ui.md` �
 ## Risks / Trade-offs
 
 - **本家の内部実装に依存しており、更新で壊れる** → 接点層に閉じ込め、基準バージョンを明示し、実測を ADR に残す。ペイロードは zod で検証し、形が変わったら黙って通さず記録に残す
-- **v2.2.5 と v2.2.7 で `summary` とタスク状態が違う（実測で判明）** → zod スキーマは v2.2.5 に合わせ、`blocked` を要求しない。本家を上げるときはここが最初に壊れる。`evidence/upstream-v2.2.5.md` に取得物を残してある
+- **基準（2.2.7）と稼働中（2.2.5）がずれている** → 差分は `blocked` まわりだけで、両方通る zod にして吸収する（ADR-0004）。ただし **2.2.7 の実ペイロードは一度も観測していない**。`~` を含む `tasks.md` に対する `task-status-update` を実物で確認できるのは、2.2.7 のダッシュボードを起動してからになる
+- **`blocked` を optional にしたことで、本家の形が変わったのに気づけない範囲ができる** → optional にしたのは `blocked` / `summary.blocked` / `blockedReason` の3つだけ。それ以外は厳密に検証し、形が変わったら弾いて記録に残す
 - **worktree 共有時に1ディレクトリへ複数 entry が対応する** → 先頭の entry を使う（決定1）。`.spec-workflow` が同一なので読める内容は変わらないが、表示上どの workspace かは区別できない。区別が必要になったら一覧の単位を決め直す
 - **切断中に起きた変化が通知にならない** → 永続化しないことの帰結として受け入れる（`tech.md` に既知の制約として記載済み）。再接続後は基準を作り直す
 - **死んだ PID がアクティブとして残る** → 本家の制約であり stroke-board では解消できない（ADR-0002）。選べるのに繋がらない行が出うる

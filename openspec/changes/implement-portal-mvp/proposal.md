@@ -13,7 +13,7 @@
 - **制御層** — 受信スナップショットと前回値の比較、通知4種の生成、ブラウザ向け WebSocket 配信
 - **上層の画面** — 通知（プロジェクト / 種別 / 内容 / 最終更新 の4列）、プロジェクト一覧（アクティブが上・未接続は非活性）、タブナビゲーション、画面内トースト
 - **下層の画面** — 仕様書 / ステアリング / タスク / 承認 の4画面と左サイドバー。通知行からこの4画面へ直行する
-- **design token を本家 v2.2.5 に合わせる** — Nuxt UI のテーマ機構で再現できるかを実装の最初に確認する
+- **design token を本家に合わせる** — Nuxt UI のテーマ機構で再現できるかを実装の最初に確認する
 
 **BREAKING** なし。stroke-board は本家とは別のアプリケーションで、本家に変更を加えない。
 
@@ -23,7 +23,9 @@
 
 ADR-0002 の「ステアリング文書の**更新**は検出できない」は成立するが、「ステアリング文書の**承認依頼**は通知になる」はそれとは別で、成立する。
 
-🔶 確認したのは手元 checkout の v2.2.7 ソース。基準の v2.2.5 はタグが無く差分を取れていない。
+稼働中の本家（2.2.5）から取得した pending の承認依頼が、実際に3件とも `category: "steering"` だった。詳細は `docs/adr/0003-approval-category-and-destination.md`。
+
+本家の基準は **2.2.7** とする（`docs/adr/0004-baseline-is-2-2-7.md`）。2.2.5 との差分は接点面では `blocked` まわりだけで、`ApprovalRequest` の形は両バージョンで同一。
 
 ### MVP から外すもの（決まっているが今回入れないもの）
 
@@ -53,7 +55,7 @@ ADR-0002 の「ステアリング文書の**更新**は検出できない」は�
 - **新規コード** — `app/`（画面）、`server/`（Nitro: 接点層と制御層）、`shared/`（共有型）。構造は structure.md の Directory Organization に従う
 - **新規の設定ファイル** — `package.json` / `nuxt.config.ts` / `tsconfig.json` / `yarn.lock` / `.gitignore`
 - **依存** — nuxt `^4.5` / @nuxt/ui `^4.10` / tailwindcss / zod / vitest / @playwright/test
-- **外部システム** — 本家 spec-workflow-mcp v2.2.5 の REST API、WebSocket（`ws://<host>/ws?projectId=<id>`）、`SPEC_WORKFLOW_HOME` 配下の `activeProjects.json`、各プロジェクトの `.spec-workflow/`。**すべて読み取りのみ**
+- **外部システム** — 本家 spec-workflow-mcp **2.2.7** の REST API、WebSocket（`ws://<host>/ws?projectId=<id>`）、`SPEC_WORKFLOW_HOME` 配下の `activeProjects.json`、各プロジェクトの `.spec-workflow/`。**すべて読み取りのみ**
 - **環境変数** — 本家ダッシュボードの URL、走査する親パス
 - **既存資産** — 変更なし。本家にも `.spec-workflow/` にも書き込まない
 - **ドキュメント** — 上記の承認カテゴリの事実を `docs/adr/` に残す
