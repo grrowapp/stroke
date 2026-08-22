@@ -43,3 +43,7 @@
   - **WS（2.8 の正規表現）**: 実在 id では question / proposal とも接続が保たれ接続時配信も届く。不在 id では即 close。**区別がついたので URL から id を抜けている**（正規表現が合っていなければ実在 id でも即 close になる）
 - [x] 4.3 `yarn session list` が動く（`server/utils/stroke/session-core.ts` の import が解決している）。`create` / `delete` は既存セッションを壊さないよう実行していない
 - [x] 4.4 `openspec validate --all` — `design-semantic-structure` は通過。失敗2件は別 change の specs 未着手で既知
+
+## 5. 成果物を git に入れる
+
+- [x] 5.1 commit する（`a7a29f6`）。地図と ADR（`plan-mainline-merge` の成果）も未コミットのままだったので同じ commit に含めた

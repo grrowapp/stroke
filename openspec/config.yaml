@@ -17,24 +17,22 @@ context: |
   - `docs/adr/`
     後から変えにくい決定の記録。矛盾する提案をする場合は、その旨を明示すること。
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+rules:
+  tasks:
+    - 成果物を git に入れるところまでを1本の change の範囲とする。tasks の最後に
+      commit を1項目置くこと。個々のタスクに commit を混ぜず、まとめて1つにする
 
 # Per-operation guidance (optional)
 # Add advisory guidance for how apply and archive work should be conducted.
 # This is separate from artifact rules above.
-# Example:
-#   operations:
-#     apply:
-#       guidance:
-#         - Keep test summaries concise
-#     archive:
-#       guidance:
-#         - Summarize the archive outcome before finishing
+operations:
+  apply:
+    guidance:
+      - 全タスクを終えたら、その change の成果物を commit すること。tasks に
+        commit の項目が無い場合も、実装が未コミットのまま完了としない。
+        commit しないのは、ユーザーが明示的にそう指示したときだけとする
+  archive:
+    guidance:
+      - archive の前に、その change の成果物が commit 済みであることを確かめる。
+        未コミットのまま archive すると、change は閉じたのに成果物が git に
+        入っていない状態になる
