@@ -23,7 +23,7 @@
 | `engines` | 宣言あり | 宣言なし | 宣言が片側にしかない |
 | dev のポート | 3100 | 3001 | 1プロセスなので1つ |
 
-さらにこちらでは**ポート 3001 が2箇所に直書き**されている。`package.json` の `dev` スクリプトと `server/utils/api-base-url.ts` の `DEFAULT_API_BASE_URL` で、片方だけ変えるとエージェントだけが古い接続先を掴む。統合でポートが動くので、この二重管理を抱えたまま移せば必ず踏む。
+さらにこちらでは**ポート 3001 が2箇所に直書き**されている。`package.json` の `dev` スクリプトと `server/utils/stroke/api-base-url.ts` の `DEFAULT_API_BASE_URL` で、片方だけ変えるとエージェントだけが古い接続先を掴む。統合でポートが動くので、この二重管理を抱えたまま移せば必ず踏む。
 
 ### テスト
 
@@ -67,15 +67,15 @@ Markdown の描画結果は実装が変われば細部が変わりうるが、`p
 
 - `package.json` / `yarn.lock` — vitest / `@nuxt/test-utils` / DOM 環境の追加、依存の入れ替え、スクリプト
 - `vitest.config.ts` — 新規
-- `server/utils/*.test.ts` — 新規。対象は `question.ts` / `request-schemas.ts` / `project.ts` / `session-core.ts` / `claude-config.ts` / `conflict.ts` / `session-store.ts`
+- `server/utils/stroke/*.test.ts` — 新規。対象は `question.ts` / `request-schemas.ts` / `project.ts` / `session-core.ts` / `claude-config.ts` / `conflict.ts` / `session-store.ts`
 - 子プロセスのスタブの置き場 — 新規
 - `nuxt.config.ts` — `imports` / `components` / `devServer`
 - `app/` 配下 19 ファイル全部
-- `server/utils/api-base-url.ts` — `DEFAULT_API_BASE_URL`
+- `server/utils/stroke/api-base-url.ts` — `DEFAULT_API_BASE_URL`
 - `README.md` / `docs/session-workflow.md` — テストの節、ポートの記載
 
 **tasks の順序**: テスト → 依存 → auto-import。テストが無い状態で他の2つを通すと、壊れても分からない。
 
-**前提**: `design-semantic-structure`。ファイルの置き場が決まってから import を書き換えるほうが二度書きにならない。
+**前提**: なし。ファイルの置き場は `docs/structure.md` で確定し、実際の移動も済んでいる（`design-semantic-structure` は archive 済み）。import を書き換える先が動く心配は無い。
 
 **吸収した change**: `add-test-harness`（テストの安全網）、`align-dependencies`（依存の突き合わせ）、`remove-auto-imports`（auto-import の廃止）の3本。いずれも「1つのアプリになるから揃うしかないもの」で、同じ `package.json` と `nuxt.config.ts` を触り、順番に実施するしかない。

@@ -34,7 +34,6 @@
 
 | id | タイトル | 概要 | 区分 |
 |---|---|---|---|
-| [design-semantic-structure](../openspec/changes/design-semantic-structure/) | 意味の構造設計 | 意味区分と命名・配置の戦略を決め、そこから置き場と名前を導く | A |
 | [align-coding-conventions](../openspec/changes/align-coding-conventions/) | コーディング方針の準拠化 | テスト整備・依存の一本化・auto-import 廃止 | A |
 | [align-settings-conventions](../openspec/changes/align-settings-conventions/) | 設定値運用方針の準拠化 | ビルド時と実行時の境界を引き、直書きを環境変数へ出す | A |
 | [connect-portal-and-strokes](../openspec/changes/connect-portal-and-strokes/) | 入口と出口を繋ぐ | 作成ボタンから入れない・承認後に一覧へ出ない、両端の断絶を埋める | B |
@@ -54,8 +53,7 @@
 
 ```mermaid
 graph TD
-  struct[design-semantic-structure] --> code[align-coding-conventions]
-  code --> settings[align-settings-conventions]
+  code[align-coding-conventions] --> settings[align-settings-conventions]
   conn[connect-portal-and-strokes]
 
   code -.-> tok[adopt-upstream-design-tokens]
@@ -66,7 +64,9 @@ graph TD
   end
 ```
 
-`connect-portal-and-strokes` は他に依存しない。この資料を生んだ change（`plan-mainline-merge`）は archive 済みで、全体の前提としてこの資料そのものが残っている。
+`connect-portal-and-strokes` は他に依存しない。
+
+archive 済みの2本（`plan-mainline-merge` / `design-semantic-structure`）は載せない。前者が生んだのがこの資料と `docs/adr/0002-*`、後者が生んだのが `docs/structure.md` で、**成果物のほうが残って前提になっている**。
 
 並走する別ワークツリーの作業は含めない。意味の区分が先に決まっていれば、取り込む時点でその制約に沿わせる調整で足りる。
 

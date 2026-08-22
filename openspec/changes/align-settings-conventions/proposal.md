@@ -54,18 +54,18 @@
 ## Impact
 
 - `nuxt.config.ts` — `runtimeConfig` の追加
-- `server/utils/paths.ts` — `SESSIONS_ROOT` / `PROJECTS_ROOT`
-- `server/utils/ai.ts` — `MAX_RETRIES`
-- `server/utils/question.ts` — 問いの構造の閾値6件
-- `server/utils/claude-config.ts` — 既にあるスキーマ検証を、外に出す値の全体へ広げる土台
-- `server/utils/request-schemas.ts` — リクエストの閾値17件
-- `server/utils/session-store.ts` — セッション内のファイル名
-- `server/utils/project.ts` — 生成先のディレクトリ名・ファイル名、名前規則
-- `server/utils/claude.ts` — 実行バイナリ名、フラグ、子プロセスへ渡す環境変数名、タイムアウト時のシグナル、CLI の出力とメッセージの判定に使う値
-- `server/utils/openspec.ts` — `openspec` のバイナリ名とサブコマンド
-- `server/utils/prompt.ts` — prompt の固定文言2本
+- `server/utils/stroke/paths.ts` — `SESSIONS_ROOT` / `PROJECTS_ROOT`
+- `server/utils/stroke/ai.ts` — `MAX_RETRIES`
+- `server/utils/stroke/question.ts` — 問いの構造の閾値6件
+- `server/utils/stroke/claude-config.ts` — 既にあるスキーマ検証を、外に出す値の全体へ広げる土台
+- `server/utils/stroke/request-schemas.ts` — リクエストの閾値17件
+- `server/utils/stroke/session-store.ts` — セッション内のファイル名
+- `server/utils/stroke/project.ts` — 生成先のディレクトリ名・ファイル名、名前規則
+- `server/utils/stroke/claude.ts` — 実行バイナリ名、フラグ、子プロセスへ渡す環境変数名、タイムアウト時のシグナル、CLI の出力とメッセージの判定に使う値
+- `server/utils/stroke/openspec.ts` — `openspec` のバイナリ名とサブコマンド
+- `server/utils/stroke/prompt.ts` — prompt の固定文言2本
 - `server/routes/` の WS — セッション id を抜く正規表現
-- `server/utils/running.ts` — セッションあたりの同時実行数
+- `server/utils/stroke/running.ts` — セッションあたりの同時実行数
 - `server/plugins/00.startup-checks.ts` — 追加した設定の検証
 - 各所のログのプレフィックス
 - `package.json` — ポートの二重管理の解消
@@ -85,7 +85,7 @@
 
 **この change に含めないもの**: 洗い出しで見つかった、設定値ではない不具合。プロジェクト名の連番採番が上限のない無限ループであること、コメントが実在しないファイル名を指していること、起動時チェックがプロセスごと落とすこと。いずれも `docs/known-issues.md` に記録済みで、統合とは別軸の修正として扱う。
 
-なお、WS の URL からセッション id を抜く正規表現は設定値として外へ出すため、リバースプロキシでサブパス配信したときに接続が無言で閉じる問題は、この change の範囲で解ける。
+なお、WS の URL からセッション id を抜く正規表現は設定値として外へ出すため、リバースプロキシでサブパス配信したときに接続が無言で閉じる問題は、この change の範囲で解ける。パスが `/api/strokes/<id>/ws/…` に変わっても、正規表現が直書きである状況は変わっていない。
 
 **吸収した change**: `separate-build-time-settings`（ビルド時設定の区別）を畳んで取り込んだ。同じ capability `configuration` の境界の両側で、同じ `nuxt.config.ts` を触り、順番に実施するしかない。2本に割る理由が無く、割ると境界がどこにあるかが2箇所に散る。
 
