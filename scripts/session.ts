@@ -1,11 +1,11 @@
-import { resolveApiBaseUrl } from '../server/utils/api-base-url'
+import { resolveApiBaseUrl } from '../server/utils/stroke/api-base-url'
 import {
   SessionCoreError,
   createSessionCore,
   deleteSessionCore,
   listSessionsCore,
   readInvocationCore,
-} from '../server/utils/session-core'
+} from '../server/utils/stroke/session-core'
 
 /**
  * サーバが動いていなくても使えるセッション管理（specs/tools/session-cli）。

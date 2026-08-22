@@ -16,5 +16,5 @@ jq -n \
   --rawfile p '$filepath' \
   --arg n '$projectname' \
   '{proposal: $p} + (if $n == "" then {} else {projectName: $n} end)' \
-| curl -X POST "$(printenv STROKE_BASEURL)/api/${CLAUDE_SESSION_ID}/proposal" -H 'Content-Type: application/json' --data-binary @-
+| curl -X POST "$(printenv STROKE_BASEURL)/api/strokes/${CLAUDE_SESSION_ID}/proposal" -H 'Content-Type: application/json' --data-binary @-
 ```

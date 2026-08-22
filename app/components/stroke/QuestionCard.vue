@@ -2,7 +2,7 @@
 // 問いを縦積みカードで出す（ui.md 画面1 = A）。
 // 問い → 背景 → 選択肢 → 自由入力 を上から1本の流れで読ませる。
 // 選択肢は決定を代行する仕掛けではないため、自由入力は常に選択肢の直後に見えている。
-import type { Answer, Question } from '#shared/types'
+import type { Answer, Question } from '#shared/stroke'
 
 const props = defineProps<{ question: Question }>()
 const emit = defineEmits<{ answer: [Answer] }>()

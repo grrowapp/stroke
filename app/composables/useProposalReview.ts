@@ -8,7 +8,7 @@ import type {
   HighlightColor,
   Phase,
   Stroke,
-} from '#shared/types'
+} from '#shared/stroke'
 import { useAnnotations } from '~/composables/useAnnotations'
 
 /** 本文の見せ方。注釈を付けられるのは生テキストの面だけ。 */
@@ -69,7 +69,7 @@ export function useProposalReview(
   const a = useAnnotations()
 
   /** このセッションの API。`/api/<uuid>` */
-  const base = computed(() => `/api/${toValue(sessionId)}`)
+  const base = computed(() => `/api/strokes/${toValue(sessionId)}`)
 
   const phase = ref<Phase>(initial.phase)
   const strokes = ref<Stroke[]>(initial.strokes)

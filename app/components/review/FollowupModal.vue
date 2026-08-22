@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 差し戻しに対して AI が返してきた問い。画面2 から動かさず、ここで1問1答を繰り返す。
 // 何問来るかは AI が決めるため、総数は示さない。
-import type { Answer, Question } from '#shared/types'
+import type { Answer, Question } from '#shared/stroke'
 
 const props = defineProps<{
   question: Question | null

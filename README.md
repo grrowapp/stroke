@@ -63,9 +63,9 @@ AI の起動設定は `nuxt.config.ts` の `runtimeConfig.claude` にある。�
 
 | ルート | 画面 |
 |---|---|
-| `/` | 概要入力 |
-| `/s/<uuid>` | 画面1（ストローク） |
-| `/s/<uuid>/proposal` | 画面2（proposal 確認） |
+| `/strokes` | 概要入力 |
+| `/strokes/<uuid>` | 画面1（ストローク） |
+| `/strokes/<uuid>/proposal` | 画面2（proposal 確認） |
 
 ## 置き場所
 
@@ -84,7 +84,7 @@ AI の起動設定は `nuxt.config.ts` の `runtimeConfig.claude` にある。�
 
 ## セッションを畳む
 
-- サーバが動いているとき: `GET /api/sessions` で一覧、`POST /api/<uuid>/delete` で削除
+- サーバが動いているとき: `GET /api/strokes` で一覧、`POST /api/strokes/<uuid>/delete` で削除
 - サーバが動いていないとき:
 
 ```bash
@@ -93,4 +93,4 @@ yarn session delete <uuid>
 yarn session create "<概要>"
 ```
 
-どちらも同じ実体（`server/utils/session-core.ts`）を呼ぶ。手順の詳細は `docs/session-workflow.md`。
+どちらも同じ実体（`server/utils/stroke/session-core.ts`）を呼ぶ。手順の詳細は `docs/session-workflow.md`。

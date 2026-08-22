@@ -3,7 +3,7 @@
 // 選択範囲は本文全体での文字オフセット（start / end）で持つ。
 // レンダリング後の HTML ではなく生テキストに対して付けるため、
 // 同じ語が本文に何度現れても、選んだ箇所だけがハイライトされる。
-import type { Annotation, HighlightColor } from '#shared/types'
+import type { Annotation, HighlightColor } from '#shared/stroke'
 
 const props = defineProps<{ source: string; comments: Annotation[] }>()
 const emit = defineEmits<{

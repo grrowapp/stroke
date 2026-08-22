@@ -8,7 +8,7 @@ allowed-tools:
 ---
 
 ```!
-curl "$(printenv STROKE_BASEURL)/api/${CLAUDE_SESSION_ID}/strokes"
+curl "$(printenv STROKE_BASEURL)/api/strokes/${CLAUDE_SESSION_ID}/strokes"
 ```
 
 ここまでにユーザーと重ねたストロークの記録で、末尾が直前の回答だ。

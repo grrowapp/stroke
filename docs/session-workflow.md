@@ -30,16 +30,16 @@ assets/.claude/skills/                                 セッション API ス�
 | 何を | どこで | どう届くか |
 |---|---|---|
 | スキーマ名 | `runtimeConfig.claude.workflowSchema`（`NUXT_CLAUDE_WORKFLOW_SCHEMA`） | セッション作成時に `openspec/config.yaml` へ書かれる |
-| 起動するスキル | `server/utils/prompt.ts` の固定文言 | 初回 prompt `/openspec-ff-change draft-proposal` |
+| 起動するスキル | `server/utils/stroke/prompt.ts` の固定文言 | 初回 prompt `/openspec-ff-change draft-proposal` |
 | 接続先 | `runtimeConfig.claude.apiBaseUrl` | spawn 時の環境変数 `STROKE_BASEURL` |
 | セッション id | — | cwd のディレクトリ名と `${CLAUDE_SESSION_ID}` |
 | スキル・コマンドの置き場 | `runtimeConfig.claude.addDir` | `--add-dir`（空白区切りで複数） |
 
-セッション作成（`server/utils/session-core.ts`）は「ディレクトリ作成 → `openspec init --tools none` → `config.yaml` 上書き → 状態ファイル書き込み」。**サーバは change を作らない**。change（固定名 `draft-proposal`）は初回呼び出しの `openspec-ff-change` スキルが `openspec new change` から作る。openspec コマンドの実行は全て cwd = セッションディレクトリで、`--store` はどのコードパスからも使わない。
+セッション作成（`server/utils/stroke/session-core.ts`）は「ディレクトリ作成 → `openspec init --tools none` → `config.yaml` 上書き → 状態ファイル書き込み」。**サーバは change を作らない**。change（固定名 `draft-proposal`）は初回呼び出しの `openspec-ff-change` スキルが `openspec new change` から作る。openspec コマンドの実行は全て cwd = セッションディレクトリで、`--store` はどのコードパスからも使わない。
 
 ## 畳み方
 
-- **サーバが動いているとき**: `GET /api/sessions` で一覧し、`POST /api/<uuid>/delete` で消す（実行中の呼び出しを持つ間は 409）。
+- **サーバが動いているとき**: `GET /api/strokes` で一覧し、`POST /api/strokes/<uuid>/delete` で消す（実行中の呼び出しを持つ間は 409）。
 - **サーバが動いていないとき**: `yarn session list` / `yarn session delete <uuid>` / `yarn session create "<概要>"`。endpoint と同じ実体（`session-core.ts`）を呼ぶ。実行中判定は `state.json` の `invocation` を材料にする。
 
 ## 実測で確定していること

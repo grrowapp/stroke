@@ -1,6 +1,6 @@
 import { access, constants } from 'node:fs/promises'
-import { describeClaudeConfigError } from '../utils/claude-config'
-import { PROJECTS_ROOT, SESSIONS_ROOT } from '../utils/paths'
+import { describeClaudeConfigError } from '../utils/stroke/claude-config'
+import { PROJECTS_ROOT, SESSIONS_ROOT } from '../utils/stroke/paths'
 
 /**
  * 起動時に、実行中はじめて気付いては困るものを確かめる。

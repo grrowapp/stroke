@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 本文へのコメントを付ける / 直すモーダル。選んだ箇所を引用として見せ、
 // 本文上で目立たせる色を5色から選ばせる。
-import type { HighlightColor } from '#shared/types'
+import type { HighlightColor } from '#shared/stroke'
 import { defaultHighlightColor, highlightColors } from '~/composables/useAnnotations'
 
 const props = defineProps<{

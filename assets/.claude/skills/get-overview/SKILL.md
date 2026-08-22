@@ -8,7 +8,7 @@ allowed-tools:
 ---
 
 ```!
-curl "$(printenv STROKE_BASEURL)/api/${CLAUDE_SESSION_ID}/overview"
+curl "$(printenv STROKE_BASEURL)/api/strokes/${CLAUDE_SESSION_ID}/overview"
 ```
 
 何がしたいのか、どんな事を想像しているかをユーザー自身が語った初めの**design tree**だ。

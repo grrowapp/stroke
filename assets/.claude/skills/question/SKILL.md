@@ -21,5 +21,5 @@ jq -n \
   --arg q '$question' \
   --argjson o '$options' \
   '{header: $h, detail: $d, question: $q, options: $o}' \
-| curl -X POST "$(printenv STROKE_BASEURL)/api/${CLAUDE_SESSION_ID}/question" -H 'Content-Type: application/json' --data-binary @-
+| curl -X POST "$(printenv STROKE_BASEURL)/api/strokes/${CLAUDE_SESSION_ID}/question" -H 'Content-Type: application/json' --data-binary @-
 ```

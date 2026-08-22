@@ -1,8 +1,9 @@
-import { DEFAULT_API_BASE_URL } from './server/utils/api-base-url'
+import { DEFAULT_API_BASE_URL } from './server/utils/stroke/api-base-url'
 
 export default defineNuxtConfig({
   modules: ['@nuxt/ui'],
-  css: ['~/assets/css/main.css'],
+  // main.css はアプリ全体、stroke.css はストローク側の画面だけ（docs/structure.md）
+  css: ['~/assets/css/main.css', '~/assets/css/stroke.css'],
   devtools: { enabled: false },
 
   // 使い捨てのプロトタイプは本体のビルドに巻き込まない
