@@ -1,5 +1,11 @@
 import { spawn } from 'node:child_process'
 import { readClaudeConfig } from './claude-config'
+import {
+  CLAUDE_BASE_URL_ENV_NAME,
+  CLAUDE_SESSION_MISSING_MESSAGE,
+  CLAUDE_TIMEOUT_MS,
+  CLAUDE_TIMEOUT_SIGNAL,
+} from './settings'
 
 /** 呼び出しモード。セッションの最初だけ `--session-id`、以降は `--resume`。 */
 export type ClaudeMode = 'new' | 'resume'
@@ -20,52 +26,34 @@ export type ClaudeRunResult =
   /** 失敗。`sessionMissing` は継続先のセッションが無かったことを指す */
   | { ok: false, sessionMissing: boolean, detail: string }
 
-/** 継続しようとしたセッションが存在しないときに CLI が出す文言（実測）。 */
-const SESSION_MISSING = 'No conversation found with session ID'
-
 /**
  * `claude -p` を子プロセスとして1回だけ起動する。リトライはここでは扱わない。
  */
 export async function runClaude(options: ClaudeRunOptions): Promise<ClaudeRunResult> {
   const config = readClaudeConfig()
+  // 起動定義（`command` / `args`）は runtimeConfig.public.claude が丸ごと持つ。ここで足すのは
+  // **呼び出しごとに決まる分だけ**で、出力形式と、セッション id と、prompt の3つである。
+  const launch = useRuntimeConfig().public.claude
   const args = [
+    ...launch.args,
     '-p',
     '--output-format',
     'json',
-    // ADR 0001: project を外すとスキルがロードされない。
-    '--setting-sources',
-    config.settingSources,
-    '--model',
-    config.model,
     options.mode === 'new' ? '--session-id' : '--resume',
     options.sessionId,
+    // `--` で option の解釈を打ち切る。以降は位置引数として届くので、`--allowedTools` の
+    // ような可変長フラグの後ろに置いても飲み込まれない。フラグを増減しても影響しない。
+    '--',
+    options.prompt,
   ]
-
-  // ADR 0001: 渡すのはリポジトリのルート。grilling / domain-modeling を持つリポジトリと、
-  // セッション API スキルを持つ assets とで置き場が分かれるため、空白区切りで複数受ける。
-  for (const dir of config.addDir.trim().split(/\s+/).filter(d => d !== '')) {
-    args.push('--add-dir', dir)
-  }
-
-  // 空なら渡さない（許可を絞りたい運用で空文字を入れられるようにしてある）。
-  const allowedTools = config.allowedTools.trim()
-  if (allowedTools !== '') {
-    args.push('--allowedTools', allowedTools)
-  }
-
-  // `--` で option の解釈を打ち切る。以降は位置引数として届くので、`--allowedTools` の
-  // ような可変長フラグの後ろに置いても飲み込まれない。フラグを増減しても影響しない。
-  args.push('--', options.prompt)
-
-  const timeoutMs = config.timeoutMs
 
   return await new Promise<ClaudeRunResult>((resolve) => {
     // 接続先は prompt に載せず環境変数で渡す（design.md 決定7）。セッション API スキルは
     // フェンスの事前実行から `printenv` でこの値を読む。
-    const child = spawn('claude', args, {
+    const child = spawn(launch.command, args, {
       cwd: options.cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, STROKE_BASEURL: config.apiBaseUrl },
+      env: { ...process.env, [CLAUDE_BASE_URL_ENV_NAME]: config.apiBaseUrl },
     })
 
     let stdout = ''
@@ -75,8 +63,8 @@ export async function runClaude(options: ClaudeRunOptions): Promise<ClaudeRunRes
 
     const timer = setTimeout(() => {
       timedOut = true
-      child.kill('SIGKILL')
-    }, timeoutMs)
+      child.kill(CLAUDE_TIMEOUT_SIGNAL)
+    }, CLAUDE_TIMEOUT_MS)
 
     const finish = (result: ClaudeRunResult): void => {
       if (settled) return
@@ -96,10 +84,10 @@ export async function runClaude(options: ClaudeRunOptions): Promise<ClaudeRunRes
 
     child.on('close', (code: number | null) => {
       if (timedOut) {
-        finish({ ok: false, sessionMissing: false, detail: `タイムアウト (${timeoutMs}ms)` })
+        finish({ ok: false, sessionMissing: false, detail: `タイムアウト (${CLAUDE_TIMEOUT_MS}ms)` })
         return
       }
-      const missing = `${stderr}${stdout}`.includes(SESSION_MISSING)
+      const missing = `${stderr}${stdout}`.includes(CLAUDE_SESSION_MISSING_MESSAGE)
       if (code !== 0) {
         finish({ ok: false, sessionMissing: missing, detail: stderr.trim() || `終了コード ${code}` })
         return

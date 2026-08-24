@@ -1,20 +1,17 @@
 import { readState, sessionExists } from '../../../../../utils/stroke/session-store'
-import { questionChannel } from '../../../../../utils/stroke/ws-channels'
+import { questionChannel, sessionIdFromUrl } from '../../../../../utils/stroke/ws-channels'
 
 /**
  * W1 `/api/:id/ws/question`。今の1問分を配信する。
  *
  * crossws の peer は h3 のルートパラメータを持たない（実測: `peer.context` は空、
  * `peer.request.url` に完全な URL が入る）ので、セッション id は URL から自分で読む。
+ * パスのパターンは `runtimeConfig.wsPathPattern`。読むのは `ws-channels.ts` の1本。
  */
-function sessionIdFromUrl(url: string): string | null {
-  const match = /\/api\/strokes\/([^/]+)\/ws\/question(?:$|[/?#])/.exec(new URL(url).pathname)
-  return match?.[1] ?? null
-}
 
 export default defineWebSocketHandler({
   async open(peer) {
-    const sessionId = sessionIdFromUrl(peer.request.url)
+    const sessionId = sessionIdFromUrl(peer.request.url, 'question')
     if (!sessionId || !(await sessionExists(sessionId))) {
       peer.close()
       return
@@ -28,7 +25,7 @@ export default defineWebSocketHandler({
     }
   },
   close(peer) {
-    const sessionId = sessionIdFromUrl(peer.request.url)
+    const sessionId = sessionIdFromUrl(peer.request.url, 'question')
     if (sessionId) questionChannel.unregister(sessionId, peer)
   },
 })

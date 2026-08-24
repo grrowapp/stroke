@@ -3,6 +3,7 @@ import { conflict } from '../../../utils/stroke/conflict'
 import { beginRun, endRun } from '../../../utils/stroke/running'
 import { requireSessionId } from '../../../utils/stroke/session-param'
 import { readState, writeState } from '../../../utils/stroke/session-store'
+import { LOG_PREFIX } from '../../../utils/stroke/settings'
 
 /**
  * AI（claude）を起動する唯一の入口（specs/api/invoke-agent）。受理系 endpoint は起動を
@@ -30,7 +31,7 @@ export default defineEventHandler(async (event) => {
 
   invokeAi(sessionId)
     .catch((error) => {
-      console.error(`[stroke-board] AI 呼び出しの管理に失敗: ${sessionId}`, error)
+      console.error(`${LOG_PREFIX} AI 呼び出しの管理に失敗: ${sessionId}`, error)
     })
     .finally(() => endRun(sessionId))
 

@@ -1,16 +1,15 @@
 import type { ProposalMessage } from '#shared/stroke'
 import { readProposal, readState, sessionExists } from '../../../../../utils/stroke/session-store'
-import { proposalChannel } from '../../../../../utils/stroke/ws-channels'
+import { proposalChannel, sessionIdFromUrl } from '../../../../../utils/stroke/ws-channels'
 
-/** W2 `/api/:id/ws/proposal`。proposal と名前候補を配信する。セッション id は URL から読む。 */
-function sessionIdFromUrl(url: string): string | null {
-  const match = /\/api\/strokes\/([^/]+)\/ws\/proposal(?:$|[/?#])/.exec(new URL(url).pathname)
-  return match?.[1] ?? null
-}
+/**
+ * W2 `/api/:id/ws/proposal`。proposal と名前候補を配信する。セッション id は URL から読む。
+ * パスのパターンは `runtimeConfig.wsPathPattern`。読むのは `ws-channels.ts` の1本。
+ */
 
 export default defineWebSocketHandler({
   async open(peer) {
-    const sessionId = sessionIdFromUrl(peer.request.url)
+    const sessionId = sessionIdFromUrl(peer.request.url, 'proposal')
     if (!sessionId || !(await sessionExists(sessionId))) {
       peer.close()
       return
@@ -26,7 +25,7 @@ export default defineWebSocketHandler({
     peer.send(JSON.stringify(message))
   },
   close(peer) {
-    const sessionId = sessionIdFromUrl(peer.request.url)
+    const sessionId = sessionIdFromUrl(peer.request.url, 'proposal')
     if (sessionId) proposalChannel.unregister(sessionId, peer)
   },
 })

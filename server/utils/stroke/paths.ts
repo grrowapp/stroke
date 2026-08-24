@@ -1,26 +1,27 @@
 import { join } from 'node:path'
+import { resolveProjectsRoot, resolveSessionsRoot } from './settings'
 
 /**
- * セッションディレクトリの置き場。`claude -p` の cwd になる。
- * `/var/lib` は実行ユーザーでは書き込み不可なので、この配下の作成と所有権付与は
- * アプリ外の配置作業（docs/adr 参照）。起動時チェックは server/plugins/00.writable.ts。
+ * 置き場からパスを組み立てる。
+ *
+ * 値そのもの（置き場の既定値・解決関数・検査）は持たない。出どころは `settings.ts` 1本で、
+ * endpoint（Nitro）もサーバを介さない CLI（`yarn session`）も同じそこを通る。だから経路で
+ * 値が割れない（specs/configuration「実行経路が違っても同じ値に解決される」）。
+ *
+ * 解決は呼び出しのたびに行う。値を持ち回るために関数の引数を増やさない。
  */
-export const SESSIONS_ROOT = '/var/lib/stroke-board/sessions'
-
-/** 承認時にプロジェクトのトップディレクトリを作る場所。 */
-export const PROJECTS_ROOT = '/opt/projects'
 
 /** セッション uuid からセッションディレクトリのパスを引く。 */
 export function sessionDir(sessionId: string): string {
-  return join(SESSIONS_ROOT, sessionId)
+  return join(resolveSessionsRoot(), sessionId)
 }
 
-/** セッションディレクトリ内のファイル。 */
+/** セッションディレクトリ内のファイル。名前は `settings.ts` の `SESSION_FILES`。 */
 export function sessionFile(sessionId: string, name: string): string {
   return join(sessionDir(sessionId), name)
 }
 
 /** 生成されるプロジェクトのトップディレクトリ。 */
 export function projectDir(name: string): string {
-  return join(PROJECTS_ROOT, name)
+  return join(resolveProjectsRoot(), name)
 }

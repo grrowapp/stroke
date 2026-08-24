@@ -11,7 +11,7 @@
     "typecheck": "nuxt typecheck",
     "spec": "openspec validate --all",
     "check": "yarn typecheck && yarn spec",
-    "session": "tsx scripts/session.ts"
+    "session": "tsx --env-file-if-exists=.env scripts/session.ts"
   },
   "dependencies": {
     "@nuxt/ui": "^4.10.0",

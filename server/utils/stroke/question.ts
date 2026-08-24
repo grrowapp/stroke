@@ -8,32 +8,29 @@ import type { Question, QuestionOption } from '#shared/stroke'
  *
  * 長さと件数の規定はここに置く。超えたものは「規定の構造として読み取れない」に倒し、
  * AI 応答ならリトライへ、保存済みなら壊れた記録として弾く（design.md 決定3・決定4）。
+ *
+ * 長さと件数は「規定の構造として読み取れるか」を決める契約であって、運用で差し替える設定
+ * ではない。値は外に出さず、schema の定義として直接書く。
  */
-
-/** 話題タグ。12字（AskUserQuestion の header に合わせる）。 */
-const HEADER_MAX = 12
-/** 詳細説明。300字。 */
-const DETAIL_MAX = 300
-/** 問い本文。20字。 */
-const QUESTION_MAX = 20
-/** 選択肢の説明。50字。 */
-const DESCRIPTION_MAX = 50
-/** 選択肢の件数。 */
-const OPTIONS_MAX = 5
 
 const rawOptionSchema = z.object({
   // label に文字数の上限は置かない。「1〜5語」は形式の規定として prompt の文言だけで
   // 伝える（AskUserQuestion 自身がハード上限を持たないのに合わせる・design.md 決定2）。
   label: z.string().trim().min(1),
-  description: z.string().trim().min(1).max(DESCRIPTION_MAX),
+  // 選択肢の説明。50字。
+  description: z.string().trim().min(1).max(50),
   recommended: z.boolean().optional(),
 })
 
 const rawQuestionSchema = z.object({
-  header: z.string().trim().min(1).max(HEADER_MAX),
-  detail: z.string().trim().min(1).max(DETAIL_MAX),
-  question: z.string().trim().min(1).max(QUESTION_MAX),
-  options: z.array(rawOptionSchema).min(1).max(OPTIONS_MAX),
+  // 話題タグ。12字（AskUserQuestion の header に合わせる）。
+  header: z.string().trim().min(1).max(12),
+  // 詳細説明。300字。
+  detail: z.string().trim().min(1).max(300),
+  // 問い本文。20字。
+  question: z.string().trim().min(1).max(20),
+  // 選択肢の件数。1件以上5件以下。
+  options: z.array(rawOptionSchema).min(1).max(5),
 })
 
 /**

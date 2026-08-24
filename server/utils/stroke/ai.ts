@@ -5,10 +5,8 @@ import { initSessionOpenspec } from './openspec'
 import { continuePrompt, firstPrompt } from './prompt'
 import { listSessionsCore } from './session-core'
 import { readState, writeState } from './session-store'
+import { CLAUDE_MAX_RETRIES, CLAUDE_TIMEOUT_MS, LOG_PREFIX } from './settings'
 import { waitForSubmission } from './submission-signal'
-
-/** リトライ回数。MVP の割り切りで設定値にしない。 */
-const MAX_RETRIES = 2
 
 type AttemptOutcome =
   | { kind: 'submitted' }
@@ -32,7 +30,6 @@ type AttemptOutcome =
 export async function invokeAi(sessionId: string): Promise<void> {
   const cwd = sessionDir(sessionId)
   const config = readClaudeConfig()
-  const timeoutMs = config.timeoutMs
 
   // 初回判定: 一覧 API の実体を叩き、符合する id があれば有効（= 継続）、無ければ初回。
   // 一覧はディレクトリ・openspec・config.yaml（スキーマ書き込み済み）の検査を
@@ -47,7 +44,7 @@ export async function invokeAi(sessionId: string): Promise<void> {
       await initSessionOpenspec(cwd, config.workflowSchema)
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
-      console.warn(`[stroke-board] AI 呼び出しが失敗: ${sessionId}`, [`実行環境を作れない: ${detail}`])
+      console.warn(`${LOG_PREFIX} AI 呼び出しが失敗: ${sessionId}`, [`実行環境を作れない: ${detail}`])
       await markInvocationFailed(sessionId)
       return
     }
@@ -56,8 +53,8 @@ export async function invokeAi(sessionId: string): Promise<void> {
   let prompt = first ? firstPrompt() : continuePrompt()
   const failures: string[] = []
 
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
-    const outcome = await attemptOnce({ sessionId, cwd, prompt, mode, timeoutMs })
+  for (let attempt = 0; attempt <= CLAUDE_MAX_RETRIES; attempt += 1) {
+    const outcome = await attemptOnce({ sessionId, cwd, prompt, mode })
 
     if (outcome.kind === 'submitted') return
 
@@ -79,7 +76,7 @@ export async function invokeAi(sessionId: string): Promise<void> {
     prompt = continuePrompt()
   }
 
-  console.warn(`[stroke-board] AI 呼び出しが失敗: ${sessionId}`, failures)
+  console.warn(`${LOG_PREFIX} AI 呼び出しが失敗: ${sessionId}`, failures)
   await markInvocationFailed(sessionId)
 }
 
@@ -93,9 +90,8 @@ function attemptOnce(options: {
   cwd: string
   prompt: string
   mode: ClaudeMode
-  timeoutMs: number
 }): Promise<AttemptOutcome> {
-  const { sessionId, cwd, prompt, mode, timeoutMs } = options
+  const { sessionId, cwd, prompt, mode } = options
 
   return new Promise((resolve) => {
     let settled = false
@@ -105,7 +101,9 @@ function attemptOnce(options: {
       resolve(outcome)
     }
 
-    waitForSubmission(sessionId, timeoutMs).then((submitted) => {
+    // 待つ長さは子プロセスを打ち切るまでの待ち時間と同じ（settings.ts の固定値）。
+    // 提出が来ないまま子が終わるのを待たず、同じ時間で決着させる
+    waitForSubmission(sessionId, CLAUDE_TIMEOUT_MS).then((submitted) => {
       if (submitted) finish({ kind: 'submitted' })
     })
 

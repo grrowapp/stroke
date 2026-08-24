@@ -3,49 +3,39 @@ import { z } from 'zod'
 /**
  * 画面から届くリクエストボディの形。
  *
- * 契約（docs/api-contract.md）に無い形は 400 で弾く。長さの上限は、単一ユーザーの MVP で
- * 起きうる範囲より十分広く、かつ子プロセスへ渡す prompt が無制限に膨らまない程度に置く。
+ * 契約（docs/api-contract.md）に無い形は 400 で弾く。長さの上限は置かない。
+ * 検査するのは「空でないこと」だけで、どこまで書けるかは画面と利用者に委ねる。
  */
 
-const OVERVIEW_MAX = 20000
-const FREE_ANSWER_MAX = 10000
-const OPTION_LABEL_MAX = 2000
-const COMMENT_MAX = 5000
-const QUOTE_MAX = 20000
-const NEXT_STEP_MAX = 2000
-const NEXT_STEPS_MAX = 50
-const COMMENTS_MAX = 200
-const SUMMARY_MAX = 50000
-const RECORD_MAX = 500000
-const PROPOSAL_MAX = 200000
-
 export const startSessionBody = z.object({
-  overview: z.string().trim().min(1, '概要が要る。').max(OVERVIEW_MAX, '概要が長すぎる。'),
+  overview: z.string().trim().min(1, '概要が要る。'),
 })
 
 /** U7 の入力。`{ kind, value }` そのまま（design.md: ストロークの問いも問い返しも同じ口）。 */
 export const answerBody = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('option'),
-    value: z.string().trim().min(1, '回答が要る。').max(OPTION_LABEL_MAX),
+    value: z.string().trim().min(1, '回答が要る。'),
   }),
   z.object({
     kind: z.literal('free'),
-    value: z.string().trim().min(1, '回答が要る。').max(FREE_ANSWER_MAX, '回答が長すぎる。'),
+    value: z.string().trim().min(1, '回答が要る。'),
   }),
 ])
 
 /** design.md 決定10 の5色。画面が出すものと同じ範囲に閉じる。 */
 const highlightColorSchema = z.object({
+  // 5色の名前そのものは shared/stroke.ts の型であり画面との契約なので、設定で増減させない
+  // （design.md 決定9）
   name: z.enum(['yellow', 'green', 'blue', 'pink', 'orange']),
-  bg: z.string().min(1).max(200),
-  border: z.string().min(1).max(200),
+  bg: z.string().min(1),
+  border: z.string().min(1),
 })
 
 const annotationBase = {
-  id: z.string().trim().min(1).max(200),
-  comment: z.string().trim().min(1, '指摘の本文が要る。').max(COMMENT_MAX, '指摘が長すぎる。'),
-  timestamp: z.string().trim().min(1).max(64),
+  id: z.string().trim().min(1),
+  comment: z.string().trim().min(1, '指摘の本文が要る。'),
+  timestamp: z.string().trim().min(1),
 }
 
 const annotationSchema = z.discriminatedUnion('type', [
@@ -54,7 +44,7 @@ const annotationSchema = z.discriminatedUnion('type', [
     ...annotationBase,
     type: z.literal('selection'),
     /** 引用は全文を残す（design.md 決定10） */
-    selectedText: z.string().min(1, '引用が要る。').max(QUOTE_MAX),
+    selectedText: z.string().min(1, '引用が要る。'),
     /** 生テキストにおける位置。差し戻す版に対してのみ有効 */
     startOffset: z.number().int().nonnegative(),
     endOffset: z.number().int().nonnegative(),
@@ -66,13 +56,12 @@ const annotationSchema = z.discriminatedUnion('type', [
 ])
 
 export const sendBackBody = z.object({
-  response: z.string().max(SUMMARY_MAX),
+  response: z.string(),
   comments: z.array(annotationSchema)
-    .min(1, '指摘が1件も無い。差し戻すには指摘が要る。')
-    .max(COMMENTS_MAX, '指摘が多すぎる。'),
+    .min(1, '指摘が1件も無い。差し戻すには指摘が要る。'),
   /** `SendBackRecord` を JSON 化したもの。中身の解釈はしない */
-  annotations: z.string().max(RECORD_MAX),
-  nextSteps: z.array(z.string().max(NEXT_STEP_MAX)).max(NEXT_STEPS_MAX, '手続きが多すぎる。'),
+  annotations: z.string(),
+  nextSteps: z.array(z.string()),
 })
 
 export const approveBody = z.object({
@@ -84,7 +73,7 @@ export const approveBody = z.object({
  * （kebab-case かどうかの判定は `project.ts` の `isKebabCase`）。ここでは形だけ検証する。
  */
 export const proposalSubmitBody = z.object({
-  proposal: z.string().trim().min(1, 'proposal の本文が要る。').max(PROPOSAL_MAX, 'proposal が長すぎる。'),
+  proposal: z.string().trim().min(1, 'proposal の本文が要る。'),
   projectName: z.string().trim().optional(),
 })
 

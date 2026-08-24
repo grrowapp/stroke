@@ -3,7 +3,13 @@ import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from 'node:
 import { join } from 'node:path'
 import fse from 'fs-extra'
 import type { Invocation, SessionSummary } from '#shared/stroke'
-import { SESSIONS_ROOT, sessionDir, sessionFile } from './paths'
+import { sessionDir, sessionFile } from './paths'
+import {
+  OPENSPEC_CONFIG_FILE,
+  OPENSPEC_DIR,
+  SESSION_FILES,
+  resolveSessionsRoot,
+} from './settings'
 
 /**
  * セッションの作成・削除・列挙の実体。endpoint（Nitro）と script（tsx）の両方から
@@ -26,11 +32,7 @@ export class SessionCoreError extends Error {
   }
 }
 
-export const STATE_FILE = 'state.json'
-export const STROKES_FILE = 'strokes.json'
-export const PROPOSAL_FILE = 'proposal.md'
-export const OVERVIEW_FILE = 'overview.txt'
-export const SEND_BACK_FILE = 'send-back.json'
+// セッション内のファイル名の出どころは settings.ts の `SESSION_FILES`（固定値）。
 
 /** uuid の形をしていないものはディレクトリ名として受け付けない。 */
 export function isSessionId(value: string): boolean {
@@ -41,7 +43,7 @@ export function isSessionId(value: string): boolean {
 export async function sessionExistsCore(sessionId: string): Promise<boolean> {
   if (!isSessionId(sessionId)) return false
   try {
-    const s = await stat(sessionFile(sessionId, STATE_FILE))
+    const s = await stat(sessionFile(sessionId, SESSION_FILES.state))
     return s.isFile()
   } catch {
     return false
@@ -63,10 +65,10 @@ export async function createSessionCore(
   const sessionId = randomUUID()
   try {
     await mkdir(sessionDir(sessionId), { recursive: true })
-    await writeAtomic(sessionId, OVERVIEW_FILE, overview)
-    await writeAtomic(sessionId, STROKES_FILE, `${JSON.stringify([], null, 2)}\n`)
+    await writeAtomic(sessionId, SESSION_FILES.overview, overview)
+    await writeAtomic(sessionId, SESSION_FILES.strokes, `${JSON.stringify([], null, 2)}\n`)
     const state = { phase: 'stroking', currentQuestion: null, invocation }
-    await writeAtomic(sessionId, STATE_FILE, `${JSON.stringify(state, null, 2)}\n`)
+    await writeAtomic(sessionId, SESSION_FILES.state, `${JSON.stringify(state, null, 2)}\n`)
     return sessionId
   } catch (error) {
     await fse.remove(sessionDir(sessionId)).catch(() => {})
@@ -105,9 +107,12 @@ async function passesListChecks(sessionId: string): Promise<boolean> {
   try {
     const dir = await stat(sessionDir(sessionId))
     if (!dir.isDirectory()) return false
-    const openspecDir = await stat(join(sessionDir(sessionId), 'openspec'))
+    const openspecDir = await stat(join(sessionDir(sessionId), OPENSPEC_DIR))
     if (!openspecDir.isDirectory()) return false
-    const config = await readFile(join(sessionDir(sessionId), 'openspec', 'config.yaml'), 'utf8')
+    const config = await readFile(
+      join(sessionDir(sessionId), OPENSPEC_DIR, OPENSPEC_CONFIG_FILE),
+      'utf8',
+    )
     return /^schema:\s*\S+/m.test(config)
   } catch {
     return false
@@ -123,7 +128,7 @@ async function passesListChecks(sessionId: string): Promise<boolean> {
 export async function listSessionsCore(): Promise<SessionSummary[]> {
   let entries
   try {
-    entries = await readdir(SESSIONS_ROOT, { withFileTypes: true })
+    entries = await readdir(resolveSessionsRoot(), { withFileTypes: true })
   } catch {
     return []
   }
@@ -133,7 +138,7 @@ export async function listSessionsCore(): Promise<SessionSummary[]> {
     if (!(await passesListChecks(entry.name))) continue
     let mtime: Date
     try {
-      const s = await stat(sessionFile(entry.name, STATE_FILE))
+      const s = await stat(sessionFile(entry.name, SESSION_FILES.state))
       if (!s.isFile()) continue
       mtime = s.mtime
     } catch {
@@ -154,7 +159,7 @@ export async function listSessionsCore(): Promise<SessionSummary[]> {
  */
 export async function readInvocationCore(sessionId: string): Promise<string | null> {
   try {
-    const raw = JSON.parse(await readFile(sessionFile(sessionId, STATE_FILE), 'utf8'))
+    const raw = JSON.parse(await readFile(sessionFile(sessionId, SESSION_FILES.state), 'utf8'))
     return typeof raw?.invocation === 'string' ? raw.invocation : null
   } catch {
     return null
@@ -163,7 +168,7 @@ export async function readInvocationCore(sessionId: string): Promise<string | nu
 
 async function readPhase(sessionId: string): Promise<SessionSummary['phase']> {
   try {
-    const raw = JSON.parse(await readFile(sessionFile(sessionId, STATE_FILE), 'utf8'))
+    const raw = JSON.parse(await readFile(sessionFile(sessionId, SESSION_FILES.state), 'utf8'))
     const phase = raw?.phase
     return phase === 'stroking' || phase === 'proposed' || phase === 'approved' ? phase : 'unknown'
   } catch {

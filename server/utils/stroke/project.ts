@@ -1,7 +1,13 @@
 import { mkdir, readdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { conflict } from './conflict'
-import { PROJECTS_ROOT, projectDir } from './paths'
+import { projectDir } from './paths'
+import {
+  PROJECT_DOCS_DIR,
+  PROJECT_NAME_PATTERN,
+  PROJECT_PROPOSAL_FILE,
+  resolveProjectsRoot,
+} from './settings'
 
 /**
  * 承認されたプロジェクトを作る。
@@ -34,8 +40,12 @@ export async function generateProject(name: string, proposal: string): Promise<s
   }
 
   try {
-    await mkdir(join(root, 'docs'))
-    await writeFile(join(root, 'docs', 'proposal.md'), proposal, 'utf8')
+    await mkdir(join(root, PROJECT_DOCS_DIR))
+    await writeFile(
+      join(root, PROJECT_DOCS_DIR, PROJECT_PROPOSAL_FILE),
+      proposal,
+      'utf8',
+    )
   } catch (error) {
     // 中途半端に残すと同じ名前で承認し直せなくなるので、作った分だけ戻す。
     await rm(root, { recursive: true, force: true }).catch(() => {})
@@ -54,7 +64,7 @@ export async function generateProject(name: string, proposal: string): Promise<s
  * 衝突していれば `-2`, `-3`, … の連番サフィックスで最初に空く名前にする。
  */
 export async function resolveAvailableProjectName(candidate: string): Promise<string> {
-  const existing = new Set(await readdir(PROJECTS_ROOT))
+  const existing = new Set(await readdir(resolveProjectsRoot()))
   if (!existing.has(candidate)) return candidate
 
   for (let n = 2; ; n++) {
@@ -70,7 +80,9 @@ export async function resolveAvailableProjectName(candidate: string): Promise<st
  */
 export function assertProjectName(name: string): string {
   const trimmed = name.trim()
-  if (trimmed === '' || !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(trimmed) || trimmed.includes('..')) {
+  // 許す文字の規則も `..` を含む名前を弾く判定も設定にしない。どちらも緩めれば置き場の
+  // 外へ書けてしまう（design.md 決定9）。出どころは settings.ts の固定値
+  if (trimmed === '' || !PROJECT_NAME_PATTERN.test(trimmed) || trimmed.includes('..')) {
     throw createError({
       statusCode: 400,
       statusMessage: 'Bad Request',

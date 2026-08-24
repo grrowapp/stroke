@@ -4,12 +4,8 @@ import type { Answer, Invocation, Question, SendBackPayload, Stroke } from '#sha
 import { sessionFile } from './paths'
 import { questionSchema } from './question'
 import { sendBackBody } from './request-schemas'
+import { SESSION_FILES } from './settings'
 import {
-  OVERVIEW_FILE,
-  PROPOSAL_FILE,
-  SEND_BACK_FILE,
-  STATE_FILE,
-  STROKES_FILE,
   SessionCoreError,
   createSessionCore,
   sessionExistsCore,
@@ -102,20 +98,21 @@ export function sessionErrorToHttp(error: unknown) {
 }
 
 export async function readState(sessionId: string): Promise<SessionState> {
-  const raw = await readFile(sessionFile(sessionId, STATE_FILE), 'utf8')
-  const parsed = stateSchema.safeParse(readJson(raw, STATE_FILE, sessionId))
-  if (!parsed.success) throw corrupt(STATE_FILE, sessionId)
+  const name = SESSION_FILES.state
+  const raw = await readFile(sessionFile(sessionId, name), 'utf8')
+  const parsed = stateSchema.safeParse(readJson(raw, name, sessionId))
+  if (!parsed.success) throw corrupt(name, sessionId)
   return parsed.data
 }
 
 export async function writeState(sessionId: string, state: SessionState): Promise<void> {
-  await writeAtomic(sessionId, STATE_FILE, `${JSON.stringify(state, null, 2)}\n`)
+  await writeAtomic(sessionId, SESSION_FILES.state, `${JSON.stringify(state, null, 2)}\n`)
 }
 
 /** U1 で投稿された概要。A1 が読む。 */
 export async function readOverview(sessionId: string): Promise<string | undefined> {
   try {
-    return await readFile(sessionFile(sessionId, OVERVIEW_FILE), 'utf8')
+    return await readFile(sessionFile(sessionId, SESSION_FILES.overview), 'utf8')
   } catch {
     return undefined
   }
@@ -123,19 +120,20 @@ export async function readOverview(sessionId: string): Promise<string | undefine
 
 /** U9 で差し戻された指摘一式。A4 が読む。差し戻しがまだ無ければ undefined。 */
 export async function readSendBack(sessionId: string): Promise<SendBackPayload | undefined> {
+  const name = SESSION_FILES.sendBack
   let raw: string
   try {
-    raw = await readFile(sessionFile(sessionId, SEND_BACK_FILE), 'utf8')
+    raw = await readFile(sessionFile(sessionId, name), 'utf8')
   } catch {
     return undefined
   }
-  const parsed = sendBackBody.safeParse(readJson(raw, SEND_BACK_FILE, sessionId))
-  if (!parsed.success) throw corrupt(SEND_BACK_FILE, sessionId)
+  const parsed = sendBackBody.safeParse(readJson(raw, name, sessionId))
+  if (!parsed.success) throw corrupt(name, sessionId)
   return parsed.data
 }
 
 export async function writeSendBack(sessionId: string, payload: SendBackPayload): Promise<void> {
-  await writeAtomic(sessionId, SEND_BACK_FILE, `${JSON.stringify(payload, null, 2)}\n`)
+  await writeAtomic(sessionId, SESSION_FILES.sendBack, `${JSON.stringify(payload, null, 2)}\n`)
 }
 
 /**
@@ -143,14 +141,15 @@ export async function writeSendBack(sessionId: string, payload: SendBackPayload)
  * `proposal: true` は proposal の初提出を示すマーカー行。
  */
 export async function readStrokes(sessionId: string): Promise<Stroke[]> {
+  const name = SESSION_FILES.strokes
   let raw: string
   try {
-    raw = await readFile(sessionFile(sessionId, STROKES_FILE), 'utf8')
+    raw = await readFile(sessionFile(sessionId, name), 'utf8')
   } catch {
     return []
   }
-  const parsed = strokesSchema.safeParse(readJson(raw, STROKES_FILE, sessionId))
-  if (!parsed.success) throw corrupt(STROKES_FILE, sessionId)
+  const parsed = strokesSchema.safeParse(readJson(raw, name, sessionId))
+  if (!parsed.success) throw corrupt(name, sessionId)
   return parsed.data
 }
 
@@ -181,20 +180,20 @@ export async function markProposalStrokeIfFirst(sessionId: string): Promise<void
 }
 
 async function writeStrokes(sessionId: string, strokes: Stroke[]): Promise<void> {
-  await writeAtomic(sessionId, STROKES_FILE, `${JSON.stringify(strokes, null, 2)}\n`)
+  await writeAtomic(sessionId, SESSION_FILES.strokes, `${JSON.stringify(strokes, null, 2)}\n`)
 }
 
 /** 最新の proposal 本文。A7 の受理でサーバが書く（decisions 7: 書き手はサーバの1つだけ）。 */
 export async function readProposal(sessionId: string): Promise<string | undefined> {
   try {
-    return await readFile(sessionFile(sessionId, PROPOSAL_FILE), 'utf8')
+    return await readFile(sessionFile(sessionId, SESSION_FILES.proposal), 'utf8')
   } catch {
     return undefined
   }
 }
 
 export async function writeProposal(sessionId: string, proposal: string): Promise<void> {
-  await writeAtomic(sessionId, PROPOSAL_FILE, proposal)
+  await writeAtomic(sessionId, SESSION_FILES.proposal, proposal)
 }
 
 /** 原子的な書き込みの実体は core。失敗はここで HTTP へ写す。 */
