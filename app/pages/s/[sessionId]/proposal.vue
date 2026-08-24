@@ -208,11 +208,12 @@ const modes = [
     </div>
 
     <ReviewModals :review="review" />
-    <ReviewFollowupModal
+    <AgentQuestionModal
       v-model:open="followupOpen"
       :question="followupQuestion"
       :waiting="followupWaiting"
       :answered="answered"
+      waiting-message="AI が次を考えています…"
       @answer="review.answerFollowup"
     />
     </template>
