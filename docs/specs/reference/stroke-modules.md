@@ -16,7 +16,7 @@
 送り直せることといった規定の本体は `openspec/specs/agent-question/spec.md` にある。
 食い違ったときは spec が勝つ。
 
-サーバとの境界（U/W の番号）は `docs/api-contract.md` を参照する。
+サーバとの境界（U/W の番号）は `docs/specs/api/api-contract.md` を参照する。
 
 ## `useAgentQuestion`
 
@@ -48,7 +48,7 @@ composable は内部で持った状態を返す側であって、状態を受け
 
 ### 何に依存するか
 
-`docs/api-contract.md` の番号で示す。
+`docs/specs/api/api-contract.md` の番号で示す。
 
 | 番号 | 使い方 |
 |---|---|
@@ -147,10 +147,10 @@ watch(error, (reason) => {
 
 ## 関連
 
-- `docs/next-agent-run.md` — この2つを汎用のエージェント実行へ広げる案（未着手）
+- `docs/specs/plan/next-agent-run.md` — この2つを汎用のエージェント実行へ広げる案（未着手）
 - `openspec/specs/agent-question/spec.md` — 振る舞いの規定（本体）
 - `openspec/specs/proposal-review/spec.md` — 画面2 に固有の規定
-- `docs/api-contract.md` — サーバとの境界
-- `docs/question-flow.md` — 往復の全体像（誰がいつ何を送るか）
-- `docs/schema.md` — 入れ物の形と検証の規定
+- `docs/specs/api/api-contract.md` — サーバとの境界
+- `docs/specs/architecture/question-flow.md` — 往復の全体像（誰がいつ何を送るか）
+- `docs/specs/core/schema.md` — 入れ物の形と検証の規定
 - `shared/types.ts` — `Question` / `Answer` の型

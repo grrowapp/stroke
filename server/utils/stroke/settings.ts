@@ -4,7 +4,7 @@ import { isAbsolute } from 'node:path'
  * 設定の唯一の置き場。
  *
  * ソースコードを設定値の置き場所にしないため、各モジュールに散っていた `DEFAULT_*` と
- * `resolve*()` をここへ集めた。設定の**正**は `docs/settings-reference.md` である
+ * `resolve*()` をここへ集めた。設定の**正**は `docs/specs/core/settings-reference.md` である
  * （docs/adr/0004）。ここに書いてよいのは資料に載っているものと、資料が「設定ではない」と
  * している内部の決め事（固定値）だけである。
  *
@@ -71,7 +71,7 @@ export function describePathsError(): string | null {
 // 2. `runtimeConfig` の既定値
 //
 // `nuxt.config.ts` がここを import して宣言し、読み手は `useRuntimeConfig()` で読む。
-// 環境変数では差し替えない（docs/settings-reference.md）。
+// 環境変数では差し替えない（docs/specs/core/settings-reference.md）。
 // ===========================================================================
 
 /**
@@ -160,7 +160,7 @@ export function describeClaudeArgsError(args: readonly string[]): string | null 
 // 3. 固定値
 //
 // システム内部の決め事であって設定ではない。外から変えられないようにする
-// （docs/settings-reference.md に載っていない = 設定ではない）。
+// （docs/specs/core/settings-reference.md に載っていない = 設定ではない）。
 // ===========================================================================
 
 /**

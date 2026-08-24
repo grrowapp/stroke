@@ -17,7 +17,7 @@
 
 ## What Changes
 
-**`docs/settings-reference.md` を作り、`docs/adr/0004-settings-reference-is-authoritative.md` でその扱いを定める。**
+**`docs/specs/core/settings-reference.md` を作り、`docs/adr/0004-settings-reference-is-authoritative.md` でその扱いを定める。**
 
 資料が載せるのは**設定だけ**である。設定とは、`nuxt.config.ts` に書かれ、`useRuntimeConfig()` から読まれる値を指す。
 
@@ -32,7 +32,7 @@
 
 **ADR 0004 が定める3つ**:
 
-1. 設定の中身を変えるとき、`docs/settings-reference.md` の編集を必ず伴う
+1. 設定の中身を変えるとき、`docs/specs/core/settings-reference.md` の編集を必ず伴う
 2. 資料の編集は、必ず OpenSpec の change を起こして行う
 3. その change には、ユーザーの承認を得る
 
@@ -50,10 +50,10 @@
 
 ## Impact
 
-- `docs/settings-reference.md` — 新規。この change の成果物
+- `docs/specs/core/settings-reference.md` — 新規。この change の成果物
 - `docs/adr/0004-settings-reference-is-authoritative.md` — 新規。資料の扱いを定める
 - `docs/adr/0003-settings-precedence.md` — 0004 に取って代わられた旨を冒頭に置く。本文は記録として残す
-- `docs/structure.md` — 資料の置き場と役割を1行
+- `docs/specs/core/structure.md` — 資料の置き場と役割を1行
 - `CLAUDE.md` の Docs 一覧 — 1行
 - `.env.example` — 置き場2件だけを持つ形に絞る（実作業は `align-settings-conventions` 10.13j）
 

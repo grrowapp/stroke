@@ -1,13 +1,13 @@
-# 設定は `docs/settings-reference.md` を正とする
+# 設定は `docs/specs/core/settings-reference.md` を正とする
 
 > [0003](0003-settings-precedence.md)（設定値はコードの既定値に優先する）に取って代わる。`NUXT_*` の環境変数は、置き場の2件（`NUXT_SESSIONS_ROOT` / `NUXT_PROJECTS_ROOT`）を除いて全廃した。
 
-`docs/settings-reference.md` が設定の**正**である。コードに書かれた値ではなく、この資料に載っている内容が、この製品の設定として定まったものを表す。
+`docs/specs/core/settings-reference.md` が設定の**正**である。コードに書かれた値ではなく、この資料に載っている内容が、この製品の設定として定まったものを表す。
 
 このため、次の3つを守る。
 
-1. **設定の中身を変えるとき、`docs/settings-reference.md` の編集を必ず伴う。** コードだけを直す変更は成立しない。資料に無い設定は存在しないものとして扱い、資料と食い違うコードは誤りとして直す
-2. **`docs/settings-reference.md` の編集は、必ず OpenSpec の change を起こして行う。** 資料の直接編集はしない
+1. **設定の中身を変えるとき、`docs/specs/core/settings-reference.md` の編集を必ず伴う。** コードだけを直す変更は成立しない。資料に無い設定は存在しないものとして扱い、資料と食い違うコードは誤りとして直す
+2. **`docs/specs/core/settings-reference.md` の編集は、必ず OpenSpec の change を起こして行う。** 資料の直接編集はしない
 3. **その change には、ユーザーの承認を得る。** 承認のない編集は差し戻す
 
 設定を1つ足す・消す・既定値を変える、のいずれも、change の提案 → ユーザー承認 → 資料の編集 → コードの追随、の順で進む。

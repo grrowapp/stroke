@@ -1,6 +1,6 @@
 # 次の拡張案: エージェント実行の3区分（未着手）
 
-**これは着手していない案である。** change にも起こしていない。`docs/stroke-modules.md` の
+**これは着手していない案である。** change にも起こしていない。`docs/specs/reference/stroke-modules.md` の
 2つのモジュールを、問い専用から汎用のエージェント実行へ広げるとどうなるかを記録しておく。
 
 ## 何を汎用化するのか
@@ -29,7 +29,7 @@
 
 ## なぜ器がそのまま使えるのか
 
-`docs/stroke-modules.md` の切り分けが、この3区分にそのまま重なる。
+`docs/specs/reference/stroke-modules.md` の切り分けが、この3区分にそのまま重なる。
 
 - 往復（composable）が **実行主体と入力** を持つ
 - 面（コンポーネント）が **応答** を出す
@@ -111,7 +111,7 @@ const { result, waiting, failed, send } = useAgentRun(sessionId, definition)
 
 ## 関連
 
-- `docs/stroke-modules.md` — この案が広げる対象
-- `docs/api-contract.md` — 今の U/W/A の境界
+- `docs/specs/reference/stroke-modules.md` — この案が広げる対象
+- `docs/specs/api/api-contract.md` — 今の U/W/A の境界
 - `openspec/specs/workflow-definition` — 定義ファイルでワークフローを外に出す既存の規定
 - `openspec/specs/ai-invocation` — 起動設定を外に出す既存の規定

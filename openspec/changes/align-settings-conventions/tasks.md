@@ -100,7 +100,7 @@ ERROR  [stroke-board] 起動できない
 - [x] 9.2 `.env` で閾値を1つ変え、再ビルドなしにその閾値で検査されることを確認する（spec `configuration`「実行時に差し替えられる設定は再ビルドなしに反映される」）
 - [x] 9.3 ビルド時に決まる設定を環境変数で変えようとして、動作が変わらないことを確認する（spec `configuration`「ビルド時に決まる設定は作り直すまで動作に現れない」）
 - [x] 9.4 `README.md` の設定表を、外に出した値の全体に合わせる
-- [x] 9.5 `docs/session-workflow.md` の設定に関する記述を実態に合わせる
+- [x] 9.5 `docs/specs/architecture/session-workflow.md` の設定に関する記述を実態に合わせる
 - [x] 9.6 `yarn check` が通ることを確認する
 
 **9.1 の実測**: 既定値で起動し、起動時チェックは無警告。20001字の概要は 400「概要が長すぎる。」、短い概要は 200 でセッションが作られた（確認後 `yarn session delete` で消した）。**AI の呼び出しまでは通していない**（`claude` の実起動を伴うため）。
@@ -275,7 +275,7 @@ ERROR  [stroke-board] 起動できない
 
 - [x] 10.16 `grep -rn "NUXT_" .` で、残っている `NUXT_*` が `NUXT_SESSIONS_ROOT` / `NUXT_PROJECTS_ROOT` の2件だけであることを確認する
 
-  **確認した。** コードで `NUXT_*` を読むのは `settings.ts` の置き場2件のみ。他のヒットは `nuxt.config.ts` / `README.md` / `docs/settings-reference.md` / ADR 0003・0004 の**記述**で、いずれも同じ2件を指す。`server` / `scripts` の `process.env` は `settings.ts` の2箇所と、`claude.ts:56` の子プロセスへの環境引き継ぎだけ
+  **確認した。** コードで `NUXT_*` を読むのは `settings.ts` の置き場2件のみ。他のヒットは `nuxt.config.ts` / `README.md` / `docs/specs/core/settings-reference.md` / ADR 0003・0004 の**記述**で、いずれも同じ2件を指す。`server` / `scripts` の `process.env` は `settings.ts` の2箇所と、`claude.ts:56` の子プロセスへの環境引き継ぎだけ
 
 - [x] 10.17 **全項目について、値が実際に届くことを1件ずつ確認する。** 結果を証拠として記録する
 
@@ -287,7 +287,7 @@ ERROR  [stroke-board] 起動できない
 
   **発見した不具合（この change の範囲外・別対応）**: `scripts/session.ts:32` が出力するパスが `/s/<uuid>` だが、実ルートは `/strokes/<uuid>`（`/s/...` は 404）。値の解決は正しく、パス組み立てだけが古い。
 
-- [x] 10.19 `docs/settings-reference.md` を実態に合わせて完成させる。**ADR 0004 により、この資料が設定の正である。** コードを先に変えて資料を後から合わせるのではなく、資料に載っていない設定をコードが持たない状態にする
+- [x] 10.19 `docs/specs/core/settings-reference.md` を実態に合わせて完成させる。**ADR 0004 により、この資料が設定の正である。** コードを先に変えて資料を後から合わせるのではなく、資料に載っていない設定をコードが持たない状態にする
 
   **資料を先に確定させ、実装をそこへ合わせた。** 資料に載っていて実装が持っていない設定、実装が読んでいて資料に無い設定、ともにゼロ
 - [x] 10.20 `docs/adr/0003-settings-precedence.md` の扱いを決める。**supersede とする。** 環境変数が置き場2件に限られ「優先順位」を設定の一般則として置けなくなったため、書き換えず記録として残す。**新方針の ADR（0004）を立てるのは `document-settings-reference` の役目**（同 change の tasks 1章）。ここでは 0003 の扱いを決めるところまで

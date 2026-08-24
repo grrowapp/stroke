@@ -3,7 +3,7 @@
 `app/components/` にある10のコンポーネントのリファレンス。
 
 - 置き場所の規約は `openspec/changes/restructure-app-directories/specs/app-structure/spec.md`
-- 層の積み方と全体の構造は `docs/structure-design.md`
+- 層の積み方と全体の構造は `docs/specs/core/structure-design.md`
 - 記述は実装から抽出した事実に限る
 
 配置は**実際の参照範囲**で決まる。複数の階層から使われるものが `shared/`、下層からしか使われないものが `workspace/`。

@@ -1,6 +1,6 @@
 # 仕様書の画面 — 現状の流れ
 
-仕様書の画面が、どこから何を取って何を出しているかを示す資料。**現状の実装だけ**を書く。これから作るものは扱わない（`docs/artifact-extension-plan.md`）。
+仕様書の画面が、どこから何を取って何を出しているかを示す資料。**現状の実装だけ**を書く。これから作るものは扱わない（`docs/specs/plan/artifact-extension-plan.md`）。
 
 ## 対象範囲
 
@@ -111,7 +111,7 @@ sequenceDiagram
 
 ## 2. stroke-board — 仕様書画面の流れ
 
-層は5つ（`docs/structure-design.md`）。画面 → API → 制御 → 接点 → 本家、と一方向に進む。
+層は5つ（`docs/specs/core/structure-design.md`）。画面 → API → 制御 → 接点 → 本家、と一方向に進む。
 
 ### 2.1 取得（REST）
 

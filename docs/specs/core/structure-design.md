@@ -5,10 +5,10 @@ stroke-board が**どう組まれているか**を示す資料。
 - 用語の定義は `CONTEXT.md`（未作成）、決定の理由は `docs/adr/`、これから作るものは `openspec/changes/` にある。ここには書かない
 - モジュール1つ1つの責務は、各ソースの冒頭コメントが持つ。ここが持つのは層の積み方・依存の向き・層をまたぐ流れ
 - 記述はすべて実装から確認できる事実に限る（`openspec/changes/document-app-structure`）
-- 仕様書の画面1本ぶんの流れ（本家との対比つき）は `docs/spec-screen-flow.md` にある
-- 拡張 artifact の検討（未決定）は `docs/artifact-extension-plan.md` にある
-- コンポーネント個別の props と参照元は `docs/file-component.md` にある
-- composable 個別の公開 API と参照元は `docs/file-composables.md` にある
+- 仕様書の画面1本ぶんの流れ（本家との対比つき）は `docs/specs/architecture/spec-screen-flow.md` にある
+- 拡張 artifact の検討（未決定）は `docs/specs/plan/artifact-extension-plan.md` にある
+- コンポーネント個別の props と参照元は `docs/specs/core/file-component.md` にある
+- composable 個別の公開 API と参照元は `docs/specs/core/file-composables.md` にある
 
 ---
 

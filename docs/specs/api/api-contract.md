@@ -1,8 +1,8 @@
 # サーバ API の契約
 
 画面（`app/`）・エージェント（`claude -p`）とサーバ（`server/`）の境界。型は `shared/stroke.ts`。
-ここに並ぶ番号が実際にどう繋がるかは `docs/question-flow.md`、入れ物の形と検証の規定は
-`docs/schema.md`。
+ここに並ぶ番号が実際にどう繋がるかは `docs/specs/architecture/question-flow.md`、入れ物の形と検証の規定は
+`docs/specs/core/schema.md`。
 方式の詳細（決定・シーケンス）は `openspec/changes/migrate-claude-p-to-api-endpoint/design.md` を参照。
 
 ## セッションの参照方法
@@ -128,7 +128,7 @@
 - 一覧には実体の揃ったセッション（ディレクトリ・openspec ルート・スキーマ設定済み）だけが
   載る。**作成直後（初回起動前）のセッションはまだ載らない**。U13 はこの符合で初回か継続かを
   判定する
-- サーバが動いていないときの削除・一覧・作成は `yarn session`（`docs/session-workflow.md`）
+- サーバが動いていないときの削除・一覧・作成は `yarn session`（`docs/specs/architecture/session-workflow.md`）
 
 ### U13 `GET /api/strokes/:id/invoke-agent`
 

@@ -16,7 +16,7 @@
                                        プロジェクト一覧 ──▶ 通知・承認待ち
 ```
 
-統合の経緯と道筋は `docs/mainline-merge.md`、統合形態の決定は
+統合の経緯と道筋は `docs/specs/plan/mainline-merge.md`、統合形態の決定は
 `docs/adr/0002-merge-into-stroke-board.md`。用語は `CONTEXT.md`。
 
 ## ポータル
@@ -119,7 +119,7 @@ store（`openspec store register`）への登録は**不要**。
 
 ### 設定（ストローク側）
 
-**設定の正は [`docs/settings-reference.md`](docs/settings-reference.md) である**
+**設定の正は [`docs/specs/core/settings-reference.md`](docs/specs/core/settings-reference.md) である**
 （[ADR 0004](docs/adr/0004-settings-reference-is-authoritative.md)）。ここに無いものは
 設定ではない。**既定値の一覧を README に重ねない。**
 
@@ -177,7 +177,7 @@ yarn session create "<概要>"
 ```
 
 どちらも同じ実体（`server/utils/stroke/session-core.ts`）を呼ぶ。手順の詳細は
-`docs/session-workflow.md`。
+`docs/specs/architecture/session-workflow.md`。
 
 ## 前提（共通）
 

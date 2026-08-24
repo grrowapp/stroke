@@ -13,7 +13,7 @@
 `app/composables/` にある4つの composable のリファレンス。
 
 - 置き場所の規約は `openspec/changes/restructure-app-directories/specs/app-structure/spec.md`
-- 層の積み方と全体の構造は `docs/structure-design.md`
+- 層の積み方と全体の構造は `docs/specs/core/structure-design.md`
 - 記述は実装から抽出した事実に限る
 
 **ポータル側は明示 import で参照する**（`~/composables/<階層>/<名前>`）。auto-import の廃止はポータル側の規約だが、ストローク側のコードがまだ依存しているため `nuxt.config.ts` では当面有効のまま（統一は `align-coding-conventions`）。
@@ -213,7 +213,7 @@ Toaster / 通知一覧                   本家 REST
 
 `app/composables/` 直下に平置き。現状の実態を書き出したもの。
 
-**これは棚卸しであって規則ではない。** 今こうなっている、という記録にすぎない。どう切り直すべきかは決めていない。置き場の規則は `docs/structure.md`。
+**これは棚卸しであって規則ではない。** 今こうなっている、という記録にすぎない。どう切り直すべきかは決めていない。置き場の規則は `docs/specs/core/structure.md`。
 
 ## 一覧
 

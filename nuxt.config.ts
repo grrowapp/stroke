@@ -32,7 +32,7 @@ export default defineNuxtConfig({
   modules: ['@nuxt/ui'],
 
   // ビルド時: CSS はバンドルに畳み込まれる
-  // main.css はアプリ全体、stroke.css はストローク側の画面だけ（docs/structure.md）
+  // main.css はアプリ全体、stroke.css はストローク側の画面だけ（docs/specs/core/structure.md）
   css: ['~/assets/css/main.css', '~/assets/css/stroke.css'],
 
   // ビルド時: DevTools はビルドに組み込まれる。画面の上に自前のバーとボタンを重ね、
@@ -58,7 +58,7 @@ export default defineNuxtConfig({
   typescript: { typeCheck: false, strict: true },
 
   // 起動の待ち受け。3000 はこのマシンで別のプロセスが使っているのでずらしてある。
-  // 3001 はストロークの `apiBaseUrl` 既定（docs/settings-reference.md）と揃える値。
+  // 3001 はストロークの `apiBaseUrl` 既定（docs/specs/core/settings-reference.md）と揃える値。
   // 別マシンのブラウザから開くため、localhost ではなく全インタフェースで待つ
   devServer: { host: '0.0.0.0', port: 3001 },
 
@@ -66,7 +66,7 @@ export default defineNuxtConfig({
   // 実行時に決まる設定
   //
   // ストローク側の値の中身はここに書かず、`server/utils/stroke/settings.ts` を import して
-  // 宣言する。設定の正は docs/settings-reference.md（ADR 0004）で、そこに無いものは設定では
+  // 宣言する。設定の正は docs/specs/core/settings-reference.md（ADR 0004）で、そこに無いものは設定では
   // ない。**差し替えられるのは置き場の2件だけ**である（`NUXT_SESSIONS_ROOT` /
   // `NUXT_PROJECTS_ROOT`）。読み手が endpoint と CLI（`yarn session`、Nitro の外）に
   // 分かれる値は、`useRuntimeConfig()` を使えない CLI のために `settings.ts` の解決関数を通る。
@@ -114,7 +114,7 @@ export default defineNuxtConfig({
 
     public: {
       // `claude` の起動定義。`.mcp.json` の記述形式に倣い、command と args のひとかたまりで
-      // 持つ（docs/settings-reference.md）。`-p` / `--output-format json` と、
+      // 持つ（docs/specs/core/settings-reference.md）。`-p` / `--output-format json` と、
       // `--session-id` / `--resume` とセッション id、`--` 以降の prompt は呼び出しごとに
       // 決まるので、ここには入れず claude.ts が args の後ろに付ける。
       // `--add-dir` に渡す置き場はどちらもこのリポジトリの中にあるので、直書きせず

@@ -2,7 +2,7 @@
 
 > **これは未決定の検討資料である。**
 > 方式の採否は決まっていない。ここに書いた図は「入れるとしたらどこに何が入るか」を見るためのものであって、実装の合意ではない。
-> 現状の事実は `docs/spec-screen-flow.md` にある。この資料と食い違ったら、事実の側が正しい。
+> 現状の事実は `docs/specs/architecture/spec-screen-flow.md` にある。この資料と食い違ったら、事実の側が正しい。
 
 ## まだ決まっていないこと
 
@@ -34,7 +34,7 @@
 
 ## 図 — 拡張 artifact の層を挟んだ形
 
-`docs/spec-screen-flow.md` 2.1 の現状図をベースにする。**太字の部分だけが新しい**。それ以外の呼び出しは現状と同一である。
+`docs/specs/architecture/spec-screen-flow.md` 2.1 の現状図をベースにする。**太字の部分だけが新しい**。それ以外の呼び出しは現状と同一である。
 
 ### 取得（REST）
 
@@ -104,7 +104,7 @@ sequenceDiagram
 1. **本家に触る部分は1行も変わらない。** `UpstreamRestClient.getSpecDocuments()` の呼び出しも、本家の `/all` も現状のまま。新しい層は既存の呼び出しを包むだけである
 2. **本家 API から取れないものが1つだけある。** 拡張 artifact の本文で、これはファイルシステムを直接読むしかない。読み取りは `read-only.test.ts` の禁止対象外（禁じているのは `writeFile` / `mkdir` / `rm` などの書き込みと、本家の書き込み API）。`server/utils/upstream/scan.ts` と `registry.ts` に既に前例がある
 3. **変わる契約が1つある。** `documents.get.ts` が返す形。3キー固定の `SpecDocumentsDto` を変えると、`[specName]/index.vue` と `[document].vue` の両方に波及する
-4. **層の置き場所は制御層になる。** 接点層（`server/utils/upstream/`）は本家の形をそのまま扱う場所で、本家が知らない概念を持ち込めない（`docs/structure-design.md` の層の定義）。ただし FS 直読みをどちらに置くかは別途判断が要る
+4. **層の置き場所は制御層になる。** 接点層（`server/utils/upstream/`）は本家の形をそのまま扱う場所で、本家が知らない概念を持ち込めない（`docs/specs/core/structure-design.md` の層の定義）。ただし FS 直読みをどちらに置くかは別途判断が要る
 
 ## 決めるべき問い
 

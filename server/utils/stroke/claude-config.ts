@@ -4,7 +4,7 @@ import { z } from 'zod'
  * `claude -p` の呼び出しに要る `runtimeConfig.claude` を読む。
  *
  * 起動定義そのもの（実行ファイルと引数）はここではなく `runtimeConfig.public.claude` が
- * JSON のひとかたまりで持つ（docs/settings-reference.md）。ここに残るのは、起動の引数
+ * JSON のひとかたまりで持つ（docs/specs/core/settings-reference.md）。ここに残るのは、起動の引数
  * ではなく**呼び出しの中で使う値**である。
  *
  * どれも環境変数では差し替えられず、値は `nuxt.config.ts` に書かれたものだけになった。

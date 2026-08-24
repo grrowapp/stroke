@@ -6,7 +6,7 @@ schema: custom
 context: |
   stroke-board — プロジェクトを起こす「ストローク」と、起きたプロジェクトを見張る
   「ポータル」を1つにした Nuxt アプリ。旧 stroke-board-frontier は統合済み
-  （docs/mainline-merge.md / docs/adr/0002-merge-into-stroke-board.md）。
+  （docs/specs/plan/mainline-merge.md / docs/adr/0002-merge-into-stroke-board.md）。
 
   artifact を書く前に、次の3つを必ず読むこと。
 

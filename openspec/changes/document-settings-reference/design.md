@@ -43,7 +43,7 @@ proposal.md の Why を参照。ここでは、資料の形を決めるのに要
 
 ## Decisions
 
-### 決定1: 置き場は `docs/settings-reference.md` 1本
+### 決定1: 置き場は `docs/specs/core/settings-reference.md` 1本
 
 **代替案**:
 
@@ -103,4 +103,4 @@ proposal.md の Why を参照。ここでは、資料の形を決めるのに要
 
 ## Open Questions
 
-- **統合後、マージ先の `.env.example` とこの資料をどう畳むか。** マージ先も `.env.example` を持つ（`docs/mainline-merge.md`）。1つになった時点で項目が合流するが、その形は統合の実物を見てから決まる。この change は統合前の姿として成立する
+- **統合後、マージ先の `.env.example` とこの資料をどう畳むか。** マージ先も `.env.example` を持つ（`docs/specs/plan/mainline-merge.md`）。1つになった時点で項目が合流するが、その形は統合の実物を見てから決まる。この change は統合前の姿として成立する

@@ -5,7 +5,7 @@
 - **自動生成しない。** 生成スクリプトも CI 検査も作らない
 - **設定でないものを載せない。** `settings.ts` の固定値・schema に畳んだ閾値・ビルド時に決まる設定は資料に現れない
 
-書き出し先は `docs/settings-reference.md` 1本（design.md 決定1）と `docs/adr/0004-settings-reference-is-authoritative.md`。
+書き出し先は `docs/specs/core/settings-reference.md` 1本（design.md 決定1）と `docs/adr/0004-settings-reference-is-authoritative.md`。
 
 ## 1. ADR
 
@@ -17,7 +17,7 @@
 
 ## 2. 骨格
 
-- [x] 2.1 `docs/settings-reference.md` を作る
+- [x] 2.1 `docs/specs/core/settings-reference.md` を作る
 - [x] 2.2 セクションを `runtimeConfig` と `runtimeConfig.public` の2つにする。**設定はこの2つにしか無い**
 - [x] 2.3 表の列を「キー / 既定値」に統一する。出どころのモジュール名は書かない（design.md 決定3）
 
@@ -44,7 +44,7 @@
 
 ## 6. 参照の配線
 
-- [x] 6.1 `docs/structure.md` に資料と ADR 0004 の置き場・役割を足す
+- [x] 6.1 `docs/specs/core/structure.md` に資料と ADR 0004 の置き場・役割を足す
 - [x] 6.2 `CLAUDE.md` の Docs 一覧に1行足す
 - [x] 6.3 `README.md` の設定に関する記述から、詳細をこの資料へ委ねる。**既定値の一覧を README に重ねない**
 - [x] 6.4 `.env.example` の冒頭から資料と ADR 0004 を指す
@@ -74,7 +74,7 @@
 
   **タスクが指定した方法では確認できていない。** 作業ツリーを `align-settings-conventions` と共有しているため、`git diff --stat` には両者の差分が混ざり、この change の分だけを切り分けられない。
 
-  代わりに commit 単位で見ると、この change の commit（`207efe0`）が触ったのは `CLAUDE.md` / `README.md` / `docs/adr/0003` / `docs/adr/0004` / `docs/settings-reference.md` / `docs/structure.md` と change 自身の4ファイルだけで、`server/` / `scripts/` / `app/` / `shared/` / `nuxt.config.ts` / `package.json` の差分は0件だった。
+  代わりに commit 単位で見ると、この change の commit（`207efe0`）が触ったのは `CLAUDE.md` / `README.md` / `docs/adr/0003` / `docs/adr/0004` / `docs/specs/core/settings-reference.md` / `docs/specs/core/structure.md` と change 自身の4ファイルだけで、`server/` / `scripts/` / `app/` / `shared/` / `nuxt.config.ts` / `package.json` の差分は0件だった。
 
   ```
   $ git show --stat 207efe0 -- server/ scripts/ app/ shared/ nuxt.config.ts package.json

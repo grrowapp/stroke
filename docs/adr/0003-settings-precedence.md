@@ -17,7 +17,7 @@ export function resolveSessionsRoot(): string {
 
 値を読む側は、使う場所で `resolve*()` を呼ぶ。解決は呼び出しのたびに行い、**値を持ち回るために関数の引数を増やさない。**
 
-一覧は `docs/settings-reference.md`、差し替えのテンプレートは `.env.example` が持つ。
+一覧は `docs/specs/core/settings-reference.md`、差し替えのテンプレートは `.env.example` が持つ。
 
 ## Considered Options
 

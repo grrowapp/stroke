@@ -42,4 +42,4 @@ git merge --allow-unrelated-histories frontier/master
 - **衝突の数を目標値にしない。** 現状のまま merge して数える手順は再現できるが、それは設計の確認手段であって出発点ではない
 - **統合して初めて生まれる期待は、統合前に change にしない。** 1つになったことで新しく要るもの（画面外への通知など）は、統合後の実物を見てから決める
 - **片方の前提が、もう片方を止めてはならない。** frontier は書き込み先が用意されていないと `process.exit(1)` で落ちる設計だが、ポータルは本家が動いていなくても「未接続」と表示して動き続ける設計である。1プロセスになる以上、前者の作法を後者に及ぼさない
-- 道筋・区分・終了条件は `docs/mainline-merge.md`、意味の区分と命名・配置の戦略は `design-semantic-structure` が持つ
+- 道筋・区分・終了条件は `docs/specs/plan/mainline-merge.md`、意味の区分と命名・配置の戦略は `design-semantic-structure` が持つ

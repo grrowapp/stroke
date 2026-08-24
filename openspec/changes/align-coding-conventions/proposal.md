@@ -72,10 +72,10 @@ Markdown の描画結果は実装が変われば細部が変わりうるが、`p
 - `nuxt.config.ts` — `imports` / `components` / `devServer`
 - `app/` 配下 19 ファイル全部
 - `server/utils/stroke/api-base-url.ts` — `DEFAULT_API_BASE_URL`
-- `README.md` / `docs/session-workflow.md` — テストの節、ポートの記載
+- `README.md` / `docs/specs/architecture/session-workflow.md` — テストの節、ポートの記載
 
 **tasks の順序**: テスト → 依存 → auto-import。テストが無い状態で他の2つを通すと、壊れても分からない。
 
-**前提**: なし。ファイルの置き場は `docs/structure.md` で確定し、実際の移動も済んでいる（`design-semantic-structure` は archive 済み）。import を書き換える先が動く心配は無い。
+**前提**: なし。ファイルの置き場は `docs/specs/core/structure.md` で確定し、実際の移動も済んでいる（`design-semantic-structure` は archive 済み）。import を書き換える先が動く心配は無い。
 
 **吸収した change**: `add-test-harness`（テストの安全網）、`align-dependencies`（依存の突き合わせ）、`remove-auto-imports`（auto-import の廃止）の3本。いずれも「1つのアプリになるから揃うしかないもの」で、同じ `package.json` と `nuxt.config.ts` を触り、順番に実施するしかない。

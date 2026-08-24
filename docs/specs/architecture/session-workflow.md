@@ -36,7 +36,7 @@ assets/.claude/skills/                                 セッション API ス�
 | セッション id | — | cwd のディレクトリ名と `${CLAUDE_SESSION_ID}` |
 | スキル・コマンドの置き場 | `runtimeConfig.public.claude.args` | `--add-dir`（起動定義の配列に2件並ぶ） |
 
-設定はどれも環境変数で差し替えない（`.env` で差し替えられるのは置き場の2件だけである）。一覧は `docs/settings-reference.md`。
+設定はどれも環境変数で差し替えない（`.env` で差し替えられるのは置き場の2件だけである）。一覧は `docs/specs/core/settings-reference.md`。
 
 セッション作成（`server/utils/stroke/session-core.ts`）は「ディレクトリ作成 → `openspec init --tools none` → `config.yaml` 上書き → 状態ファイル書き込み」。**サーバは change を作らない**。change（固定名 `draft-proposal`）は初回呼び出しの `openspec-ff-change` スキルが `openspec new change` から作る。openspec コマンドの実行は全て cwd = セッションディレクトリで、`--store` はどのコードパスからも使わない。
 

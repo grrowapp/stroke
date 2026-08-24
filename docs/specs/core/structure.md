@@ -55,6 +55,6 @@ GET  /api/strokes              一覧
 | `app/assets/css/main.css` | アプリ全体に効くスタイル。領域固有のものはここに混ぜない |
 | `nuxt.config.ts` / `package.json` / `tsconfig.json` | アプリ全体の設定・依存・型解決 |
 | `server/plugins/` | アプリ全体の起動時処理 |
-| `docs/settings-reference.md` | **設定の正。** ここに無いものは設定ではない。編集には change とユーザー承認が要る（`docs/adr/0004-settings-reference-is-authoritative.md`） |
+| `docs/specs/core/settings-reference.md` | **設定の正。** ここに無いものは設定ではない。編集には change とユーザー承認が要る（`docs/adr/0004-settings-reference-is-authoritative.md`） |
 
-これらの衝突は設計では消せない。統合時に手で畳む対象として `docs/mainline-merge.md` が持つ。
+これらの衝突は設計では消せない。統合時に手で畳む対象として `docs/specs/plan/mainline-merge.md` が持つ。

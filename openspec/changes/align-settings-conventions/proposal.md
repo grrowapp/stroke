@@ -70,7 +70,7 @@
 - 各所のログのプレフィックス
 - `package.json` — ポートの二重管理の解消
 - `.env.example` — 新規。外に出した値の一覧
-- `README.md` / `docs/session-workflow.md` — 設定できる値の記載
+- `README.md` / `docs/specs/architecture/session-workflow.md` — 設定できる値の記載
 
 - `docs/adr/` — ビルド時と実行時の境界をどこに引くかは、後から変えにくい判断にあたる。ADR に残すかを design で判断する
 
