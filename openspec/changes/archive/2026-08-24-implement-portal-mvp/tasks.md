@@ -128,4 +128,4 @@ design.md の Risks が求めているもの。ここがずれると 4章以降�
 - [x] 11.5 応答後は一覧を取り直す。先回りして画面から消さない（`ui.md` の「楽観的更新は無し」）
 - [x] 11.6 E2E スタブに応答の口を足し、承認・却下が本家へ何を送ったかをテストから確かめられるようにする
 - [x] 11.7 `design.md` 決定11 と `specs/project-workspace` を書き換える。`nuxt typecheck` / `vitest` / Playwright をすべて通す
-- [ ] 11.8 steering の `product.md` の Out of Scope から「ワークフローの状態変更」を外す。**steering の更新は本家の承認フローを通るため、ここでは直していない**（ユーザーの操作が要る）
+- [x] 11.8 steering の `product.md` の Out of Scope から「ワークフローの状態変更」を外す。本家の `PUT /api/projects/:projectId/steering/product` で書き換え、ダッシュボードの承認を通した。承認・却下と文書編集は実装したので、対象外に残るのはタスクの状態変更だけになる
