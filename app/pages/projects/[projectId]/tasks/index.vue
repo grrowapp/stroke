@@ -28,15 +28,15 @@ const items = computed(() =>
 </script>
 
 <template>
-  <WorkspacePanel title="タスク" subtitle="タスクを持つ仕様書。状態を変える操作は置かない">
+  <WorkspacePanel title="タスク" subtitle="タスクを持つ Feature。状態を変える操作は置かない">
     <!-- 0件でも表は残す（本家の Empty State と同じ扱い） -->
     <RecordList
       :items="items"
       testid="tasks-list"
-      :labels="{ name: '仕様書', status: '進捗', meta: '最終更新' }"
+      :labels="{ name: 'Feature', status: '進捗', meta: '最終更新' }"
     />
     <EmptyState v-if="items.length === 0" testid="tasks-empty" icon="tasks" title="タスクがありません">
-      タスクを持つ仕様書がありません。
+      タスクを持つ Feature がありません。
     </EmptyState>
   </WorkspacePanel>
 </template>

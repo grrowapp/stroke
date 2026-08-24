@@ -32,7 +32,7 @@ const connected = computed(() => upstreamConnected.value && !unresolved.value);
 
 const sections = [
   { to: '', label: '概要' },
-  { to: 'specs', label: '仕様書' },
+  { to: 'specs', label: 'Feature' },
   { to: 'steering', label: 'ステアリング' },
   { to: 'tasks', label: 'タスク' },
   { to: 'approvals', label: '承認' },

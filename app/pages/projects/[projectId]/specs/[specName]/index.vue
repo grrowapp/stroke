@@ -44,7 +44,7 @@ const items = computed(() =>
 </script>
 
 <template>
-  <WorkspacePanel :title="specName" subtitle="仕様書は要件定義 / 設計 / タスクの3本で固定される">
+  <WorkspacePanel :title="specName" subtitle="Feature は要件定義 / 設計 / タスクの3本で固定される">
     <RecordList
       :items="items"
       testid="spec-documents"

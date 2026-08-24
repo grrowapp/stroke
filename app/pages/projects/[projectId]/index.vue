@@ -32,10 +32,10 @@ const steeringCount = computed(() => {
 const sections = computed(() => [
   {
     to: 'specs',
-    label: '仕様書',
+    label: 'Feature',
     icon: 'document' as const,
     count: (specs.value ?? []).length,
-    unit: '本',
+    unit: '件',
   },
   {
     to: 'steering',
@@ -49,7 +49,7 @@ const sections = computed(() => [
     label: 'タスク',
     icon: 'tasks' as const,
     count: (specs.value ?? []).filter((spec) => spec.phases.tasks.exists).length,
-    unit: '本の仕様書',
+    unit: '件の Feature',
   },
   {
     to: 'approvals',
