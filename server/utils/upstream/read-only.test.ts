@@ -1,11 +1,16 @@
 /**
- * 接点層の書き込みが「承認への応答」1つに限られていることを機械的に確かめる。
+ * 接点層の書き込みが、決めた3つに限られていることを機械的に確かめる。
  *
- * 元は完全な読み取り専用だったが、承認・却下を本家の API 経由で行うと決めたため、
- * 書き込みは `POST /approvals/:id/:action` だけを通す。ファイルに触るのは本家であり、
- * stroke-board が `.spec-workflow/` を直接書くことは無い（ADR-0001）。
+ * 通すのは次の3つだけである。
  *
- * 「1つだけ」は目視では守れないので、ここで固定する。書き込み口を増やすときは、
+ * - `POST /approvals/:id/:action` — 承認への応答
+ * - `PUT /specs/:name/:document` — 仕様書の文書の保存（specs/document-editing）
+ * - `PUT /steering/:name` — ステアリング文書の保存（同上）
+ *
+ * ファイルに触るのは本家であり、stroke-board が `.spec-workflow/` を直接書くことは
+ * 無い（ADR-0001）。この関係は編集を入れても変わらない。
+ *
+ * 「3つだけ」は目視では守れないので、ここで固定する。書き込み口を増やすときは、
  * このテストを通らないと増やせない。
  */
 
@@ -55,7 +60,7 @@ async function sourceFiles(): Promise<{ name: string; content: string }[]> {
   );
 }
 
-describe('接点層の書き込みは承認への応答だけである', () => {
+describe('接点層の書き込みは決めた3つだけである', () => {
   it('検査対象のファイルが存在する', async () => {
     const files = await sourceFiles();
     expect(files.map((file) => file.name).sort()).toEqual([
@@ -67,7 +72,7 @@ describe('接点層の書き込みは承認への応答だけである', () => {
     ]);
   });
 
-  it('POST を使うのは rest.ts だけである', async () => {
+  it('書き込みメソッドを使うのは rest.ts だけである', async () => {
     for (const file of await sourceFiles()) {
       if (file.name === 'rest.ts') continue;
 
@@ -78,15 +83,18 @@ describe('接点層の書き込みは承認への応答だけである', () => {
     }
   });
 
-  it('rest.ts が使う書き込みメソッドは POST だけである', async () => {
+  it('rest.ts が使う書き込みメソッドは POST と PUT だけである', async () => {
     const rest = await readFile(join(UPSTREAM_DIR, 'rest.ts'), 'utf-8');
 
-    for (const method of ['PUT', 'PATCH', 'DELETE']) {
+    for (const method of ['PATCH', 'DELETE']) {
       expect(rest, `rest.ts に ${method} がある`).not.toContain(`'${method}'`);
     }
 
-    // POST は1か所だけ。増えていたら書き込み口が増えている
+    // POST は承認への応答の1か所。増えていたら書き込み口が増えている
     expect([...rest.matchAll(/method: 'POST'/g)]).toHaveLength(1);
+
+    // PUT は保存の共通処理1か所。仕様書とステアリングの2つがここを通る
+    expect([...rest.matchAll(/method: 'PUT'/g)]).toHaveLength(1);
   });
 
   it('本家の書き込み系エンドポイントを参照していない', async () => {
@@ -107,7 +115,7 @@ describe('接点層の書き込みは承認への応答だけである', () => {
     }
   });
 
-  it('REST クライアントが公開しているのは読み取りと承認への応答だけである', async () => {
+  it('REST クライアントが公開しているのは読み取りと決めた書き込みだけである', async () => {
     const rest = await readFile(join(UPSTREAM_DIR, 'rest.ts'), 'utf-8');
 
     // インデント2の `name(` は公開メソッド。private は `private` が前に付くので拾わない
@@ -123,6 +131,17 @@ describe('接点層の書き込みは承認への応答だけである', () => {
       'listPendingApprovals',
       'listSpecs',
       'respondToApproval',
+      'saveSpecDocument',
+      'saveSteeringDocument',
     ]);
+  });
+
+  it('保存できる文書の名前が固定されている', async () => {
+    const schema = await readFile(join(UPSTREAM_DIR, 'schema.ts'), 'utf-8');
+    const rest = await readFile(join(UPSTREAM_DIR, 'rest.ts'), 'utf-8');
+
+    // 本家の allowedDocs と同じ値。ここが緩むと保存先が広がる
+    expect(schema).toContain("['requirements', 'design', 'tasks'] as const");
+    expect(rest).toContain("['product', 'tech', 'structure'] as const");
   });
 });

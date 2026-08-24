@@ -2,9 +2,10 @@
 /** 下層 — 仕様書の文書本文。URL でこの1本を直接指せる */
 import { computed, createError, definePageMeta, useRoute } from '#imports';
 
-import DocumentView from '~/components/workspace/DocumentView.vue';
+import DocumentEditor from '~/components/workspace/DocumentEditor.vue';
 import WorkspacePanel from '~/components/workspace/WorkspacePanel.vue';
-import { useProjectId, useSpecDocuments } from '~/composables/workspace/useProjectApi';
+import { useBoardSocket } from '~/composables/shared/useBoardSocket';
+import { saveSpecDocument, useProjectId, useSpecDocuments } from '~/composables/workspace/useProjectApi';
 
 definePageMeta({ layout: 'workspace' });
 
@@ -21,8 +22,25 @@ if (!(documentKey.value in DOCUMENTS)) {
   throw createError({ statusCode: 404, statusMessage: 'unknown-spec-document' });
 }
 
-const { data } = await useSpecDocuments(projectId, specName);
+const { data, refresh } = await useSpecDocuments(projectId, specName);
 const current = computed(() => data.value?.[documentKey.value as DocumentKey] ?? null);
+
+const { upstreamConnected } = useBoardSocket();
+
+/**
+ * 保存したら取り直す。保存した内容は画面が既に持っているが、本家が整形して返す場合に
+ * 画面と本家がずれたままになるのを避ける。
+ */
+async function save(content: string): Promise<string | null> {
+  const failure = await saveSpecDocument(
+    projectId.value,
+    specName.value,
+    documentKey.value,
+    content,
+  );
+  if (failure === null) await refresh();
+  return failure;
+}
 </script>
 
 <template>
@@ -30,6 +48,11 @@ const current = computed(() => data.value?.[documentKey.value as DocumentKey] ??
     :title="DOCUMENTS[documentKey as DocumentKey]"
     :subtitle="specName"
   >
-    <DocumentView :content="current?.content" />
+    <DocumentEditor
+      :content="current?.content"
+      :save="save"
+      :can-save="upstreamConnected"
+      testid="spec-document"
+    />
   </WorkspacePanel>
 </template>

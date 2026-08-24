@@ -2,15 +2,25 @@
 /**
  * 下層 — 承認依頼1件と、その対象文書の中身。
  *
- * 承認・却下の操作は置かない。stroke-board は `.spec-workflow/` に書き込まない
- * （docs/adr/0001）。
+ * 対象文書はここで直せる。承認依頼が来た文書を読んで直したくなる場面はまさにこの画面で、
+ * 別の画面へ移り直させない（specs/document-editing）。開いている実体は仕様書や
+ * ステアリングの画面で開くものと同じファイルである。
+ *
+ * 承認・却下の操作はここに置かない。それは承認一覧の `ApprovalCard` が持つ。
  */
 import { computed, definePageMeta, useRoute } from '#imports';
 
+import DocumentEditor from '~/components/workspace/DocumentEditor.vue';
 import DocumentView from '~/components/workspace/DocumentView.vue';
 import EmptyState from '~/components/workspace/EmptyState.vue';
 import WorkspacePanel from '~/components/workspace/WorkspacePanel.vue';
-import { useApprovalContent, useProjectId, usePendingApprovals } from '~/composables/workspace/useProjectApi';
+import { useBoardSocket } from '~/composables/shared/useBoardSocket';
+import {
+  saveTargetOf,
+  useApprovalContent,
+  useProjectId,
+  usePendingApprovals,
+} from '~/composables/workspace/useProjectApi';
 
 definePageMeta({ layout: 'workspace' });
 
@@ -19,11 +29,30 @@ const projectId = useProjectId();
 const approvalId = computed(() => String(route.params.approvalId ?? ''));
 
 const { data: pending } = await usePendingApprovals(projectId);
-const { data: document } = await useApprovalContent(projectId, approvalId);
+const { data: document, refresh } = await useApprovalContent(projectId, approvalId);
 
 const approval = computed(() =>
   (pending.value ?? []).find((item) => item.id === approvalId.value) ?? null,
 );
+
+const { upstreamConnected } = useBoardSocket();
+
+/**
+ * 対象文書の保存先。`filePath` から導く。
+ *
+ * 編集を許していない文書を指している承認依頼もありうる。そのときは読むだけになる。
+ */
+const target = computed(() =>
+  approval.value === null ? null : saveTargetOf(approval.value.filePath),
+);
+
+async function save(content: string): Promise<string | null> {
+  if (target.value === null) return 'この文書は編集できません。';
+
+  const failure = await target.value.save(projectId.value, content);
+  if (failure === null) await refresh();
+  return failure;
+}
 
 const CATEGORY: Record<string, string> = { spec: '仕様', steering: 'ステアリング' };
 </script>
@@ -39,7 +68,7 @@ const CATEGORY: Record<string, string> = { spec: '仕様', steering: 'ステア�
     </EmptyState>
   </WorkspacePanel>
 
-  <WorkspacePanel v-else :title="approval.title" subtitle="対象文書。承認と却下の操作は置かない">
+  <WorkspacePanel v-else :title="approval.title" subtitle="対象文書">
     <template #actions>
       <span
         class="sb-status-badge sb-status-badge-info"
@@ -56,6 +85,15 @@ const CATEGORY: Record<string, string> = { spec: '仕様', steering: 'ステア�
       {{ approval.filePath }}
     </p>
 
-    <DocumentView :content="document?.content" missing="対象の文書を取得できませんでした。" />
+    <!-- 承認から来た人は読んで直すために来ている。編集を1回押させない -->
+    <DocumentEditor
+      v-if="target !== null"
+      :content="document?.content"
+      :save="save"
+      :can-save="upstreamConnected"
+      edit-on-open
+      testid="approval-document"
+    />
+    <DocumentView v-else :content="document?.content" missing="対象の文書を取得できませんでした。" />
   </WorkspacePanel>
 </template>

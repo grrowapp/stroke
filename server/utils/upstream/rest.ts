@@ -26,6 +26,7 @@ import {
   type ApprovalRequest,
   type ProjectInfo,
   type SpecData,
+  type SpecDocumentName,
   type SpecDocuments,
   type TaskProgress,
 } from './schema';
@@ -40,6 +41,10 @@ export type ApprovalAction = (typeof APPROVAL_ACTIONS)[number];
 /** ステアリング文書は常にこの3本。本家に一覧 API は無い */
 export const STEERING_DOCUMENTS = ['product', 'tech', 'structure'] as const;
 export type SteeringDocument = (typeof STEERING_DOCUMENTS)[number];
+
+export function isSteeringDocument(value: string): value is SteeringDocument {
+  return (STEERING_DOCUMENTS as readonly string[]).includes(value);
+}
 
 export type UpstreamFailure =
   | { kind: 'not-configured' }
@@ -128,6 +133,68 @@ export class UpstreamRestClient {
         baseURL: this.baseUrl,
         method: 'POST',
         body: { response },
+        retry: 0,
+      });
+    } catch (error) {
+      if (statusOf(error) === 404) {
+        return { ok: false, failure: { kind: 'not-found', path } };
+      }
+      return { ok: false, failure: { kind: 'unreachable', path, reason: toReason(error) } };
+    }
+
+    return { ok: true, value: null };
+  }
+
+  /**
+   * `PUT /api/projects/:projectId/specs/:name/:document` — 仕様書の文書を保存する。
+   *
+   * 送るのは文書1本ぶんの全文で、差分は送らない。本家は受け取った内容で
+   * ファイルを丸ごと置き換える（`multi-server.ts`）。
+   *
+   * 本家は保存の前に他所で変更されていないかを確かめない。確かめる手段が無いため、
+   * 後から保存したものが残る（specs/document-editing）。
+   */
+  async saveSpecDocument(
+    projectId: string,
+    specName: string,
+    document: SpecDocumentName,
+    content: string,
+  ): Promise<UpstreamResult<null>> {
+    return this.write(
+      `/api/projects/${enc(projectId)}/specs/${enc(specName)}/${enc(document)}`,
+      content,
+    );
+  }
+
+  /**
+   * `PUT /api/projects/:projectId/steering/:name` — ステアリング文書を保存する。
+   *
+   * 仕様書と違い、文書名がそのまま `product.md` などのファイル名になる。
+   */
+  async saveSteeringDocument(
+    projectId: string,
+    name: SteeringDocument,
+    content: string,
+  ): Promise<UpstreamResult<null>> {
+    return this.write(`/api/projects/${enc(projectId)}/steering/${enc(name)}`, content);
+  }
+
+  /**
+   * 保存する。
+   *
+   * 本家の応答は `{ success: true, message: ... }` だが中身を使わないので、
+   * 成否は状態コードに任せる。取得（`read`）と失敗の区別を揃えてある。
+   */
+  private async write(path: string, content: string): Promise<UpstreamResult<null>> {
+    if (this.baseUrl === null) {
+      return { ok: false, failure: { kind: 'not-configured' } };
+    }
+
+    try {
+      await ofetch(path, {
+        baseURL: this.baseUrl,
+        method: 'PUT',
+        body: { content },
         retry: 0,
       });
     } catch (error) {

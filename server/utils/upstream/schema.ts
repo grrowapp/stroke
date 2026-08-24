@@ -139,6 +139,25 @@ export const specDocumentsSchema = z.object({
   tasks: z.object({ content: z.string(), lastModified: z.string() }).nullable(),
 });
 
+// --- 編集できる文書 ---
+
+/**
+ * 保存を許す文書の名前。
+ *
+ * 本家も同じ値で弾く（`multi-server.ts` の `allowedDocs`）。それでもこちらで持つのは、
+ * 本家に投げてから弾かれると、退けられた理由が本家の応答経由になり、画面での見せ方が
+ * 本家の文言に左右されるためである。入口で弾いて、こちらの言葉で返す。
+ */
+export const specDocumentNames = ['requirements', 'design', 'tasks'] as const;
+
+export const specDocumentNameSchema = z.enum(specDocumentNames);
+
+export type SpecDocumentName = z.infer<typeof specDocumentNameSchema>;
+
+export function isSpecDocumentName(value: string): value is SpecDocumentName {
+  return specDocumentNameSchema.safeParse(value).success;
+}
+
 // --- WebSocket ---
 
 /** 接続直後に届く。ここから通知の基準を作る（design.md 決定4） */

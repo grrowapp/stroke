@@ -20,7 +20,7 @@ test.describe('下層のシェル', () => {
     const items = await page.locator('[data-testid="workspace-sidebar"] a').allTextContents();
     expect(items.map((item) => item.trim())).toEqual([
       '概要',
-      '仕様書',
+      'Feature',
       'ステアリング',
       'タスク',
       '承認',
@@ -132,10 +132,18 @@ test.describe('仕様書', () => {
     expect(response?.status()).toBe(404);
   });
 
-  test('編集も承認の操作も置かない', async ({ page }) => {
+  test('編集は置くが、承認の操作は置かない', async ({ page }) => {
+    // 文書の編集は入れた（specs/document-editing）。承認への応答は承認画面だけが持つ
     await page.goto(`/projects/${ALPHA}/specs/auth-spec/requirements`);
 
-    await expect(page.getByRole('button', { name: /^(保存|編集|承認|却下)$/ })).toHaveCount(0);
+    await expect(page.getByTestId('document-edit')).toBeVisible();
+    await expect(page.getByRole('button', { name: /^(承認|却下)$/ })).toHaveCount(0);
+  });
+
+  test('開いた時点では入力欄を出さない', async ({ page }) => {
+    // 読みに来ただけの人に編集画面を見せない。編集は押してから入る
+    await page.goto(`/projects/${ALPHA}/specs/auth-spec/requirements`);
+
     await expect(page.locator('textarea')).toHaveCount(0);
   });
 });
@@ -233,7 +241,9 @@ test.describe('承認', () => {
     await page.goto(`/projects/${ALPHA}/approvals/w2`);
 
     await expect(page.getByTestId('approval-meta')).toContainText('.spec-workflow/steering/tech.md');
-    await expect(page.getByTestId('document-content')).toContainText('本文');
+
+    // 対象文書はそのまま直せる状態で開く（specs/document-editing）
+    await expect(page.getByTestId('document-input')).toContainText('本文');
   });
 
   test('既に処理済みの承認依頼はその旨が出る', async ({ page }) => {
@@ -324,7 +334,7 @@ test.describe('通知からの導線', () => {
     await page.getByTestId('notification-open').click();
 
     await expect(page).toHaveURL(new RegExp(`/projects/${ALPHA}/approvals/nav1$`));
-    await expect(page.getByTestId('document-content')).toBeVisible();
+    await expect(page.getByTestId('document-input')).toBeVisible();
   });
 
   test('キーボードだけで通知から対象を開ける', async ({ page }) => {

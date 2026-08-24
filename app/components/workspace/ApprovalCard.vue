@@ -121,9 +121,10 @@ async function respond(action: 'approve' | 'reject', response?: string): Promise
 
           <!-- 操作。押しても行の遷移が起きないよう、この列では伝播を止める -->
           <div class="flex flex-wrap items-center gap-3" @click.stop>
+            <!-- 押した先で対象文書がそのまま直せる（specs/document-editing） -->
             <NuxtLink :to="to" class="sb-action" data-testid="record-open">
               <UpstreamIcon name="eye" class="h-4 w-4" />
-              対象を開く
+              レビューする
             </NuxtLink>
 
             <button

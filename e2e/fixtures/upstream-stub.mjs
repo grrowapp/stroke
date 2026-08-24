@@ -65,6 +65,9 @@ function seed() {
         },
       ],
       approvals: [],
+      // 保存された文書。本家はファイルに書くので、次の取得で保存後の内容が返る
+      savedSpecDocuments: new Map(),
+      savedSteeringDocuments: new Map(),
       tasksBySpec: new Map([
         [
           'auth-spec',
@@ -243,14 +246,39 @@ function handleApi(segments, respond, method = 'GET', body = null) {
 
   if (rest[0] === 'specs' && rest.length === 1) return respond(200, project.specs);
 
+  /*
+   * 仕様書の文書の保存。本家は受け取った `content` でファイルを丸ごと置き換える。
+   * 保存したものを次の取得で返すことで、保存が効いているかを E2E で確かめられる。
+   */
+  if (method === 'PUT' && rest[0] === 'specs' && rest.length === 3) {
+    const [, specName, document] = rest;
+
+    if (!['requirements', 'design', 'tasks'].includes(document)) {
+      return respond(400, { error: 'Invalid document type' });
+    }
+    if (typeof body?.content !== 'string') {
+      return respond(400, { error: 'Content must be a string' });
+    }
+
+    project.savedSpecDocuments.set(`${specName}/${document}`, body.content);
+    return respond(200, { success: true, message: 'Document saved successfully' });
+  }
+
   // 仕様書の本文。無い文書は null で返る。design を欠かしてあるのは、
   // 未作成の文書を開けないことを E2E で押さえるため
   if (rest[0] === 'specs' && rest[2] === 'all') {
     const lastModified = '2026-08-21T00:00:00.000Z';
+    const saved = (name) => project.savedSpecDocuments.get(`${rest[1]}/${name}`);
+
+    const requirements = saved('requirements') ?? `# ${rest[1]} 要件定義\n\n本文`;
+    const tasks = saved('tasks') ?? `# ${rest[1]} タスク\n\n- [x] 1.1 ログインを作る`;
+    const design = saved('design');
+
     return respond(200, {
-      requirements: { content: `# ${rest[1]} 要件定義\n\n本文`, lastModified },
-      design: null,
-      tasks: { content: `# ${rest[1]} タスク\n\n- [x] 1.1 ログインを作る`, lastModified },
+      requirements: { content: requirements, lastModified },
+      // 未作成のまま。保存されたら作られたことにする
+      design: design === undefined ? null : { content: design, lastModified },
+      tasks: { content: tasks, lastModified },
     });
   }
 
@@ -300,9 +328,27 @@ function handleApi(segments, respond, method = 'GET', body = null) {
 
   if (rest[0] === 'approvals' && rest.length === 1) return respond(200, project.approvals);
 
+  /*
+   * 承認対象の本文。本家は `filePath` が指す実ファイルを読むので、その文書が
+   * 保存されていれば保存後の内容が返る。承認画面から直したものが、同じ文書の
+   * 画面にも反映されることをテストで確かめられるようにする。
+   */
   if (rest[0] === 'approvals' && rest[2] === 'content') {
     const approval = project.approvals.find((item) => item.id === rest[1]);
     if (approval === undefined) return respond(404, { error: 'Approval not found' });
+
+    const steering = /^\.spec-workflow\/steering\/([^/]+)\.md$/.exec(approval.filePath);
+    if (steering !== null) {
+      const saved = project.savedSteeringDocuments.get(steering[1]);
+      if (saved !== undefined) return respond(200, { content: saved });
+    }
+
+    const spec = /^\.spec-workflow\/specs\/([^/]+)\/([^/]+)\.md$/.exec(approval.filePath);
+    if (spec !== null) {
+      const saved = project.savedSpecDocuments.get(`${spec[1]}/${spec[2]}`);
+      if (saved !== undefined) return respond(200, { content: saved });
+    }
+
     return respond(200, { content: `# ${approval.title}\n\n本文` });
   }
 
@@ -311,7 +357,23 @@ function handleApi(segments, respond, method = 'GET', body = null) {
    * 描かれていること（見出し・箇条書き・表・コードブロック）と、文書に混ざった生 HTML を
    * 描かないことを E2E で押さえるため。
    */
+  /* ステアリングの保存。文書名がそのままファイル名になるので3本以外は弾く */
+  if (method === 'PUT' && rest[0] === 'steering' && rest.length === 2) {
+    if (!['product', 'tech', 'structure'].includes(rest[1])) {
+      return respond(400, { error: 'Invalid steering document name' });
+    }
+    if (typeof body?.content !== 'string') {
+      return respond(400, { error: 'Content must be a string' });
+    }
+
+    project.savedSteeringDocuments.set(rest[1], body.content);
+    return respond(200, { success: true, message: 'Steering document saved successfully' });
+  }
+
   if (rest[0] === 'steering') {
+    const saved = project.savedSteeringDocuments.get(rest[1]);
+    if (saved !== undefined) return respond(200, { content: saved });
+
     return respond(200, {
       content: [
         `# ${rest[1]}`,
@@ -364,8 +426,17 @@ const server = createServer(async (request, response) => {
     }
   }
 
-  const body = request.method === 'POST' ? await readJson(request) : null;
-  if (handleApi(segments, respond, request.method, body) !== false) return;
+  // 承認への応答は POST、文書の保存は PUT。どちらも body を持つ
+  const hasBody = request.method === 'POST' || request.method === 'PUT';
+  const body = hasBody ? await readJson(request) : null;
+
+  // 保存の失敗でスタブごと落とさない。落ちると以降のテストが全部 ECONNREFUSED になり、
+  // 本当に壊れているものが1件も分からなくなる
+  try {
+    if (handleApi(segments, respond, request.method, body) !== false) return;
+  } catch (error) {
+    return respond(500, { error: error instanceof Error ? error.message : String(error) });
+  }
 
   respond(404, { error: 'not found' });
 });

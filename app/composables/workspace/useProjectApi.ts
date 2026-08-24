@@ -10,7 +10,7 @@
  * ここで明示しておかないと画面側が any になる。
  */
 
-import { useFetch, useRoute } from '#imports';
+import { $fetch, useFetch, useRoute } from '#imports';
 import { computed, toValue, type MaybeRefOrGetter } from 'vue';
 
 import type {
@@ -79,4 +79,114 @@ export function useApprovalContent(
   return useFetch<DocumentContentDto>(
     () => `${base(projectId)}/approvals/${toValue(approvalId)}/content`,
   );
+}
+
+// --- 保存 ---
+
+/**
+ * 保存は取得と違い、画面の操作に対して1回だけ走る。`useFetch` は URL に紐づいて
+ * 追従するもので、押したときに送る用途には合わないので `$fetch` を直に使う。
+ *
+ * 失敗は理由の文字列で返す。画面はそれをそのまま出す。何が起きたかによって
+ * 見せ方を変えたいので、握り潰して真偽値にしない（specs/document-editing）。
+ */
+async function put(path: string, content: string): Promise<string | null> {
+  try {
+    await $fetch(path, { method: 'PUT', body: { content } });
+    return null;
+  } catch (error) {
+    return reasonOf(error);
+  }
+}
+
+/** 仕様書の文書を保存する */
+export function saveSpecDocument(
+  projectId: string,
+  specName: string,
+  document: string,
+  content: string,
+): Promise<string | null> {
+  return put(`/api/projects/${projectId}/specs/${specName}/${document}`, content);
+}
+
+/** ステアリング文書を保存する */
+export function saveSteeringDocument(
+  projectId: string,
+  name: string,
+  content: string,
+): Promise<string | null> {
+  return put(`/api/projects/${projectId}/steering/${name}`, content);
+}
+
+/**
+ * 承認依頼の `filePath` から、その文書の保存先を導く。
+ *
+ * 承認で開いた文書は、仕様書やステアリングの画面で開くものと同じ実体である。
+ * 承認の文脈で読んで直したくなったときに、別の画面へ移り直させない
+ * （specs/document-editing）。
+ *
+ * `filePath` はプロジェクトルートからの相対パスで、次の2つの形しか来ない。
+ *
+ *   .spec-workflow/steering/<name>.md
+ *   .spec-workflow/specs/<specName>/<document>.md
+ *
+ * 上記に当てはまらないもの、または編集を許していない文書名のものは `null` を返す。
+ * その場合は読むだけになる。
+ */
+export function saveTargetOf(
+  filePath: string,
+): { save: (projectId: string, content: string) => Promise<string | null> } | null {
+  const steering = /^\.spec-workflow\/steering\/([^/]+)\.md$/.exec(filePath);
+  if (steering !== null) {
+    const name = steering[1]!;
+    if (!STEERING_DOCUMENTS.includes(name)) return null;
+    return { save: (projectId, content) => saveSteeringDocument(projectId, name, content) };
+  }
+
+  const spec = /^\.spec-workflow\/specs\/([^/]+)\/([^/]+)\.md$/.exec(filePath);
+  if (spec !== null) {
+    const specName = spec[1]!;
+    const document = spec[2]!;
+    if (!SPEC_DOCUMENTS.includes(document)) return null;
+    return {
+      save: (projectId, content) => saveSpecDocument(projectId, specName, document, content),
+    };
+  }
+
+  return null;
+}
+
+/**
+ * 編集を許す文書名。サーバー側（`upstream/schema.ts` と `upstream/rest.ts`）が持つものと
+ * 同じ値を、画面側でも持つ。ここは「編集の口を出すかどうか」の判断に使う。
+ * 実際に保存を通すかどうかはサーバーが決める。
+ */
+const STEERING_DOCUMENTS: readonly string[] = ['product', 'tech', 'structure'];
+const SPEC_DOCUMENTS: readonly string[] = ['requirements', 'design', 'tasks'];
+
+/**
+ * 失敗の理由を画面に出せる言葉にする。
+ *
+ * サーバーは `statusMessage` に何が起きたかを入れて返す（`upstream-proxy.ts` の
+ * `toHttpError`）。本家が止まっているのか、送った内容が悪いのかで直し方が違うので、
+ * 「保存に失敗しました」だけにまとめない。
+ */
+function reasonOf(error: unknown): string {
+  const status = (error as { statusMessage?: string } | null)?.statusMessage;
+
+  switch (status) {
+    case 'upstream-not-configured':
+      return '本家ダッシュボードの URL が設定されていません。';
+    case 'upstream-unreachable':
+      return '本家に繋がりません。本家が動いているか確かめてください。';
+    case 'upstream-not-found':
+      return 'この文書が本家に見つかりません。削除されたか、名前が変わった可能性があります。';
+    case 'unknown-spec-document':
+    case 'unknown-steering-document':
+      return 'この文書は編集できません。';
+    case 'invalid-body':
+      return '送る内容の形が正しくありません。';
+    default:
+      return '保存できませんでした。もう一度試してください。';
+  }
 }

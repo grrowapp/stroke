@@ -2,9 +2,10 @@
 /** 下層 — ステアリング文書の本文。URL でこの1本を直接指せる */
 import { computed, createError, definePageMeta, useRoute } from '#imports';
 
-import DocumentView from '~/components/workspace/DocumentView.vue';
+import DocumentEditor from '~/components/workspace/DocumentEditor.vue';
 import WorkspacePanel from '~/components/workspace/WorkspacePanel.vue';
-import { useProjectId, useSteeringDocument } from '~/composables/workspace/useProjectApi';
+import { useBoardSocket } from '~/composables/shared/useBoardSocket';
+import { saveSteeringDocument, useProjectId, useSteeringDocument } from '~/composables/workspace/useProjectApi';
 import { isSteeringName } from '~/composables/workspace/useSteeringDocuments';
 
 definePageMeta({ layout: 'workspace' });
@@ -18,14 +19,28 @@ if (!isSteeringName(name.value)) {
   throw createError({ statusCode: 404, statusMessage: 'unknown-steering-document' });
 }
 
-const { data } = await useSteeringDocument(projectId, name);
+const { data, refresh } = await useSteeringDocument(projectId, name);
+
+const { upstreamConnected } = useBoardSocket();
+
+/**
+ * 保存したら取り直す。保存した内容は画面が既に持っているが、本家が整形して返す場合に
+ * 画面と本家がずれたままになるのを避ける。
+ */
+async function save(content: string): Promise<string | null> {
+  const failure = await saveSteeringDocument(projectId.value, name.value, content);
+  if (failure === null) await refresh();
+  return failure;
+}
 </script>
 
 <template>
   <WorkspacePanel :title="`${name}.md`" subtitle="ステアリング">
-    <DocumentView
+    <DocumentEditor
       :content="data?.content"
-      missing="このステアリング文書はまだ作られていません。"
+      :save="save"
+      :can-save="upstreamConnected"
+      testid="steering-document"
     />
   </WorkspacePanel>
 </template>

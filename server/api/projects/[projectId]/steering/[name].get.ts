@@ -1,6 +1,6 @@
 import { createError, defineEventHandler, getRouterParam } from 'h3';
 
-import { STEERING_DOCUMENTS, type SteeringDocument } from '../../../../utils/upstream/rest';
+import { isSteeringDocument } from '../../../../utils/upstream/rest';
 import { toHttpError, upstreamClient } from '../../../../utils/control/upstream-proxy';
 
 export default defineEventHandler(async (event) => {
@@ -17,7 +17,3 @@ export default defineEventHandler(async (event) => {
   if (!result.ok) throw toHttpError(result.failure);
   return result.value;
 });
-
-function isSteeringDocument(name: string): name is SteeringDocument {
-  return (STEERING_DOCUMENTS as readonly string[]).includes(name);
-}
