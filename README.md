@@ -47,25 +47,27 @@ yarn dev
 
 ## 設定
 
-AI の起動設定は `nuxt.config.ts` の `runtimeConfig.claude` にある。再ビルドせずに環境変数で上書きできる。
+**設定の正は [`docs/settings-reference.md`](docs/settings-reference.md) である**（[ADR 0004](docs/adr/0004-settings-reference-is-authoritative.md)）。ここに無いものは設定ではない。**既定値の一覧を README に重ねない。**
 
-| 環境変数 | 既定 | 意味 |
-|---|---|---|
-| `NUXT_CLAUDE_SETTING_SOURCES` | `project` | `claude -p` の `--setting-sources`。**`project` を外すとスキルが一切ロードされない**（ADR 0001） |
-| `NUXT_CLAUDE_ADD_DIR` | このリポジトリのパス | `--add-dir`。`grilling` と `domain-modeling` を持つリポジトリのルートを渡す |
-| `NUXT_CLAUDE_ALLOWED_TOOLS` | `Write Edit`（**暫定**） | `--allowedTools`。これが無いと AI が `proposal.md` を書けず把握完了が起きないため MVP を動かす目的で渡している。中身は未決 |
-| `NUXT_CLAUDE_TIMEOUT_MS` | `180000` | 子プロセスのタイムアウト。超えたらリトライへ |
-| `NUXT_CLAUDE_WORKFLOW_SCHEMA` | `flontier-strokeflow` | セッションの `openspec/config.yaml` に書くスキーマ名（user レベル配置） |
+**`.env` で差し替えられるのは置き場の2件だけ**（`NUXT_SESSIONS_ROOT` / `NUXT_PROJECTS_ROOT`）。動かす機械ごとに変わるためである。他の設定は機械が変わっても変わらないので、`nuxt.config.ts` に書かれた値だけを使う。
 
-不正な値（数値でないタイムアウトなど）は起動時に弾く。
+```bash
+cp .env.example .env   # 変えたい行のコメントを外す
+```
+
+置き場が絶対パスでなければ**起動時に弾く**。どちらが不正かは起動時のメッセージに出る。
+
+**ビルド時に決まるもの**（`modules` / `css` / `devtools` / `ignore` / `nitro.experimental.websocket`）は環境変数で変えられない。変えるにはアプリを作り直す。どちらなのかは `nuxt.config.ts` の見出しで分かれている。
+
+`yarn session`（CLI）もサーバと同じ設定を読む。`.env` があれば読み込み、無ければ既定で動く。
 
 ## 画面
 
 | ルート | 画面 |
 |---|---|
-| `/` | 概要入力 |
-| `/s/<uuid>` | 画面1（ストローク） |
-| `/s/<uuid>/proposal` | 画面2（proposal 確認） |
+| `/strokes` | 概要入力 |
+| `/strokes/<uuid>` | 画面1（ストローク） |
+| `/strokes/<uuid>/proposal` | 画面2（proposal 確認） |
 
 ## 置き場所
 
@@ -84,7 +86,7 @@ AI の起動設定は `nuxt.config.ts` の `runtimeConfig.claude` にある。�
 
 ## セッションを畳む
 
-- サーバが動いているとき: `GET /api/sessions` で一覧、`POST /api/<uuid>/delete` で削除
+- サーバが動いているとき: `GET /api/strokes` で一覧、`POST /api/strokes/<uuid>/delete` で削除
 - サーバが動いていないとき:
 
 ```bash
@@ -93,4 +95,4 @@ yarn session delete <uuid>
 yarn session create "<概要>"
 ```
 
-どちらも同じ実体（`server/utils/session-core.ts`）を呼ぶ。手順の詳細は `docs/session-workflow.md`。
+どちらも同じ実体（`server/utils/stroke/session-core.ts`）を呼ぶ。手順の詳細は `docs/session-workflow.md`。

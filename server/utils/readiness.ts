@@ -1,6 +1,10 @@
 import { access, constants } from 'node:fs/promises'
-import { describeClaudeConfigError } from './claude-config'
-import { PROJECTS_ROOT, SESSIONS_ROOT } from './paths'
+import {
+  describeClaudeArgsError,
+  describePathsError,
+  resolveProjectsRoot,
+  resolveSessionsRoot,
+} from './stroke/settings'
 
 /**
  * 実行中はじめて気付いては困る前提が揃っているかを確かめる（specs/startup-readiness）。
@@ -13,7 +17,8 @@ import { PROJECTS_ROOT, SESSIONS_ROOT } from './paths'
 export async function missingPrerequisites(): Promise<string[]> {
   const missing: string[] = []
 
-  for (const dir of [SESSIONS_ROOT, PROJECTS_ROOT]) {
+  // チェックする値と、実際に読み書きする値が同じ解決関数から来ることを保つ
+  for (const dir of [resolveSessionsRoot(), resolveProjectsRoot()]) {
     try {
       await access(dir, constants.W_OK | constants.X_OK)
     } catch {
@@ -21,10 +26,13 @@ export async function missingPrerequisites(): Promise<string[]> {
     }
   }
 
-  // `runtimeConfig` は環境変数で差し替えられるため、形をなしていない値が入りうる。
-  // 特に `timeoutMs` が数でないと、全ての呼び出しが即タイムアウトになる。
-  const configError = describeClaudeConfigError()
-  if (configError) missing.push(`AI の起動設定が不正: ${configError}`)
+  // 置き場は `.env` で差し替えられる唯一の設定なので、形をなしていない値が入りうる。
+  const pathsError = describePathsError()
+  if (pathsError) missing.push(`置き場の設定が不正: ${pathsError}`)
+
+  // ADR 0001: `--setting-sources` から `project` が落ちるとスキルが一切ロードされない。
+  const argsError = describeClaudeArgsError(useRuntimeConfig().public.claude.args)
+  if (argsError) missing.push(`AI の起動定義が不正: ${argsError}`)
 
   return missing
 }

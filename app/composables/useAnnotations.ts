@@ -1,7 +1,7 @@
 // 差し戻しのコメント。design.md 決定9（spec-workflow-mcp の approvals に倣う）。
 // 注釈はレンダリング後の HTML ではなく proposal の生テキストに対して付け、
 // 位置は文字オフセット（startOffset / endOffset）と引用文字列で持つ。
-import type { Annotation, HighlightColor, SendBackPayload, SendBackRecord } from '#shared/types'
+import type { Annotation, HighlightColor, SendBackPayload, SendBackRecord } from '#shared/stroke'
 
 /** 色を選ばずに書き始めたときの色。 */
 export const defaultHighlightColor: HighlightColor = {

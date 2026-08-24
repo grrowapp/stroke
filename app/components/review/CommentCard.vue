@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // コメント1件のカード。種別・色・ID・引用の全文・コメント本文を持ち、編集 / 消すの口を備える。
-import type { Annotation } from '#shared/types'
+import type { Annotation } from '#shared/stroke'
 
 defineProps<{ comment: Annotation }>()
 const emit = defineEmits<{ edit: [id: string]; remove: [id: string] }>()

@@ -1,11 +1,11 @@
-import { resolveApiBaseUrl } from '../server/utils/api-base-url'
+import { DEFAULT_API_BASE_URL } from '../server/utils/stroke/settings'
 import {
   SessionCoreError,
   createSessionCore,
   deleteSessionCore,
   listSessionsCore,
   readInvocationCore,
-} from '../server/utils/session-core'
+} from '../server/utils/stroke/session-core'
 
 /**
  * サーバが動いていなくても使えるセッション管理（specs/tools/session-cli）。
@@ -26,8 +26,10 @@ async function main(): Promise<void> {
       if (!arg?.trim()) fail(`概要が必要。\n${USAGE}`)
       // AI の呼び出しはここでは起きないので invocation は idle で書く（design.md 決定3）
       const sessionId = await createSessionCore(arg, 'idle')
-      // 返答は転送予定先（画面1）の URL。開けばセッションが進む
-      console.log(`${resolveApiBaseUrl()}/s/${sessionId}`)
+      // 返答は転送予定先（画面1）の URL。開けばセッションが進む。
+      // base URL は環境変数で差し替えないので、endpoint 側（runtimeConfig.claude.apiBaseUrl）
+      // と同じ `settings.ts` の値をそのまま使う
+      console.log(`${DEFAULT_API_BASE_URL}/s/${sessionId}`)
       return
     }
     case 'delete': {

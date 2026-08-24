@@ -3,7 +3,7 @@
 // 粒は通し番号（Q1, Q2, …）だけ。問いの文言を載せると幅が問いの長さに左右されるため載せない。
 // proposal の初提出はマーカー行（`proposal: true`）として道に入り、番号を持たない。
 // 通し番号は問い返しも含む問いの粒だけを数える（マーカーは数えない）。
-import type { Stroke } from '#shared/types'
+import type { Stroke } from '#shared/stroke'
 
 const props = withDefaults(
   defineProps<{

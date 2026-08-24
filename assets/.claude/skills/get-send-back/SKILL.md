@@ -8,7 +8,7 @@ allowed-tools:
 ---
 
 ```!
-curl "$(printenv STROKE_BASEURL)/api/${CLAUDE_SESSION_ID}/send-back"
+curl "$(printenv STROKE_BASEURL)/api/strokes/${CLAUDE_SESSION_ID}/send-back"
 ```
 
 ユーザーが proposal を承認せず返した差し戻しの指摘一式だ（404 なら差し戻しは無い）。

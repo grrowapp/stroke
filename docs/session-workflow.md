@@ -12,6 +12,7 @@ store（マシン共有の登録簿）は使わない。**登録作業は不要*
 └── templates/{stroke,proposal}.md
 
 /var/lib/stroke-board/sessions/<uuid>/                 セッションディレクトリ = openspec ルート
+                                                       （置き場もファイル名も設定値。既定値を示す）
 ├── openspec/
 │   ├── config.yaml             schema: flontier-strokeflow（サーバが書く）
 │   └── changes/draft-proposal/ 初回呼び出しの openspec-ff-change スキルが作る
@@ -29,17 +30,19 @@ assets/.claude/skills/                                 セッション API ス�
 
 | 何を | どこで | どう届くか |
 |---|---|---|
-| スキーマ名 | `runtimeConfig.claude.workflowSchema`（`NUXT_CLAUDE_WORKFLOW_SCHEMA`） | セッション作成時に `openspec/config.yaml` へ書かれる |
-| 起動するスキル | `server/utils/prompt.ts` の固定文言 | 初回 prompt `/openspec-ff-change draft-proposal` |
-| 接続先 | `runtimeConfig.claude.apiBaseUrl` | spawn 時の環境変数 `STROKE_BASEURL` |
+| スキーマ名 | `runtimeConfig.claude.workflowSchema` | セッション作成時に `openspec/config.yaml` へ書かれる |
+| 起動するスキル | `runtimeConfig.claude.firstPrompt` | 初回 prompt `/openspec-ff-change draft-proposal` |
+| 接続先 | `runtimeConfig.claude.apiBaseUrl` | spawn 時の環境変数 `STROKE_BASEURL`。名前は `settings.ts` の固定値で、変えるならスキル側と揃えること |
 | セッション id | — | cwd のディレクトリ名と `${CLAUDE_SESSION_ID}` |
-| スキル・コマンドの置き場 | `runtimeConfig.claude.addDir` | `--add-dir`（空白区切りで複数） |
+| スキル・コマンドの置き場 | `runtimeConfig.public.claude.args` | `--add-dir`（起動定義の配列に2件並ぶ） |
 
-セッション作成（`server/utils/session-core.ts`）は「ディレクトリ作成 → `openspec init --tools none` → `config.yaml` 上書き → 状態ファイル書き込み」。**サーバは change を作らない**。change（固定名 `draft-proposal`）は初回呼び出しの `openspec-ff-change` スキルが `openspec new change` から作る。openspec コマンドの実行は全て cwd = セッションディレクトリで、`--store` はどのコードパスからも使わない。
+設定はどれも環境変数で差し替えない（`.env` で差し替えられるのは置き場の2件だけである）。一覧は `docs/settings-reference.md`。
+
+セッション作成（`server/utils/stroke/session-core.ts`）は「ディレクトリ作成 → `openspec init --tools none` → `config.yaml` 上書き → 状態ファイル書き込み」。**サーバは change を作らない**。change（固定名 `draft-proposal`）は初回呼び出しの `openspec-ff-change` スキルが `openspec new change` から作る。openspec コマンドの実行は全て cwd = セッションディレクトリで、`--store` はどのコードパスからも使わない。
 
 ## 畳み方
 
-- **サーバが動いているとき**: `GET /api/sessions` で一覧し、`POST /api/<uuid>/delete` で消す（実行中の呼び出しを持つ間は 409）。
+- **サーバが動いているとき**: `GET /api/strokes` で一覧し、`POST /api/strokes/<uuid>/delete` で消す（実行中の呼び出しを持つ間は 409）。
 - **サーバが動いていないとき**: `yarn session list` / `yarn session delete <uuid>` / `yarn session create "<概要>"`。endpoint と同じ実体（`session-core.ts`）を呼ぶ。実行中判定は `state.json` の `invocation` を材料にする。
 
 ## 実測で確定していること
