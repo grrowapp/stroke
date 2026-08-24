@@ -5,6 +5,10 @@ stroke-board が**どう組まれているか**を示す資料。
 - 用語の定義は `CONTEXT.md`（未作成）、決定の理由は `docs/adr/`、これから作るものは `openspec/changes/` にある。ここには書かない
 - モジュール1つ1つの責務は、各ソースの冒頭コメントが持つ。ここが持つのは層の積み方・依存の向き・層をまたぐ流れ
 - 記述はすべて実装から確認できる事実に限る（`openspec/changes/document-app-structure`）
+- 仕様書の画面1本ぶんの流れ（本家との対比つき）は `docs/spec-screen-flow.md` にある
+- 拡張 artifact の検討（未決定）は `docs/artifact-extension-plan.md` にある
+- コンポーネント個別の props と参照元は `docs/file-component.md` にある
+- composable 個別の公開 API と参照元は `docs/file-composables.md` にある
 
 ---
 
@@ -12,7 +16,7 @@ stroke-board が**どう組まれているか**を示す資料。
 
 stroke-board は **spec-workflow-mcp（以下「本家」）を監視する外部のダッシュボード**である。複数のプロジェクトで動いている本家に接続し、起きた変化を通知として1箇所に集め、対象のドキュメントを開かせる。
 
-本家とは別のアプリケーションで、**本家に変更を加えない**。本家への書き込みは承認への応答1種だけに限る。
+本家とは別のアプリケーションで、**本家のコードには変更を加えない**。本家への書き込みは、承認への応答と、仕様書・ステアリングの文書の保存の3種だけに限る。いずれも本家の API を呼ぶだけで、stroke-board が `.spec-workflow/` へ直接書くことはない。
 
 ---
 
@@ -57,7 +61,7 @@ stroke-board は **spec-workflow-mcp（以下「本家」）を監視する外�
 │   └── assets/css/main.css   design token（本家から取った値／既定はダーク）
 │
 ├── server/                   Nitro
-│   ├── api/                  画面向け REST（9本）
+│   ├── api/                  画面向け REST（11本／うち書き込み3本）
 │   ├── routes/ws.ts          ブラウザ向け WebSocket（通知の配信のみ）
 │   ├── plugins/upstream.ts   起動時に接続を張り、アクティブ集合に追従させる
 │   └── utils/
@@ -66,7 +70,7 @@ stroke-board は **spec-workflow-mcp（以下「本家」）を監視する外�
 │       └── upstream/         接点層
 │
 ├── shared/types.ts           画面とサーバーの共有型
-├── e2e/                      Playwright（129 ケース）
+├── e2e/                      Playwright（142 ケース）
 ├── docs/adr/                 決定の記録
 ├── openspec/                 change と spec
 └── CLAUDE.md                 エージェント向けの入口
@@ -140,9 +144,17 @@ stroke-board は **spec-workflow-mcp（以下「本家」）を監視する外�
 
 走査対象は**読み取りのみ**で扱う。プロジェクトのディレクトリにも `.spec-workflow/` にも書き込まない。
 
-### 書き込みは承認への応答だけ
+### 書き込みは3本だけ
 
-`rest.ts` には**承認への応答（`POST /approvals/:id/:action`）以外の書き込み関数を置かない**。本家には仕様書の保存・タスクの状態更新・プロジェクトの登録と解除も実在するが、呼べる関数が無ければ上位から誤って呼ばれない。
+`rest.ts` に置く書き込み関数は次の3本に限る。
+
+- `respondToApproval` — `POST /approvals/:id/:action`
+- `saveSpecDocument` — `PUT /specs/:name/:document`
+- `saveSteeringDocument` — `PUT /steering/:name`
+
+本家にはタスクの状態更新・プロジェクトの登録と解除・アーカイブ・スナップショットも実在するが、**呼べる関数が無ければ上位から誤って呼ばれない**。`read-only.test.ts` が公開メソッドの一覧と使用する HTTP メソッドを固定しており、増やすときはそのテストを通らないと増やせない。
+
+保存できる文書名も固定してある（仕様書3本 / ステアリング3本）。ステアリングは文書名がそのままファイル名になるため、ここが緩むとファイル名を指定できてしまう。
 
 ### バージョンの基準
 
@@ -162,7 +174,7 @@ stroke-board は **spec-workflow-mcp（以下「本家」）を監視する外�
 | `board.ts` | ブラウザへ通知を配信するハブ |
 | `directory.ts` | 走査結果と registry を突き合わせ、上層のプロジェクト一覧を作る |
 | `actions.ts` | 一覧画面の操作（登録・作成）が使えるかどうか |
-| `upstream-proxy.ts` | 下層の画面が要る読み取りを本家から取り、画面向けの形にする |
+| `upstream-proxy.ts` | 下層の画面が要る読み取りと保存を本家との間で仲介する |
 
 ### 差分の判定が必要な理由
 
@@ -187,7 +199,7 @@ stroke-board は **spec-workflow-mcp（以下「本家」）を監視する外�
 
 ## 7. API 層
 
-### `server/api/` — 画面向け REST（9本）
+### `server/api/` — 画面向け REST（11本）
 
 | エンドポイント | 用途 |
 | --- | --- |
@@ -199,9 +211,15 @@ stroke-board は **spec-workflow-mcp（以下「本家」）を監視する外�
 | `GET /api/projects/:id/steering/:name` | ステアリング文書 |
 | `GET /api/projects/:id/approvals` | 承認依頼の一覧 |
 | `GET /api/projects/:id/approvals/:aid/content` | 承認対象の本文 |
-| `POST /api/projects/:id/approvals/:aid/:action` | 承認 / 却下（**唯一の書き込み**） |
+| `POST /api/projects/:id/approvals/:aid/:action` | 承認 / 却下（**書き込み**） |
+| `PUT /api/projects/:id/specs/:spec/:document` | 仕様書の文書の保存（**書き込み**） |
+| `PUT /api/projects/:id/steering/:name` | ステアリング文書の保存（**書き込み**） |
 
-下層向けの8本はすべて `control/upstream-proxy.ts` を経由する。ブラウザから本家へ触らせないための唯一の経路。
+**書き込みはこの3本だけ。** 接点層（`upstream/rest.ts`）にもこの3本ぶんの関数しか置いておらず、`read-only.test.ts` が範囲を機械的に固定している。増やすときはそのテストを通らないと増やせない。
+
+保存できる文書名は6つに固定されている（仕様書 requirements / design / tasks、ステアリング product / tech / structure）。本家も同じ値で弾くが、退けられた理由を stroke-board の言葉で返すためにこちらでも弾く。
+
+下層向けの10本はすべて `control/upstream-proxy.ts` を経由する。ブラウザから本家へ触らせないための唯一の経路。
 
 上層向けの `GET /api/projects` だけは経路が違い、`scan` / `registry` / `directory` / `actions` を組み合わせて一覧を組み立てる。本家が動いていなくても母集合が出るのはこのため。
 
