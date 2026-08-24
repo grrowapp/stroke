@@ -277,15 +277,15 @@ ERROR  [stroke-board] 起動できない
 
   **確認した。** コードで `NUXT_*` を読むのは `settings.ts` の置き場2件のみ。他のヒットは `nuxt.config.ts` / `README.md` / `docs/settings-reference.md` / ADR 0003・0004 の**記述**で、いずれも同じ2件を指す。`server` / `scripts` の `process.env` は `settings.ts` の2箇所と、`claude.ts:56` の子プロセスへの環境引き継ぎだけ
 
-- [ ] 10.17 **全項目について、値が実際に届くことを1件ずつ確認する。** 結果を証拠として記録する
+- [x] 10.17 **全項目について、値が実際に届くことを1件ずつ確認する。** 結果を証拠として記録する
 
-  **一度実測したが、その後コードが変わったので取り直しが要る。** 実測時は起動時チェックが `process.exit(1)` で落ちる実装だったが、master への集約（`326ec54`）で `readiness.ts` へ委譲し**落ちない**形になった。ADR 0001 の検査の確認（`--setting-sources project` を外すと落ちる）は、現在の実装に対するものではない。
+  **統合後のコード（merge `9cef630`、readiness.ts 委譲版）で実測し直した（2026-08-24）。** 既定値で dev 起動（port 3001）→ 起動時チェック**無警告**（= 置き場2件の検査と ADR 0001 の起動定義検査が現行実装で走り、通っている）。`POST /api/strokes` 200 → セッションに `overview.txt` / `state.json` / `strokes.json` 生成（`sessionsRoot` 既定に着地）。`GET /api/strokes/<id>/overview` 200。`GET .../invoke-agent` 204 → `invocation=running`、spawn された claude プロセスの環境に **`STROKE_BASEURL=http://127.0.0.1:3001`**（`claude.apiBaseUrl`）を実観測。セッションの `openspec/config.yaml` に **`schema: flontier-strokeflow`**（`claude.workflowSchema` と `openspec.bin` / `initArgs` の到達）。WS `ws://127.0.0.1:3001/api/strokes/<id>/ws/question` 接続を10秒維持（`wsPathPattern` が効いている）。エージェントは一巡して `phase=proposed` / `proposal.md` 生成まで到達（`firstPrompt` の到達）。
 
-  取り直しが要らない分（前回の実測）: 既定値で dev 起動 → 起動時チェック無警告。`POST /api/strokes` 200 でセッションに `overview.txt` / `state.json` / `strokes.json` が生成。`GET .../overview` 200。WS `question` 接続が維持（`runtimeConfig.wsPathPattern` が効いている）
+- [x] 10.18 CLI 経路（`yarn session`）でも同じ値に解決されることを確認する
 
-- [ ] 10.18 CLI 経路（`yarn session`）でも同じ値に解決されることを確認する
+  **統合後のコードで実測し直した（2026-08-24）。** `yarn session list` が HTTP で作ったセッションを同じ置き場から一覧。`yarn session create` の出力 URL は `http://127.0.0.1:3001/...`（`apiBaseUrl` がサーバ側と同値に解決。統合で dev ポートも 3001 に揃い、URL が実際に開ける）。HTTP で作ったセッションを `yarn session delete` が同じ置き場で削除できることを確認。
 
-  **前回の実測**: `create` の出力 URL は `http://127.0.0.1:3001/...`（固定の `apiBaseUrl`）。HTTP で作ったセッションを `yarn session delete` が同じ置き場で消せることを確認。**ただし 10.17 と同じ理由で、集約後のコードに対しては取り直していない**
+  **発見した不具合（この change の範囲外・別対応）**: `scripts/session.ts:32` が出力するパスが `/s/<uuid>` だが、実ルートは `/strokes/<uuid>`（`/s/...` は 404）。値の解決は正しく、パス組み立てだけが古い。
 
 - [x] 10.19 `docs/settings-reference.md` を実態に合わせて完成させる。**ADR 0004 により、この資料が設定の正である。** コードを先に変えて資料を後から合わせるのではなく、資料に載っていない設定をコードが持たない状態にする
 

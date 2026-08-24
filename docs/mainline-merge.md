@@ -2,6 +2,12 @@
 
 `stroke-board-frontier` を `stroke-board` へ統合する。**単一の Nuxt アプリにする**（`docs/adr/0002-merge-into-stroke-board.md`）。
 
+> **統合は実施済み**（merge `9cef630`、2026-08-24）。終了条件のうち「マージ前に消化する」2本
+> （`align-coding-conventions` / `align-settings-conventions` の残タスク）はユーザー判断で
+> 統合後へ持ち越した。衝突はコード本体ゼロ・共有ファイル14件のみで、解決の内訳は merge
+> commit に記録してある。この資料の以下は統合前の計画の記録であり、「統合後に回す」の
+> change 一覧だけが現役である。
+
 この資料は道筋を示すもので、中身は持たない。各 change の内容は `openspec/changes/<id>/proposal.md`、意味の区分と命名・配置の戦略は `design-semantic-structure`、ドメイン用語は `CONTEXT.md` が本体である。**一行を超えた説明が要るときは本体を見に行くこと。**
 
 進捗も持たない。今どこまで来たかは `openspec list` が答える。
