@@ -36,7 +36,6 @@
 |---|---|---|---|
 | [align-coding-conventions](../openspec/changes/align-coding-conventions/) | コーディング方針の準拠化 | テスト整備・依存の一本化・auto-import 廃止 | A |
 | [align-settings-conventions](../openspec/changes/align-settings-conventions/) | 設定値運用方針の準拠化 | ビルド時と実行時の境界を引き、直書きを環境変数へ出す | A |
-| [connect-portal-and-strokes](../openspec/changes/connect-portal-and-strokes/) | 入口と出口を繋ぐ | 作成ボタンから入れない・承認後に一覧へ出ない、両端の断絶を埋める | B |
 
 ### 統合後に回す
 
@@ -44,8 +43,11 @@
 
 | id | タイトル | 概要 |
 |---|---|---|
+| [connect-portal-and-strokes](../openspec/changes/connect-portal-and-strokes/) | 入口と出口を繋ぐ | 作成ボタンから入れない・承認後に一覧へ出ない、両端の断絶を埋める |
 | [adopt-upstream-design-tokens](../openspec/changes/adopt-upstream-design-tokens/) | design token の採用 | 1つのアプリの中で見た目が割れないようにする |
 | [unify-agent-conventions](../openspec/changes/unify-agent-conventions/) | エージェント規約の統合 | 両側にあって食い違う規約を1組にする |
+
+`connect-portal-and-strokes` は区分 B（統合しても目的が立たない）だが、有力な案の実装先が**マージ先のコード**にあり、統合するまでこのリポジトリに存在しない（proposal「どちら側のコードに落ちるかも design で決める」）。マージ前に消化しろと課すと、マージしないと着手できない作業を待つ循環になるため、統合後に回す。断絶の存在自体は「統合後の姿」に記録済みで、統合の判断材料としては足りている。
 
 ## 依存関係
 
@@ -54,17 +56,17 @@
 ```mermaid
 graph TD
   code[align-coding-conventions] --> settings[align-settings-conventions]
-  conn[connect-portal-and-strokes]
 
   code -.-> tok[adopt-upstream-design-tokens]
 
   subgraph after [統合後]
+    conn[connect-portal-and-strokes]
     tok
     conv[unify-agent-conventions]
   end
 ```
 
-`connect-portal-and-strokes` は他に依存しない。
+`connect-portal-and-strokes` は他の change に依存しないが、実装先のコードが統合まで無い（上記）。
 
 archive 済みの2本（`plan-mainline-merge` / `design-semantic-structure`）は載せない。前者が生んだのがこの資料と `docs/adr/0002-*`、後者が生んだのが `docs/structure.md` で、**成果物のほうが残って前提になっている**。
 
