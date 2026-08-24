@@ -1,8 +1,25 @@
 # components の棚卸し
 
-`app/components/` に8本。現状の実態を書き出したもの。
+`app/components/` の現状の実態と、規範（`docs/specs/core/system-structure.md` の区切り）への対応を書き出したもの。
 
-**これは棚卸しであって規則ではない。** 今こうなっている、という記録にすぎない。どう切り直すべきかは決めていない。置き場の規則は `docs/specs/core/structure.md`。
+## 規範への対応 — 全18本
+
+規範の区切りは **`ui/`（機能に属さない共通部品）＋ 機能単位**。現在の18本をこの区切りへ写すと:
+
+| 区切り | 部品（現在の置き場 →） | 根拠 |
+| --- | --- | --- |
+| `ui/` | `SbIcon` `UpstreamIcon`（shared/）、`WaitingIndicator`（直下）、`EmptyState` `RecordList` `DocumentView` `DocumentEditor` `WorkspacePanel`（workspace/） | どの機能にも属さない見た目の部品。一覧・本文・外枠・アイコン・待機表示 |
+| `notification/` | `NotificationToaster`（shared/） | 通知の受け口 |
+| `project/` | `OverviewForm`（stroke/） | 概要入力はプロジェクトを起こす入口 |
+| `question/` | `QuestionCard`（stroke/）、`AgentQuestionModal` `StrokeBreadcrumb`（直下） | 問いの提示・回答と、ストローク履歴の表示。`Question` / `Answer` / `Stroke` 型を扱う |
+| `proposal/` | `AnnotateSource` `CommentCard` `CommentModal` `Modals`（review/） | proposal の確認・注釈・差し戻し。`Annotation` / `HighlightColor` 型を扱う |
+| `approval/` | `ApprovalCard`（workspace/） | 承認1件の表示 |
+
+移動の実施は `docs/specs/plan/structure-migration.md`。
+
+---
+
+以下は統合前の棚卸しの記録。
 
 ## 一覧
 

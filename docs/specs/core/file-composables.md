@@ -1,9 +1,32 @@
 # composable 一覧
 
-`app/composables/` には2系統が同居している。
+`app/composables/` の現状の実態と、規範（`docs/specs/core/system-structure.md` の区切り）への対応。
+
+## 規範への対応 — 全10本
+
+規範は**関心単位の `useXxx` を平置き**（境界のディレクトリ shared / workspace を作らない）。現在の10本:
+
+| 関心 | composable | 整理の方向 |
+| --- | --- | --- |
+| 通知の受信 | `useBoardSocket` | シングルトン WS。そのまま |
+| 時刻表示 | `useRelativeTime` | そのまま |
+| プロジェクトの読み書き | `useProjectApi` | プロジェクト単位画面の唯一の口。そのまま |
+| ステアリングの読み書き | `useSteeringDocuments` | `useProjectApi` と同じ関心の口として並べる |
+| 問いの往復 | `useAgentQuestion` | 回答送信・AI 起動（契約 U7 / U13）。そのまま |
+| 問いの配信 | `useQuestionChannel` | 契約 W1 の受け口 |
+| proposal の配信 | `useProposalChannel` | 契約 W2 の受け口 |
+| proposal のレビュー | `useProposalReview` | 46 プロパティに肥大し `Modals.vue` と密結合。関心（注釈・差し戻し・承認）での分割が課題 |
+| 注釈 | `useAnnotations` | 色定義5件をコンポーネントが逆向き import している。定数は `shared/` へ出す |
+| 待機とリトライ | `useWaitingRetry` | そのまま |
+
+移動の実施は `docs/specs/plan/structure-migration.md`。
+
+---
+
+以下は統合前の棚卸しの記録。2系統が同居している。
 
 - **ポータル側** — `shared/` と `workspace/` の4本（階層で分ける規約。以下「ポータル側」）
-- **ストローク側** — 直下に平置きの6本（棚卸しは「ストローク側」の章。配置の切り直しは統合後の課題）
+- **ストローク側** — 直下に平置きの6本（棚卸しは「ストローク側」の章）
 
 ---
 
@@ -13,7 +36,7 @@
 `app/composables/` にある4つの composable のリファレンス。
 
 - 置き場所の規約は `openspec/changes/restructure-app-directories/specs/app-structure/spec.md`
-- 層の積み方と全体の構造は `docs/specs/core/structure-design.md`
+- 層の積み方と全体の構造は `docs/specs/core/system-structure.md`
 - 記述は実装から抽出した事実に限る
 
 **ポータル側は明示 import で参照する**（`~/composables/<階層>/<名前>`）。auto-import の廃止はポータル側の規約だが、ストローク側のコードがまだ依存しているため `nuxt.config.ts` では当面有効のまま（統一は `align-coding-conventions`）。
@@ -213,7 +236,7 @@ Toaster / 通知一覧                   本家 REST
 
 `app/composables/` 直下に平置き。現状の実態を書き出したもの。
 
-**これは棚卸しであって規則ではない。** 今こうなっている、という記録にすぎない。どう切り直すべきかは決めていない。置き場の規則は `docs/specs/core/structure.md`。
+**これは棚卸しであって規則ではない。** 今こうなっている、という記録にすぎない。どう切り直すべきかは決めていない。置き場の規則は `docs/specs/core/system-structure.md`。
 
 ## 一覧
 

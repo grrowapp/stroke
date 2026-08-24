@@ -32,7 +32,7 @@ export default defineNuxtConfig({
   modules: ['@nuxt/ui'],
 
   // ビルド時: CSS はバンドルに畳み込まれる
-  // main.css はアプリ全体、stroke.css はストローク側の画面だけ（docs/specs/core/structure.md）
+  // main.css はアプリ全体、stroke.css はストローク側の画面だけ（docs/specs/core/system-structure.md）
   css: ['~/assets/css/main.css', '~/assets/css/stroke.css'],
 
   // ビルド時: DevTools はビルドに組み込まれる。画面の上に自前のバーとボタンを重ね、

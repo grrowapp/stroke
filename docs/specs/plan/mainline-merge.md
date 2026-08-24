@@ -74,7 +74,7 @@ graph TD
 
 `connect-portal-and-strokes` は他の change に依存しないが、実装先のコードが統合まで無い（上記）。
 
-archive 済みの2本（`plan-mainline-merge` / `design-semantic-structure`）は載せない。前者が生んだのがこの資料と `docs/adr/0002-*`、後者が生んだのが `docs/specs/core/structure.md` で、**成果物のほうが残って前提になっている**。
+archive 済みの2本（`plan-mainline-merge` / `design-semantic-structure`）は載せない。前者が生んだのがこの資料と `docs/adr/0002-*`、後者が生んだのが `docs/specs/core/system-structure.md` で、**成果物のほうが残って前提になっている**。
 
 並走する別ワークツリーの作業は含めない。意味の区分が先に決まっていれば、取り込む時点でその制約に沿わせる調整で足りる。
 

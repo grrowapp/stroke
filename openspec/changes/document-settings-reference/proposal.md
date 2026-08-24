@@ -53,7 +53,7 @@
 - `docs/specs/core/settings-reference.md` — 新規。この change の成果物
 - `docs/adr/0004-settings-reference-is-authoritative.md` — 新規。資料の扱いを定める
 - `docs/adr/0003-settings-precedence.md` — 0004 に取って代わられた旨を冒頭に置く。本文は記録として残す
-- `docs/specs/core/structure.md` — 資料の置き場と役割を1行
+- `docs/specs/core/system-structure.md` — 資料の置き場と役割を1行
 - `CLAUDE.md` の Docs 一覧 — 1行
 - `.env.example` — 置き場2件だけを持つ形に絞る（実作業は `align-settings-conventions` 10.13j）
 

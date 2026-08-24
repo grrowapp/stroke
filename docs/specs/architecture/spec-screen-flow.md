@@ -111,7 +111,7 @@ sequenceDiagram
 
 ## 2. stroke-board — 仕様書画面の流れ
 
-層は5つ（`docs/specs/core/structure-design.md`）。画面 → API → 制御 → 接点 → 本家、と一方向に進む。
+層は5つ（`docs/specs/core/system-structure.md`）。画面 → API → 制御 → 接点 → 本家、と一方向に進む。
 
 ### 2.1 取得（REST）
 

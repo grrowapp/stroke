@@ -7,21 +7,21 @@
 
 ### Requirement: 構造資料は単一の場所に置く
 
-システムの構造を説明する資料は `docs/specs/core/structure-design.md` の1ファイルでなければならない（SHALL）。同じ内容を複数の場所に置いてはならない（MUST NOT）。
+システムの構造を説明する資料は `docs/specs/core/system-structure.md` の1ファイルでなければならない（SHALL）。同じ内容を複数の場所に置いてはならない（MUST NOT）。
 
 #### Scenario: 全体像を知りたい
 
 - **WHEN** リポジトリを初めて触る人間またはエージェントが構造を知ろうとする
-- **THEN** `docs/specs/core/structure-design.md` を読めば層・配置・依存の向きが分かり、他のファイルを横断して回る必要が無い
+- **THEN** `docs/specs/core/system-structure.md` を読めば層・配置・依存の向きが分かり、他のファイルを横断して回る必要が無い
 
 #### Scenario: 構造の説明を書き足したくなった
 
 - **WHEN** 構造についての説明を新たに書く必要が生じる
-- **THEN** 別の資料を作らず `docs/specs/core/structure-design.md` に加える
+- **THEN** 別の資料を作らず `docs/specs/core/system-structure.md` に加える
 
 ### Requirement: 資料は層・配置・依存・流れを示す
 
-`docs/specs/core/structure-design.md` は次のすべてを含まなければならない（SHALL）。
+`docs/specs/core/system-structure.md` は次のすべてを含まなければならない（SHALL）。
 
 - 層の一覧と、各層が何に責任を持つか
 - ディレクトリツリーと、各ディレクトリが何を持つか
@@ -56,14 +56,14 @@
 
 ### Requirement: 実装を変えたら資料も更新する
 
-モジュールの配置、層の構成、または層をまたぐ依存の向きを変更したときは、同じ変更のなかで `docs/specs/core/structure-design.md` を更新しなければならない（SHALL）。資料と実装が食い違ったまま残してはならない（MUST NOT）。
+モジュールの配置、層の構成、または層をまたぐ依存の向きを変更したときは、同じ変更のなかで `docs/specs/core/system-structure.md` を更新しなければならない（SHALL）。資料と実装が食い違ったまま残してはならない（MUST NOT）。
 
 単一の層の内部だけで完結する変更（層をまたぐ依存も配置も変えないもの）では、更新は要求されない。
 
 #### Scenario: モジュールを別の階層へ移す
 
 - **WHEN** モジュールの参照範囲が変わり、別の階層ディレクトリへ移す
-- **THEN** `docs/specs/core/structure-design.md` のディレクトリツリーも同じ変更のなかで更新される
+- **THEN** `docs/specs/core/system-structure.md` のディレクトリツリーも同じ変更のなかで更新される
 
 #### Scenario: 新しい層をまたぐ依存が生まれた
 
@@ -77,7 +77,7 @@
 
 ### Requirement: 既存ドキュメントと役割を分ける
 
-`docs/specs/core/structure-design.md` は「今どう組まれているか」だけを扱わなければならない（SHALL）。次のものを持ってはならない（MUST NOT）。
+`docs/specs/core/system-structure.md` は「今どう組まれているか」だけを扱わなければならない（SHALL）。次のものを持ってはならない（MUST NOT）。
 
 - ドメイン用語の定義 — `CONTEXT.md` が持つ
 - なぜその選択をしたかという決定の記録 — `docs/adr/` が持つ
