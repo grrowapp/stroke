@@ -52,12 +52,12 @@ function linkOf(to: string): string {
   -->
   <div class="flex min-h-screen flex-col bg-[var(--surface-base)] text-[var(--text-primary)]">
     <header class="sb-bar">
-      <NuxtLink to="/" class="sb-navitem pl-0" data-testid="back-to-portal">
+      <NuxtLink to="/" class="sb-navitem sb-bar-back pl-0" data-testid="back-to-portal">
         <SbIcon name="back" :size="16" />
         ポータルへ戻る
       </NuxtLink>
 
-      <span class="inline-flex items-center gap-1.5 font-semibold" data-testid="workspace-project-name">
+      <span class="sb-bar-title inline-flex items-center gap-1.5" data-testid="workspace-project-name">
         <SbIcon name="folder" :size="14" />
         {{ info?.projectName ?? projectId }}
       </span>

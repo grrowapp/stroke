@@ -287,6 +287,46 @@ body {
     font-weight: 600;
   }
 
+  /*
+   * 下層ヘッダーの文字。prototype（戻る導線 13px / 主題 14px）から意図的に外れる。
+   *
+   * prototype は両者の差が 1px しかなく、今どのプロジェクトにいるかがヘッダーの中で
+   * 立たない。ヘッダーだけを大きく取り、主題を戻る導線より一段大きくして階層を作る。
+   * ここは prototype 準拠の例外なので、値を動かすときは prototype ではなくこの意図を見る。
+   *
+   * `.sb-bar-back` は `.sb-navitem` の 13px を上書きする。詳細度が同じなので、
+   * 後に置くことで勝たせている（この位置を動かさないこと）。
+   */
+  .sb-bar-back {
+    font-size: 16px;
+  }
+
+  /*
+   * マウスを乗せたときに、押せることがはっきり分かるようにする。
+   * `.sb-navitem:hover` の面（surface-hover）はヘッダーの面との差が小さく、乗せても
+   * 変わったことに気づけない。アクセントで塗り、文字を白に抜く。
+   */
+  .sb-bar-back:hover {
+    background: var(--interactive-primary);
+    color: #fff;
+  }
+
+  /* キーボードで辿ったときは枠で示す。色は本家の design token にある focus 用の1色だけ */
+  .sb-bar-back:focus-visible {
+    outline: 3px solid var(--border-focus);
+    outline-offset: 3px;
+  }
+
+  /*
+   * 戻る導線との間だけを空ける。`.sb-bar` の gap（12px）を広げると主題と状態チップの間まで
+   * 一緒に開くので、主題の側に持たせる。
+   */
+  .sb-bar-title {
+    font-size: 20px;
+    font-weight: 600;
+    margin-left: 8px;
+  }
+
   .sb-card {
     border: 1px solid var(--border-default);
     border-radius: 8px;
@@ -390,14 +430,25 @@ body {
     background: var(--surface-sunken);
   }
 
+  /*
+   * 列見出し。本家は 11px + uppercase + tracking だが、それは英語の大文字を前提にした
+   * 組み方で、日本語の見出し（ドキュメント / ステータス）を入れると詰まって読めない。
+   * 文字を一段上げる。ここは本家から意図的に外れる。
+   */
   .sb-datatable th {
     text-align: left;
     padding: 12px 16px;
-    font-size: var(--text-xs);
+    /* トークンに 13px は無い。生の値で持つ（`.sb-table td` と同じ扱い） */
+    font-size: 13px;
     font-weight: 500;
     letter-spacing: 0.05em;
     text-transform: uppercase;
     color: var(--text-muted);
+  }
+
+  /* 1列目の見出しだけ左が枠に張り付いて見えるので、余白を一段足す */
+  .sb-datatable th:first-child {
+    padding-left: 24px;
   }
 
   .sb-datatable td {
@@ -455,7 +506,8 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 2px 8px;
+    /* 本家は `px-2 py-1`。稼働中の本家で実測すると 4px 8px */
+    padding: 4px 8px;
     border-radius: 9999px;
     font-size: var(--text-xs);
     font-weight: 500;
@@ -463,9 +515,14 @@ body {
     white-space: nowrap;
   }
 
+  /*
+   * 一覧の状態バッジは本家が Tailwind を直書きしており（`dark:bg-green-900/20
+   * dark:text-green-400`）、design token の `--status-success`（green-500）とは別の色になる。
+   * 稼働中の本家で実測した値をそのまま持つ。トークン側は接続 dot などで使うので触らない。
+   */
   .sb-status-badge-success {
-    background: var(--status-success-muted);
-    color: var(--status-success);
+    background: oklab(0.393 -0.0842928 0.0438146 / 0.2);
+    color: oklch(0.792 0.209 151.711);
   }
 
   .sb-status-badge-warning {

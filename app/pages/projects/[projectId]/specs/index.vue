@@ -31,7 +31,8 @@ const items = computed(() =>
 </script>
 
 <template>
-  <WorkspacePanel title="Feature" subtitle="本家が持つ Feature を読む。編集と承認の操作は置かない">
+  <!-- 文言は本家の日本語ロケール（`locales/ja.json` の `specsPage`）から取る。呼び名だけ Feature -->
+  <WorkspacePanel title="Feature" subtitle="アクティブな要件・設計・タスク文書を表示・管理">
     <EmptyState v-if="error" testid="specs-error" title="取得できませんでした">
       Feature を取得できませんでした。本家に繋がっていない可能性があります。
     </EmptyState>
@@ -44,7 +45,7 @@ const items = computed(() =>
       <RecordList
         :items="items"
         testid="specs-list"
-        :labels="{ name: 'Feature', status: '進捗', meta: '最終更新' }"
+        :labels="{ name: 'Feature', status: '進捗', meta: '最終更新', actions: 'アクション' }"
       />
       <EmptyState v-if="items.length === 0" testid="specs-empty" title="Feature がありません">
         本家で Feature を作ると、ここに並びます。

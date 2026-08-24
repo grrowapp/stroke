@@ -7,10 +7,17 @@
 
 import { computed, type ComputedRef, type Ref } from 'vue';
 
+/**
+ * 本家は行の1列目を2段で出す。上段が表示名、下段がファイル名
+ * （`SteeringPage.tsx` の `SteeringDocumentRow`）。
+ *
+ * 表示名は本家が `displayName` に直接書いており、i18n を通していない。日本語表示でも
+ * Product / Technical / Structure のまま出るので、ここも訳さない。
+ */
 export const STEERING_DOCUMENTS = [
-  { name: 'product', label: 'product.md' },
-  { name: 'tech', label: 'tech.md' },
-  { name: 'structure', label: 'structure.md' },
+  { name: 'product', label: 'Product', file: 'product.md' },
+  { name: 'tech', label: 'Technical', file: 'tech.md' },
+  { name: 'structure', label: 'Structure', file: 'structure.md' },
 ] as const;
 
 export type SteeringName = (typeof STEERING_DOCUMENTS)[number]['name'];
@@ -18,6 +25,8 @@ export type SteeringName = (typeof STEERING_DOCUMENTS)[number]['name'];
 export interface SteeringEntry {
   name: SteeringName;
   label: string;
+  /** 行の下段に出すファイル名。本家の `{name}.md` */
+  file: string;
   exists: boolean;
 }
 

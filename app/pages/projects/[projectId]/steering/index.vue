@@ -16,15 +16,19 @@ const entries = useSteeringEntries(info);
 
 /**
  * 本家は有無を緑（Available）と無彩色（Not Created）のバッジで出す
- * （`SteeringPage.tsx` の `SteeringDocumentRow`）。文言だけ日本語にする。
+ * （`SteeringPage.tsx` の `SteeringDocumentRow`）。
+ *
+ * 文言は本家の日本語ロケール（`locales/ja.json` の `steeringPage`）をそのまま使う。
+ * 自前で訳すと本家と並べたときに言葉がずれる。
  */
 const items = computed(() =>
   entries.value.map((entry) => ({
     key: entry.name,
     label: entry.label,
+    detail: entry.file,
     icon: 'document' as const,
     badge: entry.exists
-      ? { text: 'あり', tone: 'success' as const }
+      ? { text: '利用可', tone: 'success' as const }
       : { text: '未作成', tone: 'pending' as const },
     /*
      * 本家のステアリング一覧は Last Modified の列を持つ（`SteeringPage.tsx`）。
@@ -43,13 +47,13 @@ const items = computed(() =>
 
 <template>
   <WorkspacePanel
-    title="ステアリング"
-    subtitle="本家のステアリングは product / tech / structure の3本で固定される"
+    title="ステアリング文書"
+    subtitle="プロダクト方針・技術アーキテクチャ・組織構造に関するプロジェクトのステアリング文書を表示・管理"
   >
     <RecordList
       :items="items"
       testid="steering-list"
-      :labels="{ name: '文書', status: '状態', meta: '最終更新' }"
+      :labels="{ name: 'ドキュメント', status: 'ステータス', meta: '最終更新', actions: '操作' }"
     />
   </WorkspacePanel>
 </template>

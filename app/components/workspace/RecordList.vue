@@ -41,10 +41,15 @@ const props = withDefaults(
   defineProps<{
     items: RecordItem[];
     testid?: string;
-    /** 列見出し。本家は画面ごとに文言が違うので、呼び出し側から渡す */
-    labels?: { name: string; status: string; meta: string };
+    /**
+     * 列見出し。本家は画面ごとに文言が違うので、呼び出し側から渡す。
+     * 文言の出どころは本家の日本語ロケール（`locales/ja.json`）。
+     */
+    labels?: { name: string; status: string; meta: string; actions: string };
   }>(),
-  { labels: () => ({ name: '名前', status: '状態', meta: '最終更新' }) },
+  {
+    labels: () => ({ name: '名前', status: '状態', meta: '最終更新', actions: 'アクション' }),
+  },
 );
 
 /**
@@ -75,8 +80,12 @@ function open(item: RecordItem): void {
         <th scope="col">{{ labels.name }}</th>
         <th v-if="uses('badge') || uses('progress')" scope="col">{{ labels.status }}</th>
         <th v-if="uses('meta')" scope="col">{{ labels.meta }}</th>
-        <!-- 本家は操作列の見出しを持つが、stroke-board に操作は無いので空にする -->
-        <th scope="col" class="w-12"><span class="sr-only">開く</span></th>
+        <!--
+          本家は操作列にも見出しを出す（`SteeringPage.tsx` / `SpecsPage.tsx` の thead）。
+          幅は指定しない。48px に固定したまま見出しを入れると、文字が最小幅を押し広げて
+          他の列を圧迫する。本家もこの列に幅指定を持たない。
+        -->
+        <th scope="col">{{ labels.actions }}</th>
       </tr>
     </thead>
     <tbody>

@@ -35,15 +35,16 @@ function reload(): void {
     <div class="sb-panel p-3">
       <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div class="min-w-0 flex-1">
+          <!-- 文言は本家の日本語ロケール（`locales/ja.json` の `approvalsPage`）から取る -->
           <h1 class="sb-panel-title">承認</h1>
-          <p class="sb-panel-subtitle">保留中の承認依頼。承認と却下の操作は置かない</p>
+          <p class="sb-panel-subtitle">保留中の承認リクエストをレビュー・管理</p>
         </div>
         <span
           class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
           style="background: var(--status-warning-muted); color: var(--status-warning)"
           data-testid="approvals-count"
         >
-          {{ approvals.length }} 件が保留中
+          保留中 {{ approvals.length }} 件
         </span>
       </div>
     </div>
