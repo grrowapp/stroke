@@ -74,7 +74,7 @@ archive 済みの2本（`plan-mainline-merge` / `design-semantic-structure`）�
 
 統合とは別軸で直すべきものも change として起こす。統合をきっかけに見つかっても、統合を待つ理由が無いならこの一覧には混ぜない。
 
-- `scope-startup-checks` — 起動時チェックが `process.exit(1)` でプロセスごと落とす件。統合すると被害が広がるが、単体でも不具合である
+- `scope-storage-requirements` — 置き場への要求の強さが用途ごとに違う件。統合すると読むだけの機能が入るので、書き込み必須の要求が残っていると動かない
 - `limit-project-name-numbering` — プロジェクト名の連番採番に終了条件が無い件
 
 ## 区分の基準
