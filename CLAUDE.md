@@ -20,5 +20,6 @@ Use fresh agents, not `fork`, when the goal is to keep context out. See `docs/ag
 
 - `docs/structure.md` — 何をどこに置き、どう名付けるかの規則（領域名・区分・URL・置き場）
 - `docs/session-workflow.md` — セッションのワークフロー定義（store・スキル・配線・実測で確定した制約）
+- `docs/settings-reference.md` — 設定の**正**。ここに無いものは設定ではない（`docs/adr/0004-settings-reference-is-authoritative.md`）。編集には change とユーザー承認が要る
 - `docs/known-issues.md` — まだ change に起こしていない未解消事項
 - `docs/mainline-merge.md` — `stroke-board` への統合の道筋（change 一覧・依存・区分の基準・終了条件）
