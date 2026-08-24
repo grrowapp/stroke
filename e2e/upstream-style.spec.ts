@@ -166,16 +166,21 @@ test.describe('状態と進捗の表示が本家と同じ', () => {
       Number.parseFloat(style.fontSize) * 1.4,
       0,
     );
-    // 本家は padding: 2px var(--space-2)
+    /*
+     * 本家 CSS の `.status-badge` は padding: 2px var(--space-2) を持つが、この class は
+     * 本家のどの画面からも使われていない（定義だけが tailwind.css に残っている）。
+     * 実際に画面へ出ているバッジは `px-2 py-1` の直書きで、稼働中の本家で実測すると 4px 8px。
+     * 見えを揃えるのが目的なので、定義ではなく実際に出ている値に合わせる。
+     */
     expect(rule.padding).toBe('2px var(--space-2)');
-    expect(style.paddingTop).toBe('2px');
+    expect(style.paddingTop).toBe('4px');
     expect(style.paddingLeft).toBe(upstreamRootToken('--space-2'));
   });
 
   test('ステアリングの有無は success と pending の2色で出る', async ({ page }) => {
     await page.goto(`/projects/${ALPHA}/steering`);
 
-    const tokens = await resolvedTokens(page, ['--status-success', '--status-pending']);
+    const tokens = await resolvedTokens(page, ['--status-pending']);
 
     const available = await page
       .getByTestId('record-row')
@@ -189,7 +194,13 @@ test.describe('状態と進捗の表示が本家と同じ', () => {
       .locator('.sb-status-badge')
       .evaluate((element) => getComputedStyle(element).color);
 
-    expect(available).toBe(hexToRgb(tokens['--status-success']!));
+    /*
+     * 有無の色は本家の一覧バッジに合わせる。本家はここを Tailwind の直書き
+     * （`dark:text-green-400`）で塗っており、design token の `--status-success`
+     * （green-500）とは別の色になる。稼働中の本家で実測した green-400 を固定する。
+     * トークン側は接続 dot などで使うので、そちらは変えていない。
+     */
+    expect(available).toBe('oklch(0.792 0.209 151.711)');
     expect(missing).toBe(hexToRgb(tokens['--status-pending']!));
   });
 

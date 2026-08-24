@@ -32,7 +32,7 @@ const items = computed(() =>
       badge:
         entry === null
           ? { text: '未作成', tone: 'pending' as const }
-          : { text: 'あり', tone: 'success' as const },
+          : { text: '利用可', tone: 'success' as const },
       // 未作成の文書へはリンクを張らない。開いても中身が無い
       to:
         entry === null
@@ -48,7 +48,7 @@ const items = computed(() =>
     <RecordList
       :items="items"
       testid="spec-documents"
-      :labels="{ name: '文書', status: '状態', meta: '最終更新' }"
+      :labels="{ name: 'ドキュメント', status: 'ステータス', meta: '最終更新', actions: '操作' }"
     />
   </WorkspacePanel>
 </template>

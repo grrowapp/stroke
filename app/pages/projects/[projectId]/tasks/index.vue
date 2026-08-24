@@ -28,12 +28,13 @@ const items = computed(() =>
 </script>
 
 <template>
-  <WorkspacePanel title="タスク" subtitle="タスクを持つ仕様書。状態を変える操作は置かない">
+  <!-- 文言は本家の日本語ロケール（`locales/ja.json` の `tasksPage`）から取る -->
+  <WorkspacePanel title="タスク管理" subtitle="仕様を選択してタスクを表示・管理します">
     <!-- 0件でも表は残す（本家の Empty State と同じ扱い） -->
     <RecordList
       :items="items"
       testid="tasks-list"
-      :labels="{ name: '仕様書', status: '進捗', meta: '最終更新' }"
+      :labels="{ name: '名前', status: '進捗', meta: '最終更新', actions: 'アクション' }"
     />
     <EmptyState v-if="items.length === 0" testid="tasks-empty" icon="tasks" title="タスクがありません">
       タスクを持つ仕様書がありません。

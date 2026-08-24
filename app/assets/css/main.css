@@ -430,14 +430,25 @@ body {
     background: var(--surface-sunken);
   }
 
+  /*
+   * 列見出し。本家は 11px + uppercase + tracking だが、それは英語の大文字を前提にした
+   * 組み方で、日本語の見出し（ドキュメント / ステータス）を入れると詰まって読めない。
+   * 文字を一段上げる。ここは本家から意図的に外れる。
+   */
   .sb-datatable th {
     text-align: left;
     padding: 12px 16px;
-    font-size: var(--text-xs);
+    /* トークンに 13px は無い。生の値で持つ（`.sb-table td` と同じ扱い） */
+    font-size: 13px;
     font-weight: 500;
     letter-spacing: 0.05em;
     text-transform: uppercase;
     color: var(--text-muted);
+  }
+
+  /* 1列目の見出しだけ左が枠に張り付いて見えるので、余白を一段足す */
+  .sb-datatable th:first-child {
+    padding-left: 24px;
   }
 
   .sb-datatable td {
@@ -495,7 +506,8 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 2px 8px;
+    /* 本家は `px-2 py-1`。稼働中の本家で実測すると 4px 8px */
+    padding: 4px 8px;
     border-radius: 9999px;
     font-size: var(--text-xs);
     font-weight: 500;
@@ -503,9 +515,14 @@ body {
     white-space: nowrap;
   }
 
+  /*
+   * 一覧の状態バッジは本家が Tailwind を直書きしており（`dark:bg-green-900/20
+   * dark:text-green-400`）、design token の `--status-success`（green-500）とは別の色になる。
+   * 稼働中の本家で実測した値をそのまま持つ。トークン側は接続 dot などで使うので触らない。
+   */
   .sb-status-badge-success {
-    background: var(--status-success-muted);
-    color: var(--status-success);
+    background: oklab(0.393 -0.0842928 0.0438146 / 0.2);
+    color: oklch(0.792 0.209 151.711);
   }
 
   .sb-status-badge-warning {

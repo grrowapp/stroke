@@ -31,7 +31,8 @@ const items = computed(() =>
 </script>
 
 <template>
-  <WorkspacePanel title="仕様書" subtitle="本家が持つ仕様書を読む。編集と承認の操作は置かない">
+  <!-- 文言は本家の日本語ロケール（`locales/ja.json` の `specsPage`）から取る -->
+  <WorkspacePanel title="仕様書" subtitle="アクティブな要件・設計・タスク文書を表示・管理">
     <EmptyState v-if="error" testid="specs-error" title="取得できませんでした">
       仕様書を取得できませんでした。本家に繋がっていない可能性があります。
     </EmptyState>
@@ -44,7 +45,7 @@ const items = computed(() =>
       <RecordList
         :items="items"
         testid="specs-list"
-        :labels="{ name: '仕様書', status: '進捗', meta: '最終更新' }"
+        :labels="{ name: '名前', status: '進捗', meta: '最終更新', actions: 'アクション' }"
       />
       <EmptyState v-if="items.length === 0" testid="specs-empty" title="仕様書がありません">
         本家で仕様書を作ると、ここに並びます。
