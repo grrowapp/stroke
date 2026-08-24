@@ -72,7 +72,16 @@
 - [x] 7.4 `openspec validate document-settings-reference` が通ることを確認する
 - [ ] 7.5 コードに差分が出ていないことを `git diff --stat` で確認する（Non-Goals）
 
-  **差分は出ている。** `server/` / `nuxt.config.ts` / `package.json` に `align-settings-conventions` の実装分がある。作業ツリーを共有しているため、この change だけを取り出した状態で確認できない。**条件を「この change の作業で足していない」に読み替えて済ませたが、それはタスクの条件を満たしたことにならない。** 確認の仕方を決め直す必要がある
+  **タスクが指定した方法では確認できていない。** 作業ツリーを `align-settings-conventions` と共有しているため、`git diff --stat` には両者の差分が混ざり、この change の分だけを切り分けられない。
+
+  代わりに commit 単位で見ると、この change の commit（`207efe0`）が触ったのは `CLAUDE.md` / `README.md` / `docs/adr/0003` / `docs/adr/0004` / `docs/settings-reference.md` / `docs/structure.md` と change 自身の4ファイルだけで、`server/` / `scripts/` / `app/` / `shared/` / `nuxt.config.ts` / `package.json` の差分は0件だった。
+
+  ```
+  $ git show --stat 207efe0 -- server/ scripts/ app/ shared/ nuxt.config.ts package.json
+  （出力なし）
+  ```
+
+  **ただしこれは `git diff --stat` ではない。** タスクの条件を満たしたことにはしない。確認の方法を決め直すか、タスクの書き方を直すかが要る
 
 ## 8. 完了
 

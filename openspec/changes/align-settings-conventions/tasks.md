@@ -293,7 +293,13 @@ ERROR  [stroke-board] 起動できない
 - [x] 10.20 `docs/adr/0003-settings-precedence.md` の扱いを決める。**supersede とする。** 環境変数が置き場2件に限られ「優先順位」を設定の一般則として置けなくなったため、書き換えず記録として残す。**新方針の ADR（0004）を立てるのは `document-settings-reference` の役目**（同 change の tasks 1章）。ここでは 0003 の扱いを決めるところまで
 - [ ] 10.21 `yarn check` が通ることを確認する
 
-  **通っていない。** `yarn typecheck` は 0 エラーだが、`yarn check` 全体は `connect-portal-and-strokes` の specs 未作成で失敗する（20 passed / 1 failed）。**この change の変更が原因ではないが、タスクの条件は「`yarn check` が通ること」なので満たしていない。** 9.6 から続く同じ状況で、`connect-portal-and-strokes` が specs を持つまで通らない
+  **通っていない。統合が終わるまで通らない。**
+
+  `yarn check` は `yarn typecheck && yarn spec`（= `openspec validate --all`）で、**全 change の validate を含む。** `yarn typecheck` は 0 エラーだが、`connect-portal-and-strokes` の specs 未作成で failed（20 passed / 1 failed）。
+
+  その specs は書けない。proposal が「specs は design の後に書く。埋め方が決まるまで、どの要求が変わるのかを正直には書けない」としており、出口の3案のうち有力な案（ポータルの母集合を広げる）は**マージ先のコードに落ちる**。そのコードは統合するまでこのリポジトリに無い。
+
+  **条件は書き換えない。** この change 自身の問題ではないが、タスクに書いた条件は「`yarn check` が通ること」であって「この change が原因でないこと」ではない。統合が済むまで未完了のまま残す
 
 ## 11. 完了
 
