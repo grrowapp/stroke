@@ -1,5 +1,7 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
+/* ストローク側（stroke.css / 画面2 の proposal 表示）が typography を使う */
+@plugin "@tailwindcss/typography";
 
 /*
  * 本家 spec-workflow-mcp の design token。

@@ -254,7 +254,7 @@ test.describe('承認', () => {
 
 /**
  * 承認と却下は本家の `POST /approvals/:id/:action` を呼ぶ。ファイルに書くのは本家で、
- * stroke-board は依頼するだけ（ADR-0001）。
+ * stroke-board は依頼するだけ（ADR-0005）。
  */
 test.describe('承認と却下', () => {
   test.beforeEach(async ({ page }) => {

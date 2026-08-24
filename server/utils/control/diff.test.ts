@@ -9,7 +9,7 @@ import {
 } from './diff';
 import type { ApprovalRequest, TaskSummary } from '../upstream/schema';
 
-/** 2.2.5 の形（blocked 無し）。基準は 2.2.7 だが両方通す（ADR-0004） */
+/** 2.2.5 の形（blocked 無し）。基準は 2.2.7 だが両方通す（ADR-0008） */
 function summary(completed: number, total: number, inProgress = 0): TaskSummary {
   return { total, completed, inProgress, pending: total - completed - inProgress, headers: 0 };
 }
@@ -240,7 +240,7 @@ describe('承認依頼の差分判定', () => {
     expect(diffApprovals(baseline, [approval('a1')])).toHaveLength(1);
   });
 
-  it('ステアリング文書への承認依頼も通知になる（ADR-0003）', () => {
+  it('ステアリング文書への承認依頼も通知になる（ADR-0007）', () => {
     const baseline = createBaseline();
     seedApprovals(baseline, []);
 

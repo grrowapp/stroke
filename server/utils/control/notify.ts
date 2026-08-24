@@ -2,7 +2,7 @@
  * 差分判定の結果を通知にする。
  *
  * 飛び先は種別だけで決まる。承認依頼は `category` が `spec` でも `steering` でも承認画面
- * （docs/adr/0003）。タスクの3種はタスク画面（design.md 決定9）。
+ * （docs/adr/0007）。タスクの3種はタスク画面（design.md 決定9）。
  *
  * 通知は永続化しない。履歴も既読未読も持たない（specs/notification-feed）。保持は
  * プロセスのメモリ上に限り、上限を超えたら古いものから落とす。
@@ -106,7 +106,7 @@ function tone(kind: Notification['kind']): NotificationTone {
  *
  * 直近に起きたことに気づくための画面なので新しいものを上に置く（design.md 決定6）。
  * 同じ対象への通知を畳むことはしない。畳むのは本家から受け取った情報の再構成にあたり、
- * やるかどうかはユーザーが決める（docs/adr/0001）。
+ * やるかどうかはユーザーが決める（docs/adr/0005）。
  */
 export class NotificationFeed {
   private items: Notification[] = [];

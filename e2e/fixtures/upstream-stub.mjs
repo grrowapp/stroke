@@ -3,7 +3,7 @@
  *
  * 実物の spec-workflow-mcp を E2E に使うと、承認依頼やタスクの状態を動かすために本家へ
  * 書き込むことになる。stroke-board は `.spec-workflow/` に書き込まないと決めているので
- * （docs/adr/0001）、テストのためにそれを破らない。代わりに、実測した形と同じペイロードを
+ * （docs/adr/0005）、テストのためにそれを破らない。代わりに、実測した形と同じペイロードを
  * 返すスタブを置く。
  *
  * スタブが実物とずれていないことは `yarn test:live` が本物に対して確かめている。
@@ -301,7 +301,7 @@ function handleApi(segments, respond, method = 'GET', body = null) {
   /*
    * 承認への応答。本家は `POST /api/projects/:id/approvals/:id/:action` を受け、
    * 応答を保存したうえで保留中から外す。承認と却下の区別は保留中から消えたことでしか
-   * 観測できない（ADR-0002）ので、スタブも同じく消すだけにする。
+   * 観測できない（ADR-0006）ので、スタブも同じく消すだけにする。
    */
   if (method === 'POST' && rest[0] === 'approvals' && rest.length === 3) {
     const [, approvalId, action] = rest;

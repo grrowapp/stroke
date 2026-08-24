@@ -1,0 +1,20 @@
+{
+  "name": "prototype-stroke-question",
+  "private": true,
+  "type": "module",
+  "description": "THROWAWAY prototype - 画面1（ストローク）の問いの見せ方を3 variant で見比べる。main には載せない。",
+  "scripts": {
+    "dev": "nuxt dev --host 0.0.0.0"
+  },
+  "dependencies": {
+    "@nuxt/ui": "^4.10.0",
+    "marked": "^18.0.9",
+    "nuxt": "^4.5.2",
+    "vue": "^3.5.0",
+    "vue-router": "^4.5.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/typography": "^0.5.20",
+    "playwright-core": "^1.62.1"
+  }
+}

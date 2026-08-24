@@ -87,7 +87,7 @@ describe('本家ペイロードの検証', () => {
     });
   });
 
-  describe('基準は 2.2.7 だが 2.2.5 も通す（ADR-0004）', () => {
+  describe('基準は 2.2.7 だが 2.2.5 も通す（ADR-0008）', () => {
     it('blocked を含む 2.2.7 の task-status-update が通る', () => {
       const parsed = taskStatusUpdateMessageSchema.parse(taskUpdate2_2_7());
       expect(parsed.data.summary.blocked).toBe(1);

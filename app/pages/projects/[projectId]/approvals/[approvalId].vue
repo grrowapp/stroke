@@ -60,7 +60,7 @@ const CATEGORY: Record<string, string> = { spec: '仕様', steering: 'ステア�
 <template>
   <!--
     本家は保留中のものしか返さないため、既に処理済みの承認依頼はここに来ない。
-    承認されたのか却下されたのかは観測できない（docs/adr/0002）。
+    承認されたのか却下されたのかは観測できない（docs/adr/0006）。
   -->
   <WorkspacePanel v-if="approval === null" title="承認">
     <EmptyState testid="approval-resolved" icon="check-circle" title="保留中の一覧にありません">

@@ -1,30 +1,65 @@
-# Issue tracker: Local Markdown
+# Issue tracker: OpenSpec
 
-Issues and specs for this repo live as markdown files in `.scratch/`.
+作業単位は OpenSpec の **change** で管理する。実体は `openspec/changes/<change-id>/` 配下のファイル。
 
-## Conventions
+CLI は `openspec`（v1.9.0）。スキーマは `openspec/schemas/custom/schema.yaml`（`openspec/config.yaml` の `schema: custom`）。
 
-- One feature per directory: `.scratch/<feature-slug>/`
-- The spec is `.scratch/<feature-slug>/spec.md`
-- Implementation issues are one file per ticket at `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01` — never a single combined tickets file
-- Triage state is recorded as a `Status:` line near the top of each issue file (see `triage-labels.md` for the role strings)
-- Comments and conversation history append to the bottom of the file under a `## Comments` heading
+## 構成
 
-## When a skill says "publish to the issue tracker"
+```
+openspec/
+├── config.yaml              スキーマ指定とプロジェクト context
+├── schemas/custom/          artifact の定義とテンプレート
+├── specs/                   確定済みの capability spec
+└── changes/
+    ├── <change-id>/         進行中の change
+    │   ├── proposal.md
+    │   ├── specs/<capability-path>/spec.md
+    │   ├── design.md
+    │   └── tasks.md
+    └── archive/             完了した change
+```
 
-Create a new file under `.scratch/<feature-slug>/` (creating the directory if needed).
+## artifact の順序
 
-## When a skill says "fetch the relevant ticket"
+`proposal → specs → design → tasks` の順に作る。依存関係はスキーマの `requires` が持つ。
 
-Read the file at the referenced path. The user will normally pass the path or the issue number directly.
+- **proposal** — なぜこの変更が要るか。`Why` / `What Changes` / `Capabilities` / `Impact`
+- **specs** — 何を満たすか。capability ごとに1ファイル
+- **design** — どう作るか。横断的な変更や新しい依存がある場合のみ
+- **tasks** — 実装チェックリスト。`- [ ] X.Y` 形式でないと進捗が追跡されない
 
-## Wayfinding operations
+## スキルが「issue tracker に publish しろ」と言ったとき
 
-Used by `/wayfinder`. The **map** is a file with one **child** file per ticket.
+新しい change を起こす。`/opsx:new` または `/opsx:propose`。
 
-- **Map**: `.scratch/<effort>/map.md` — the Notes / Decisions-so-far / Fog body.
-- **Child ticket**: `.scratch/<effort>/issues/NN-<slug>.md`, numbered from `01`, with the question in the body. A `Type:` line records the ticket type (`research`/`prototype`/`grilling`/`task`); a `Status:` line records `claimed`/`resolved`.
-- **Blocking**: a `Blocked by: NN, NN` line near the top. A ticket is unblocked when every file it lists is `resolved`.
-- **Frontier**: scan `.scratch/<effort>/issues/` for files that are open, unblocked, and unclaimed; first by number wins.
-- **Claim**: set `Status: claimed` and save before any work.
-- **Resolve**: append the answer under an `## Answer` heading, set `Status: resolved`, then append a context pointer (gist + link) to the map's Decisions-so-far in `map.md`.
+## スキルが「該当チケットを取ってこい」と言ったとき
+
+`openspec/changes/<change-id>/` 配下の該当 artifact を読む。ユーザーは通常 change-id を直接渡す。
+
+## 進捗と検証
+
+- 進捗は `tasks.md` のチェックボックスで追う。
+- `openspec validate --all` で change と spec を検証する。capability を1つも宣言しない change は、その change の `.openspec.yaml` に `skip_specs: true` が無いと弾かれる。
+
+## この repo での前提
+
+artifact を書く前に読むもの。`openspec/config.yaml` の `context` にも同じ指示が入っている。
+
+- `.scratch/stroke-board-frontier/decisions.md` — 確定済みの決定事項
+- `CONTEXT.md` — ドメイン用語集
+- `docs/adr/` — 後から変えにくい決定
+
+## `.scratch/` の扱い
+
+`.scratch/stroke-board-frontier/` は grilling セッションの成果物置き場であり、issue tracker ではない。change の入力として読むだけで、ここに新しいチケットを作らない。
+
+## ブランチの切りどころ
+
+**planning の段階ではブランチを切らない。** `proposal` / `specs` / `design` / `tasks` は master 上で作る。
+
+理由は、artifact を分離すると辿れなくなるからである。change は「今どこに何の課題があるか」を示す記録で、`openspec list` で一覧できることに価値がある。ブランチに分けると、そのブランチに切り替えない限り change が見えず、複数の change を並べて読むこともできない。planning の段階では隔離すべき成果物がまだ無い。
+
+**ブランチを切るのは apply（実装）に入るとき。** そこで初めてコードに触れ、壊れうる状態が生まれる。ブランチ名は change-id をそのまま使う。
+
+実装が終わって archive するところまでをそのブランチで行い、master へマージする。

@@ -1,7 +1,7 @@
 /**
  * 本家から受け取るペイロードの形。
  *
- * 基準は 2.2.7（docs/adr/0004）。ただし `blocked` まわりの3つだけは optional にしてある。
+ * 基準は 2.2.7（docs/adr/0008）。ただし `blocked` まわりの3つだけは optional にしてある。
  * この環境で動いているダッシュボードは 2.2.5 で、そこには `blocked` が存在しないため、
  * 必須にすると1件も通らない。逆に 2.2.5 の形しか許さないと本家を上げた瞬間に全部弾く。
  * 両方を通すのはこの3つだけで、それ以外は厳密に検証する。
@@ -81,7 +81,7 @@ export const specDataSchema = z.object({
  * 保留中の承認依頼。
  *
  * `category` は `'spec' | 'steering'` の2値で、ステアリング文書に対しても承認依頼が立つ
- * （docs/adr/0003）。`filePath` はプロジェクトルートからの相対パスで返る。
+ * （docs/adr/0007）。`filePath` はプロジェクトルートからの相対パスで返る。
  */
 export const approvalRequestSchema = z.object({
   id: z.string(),

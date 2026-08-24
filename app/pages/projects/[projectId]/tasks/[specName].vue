@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 下層 — 仕様書1本のタスク。タスク通知の飛び先（ADR-0003 / design.md 決定9）。
+ * 下層 — 仕様書1本のタスク。タスク通知の飛び先（ADR-0007 / design.md 決定9）。
  *
  * 状態を変える操作は置かない。読むだけ（specs/project-workspace）。
  *
@@ -22,7 +22,7 @@ const specName = computed(() => String(route.params.specName ?? ''));
 const { data: progress, error } = await useTaskProgress(projectId, specName);
 
 /**
- * 2.2.5 は blocked を持たない。2.2.7 で追加されたもの（ADR-0004）。
+ * 2.2.5 は blocked を持たない。2.2.7 で追加されたもの（ADR-0008）。
  * 点の色は本家の `statusConfig` の `dotColor` をそのまま使う。
  */
 const STATUS = {

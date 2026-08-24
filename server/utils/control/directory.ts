@@ -71,7 +71,7 @@ export function buildProjectDirectory(
  * `workflowRootPath` から registry entry を引けるようにする。
  *
  * アクティブとは `instances` が空でないこと。本家の生存確認はダッシュボード起動時の
- * 1回だけなので、stroke-board が独自に PID を確認することはしない（docs/adr/0002）。
+ * 1回だけなので、stroke-board が独自に PID を確認することはしない（docs/adr/0006）。
  *
  * `SPEC_WORKFLOW_SHARED_ROOT` を使った worktree 共有では、複数の workspace が1つの
  * `workflowRootPath` を共有しうる。`.spec-workflow` の中身は同一なのでどれを使っても

@@ -140,7 +140,7 @@ stroke-board は **spec-workflow-mcp（以下「本家」）を監視する外�
 
 ### 母集合を API から作らない
 
-本家 API はプロジェクト一覧の母集合にできない。本家の `cleanupStaleProjects()` が、生きた instance の無いエントリを registry ごと削除するため、**停止中のプロジェクトを知る手段が無い**。そこで親パスの走査を母集合とし、registry は「アクティブかどうか」の判定にだけ使う（`docs/adr/0002`）。
+本家 API はプロジェクト一覧の母集合にできない。本家の `cleanupStaleProjects()` が、生きた instance の無いエントリを registry ごと削除するため、**停止中のプロジェクトを知る手段が無い**。そこで親パスの走査を母集合とし、registry は「アクティブかどうか」の判定にだけ使う（`docs/adr/0006`）。
 
 走査対象は**読み取りのみ**で扱う。プロジェクトのディレクトリにも `.spec-workflow/` にも書き込まない。
 
@@ -158,7 +158,7 @@ stroke-board は **spec-workflow-mcp（以下「本家」）を監視する外�
 
 ### バージョンの基準
 
-基準は本家 **2.2.7**（`docs/adr/0004`）。ただし `blocked` まわりの3フィールドだけ optional にしてある。稼働環境が 2.2.5 で `blocked` を持たないため、必須にすると1件も通らず、逆に 2.2.5 の形しか許さないと本家を上げた瞬間に全部弾くことになる。
+基準は本家 **2.2.7**（`docs/adr/0008`）。ただし `blocked` まわりの3フィールドだけ optional にしてある。稼働環境が 2.2.5 で `blocked` を持たないため、必須にすると1件も通らず、逆に 2.2.5 の形しか許さないと本家を上げた瞬間に全部弾くことになる。
 
 ---
 
@@ -188,7 +188,7 @@ stroke-board は **spec-workflow-mcp（以下「本家」）を監視する外�
 
 飛び先は**種別だけ**で決まる。
 
-- 承認依頼 → 承認画面。`category` が `spec` でも `steering` でも変わらない（`docs/adr/0003`）
+- 承認依頼 → 承認画面。`category` が `spec` でも `steering` でも変わらない（`docs/adr/0007`）
 - タスクの3種 → タスク画面
 
 ### 登録・作成が使えない理由は2つある
@@ -335,10 +335,10 @@ E2E は `e2e/fixtures/upstream-stub.mjs` が本家を差し替える。`*.live.t
 | 資料 | 持つもの |
 | --- | --- |
 | `CONTEXT.md` | ドメイン用語の定義（未作成） |
-| `docs/adr/0001` | 本家データから派生させない |
-| `docs/adr/0002` | 本家の観測された挙動 |
-| `docs/adr/0003` | 承認の category と飛び先 |
-| `docs/adr/0004` | 基準は 2.2.7 |
+| `docs/adr/0005` | 本家データから派生させない |
+| `docs/adr/0006` | 本家の観測された挙動 |
+| `docs/adr/0007` | 承認の category と飛び先 |
+| `docs/adr/0008` | 基準は 2.2.7 |
 | `openspec/changes/implement-portal-mvp` | MVP の範囲と画面の要件 |
 | `openspec/changes/restructure-app-directories` | 配置の規約 |
 | `openspec/changes/document-app-structure` | この資料の要件 |

@@ -54,7 +54,7 @@ const categoryLabel: Record<Notification['category'], string> = {
 };
 
 /**
- * 行から対象を開く。飛び先は種別だけで決まる（ADR-0003 / design.md 決定9）。
+ * 行から対象を開く。飛び先は種別だけで決まる（ADR-0007 / design.md 決定9）。
  * 開いた先でスクロールもハイライトもしない。
  */
 function open(notification: Notification): void {

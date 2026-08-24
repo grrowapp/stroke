@@ -115,7 +115,7 @@ async function respond(action: 'approve' | 'reject', response?: string): Promise
             </span>
             <!--
               本家のカードは category を出していない。こちらで足すと本家に無い情報が
-              増えるので置かない（ADR-0001）。
+              増えるので置かない（ADR-0005）。
             -->
           </div>
 

@@ -75,7 +75,7 @@ describe('通知への変換', () => {
       expect(result.target).toBe('approvals');
     });
 
-    it('ステアリングへの承認依頼も承認画面へ（ADR-0003）', () => {
+    it('ステアリングへの承認依頼も承認画面へ（ADR-0007）', () => {
       const result = toApprovalNotification(
         { kind: 'approval-requested', approval: approval({ category: 'steering' }) },
         context,

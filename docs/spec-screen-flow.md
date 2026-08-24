@@ -14,7 +14,7 @@
 
 ## 基準
 
-本家は **spec-workflow-mcp 2.2.7**（ADR-0004）。行番号は `/home/vagrant/work/repo/spec-workflow-mcp` の main を指す。本家が変わればこの資料も古くなる。
+本家は **spec-workflow-mcp 2.2.7**（ADR-0008）。行番号は `/home/vagrant/work/repo/spec-workflow-mcp` の main を指す。本家が変わればこの資料も古くなる。
 
 ---
 

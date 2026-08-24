@@ -37,7 +37,7 @@ export interface ProjectSummary {
    * 承認依頼はその時点で既に存在しうる。承認待ちが起きていることを見に行かずに知るのが
    * このプロダクトの目的（product.md の Purpose）なので、今の状態も出す。
    *
-   * 本家が返すものを数えているだけで、意味づけを足していない（docs/adr/0001）。
+   * 本家が返すものを数えているだけで、意味づけを足していない（docs/adr/0005）。
    */
   pendingApprovals: number | null;
 }
@@ -90,7 +90,7 @@ export type NotificationKind =
 /** トーストの色。本家と同じ4種 */
 export type NotificationTone = 'info' | 'success' | 'warning' | 'error';
 
-/** 通知の飛び先。承認依頼は承認画面、タスクはタスク画面（ADR-0003 / design.md 決定9） */
+/** 通知の飛び先。承認依頼は承認画面、タスクはタスク画面（ADR-0007 / design.md 決定9） */
 export type NotificationTarget = 'approvals' | 'tasks';
 
 /** 通知1件。永続化しないのでプロセスのメモリ上にだけ存在する */

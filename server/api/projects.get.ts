@@ -43,7 +43,7 @@ export default defineEventHandler(async (): Promise<ProjectDirectoryResponse> =>
  * その時点で既に起きている。見に行かずに気づくのがこのプロダクトの目的なので、今の状態も
  * 出す（product.md の Purpose）。
  *
- * 本家が返す配列を数えているだけで、意味づけを足していない（docs/adr/0001）。
+ * 本家が返す配列を数えているだけで、意味づけを足していない（docs/adr/0005）。
  * 取れなかったプロジェクトは持たない。0件と混ぜない。
  */
 async function countPendingApprovals(
