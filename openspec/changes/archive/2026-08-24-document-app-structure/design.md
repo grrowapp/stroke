@@ -26,14 +26,14 @@
 
 ## Decisions
 
-### 置き場所を `docs/architecture.md` にした
+### 置き場所を `docs/structure-design.md` にした
 
 **選択肢**
 
 1. `CONTEXT.md` に書く
-2. `docs/architecture.md` を新設する
+2. `docs/structure-design.md` を新設する
 3. ルートの `README.md` に書く
-4. `docs/architecture/` の下に複数ファイルで分ける
+4. `docs/structure-design/` の下に複数ファイルで分ける
 
 **選んだのは 2。**
 

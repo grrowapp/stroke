@@ -13,7 +13,7 @@
 ## 2. 置き場所の決定
 
 - [x] 2.1 `CONTEXT.md` が用途違いであることを `docs/agents/domain.md` で確認する
-- [x] 2.2 置き場所を `docs/architecture.md` に決め、根拠を design.md に残す
+- [x] 2.2 置き場所を `docs/structure-design.md` に決め、根拠を design.md に残す
 
 ## 3. 資料の作成
 

@@ -10,7 +10,7 @@
 
 ## What Changes
 
-- **`docs/architecture.md` を新設する** — システムの層構成、ディレクトリの配置、依存の向き、データの流れを1つの資料にまとめる
+- **`docs/structure-design.md` を新設する** — システムの層構成、ディレクトリの配置、依存の向き、データの流れを1つの資料にまとめる
 - 資料に含めるもの:
   - 層の一覧と各層の責務（接点層 / 制御層 / API 層 / 画面層 / 共有型）
   - ディレクトリツリーと、各ディレクトリが何を持つか
@@ -24,7 +24,7 @@
 
 ### CONTEXT.md を使わない理由
 
-`docs/agents/domain.md` は、このリポジトリの `CONTEXT.md` をドメイン用語集と定義しており、かつ「存在しなければ黙って進め、先回りして作成を提案するな」と明記している（`/domain-modeling` が用語や決定が実際に固まったときに遅延生成する）。構造資料の置き場としては用途が違うため、独立した `docs/architecture.md` を作る。
+`docs/agents/domain.md` は、このリポジトリの `CONTEXT.md` をドメイン用語集と定義しており、かつ「存在しなければ黙って進め、先回りして作成を提案するな」と明記している（`/domain-modeling` が用語や決定が実際に固まったときに遅延生成する）。構造資料の置き場としては用途が違うため、独立した `docs/structure-design.md` を作る。
 
 ## Capabilities
 
@@ -38,6 +38,6 @@
 
 ## Impact
 
-- **新規** `docs/architecture.md` 1ファイル
+- **新規** `docs/structure-design.md` 1ファイル
 - **コード変更なし** — 資料のみ。テストの結果は変わらない
 - **前提** `restructure-app-directories` の配置を記述対象とする。あの change が先に成立している必要がある
