@@ -51,7 +51,7 @@ proposal.md の Why を参照。ここでは、資料の形を決めるのに要
 - `.env.example` のコメントを厚くする — 差し替えられる2件しか置けない。残り8件が書けない
 - 読み口ごとに複数ファイルへ分ける — 「どこに書けば効くか」を引くには、`runtimeConfig` と `runtimeConfig.public` が並んで見えている必要がある
 
-`docs/` の既存（`structure.md` / `session-workflow.md` / `known-issues.md` / `mainline-merge.md` / `api-contract.md`）と同じ粒度・同じ命名に収まる。
+`docs/` の既存（`structure.md` / `session-workflow.md` / `mainline-merge.md` / `api-contract.md`）と同じ粒度・同じ命名に収まる。
 
 ### 決定2: 資料が正である。コードが資料に追随する
 
