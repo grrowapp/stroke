@@ -1,2 +1,14 @@
 schema: custom
 created: 2026-08-24
+note: |
+  app/pages/strokes/** のルーティングを app/pages/projects/create/ 配下へ移す。
+  pages はルーティングのみという規範に沿い、セッションを「プロジェクトを起こす操作」としてプロジェクトの URL 空間に置く。
+  
+  触るファイル:
+    移動 app/pages/strokes/index.vue                    → app/pages/projects/create/index.vue
+    移動 app/pages/strokes/[sessionId]/index.vue        → app/pages/projects/create/[sessionId]/index.vue
+    移動 app/pages/strokes/[sessionId]/proposal.vue     → app/pages/projects/create/[sessionId]/proposal.vue
+    更新 画面内のリンク・navigateTo・E2E（e2e/**）の URL 文字列
+    更新 docs/specs/api/api-contract.md「セッションの参照方法」の画面ルート表
+    更新 docs/specs/plan/structure-migration.md（該当行を消す）
+  server/api/strokes/** の endpoint パスは変えない（api の契約は別物）。
