@@ -339,3 +339,97 @@ test.describe('表の中身が prototype と同じ様式になっている', () 
     }
   });
 });
+
+/**
+ * 下層ヘッダーだけは prototype 準拠の例外。prototype は戻る導線 13px / 主題 14px で
+ * 差が 1px しか無く、ヘッダーの中で現在地が立たない。ヘッダーを大きく取り、主題を
+ * 戻る導線より一段大きくして階層を作る（この change の決定）。
+ */
+test.describe('下層のヘッダーは階層が読める文字の大小になっている', () => {
+  test('戻る導線 16px / プロジェクト名 20px、主題の方が大きい', async ({ page }) => {
+    await page.goto('/projects/ALPHAID000000001');
+
+    const sizes = {
+      back: await page
+        .getByTestId('back-to-portal')
+        .evaluate((element) => getComputedStyle(element).fontSize),
+      title: await page
+        .getByTestId('workspace-project-name')
+        .evaluate((element) => getComputedStyle(element).fontSize),
+    };
+
+    expect(sizes.back, '戻る導線の文字サイズ').toBe('16px');
+    expect(sizes.title, 'プロジェクト名の文字サイズ').toBe('20px');
+
+    // 差が無いと階層が読めない。この関係が崩れたら値の意図が失われている
+    expect(Number.parseFloat(sizes.title)).toBeGreaterThan(Number.parseFloat(sizes.back));
+  });
+
+  test('状態チップは prototype のまま 11px', async ({ page }) => {
+    await page.goto('/projects/ALPHAID000000001');
+
+    const chip = await page
+      .locator('header.sb-bar .sb-chip')
+      .evaluate((element) => getComputedStyle(element).fontSize);
+
+    expect(chip).toBe('11px');
+  });
+
+  test('戻る導線はマウスを乗せると塗りが変わる', async ({ page }) => {
+    await page.goto('/projects/ALPHAID000000001');
+
+    const back = page.getByTestId('back-to-portal');
+
+    const idle = await back.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { background: style.backgroundColor, color: style.color };
+    });
+
+    // 乗せる前は塗っていない
+    expect(idle.background).toBe('rgba(0, 0, 0, 0)');
+
+    await back.hover();
+
+    const hovered = await back.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { background: style.backgroundColor, color: style.color };
+    });
+
+    /*
+     * `.sb-navitem:hover` の面（surface-hover #334155）はヘッダーの面（#1e293b）との差が
+     * 小さく、乗せても変わったことに気づけない。アクセントで塗って白に抜く。
+     */
+    expect(hovered.background).toBe('rgb(99, 102, 241)');
+    expect(hovered.color).toBe('rgb(255, 255, 255)');
+    expect(hovered.background).not.toBe('rgb(51, 65, 85)');
+  });
+
+  test('戻る導線はフォーカスすると枠が出る', async ({ page }) => {
+    await page.goto('/projects/ALPHAID000000001');
+
+    const back = page.getByTestId('back-to-portal');
+
+    // 何も当たっていないときは出ない
+    const idle = await back.evaluate((element) => getComputedStyle(element).outlineStyle);
+    expect(idle).toBe('none');
+
+    // キーボードでもマウスでも出す（:focus-visible ではなく :focus）
+    await back.focus();
+
+    const focused = await back.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        outlineStyle: style.outlineStyle,
+        outlineWidth: style.outlineWidth,
+        outlineColor: style.outlineColor,
+        outlineOffset: style.outlineOffset,
+      };
+    });
+
+    expect(focused.outlineStyle).toBe('solid');
+    expect(focused.outlineWidth).toBe('3px');
+    expect(focused.outlineOffset).toBe('3px');
+    // 本家の --border-focus（#818cf8）。色はこの1色だけで、背景や文字色は動かさない
+    expect(focused.outlineColor).toBe('rgb(129, 140, 248)');
+  });
+});

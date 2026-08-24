@@ -287,6 +287,46 @@ body {
     font-weight: 600;
   }
 
+  /*
+   * 下層ヘッダーの文字。prototype（戻る導線 13px / 主題 14px）から意図的に外れる。
+   *
+   * prototype は両者の差が 1px しかなく、今どのプロジェクトにいるかがヘッダーの中で
+   * 立たない。ヘッダーだけを大きく取り、主題を戻る導線より一段大きくして階層を作る。
+   * ここは prototype 準拠の例外なので、値を動かすときは prototype ではなくこの意図を見る。
+   *
+   * `.sb-bar-back` は `.sb-navitem` の 13px を上書きする。詳細度が同じなので、
+   * 後に置くことで勝たせている（この位置を動かさないこと）。
+   */
+  .sb-bar-back {
+    font-size: 16px;
+  }
+
+  /*
+   * マウスを乗せたときに、押せることがはっきり分かるようにする。
+   * `.sb-navitem:hover` の面（surface-hover）はヘッダーの面との差が小さく、乗せても
+   * 変わったことに気づけない。アクセントで塗り、文字を白に抜く。
+   */
+  .sb-bar-back:hover {
+    background: var(--interactive-primary);
+    color: #fff;
+  }
+
+  /* キーボードで辿ったときは枠で示す。色は本家の design token にある focus 用の1色だけ */
+  .sb-bar-back:focus-visible {
+    outline: 3px solid var(--border-focus);
+    outline-offset: 3px;
+  }
+
+  /*
+   * 戻る導線との間だけを空ける。`.sb-bar` の gap（12px）を広げると主題と状態チップの間まで
+   * 一緒に開くので、主題の側に持たせる。
+   */
+  .sb-bar-title {
+    font-size: 20px;
+    font-weight: 600;
+    margin-left: 8px;
+  }
+
   .sb-card {
     border: 1px solid var(--border-default);
     border-radius: 8px;
