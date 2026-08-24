@@ -277,21 +277,23 @@ ERROR  [stroke-board] 起動できない
 
   **確認した。** コードで `NUXT_*` を読むのは `settings.ts` の置き場2件のみ。他のヒットは `nuxt.config.ts` / `README.md` / `docs/settings-reference.md` / ADR 0003・0004 の**記述**で、いずれも同じ2件を指す。`server` / `scripts` の `process.env` は `settings.ts` の2箇所と、`claude.ts:56` の子プロセスへの環境引き継ぎだけ
 
-- [x] 10.17 **全項目について、値が実際に届くことを1件ずつ確認する。** 結果を証拠として記録する
+- [ ] 10.17 **全項目について、値が実際に届くことを1件ずつ確認する。** 結果を証拠として記録する
 
-  **実測**: 既定値で dev 起動 → 起動時チェック無警告。`POST /api/strokes` 200 でセッションに `overview.txt` / `state.json` / `strokes.json` が生成（固定ファイル名が効いている）。`GET .../overview` 200。WS `question` 接続が維持（`runtimeConfig.wsPathPattern` が効いている）。`NUXT_SESSIONS_ROOT=<一時dir>` を与えると `yarn session create` がその置き場に生成する。ADR 0001 の検査は、`args` から `--setting-sources project` を一時的に外すと `process.exit(1)` することを実測し、元に戻して正常起動を再確認
+  **一度実測したが、その後コードが変わったので取り直しが要る。** 実測時は起動時チェックが `process.exit(1)` で落ちる実装だったが、master への集約（`326ec54`）で `readiness.ts` へ委譲し**落ちない**形になった。ADR 0001 の検査の確認（`--setting-sources project` を外すと落ちる）は、現在の実装に対するものではない。
 
-- [x] 10.18 CLI 経路（`yarn session`）でも同じ値に解決されることを確認する
+  取り直しが要らない分（前回の実測）: 既定値で dev 起動 → 起動時チェック無警告。`POST /api/strokes` 200 でセッションに `overview.txt` / `state.json` / `strokes.json` が生成。`GET .../overview` 200。WS `question` 接続が維持（`runtimeConfig.wsPathPattern` が効いている）
 
-  **実測**: `create` の出力 URL は `http://127.0.0.1:3001/...`（固定の `apiBaseUrl`）。**HTTP で作ったセッションを `yarn session delete` が同じ置き場で消せる**ことを確認し、経路をまたいで同値であることが取れた
+- [ ] 10.18 CLI 経路（`yarn session`）でも同じ値に解決されることを確認する
+
+  **前回の実測**: `create` の出力 URL は `http://127.0.0.1:3001/...`（固定の `apiBaseUrl`）。HTTP で作ったセッションを `yarn session delete` が同じ置き場で消せることを確認。**ただし 10.17 と同じ理由で、集約後のコードに対しては取り直していない**
 
 - [x] 10.19 `docs/settings-reference.md` を実態に合わせて完成させる。**ADR 0004 により、この資料が設定の正である。** コードを先に変えて資料を後から合わせるのではなく、資料に載っていない設定をコードが持たない状態にする
 
   **資料を先に確定させ、実装をそこへ合わせた。** 資料に載っていて実装が持っていない設定、実装が読んでいて資料に無い設定、ともにゼロ
 - [x] 10.20 `docs/adr/0003-settings-precedence.md` の扱いを決める。**supersede とする。** 環境変数が置き場2件に限られ「優先順位」を設定の一般則として置けなくなったため、書き換えず記録として残す。**新方針の ADR（0004）を立てるのは `document-settings-reference` の役目**（同 change の tasks 1章）。ここでは 0003 の扱いを決めるところまで
-- [x] 10.21 `yarn check` が通ることを確認する
+- [ ] 10.21 `yarn check` が通ることを確認する
 
-  **`yarn typecheck` は 0 エラー。** `yarn check` 全体は失敗するが、原因は `connect-portal-and-strokes` の specs が未作成であることで、この change の変更とは無関係な既存の状態である（`openspec validate --all` は 17 passed / 1 failed。`align-settings-conventions` と `document-settings-reference` はともに passed）。9.6 と同じ状況が続いている
+  **通っていない。** `yarn typecheck` は 0 エラーだが、`yarn check` 全体は `connect-portal-and-strokes` の specs 未作成で失敗する（20 passed / 1 failed）。**この change の変更が原因ではないが、タスクの条件は「`yarn check` が通ること」なので満たしていない。** 9.6 から続く同じ状況で、`connect-portal-and-strokes` が specs を持つまで通らない
 
 ## 11. 完了
 

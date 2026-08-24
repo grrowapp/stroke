@@ -70,7 +70,9 @@
   **確認した**（`align-settings-conventions` の 10 章の実装後）。コードが `NUXT_*` を読むのは `settings.ts` の置き場2件のみ。資料に載っていて実装が持っていない設定、実装が読んでいて資料に無い設定、ともにゼロ
 - [x] 7.3 `.openspec.yaml` に `skip_specs: true` を置く
 - [x] 7.4 `openspec validate document-settings-reference` が通ることを確認する
-- [x] 7.5 **この change の作業でコードに差分を足していない**ことを確認する。`git diff --stat -- server/ nuxt.config.ts package.json` に出る差分は `align-settings-conventions` の 1〜9 章の実装分であり、この change の着手前から作業ツリーにあったものである
+- [ ] 7.5 コードに差分が出ていないことを `git diff --stat` で確認する（Non-Goals）
+
+  **差分は出ている。** `server/` / `nuxt.config.ts` / `package.json` に `align-settings-conventions` の実装分がある。作業ツリーを共有しているため、この change だけを取り出した状態で確認できない。**条件を「この change の作業で足していない」に読み替えて済ませたが、それはタスクの条件を満たしたことにならない。** 確認の仕方を決め直す必要がある
 
 ## 8. 完了
 
