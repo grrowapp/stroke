@@ -23,3 +23,7 @@ Use fresh agents, not `fork`, when the goal is to keep context out. See `docs/ag
 - `docs/settings-reference.md` — 設定の**正**。ここに無いものは設定ではない（`docs/adr/0004-settings-reference-is-authoritative.md`）。編集には change とユーザー承認が要る
 - `docs/known-issues.md` — まだ change に起こしていない未解消事項
 - `docs/mainline-merge.md` — `stroke-board` への統合の道筋（change 一覧・依存・区分の基準・終了条件）
+- `docs/question-flow.md` — 問いの往復（誰がいつ何を送り、状態がどう動くか）を図で示す
+- `docs/schema.md` — 入れ物の形と検証の規定（長さ・件数の上限）
+- `docs/stroke-modules.md` — stroke のモジュール（`useAgentQuestion` / `AgentQuestionModal`）の使い方
+- `docs/next-agent-run.md` — エージェント実行の3区分への汎用化案（未着手）

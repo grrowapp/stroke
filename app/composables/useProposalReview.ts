@@ -75,11 +75,18 @@ export function useProposalReview(
   const strokes = ref<Stroke[]>(initial.strokes)
 
   const { message: proposalMessage } = useProposalChannel(sessionId)
-  const { question: followupQuestion } = useQuestionChannel(sessionId)
+
+  // 問いの往復は1つの機構が持つ。W1 の購読も回答の送信もこの中にあり、この画面は
+  // 開く引き金と、差し戻しとの兼ね合いだけを見る（design 決定2）。
+  const agentQuestion = useAgentQuestion(sessionId)
+  const followupQuestion = agentQuestion.question
+
+  // 差し戻しの待機。問い返しの待機は agentQuestion 側にあり、両者は同時に立たない
+  // （差し戻しの待ち受け中は知らせ帯が出ないため、回答を送る経路が無い・design Risks）。
   const waitingRetry = useWaitingRetry(sessionId)
 
-  /** 今どちらの送信の決着を待っているか。settle 時にどちらの後始末をするか決める。 */
-  const pendingAction = ref<'send-back' | 'followup' | null>(null)
+  /** 差し戻しを送って決着を待っている間だけ立つ。問い返しの待機は agentQuestion 側。 */
+  const pendingAction = ref<'send-back' | null>(null)
 
   const proposal = computed(() => proposalMessage.value?.proposal ?? '')
 
@@ -120,14 +127,14 @@ export function useProposalReview(
   /** 衝突した名前。同じ名前のままでは承認を通さない。 */
   const conflictName = ref<string | null>(null)
 
-  // 問い返し
+  // 問い返し。開く引き金だけがこの画面のもので、往復は agentQuestion が持つ。
   const followupOpen = ref(false)
-  const answered = ref(0)
+  const answered = agentQuestion.answered
 
   /** 差し戻し送信〜決着までの全面待ち受け。 */
   const sendingBack = computed(() => pendingAction.value === 'send-back' && waitingRetry.waiting.value)
   /** followup 回答の送信〜決着までの、モーダル内の待ち受け。 */
-  const followupWaiting = computed(() => pendingAction.value === 'followup' && waitingRetry.waiting.value)
+  const followupWaiting = agentQuestion.waiting
   /** 承認ボタンの busy。差し戻し中は承認もできない。 */
   const busy = computed(() => sendingBack.value || approveBusy.value)
 
@@ -136,32 +143,49 @@ export function useProposalReview(
     if (prev !== null && next !== null) notice.value = 'revised'
   })
 
-  /** 送信の決着(待機の終わり)。strokes を読み直し、followup なら modal の続きを決める。 */
+  /** 差し戻しの決着(待機の終わり)。strokes を読み直す。 */
   watch(
     () => waitingRetry.waiting.value,
     async (isWaiting, wasWaiting) => {
       if (!wasWaiting || isWaiting) return
-      const action = pendingAction.value
       pendingAction.value = null
 
-      const data = await $fetch<{ strokes: Stroke[] }>(`${base.value}/strokes`)
-      strokes.value = data.strokes
+      await reloadStrokes()
 
       if (waitingRetry.failed.value) {
-        if (action !== 'followup') {
-          warn('AI からの応答が得られませんでした', 'もう一度差し戻してください。')
-        }
-        // followup の失敗は modal 側で追う(followupWaiting が false に戻るだけで、
-        // 問いは変わらないので modal は開いたまま同じ問いを再送できる)。
-        return
+        warn('AI からの応答が得られませんでした', 'もう一度差し戻してください。')
       }
+    },
+  )
 
-      if (action === 'followup' && !awaitingFollowup.value) {
-        // 新しい followup は来なかった(= proposal が出し直された)。modal を閉じる。
+  /** 問い返しの決着。次の問いが来なければ面を閉じる。 */
+  watch(
+    () => agentQuestion.waiting.value,
+    async (isWaiting, wasWaiting) => {
+      if (!wasWaiting || isWaiting) return
+
+      await reloadStrokes()
+
+      // 失敗は面の側で追う(待機が下りるだけで問いは変わらないので、面は開いたまま
+      // 同じ問いを送り直せる)。
+      if (agentQuestion.failed.value) return
+
+      if (!awaitingFollowup.value) {
+        // 新しい問い返しは来なかった(= proposal が出し直された)。面を閉じる。
         followupOpen.value = false
       }
     },
   )
+
+  /** 送れなかったときの理由を、この画面の知らせ方(確認モーダル)で出す。 */
+  watch(agentQuestion.error, (reason) => {
+    if (reason) warn(reason.title, reason.message)
+  })
+
+  async function reloadStrokes(): Promise<void> {
+    const data = await $fetch<{ strokes: Stroke[] }>(`${base.value}/strokes`)
+    strokes.value = data.strokes
+  }
 
   function warn(title: string, message: string): void {
     alertTitle.value = title
@@ -297,31 +321,9 @@ export function useProposalReview(
     followupOpen.value = true
   }
 
+  /** 回答の送信・起動要求・待機は agentQuestion が持つ。ここは中継するだけ。 */
   async function answerFollowup(answer: Answer): Promise<void> {
-    const asked = followupQuestion.value
-    if (waitingRetry.waiting.value || !asked) return
-    pendingAction.value = 'followup'
-    try {
-      await $fetch(`${base.value}/answer`, { method: 'POST', body: answer })
-      answered.value += 1
-    } catch (error) {
-      pendingAction.value = null
-      warn('答えを送れませんでした', messageOf(error))
-      return
-    }
-    // 受理と起動は分かれている(specs/api/answer)。成功応答の直後に起動を要求する
-    // (design.md 決定6)。busy(409)は invoke-agent 側が返す。
-    try {
-      await $fetch(`${base.value}/invoke-agent`)
-      waitingRetry.startWaiting()
-    } catch (error) {
-      pendingAction.value = null
-      if (statusOf(error) === 409) {
-        warn('まだ前の応答を待っています', 'AI が応答を返すまで、続けて送ることはできません。')
-      } else {
-        warn('AI を起動できませんでした', messageOf(error))
-      }
-    }
+    await agentQuestion.send(answer)
   }
 
   // --- 承認
