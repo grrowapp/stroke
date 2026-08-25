@@ -117,4 +117,4 @@
 - [x] 10.3 `yarn build` で `.output` を作り直したうえで `yarn test:e2e` を全件通す（`playwright.config.ts` は `node .output/server/index.mjs` を起動するだけで、`yarn test:e2e` にビルド段が無い）。199件パス
 - [x] 10.6 e2e のポートをワークツリー専用にする。3ワークツリー（base2 / base3 / base4）が既定の 3199/5199 を共有しており、**別のワークツリーが e2e を起動した瞬間にこちらの web サーバが落ちていた**（実測: `[WebServer] Killed` が2回、base2 の `.e2e-tmp` 更新時刻と一致）。base3 は 3300/5300
 - [x] 10.4 `openspec validate replace-handrolled-with-libraries --strict` を通す
-- [ ] 10.5 ここまでの成果物を1つの commit にまとめる
+- [x] 10.5 ここまでの成果物を1つの commit にまとめる（`63cd650`。70ファイル。別 change の文書・ADR-0012・`openspec/config.yaml` の構文修正・計測スクリプトは含めない）
