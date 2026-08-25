@@ -6,6 +6,7 @@ import { approveBody, parseBody } from '../../../utils/stroke/request-schemas'
 import { invokePath } from '../../../utils/stroke/invoke'
 import { requireSessionId } from '../../../utils/stroke/session-param'
 import { readProposal, readState, writeState } from '../../../utils/stroke/session-store'
+import { forgetSubmissions } from '../../../utils/stroke/submission-signal'
 
 /**
  * U10: 承認してプロジェクトへ昇格させる。承認は昇格の唯一の引き金。
@@ -68,8 +69,20 @@ export default defineEventHandler(async (event) => {
   //
   // path は相対。自分自身を叩くのに外向けの設定値（`claude.apiBaseUrl`）で URL を組むと、
   // 待ち受けを変えた瞬間に届かなくなる（実測: E2E の 3199 で fetch failed）。
-  $fetch(invokePath(projectName, target)).catch((error) => {
+  // 昇格した時点で旧 id の提出の記録は用済み。以後この id は二度と来ない。
+  forgetSubmissions(sessionId)
+
+  $fetch(invokePath(projectName, target)).catch(async (error) => {
+    // **キックが届かなかったら `failed` に倒す。** 前提の欠け（503）やネットワーク層の
+    // 失敗でここに来ると、`invocation` は昇格時に書いた `idle` のまま残る。巡回は
+    // `failed` しか拾わないので、倒しておかないと誰も起こし直さない。
     console.error(`${LOG_PREFIX} steering の起動に失敗: ${projectName}`, error)
+    try {
+      const promoted = await readState(projectName)
+      await writeState(projectName, { ...promoted, invocation: 'failed' })
+    } catch (writeError) {
+      console.error(`${LOG_PREFIX} 起動失敗の記録に失敗: ${projectName}`, writeError)
+    }
   })
 
   setResponseStatus(event, 200)

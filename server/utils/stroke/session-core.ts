@@ -19,7 +19,7 @@ import { sessionDir, sessionFile } from './paths'
  * （docs/specs/core/settings-reference.md「設定を引くのは端だけである」）。
  */
 
-export type SessionCoreErrorKind = 'not-found' | 'io'
+export type SessionCoreErrorKind = 'not-found' | 'io' | 'phase'
 
 export class SessionCoreError extends Error {
   constructor(
@@ -101,13 +101,24 @@ export async function createSessionCore(
 }
 
 /**
- * セッションを消す。存在検査 → `fs-extra` の `remove(sessionDir)` の1関数（design.md 決定4）。
- * 存在しない id は何も消さず失敗にする（`remove` は存在しないパスで沈黙するため、
- * 検査を先に置くことで「無いものを消した」ことにしない）。
+ * セッションを消す。存在検査 → phase の検査 → `fs-extra` の `remove(sessionDir)`
+ * （design.md 決定4）。存在しない id は何も消さず失敗にする（`remove` は存在しないパスで
+ * 沈黙するため、検査を先に置くことで「無いものを消した」ことにしない）。
+ *
+ * **消せるのはセッションだけである。** 承認で昇格した対象（`phase: 'approved'`）はもう
+ * プロジェクトなので消さない。保存先にはセッション（uuid）と昇格したプロジェクト（名前）が
+ * 並び、一覧（`listSessionsCore`）はどちらも返す。その名前をそのまま渡せてしまうと、
+ * `.spec-workflow/` を含む本物のプロジェクトが丸ごと消える。
+ *
+ * **この検査は core に置く。** endpoint（U11）と CLI（`yarn session delete`）の両方が
+ * ここを通るので、片方だけ守っても意味がない。
  */
 export async function deleteSessionCore(root: string, sessionId: string): Promise<void> {
   if (!(await sessionExistsCore(root, sessionId))) {
     throw new SessionCoreError('not-found', `そのセッションは無い: ${sessionId}`)
+  }
+  if ((await readPhase(root, sessionId)) === 'approved') {
+    throw new SessionCoreError('phase', `承認済みのプロジェクトはここでは消せない: ${sessionId}`)
   }
   try {
     await fse.remove(sessionDir(root, sessionId))

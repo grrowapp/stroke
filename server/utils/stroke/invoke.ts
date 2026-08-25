@@ -3,7 +3,7 @@ import { invokeAi, type AiRun } from './ai'
 import { readStrokeConfig } from './config'
 import { initSessionOpenspec } from './openspec'
 import { listSessionsCore } from './session-core'
-import { readState, writeState } from './session-store'
+import { readState, writeInvocation, writeState } from './session-store'
 import { submissionCount } from './submission-signal'
 
 /**
@@ -34,18 +34,12 @@ export function invokePath(sessionId: string, cwd: string): string {
 /**
  * `invocation` を書く口。**A8 を通す**（openspec/specs/agent/invocation）。
  *
- * A8 の実体は同一プロセス内の `writeState` なので、HTTP を経由せず同じ処理を直接呼ぶ。
- * 書き込みの規則（値をそのまま書く・回数は渡されたときだけ上書き）は A8 と同一である。
+ * A8 の endpoint（`submission.post.ts`）と同じ実体（`writeInvocation`）を呼ぶ。書き込みの
+ * 規則を2箇所に写さないため、規則そのものは `session-store.ts` の1本に置いてある。
  */
 function invocationWriter(sessionId: string) {
-  return async (invocation: Invocation, retries?: number): Promise<void> => {
-    const state = await readState(sessionId)
-    await writeState(sessionId, {
-      ...state,
-      invocation,
-      ...(retries === undefined ? {} : { retries }),
-    })
-  }
+  return (invocation: Invocation, retries?: number): Promise<void> =>
+    writeInvocation(sessionId, invocation, retries)
 }
 
 /**

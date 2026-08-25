@@ -138,6 +138,8 @@ const { projectShareRoot, claude } = config.runtimeConfig
 | 継続先が無いときに `claude` が出す文言 | `server/utils/stroke/claude.ts` |
 | 子プロセスへ接続先を渡す環境変数の名前（`STROKE_BASEURL`） | `server/utils/stroke/claude.ts` |
 | プロジェクト名として許す文字 | `server/utils/stroke/project.ts` |
+| 対象の id として受け付ける形 | `server/utils/stroke/session-core.ts` |
+| 失敗した実行を起こし直す巡回の間隔 | `server/plugins/02.retry-failed.ts` |
 | ログの接頭辞 | `server/utils/stroke/log.ts` |
 
 `STROKE_BASEURL` は**こちらが読む設定ではなく、子プロセスへ渡す名前**である。セッション API スキルがこの名前で接続先を読む。

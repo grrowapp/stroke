@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { z } from 'zod'
 import type { Answer, Invocation, Question, SendBackPayload, Stroke } from '#shared/stroke'
+import { conflict } from './conflict'
 import { sessionFile } from './paths'
 import { PROJECT_DOCS_DIR, PROJECT_PROPOSAL_FILE } from './project'
 import { questionSchema } from './question'
@@ -127,11 +128,19 @@ export async function sessionExists(sessionId: string): Promise<boolean> {
 
 /** core の失敗を HTTP へ写す。endpoint 側の共通の出口。 */
 export function sessionErrorToHttp(error: unknown) {
-  const notFound = error instanceof SessionCoreError && error.kind === 'not-found'
+  const kind = error instanceof SessionCoreError ? error.kind : 'io'
+  const message = error instanceof Error ? error.message : String(error)
+
+  if (kind === 'phase') {
+    // 今の phase に当てはまらない操作。画面は 409 を「待てば通る」と読むが、
+    // これは待っても通らない——それでも既存の 409 の語彙に揃える（utils/conflict）。
+    return conflict('phase', message)
+  }
+  const notFound = kind === 'not-found'
   return createError({
     statusCode: notFound ? 404 : 500,
     statusMessage: notFound ? 'Not Found' : 'Internal Server Error',
-    message: error instanceof Error ? error.message : String(error),
+    message,
   })
 }
 
@@ -141,6 +150,27 @@ export async function readState(sessionId: string): Promise<SessionState> {
   const parsed = stateSchema.safeParse(readJson(raw, name, sessionId))
   if (!parsed.success) throw corrupt(name, sessionId)
   return parsed.data
+}
+
+/**
+ * 実行の記録（`invocation`）を書く。
+ *
+ * **この1本が書き込みの規則である。** A8 の endpoint（`submission.post.ts`）も、invokeAi
+ * へ渡す書き込み口（`invoke.ts`）も、ここを呼ぶ。規則を2箇所に写さないため。
+ *
+ * 値はそのまま書く。回数は渡されたときだけ上書きする（`error` からの再実行で 0 に戻す）。
+ */
+export async function writeInvocation(
+  sessionId: string,
+  invocation: Invocation,
+  retries?: number,
+): Promise<void> {
+  const state = await readState(sessionId)
+  await writeState(sessionId, {
+    ...state,
+    invocation,
+    ...(retries === undefined ? {} : { retries }),
+  })
 }
 
 export async function writeState(sessionId: string, state: SessionState): Promise<void> {
