@@ -4,6 +4,7 @@ import { readStrokeConfig } from './config'
 import { initSessionOpenspec } from './openspec'
 import { listSessionsCore } from './session-core'
 import { readState, writeState } from './session-store'
+import { submissionCount } from './submission-signal'
 
 /**
  * 起動の材料を設定から組み立てる端。
@@ -45,6 +46,17 @@ function invocationWriter(sessionId: string) {
       ...(retries === undefined ? {} : { retries }),
     })
   }
+}
+
+/**
+ * 「この時点より後に提出があったか」を答える関数を作る。
+ *
+ * 起動の前に今の数を控え、呼ばれた時点の数と比べる。完了の検知（output stream）とは
+ * 別で、作業が行われたかだけを見る。
+ */
+function submittedSince(sessionId: string): () => boolean {
+  const before = submissionCount(sessionId)
+  return () => submissionCount(sessionId) > before
 }
 
 /** steering の会話 id を `state.json` に覚える。次のキックの続き先になる。 */
@@ -118,6 +130,9 @@ export function buildRun(options: {
     hasConversation: async () =>
       (await listSessionsCore(projectShareRoot)).some(s => s.id === sessionId),
     setInvocation: invocationWriter(sessionId),
+    // ストロークの1回の実行は必ず提出（A5・A7）で終わる。プロセスが正常終了しても
+    // 提出が1つも無ければ、作業をせずに終わったということなので起こし直す。
+    didWork: submittedSince(sessionId),
     prepare: () => initSessionOpenspec({
       cwd,
       bin: openspec.bin,

@@ -41,6 +41,15 @@ test.describe('承認して一覧へ戻る', () => {
     await expect(page.getByTestId('projects-table')).toBeVisible();
   });
 
+  test('昇格したプロジェクトは U11 で消せない', async ({ request }) => {
+    // 一覧（U12）は昇格後の対象も名前で返す。その名前をそのまま削除に渡せてしまうと、
+    // `.spec-workflow/` を含む本物のプロジェクトが消える
+    const response = await request.post(`/api/strokes/${SEEDED_PROJECT_NAME}/delete`);
+
+    expect(response.status()).toBe(409);
+    expect(existsSync(join(PROJECTS_PARENT, SEEDED_PROJECT_NAME))).toBe(true);
+  });
+
   test('昇格は改名だけで、proposal は同じ相対位置のまま残る', async () => {
     // 新しいディレクトリを作らず、ファイルも動かさない（specs/project/generation）
     expect(existsSync(join(PROJECTS_PARENT, SEEDED_PROJECT_NAME, 'docs', 'proposal.md'))).toBe(true);

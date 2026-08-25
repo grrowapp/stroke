@@ -36,12 +36,7 @@ export async function promoteSessionToProject(
   sessionId: string,
   name: string,
 ): Promise<string> {
-  const target = projectDir(shareRoot, assertProjectName(name))
-
-  // 衝突確認 → 改名の順。存在すれば何もしない。
-  if (await exists(target)) {
-    throw conflict('name-conflict', `${target} は既に存在する。別の名前を確定すること。`)
-  }
+  const target = await assertNameAvailable(shareRoot, name)
 
   try {
     await rename(sessionDir(shareRoot, sessionId), target)
@@ -54,6 +49,23 @@ export async function promoteSessionToProject(
     })
   }
 
+  return target
+}
+
+/**
+ * その名前で昇格できるか。名前の形と、保存先での衝突を見る。
+ *
+ * **呼び出し側が phase を書き換える前に通すためにここに切り出してある。** 承認は
+ * 「衝突確認 → phase 書き換え → 改名」の順でなければならず（design.md D3）、確認が
+ * 改名と同じ関数の中にあると、phase を書いた後にしか確認できない。
+ *
+ * @returns 昇格先のパス
+ */
+export async function assertNameAvailable(shareRoot: string, name: string): Promise<string> {
+  const target = projectDir(shareRoot, assertProjectName(name))
+  if (await exists(target)) {
+    throw conflict('name-conflict', `${target} は既に存在する。別の名前を確定すること。`)
+  }
   return target
 }
 

@@ -3,6 +3,7 @@ import { conflict } from '../../../utils/stroke/conflict'
 import { isKebabCase } from '../../../utils/stroke/project'
 import { parseBody, proposalSubmitBody } from '../../../utils/stroke/request-schemas'
 import { requireSessionId } from '../../../utils/stroke/session-param'
+import { notifySubmission } from '../../../utils/stroke/submission-signal'
 import { markProposalStrokeIfFirst, readState, writeState } from '../../../utils/stroke/session-store'
 import { proposalChannel } from '../../../utils/stroke/ws-channels'
 
@@ -38,6 +39,8 @@ export default defineEventHandler(async (event) => {
 
   const message: ProposalMessage = { proposal, projectName: candidate ?? null }
   proposalChannel.publish(sessionId, message)
+  // 完了の合図ではなく「作業が行われた」ことの記録。invokeAi が起動の前後で比べる。
+  notifySubmission(sessionId)
 
   setResponseStatus(event, 200)
   return null

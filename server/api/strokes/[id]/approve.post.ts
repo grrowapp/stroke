@@ -1,7 +1,7 @@
 import { readStrokeConfig } from '../../../utils/stroke/config'
 import { conflict } from '../../../utils/stroke/conflict'
 import { LOG_PREFIX } from '../../../utils/stroke/log'
-import { promoteSessionToProject } from '../../../utils/stroke/project'
+import { assertNameAvailable, promoteSessionToProject } from '../../../utils/stroke/project'
 import { approveBody, parseBody } from '../../../utils/stroke/request-schemas'
 import { invokePath } from '../../../utils/stroke/invoke'
 import { requireSessionId } from '../../../utils/stroke/session-param'
@@ -45,10 +45,13 @@ export default defineEventHandler(async (event) => {
 
   // 昇格後も steering の実行が起こるので、`invocation` を持たせて引き継ぐ
   // （openspec/specs/agent/invocation）。回数は新しい用途なので 0 から数え直す。
+  // 衝突確認は phase を書く**前**に通す（design.md D3）。既にあれば何も動かさずに 409 で、
+  // セッションは `proposed` のまま残る。
+  await assertNameAvailable(shareRoot, projectName)
+
   await writeState(sessionId, { phase: 'approved', projectName, invocation: 'idle', retries: 0 })
   let target: string
   try {
-    // 衝突確認 → 改名。既にあれば何も動かさずに 409。
     target = await promoteSessionToProject(shareRoot, sessionId, projectName)
   } catch (error) {
     // 昇格しなかったので承認を確定させない。元の状態へ戻して同じ失敗を返す。

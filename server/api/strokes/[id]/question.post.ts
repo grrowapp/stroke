@@ -1,6 +1,7 @@
 import { conflict } from '../../../utils/stroke/conflict'
 import { parseQuestion } from '../../../utils/stroke/question'
 import { requireSessionId } from '../../../utils/stroke/session-param'
+import { notifySubmission } from '../../../utils/stroke/submission-signal'
 import { readState, writeState } from '../../../utils/stroke/session-store'
 import { questionChannel } from '../../../utils/stroke/ws-channels'
 
@@ -30,6 +31,8 @@ export default defineEventHandler(async (event) => {
   // 子プロセスの output stream で検知する（openspec/specs/agent/invocation の MUST）。
   await writeState(sessionId, { ...state, currentQuestion: question })
   questionChannel.publish(sessionId, question)
+  // 完了の合図ではなく「作業が行われた」ことの記録。invokeAi が起動の前後で比べる。
+  notifySubmission(sessionId)
 
   setResponseStatus(event, 200)
   return null

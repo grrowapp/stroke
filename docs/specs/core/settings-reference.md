@@ -78,7 +78,9 @@ const { projectShareRoot, claude } = config.runtimeConfig
 
 ### `claude.maxRetries`
 
-失敗した実行を起こし直す回数の上限。上限に達したら起動せず `invocation` を `error`（終端）にする（`openspec/specs/agent/invocation`）。総待ち時間は「(回数 + 1) × タイムアウト」で決まる。
+失敗した実行を**起こし直す**回数の上限。初回のキックは起こし直しではないので数えない。上限を超えたキックは起動せず `invocation` を `error`（終端）にする（`openspec/specs/agent/invocation`）。
+
+1回の呼び出しで起こすのは1回だけで、起こし直しは巡回が担う。したがって起動の総回数は「上限 + 1」、総待ち時間は「(上限 + 1) × タイムアウト」で決まる。`0` にすると起こし直さない（1回だけ試す）。
 
 ### `claude` の起動定義
 

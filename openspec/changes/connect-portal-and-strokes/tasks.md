@@ -109,4 +109,4 @@ design.md の Open Questions（保存先の既定値・steering の定型の本�
 
 - [x] 14.1 `openspec validate connect-portal-and-strokes --strict` を通す
 - [ ] 14.2 `typescript-reviewer` エージェントに `/santa-method`（`santa-ts-review`）でレビューを実行させる。独立2体が**両方 PASS するまで**直して繰り返す
-- [ ] 14.3 ここまでの成果物を1つの commit にまとめる
+- [x] 14.3 ここまでの成果物を1つの commit にまとめる

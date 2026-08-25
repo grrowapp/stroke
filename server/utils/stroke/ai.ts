@@ -40,6 +40,14 @@ export interface AiRun {
   hasConversation: () => Promise<boolean>
   /** 実行の記録を書く。A8（`POST /api/strokes/:id/submission`）を通す */
   setInvocation: (invocation: Invocation, retries?: number) => Promise<void>
+  /**
+   * その実行で**作業が行われたか**。完了の検知とは別の問いである。
+   *
+   * プロセスが正常終了しても、何もせずに終わっていることがある。ストロークは1回の
+   * 実行が必ず提出（A5・A7）で終わるので、提出が無ければ作業をしていない。渡さなければ
+   * 常に「行われた」とみなす（steering は endpoint へ何も提出しないため渡さない）。
+   */
+  didWork?: () => boolean
   /** 走った会話の id を覚える。続きが要る用途だけ渡す */
   remember?: (conversationId: string) => Promise<void>
   /** 初回と判定されたときに実行環境を整える。要らない用途では省く */
@@ -63,11 +71,13 @@ export interface AiRun {
 export async function invokeAi(sessionId: string, run: AiRun): Promise<void> {
   const {
     launch, cwd, prompts, maxRetries, retries,
-    conversationId, hasConversation, setInvocation, remember, prepare,
+    conversationId, hasConversation, setInvocation, remember, prepare, didWork,
   } = run
 
-  // 上限判定は起動の前。到達していたら起こさず終端へ倒し、ユーザーに引き渡す。
-  if (retries >= maxRetries) {
+  // 上限判定は起動の前。**`retries` は「これまでに起こし直した回数」** なので、初回の
+  // キック（0回）は起こし直しではない。超えていたら起こさず終端へ倒し、ユーザーに
+  // 引き渡す。起動の総回数は「上限 + 1」になる（docs/specs/core/settings-reference.md）。
+  if (retries > maxRetries) {
     console.warn(`${LOG_PREFIX} リトライ上限に達した: ${sessionId}（${retries}/${maxRetries}）`)
     await setInvocation('error')
     return
@@ -89,42 +99,41 @@ export async function invokeAi(sessionId: string, run: AiRun): Promise<void> {
     }
   }
 
-  let mode: ClaudeMode = continuing ? 'resume' : 'new'
-  let prompt = continuing ? prompts.continue : prompts.first
-  let id = conversationId
-  const failures: string[] = []
+  const mode: ClaudeMode = continuing ? 'resume' : 'new'
+  const prompt = continuing ? prompts.continue : prompts.first
 
-  for (let attempt = retries; attempt < maxRetries; attempt += 1) {
-    const result = await runClaude({ sessionId: id, launch, cwd, prompt, mode })
+  // **1回の呼び出しで起こすのは1回だけである。** 起こし直しは巡回（`failed` を拾って
+  // U13 を叩く）が担い、回数は `state.json` が持つ。ここで内側にもループを持つと、
+  // 巡回の回数と掛け算になって総起動回数が上限の意味から外れる。
+  const result = await runClaude({ sessionId: conversationId, launch, cwd, prompt, mode })
 
-    if (result.ok) {
-      // output stream の成功エンベロープ = 完了。会話 id を覚えて平常へ返す。
-      if (remember && result.sessionId !== null) await remember(result.sessionId)
+  if (result.ok) {
+    // 会話 id は作業の成否に関わらず覚える。次のキックはこの続きから始める。
+    if (remember && result.sessionId !== null) await remember(result.sessionId)
+
+    // output stream の成功エンベロープ = プロセスは完了した。ただし**何もせずに
+    // 終わっている**ことがあるので、用途ごとの確認を通す。作業をしていなければ
+    // 失敗として起こし直す——ここを素通しにすると、問いも proposal も出ないまま
+    // `idle` になり、巡回（`failed` しか拾わない）も回収できない詰まりが残る。
+    if (didWork === undefined || didWork()) {
       await setInvocation('idle', 0)
       return
     }
 
-    failures.push(result.detail)
-    if (result.sessionMissing) {
-      if (continuing) {
-        // 往復の途中で継続先を失った。ここから新しい会話で始め直すと、概要も過去の
-        // ストロークも無いところへ入力だけを流し込むことになる。
-        failures.push('継続先の会話が失われた（初回ではないので作り直さない）')
-        break
-      }
-      // 初回。継続先が無い = 履歴には何も入っていない。送り直してよい。
-      mode = 'new'
-      prompt = prompts.first
-      continue
-    }
-
-    mode = 'resume'
-    prompt = prompts.continue
-    id = conversationId
+    console.warn(`${LOG_PREFIX} AI 呼び出しが失敗: ${sessionId}`, ['プロセスは成功したが提出が届かない'])
+    await setInvocation('failed')
+    return
   }
 
-  // 尽きた。`failed` は巡回（openspec/specs/portal/batch）が拾って起こし直す。
-  // 回数が上限に届いていれば、次のキックが `error` へ倒す。
+  const failures = [result.detail]
+  if (result.sessionMissing && continuing) {
+    // 往復の途中で継続先を失った。ここから新しい会話で始め直すと、概要も過去の
+    // ストロークも無いところへ入力だけを流し込むことになる。
+    failures.push('継続先の会話が失われた（初回ではないので作り直さない）')
+  }
+
+  // `failed` は巡回（openspec/specs/portal/batch）が拾って起こし直す。回数が上限を
+  // 超えていれば、次のキックが `error` へ倒してユーザーに引き渡す。
   console.warn(`${LOG_PREFIX} AI 呼び出しが失敗: ${sessionId}`, failures)
   await setInvocation('failed')
 }

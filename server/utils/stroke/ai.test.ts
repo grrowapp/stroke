@@ -43,6 +43,7 @@ function makeRun(overrides: Partial<AiRun> = {}): {
     setInvocation: async (invocation, retries) => {
       calls.push({ invocation, retries })
     },
+    didWork: () => true,
     remember: async (id) => {
       remembered.push(id)
     },
@@ -106,14 +107,52 @@ describe('invokeAi', () => {
     ])
   })
 
-  it('完了の検知に提出を使わない（提出が無くてもプロセスの成功で idle）', async () => {
-    // steering は endpoint へ何も提出しない。それでも完了として扱う
+  it('提出を要らない用途では、プロセスの成功だけで idle にする', async () => {
+    // steering は endpoint へ何も提出しない。`didWork` を渡さないので成功として扱う
     runClaude.mockResolvedValue({ ok: true, sessionId: 'x' })
 
-    const { run, calls } = makeRun()
+    const { run, calls } = makeRun({ didWork: undefined })
     await invokeAi(SESSION_ID, run)
 
     expect(calls.at(-1)).toEqual({ invocation: 'idle', retries: 0 })
+  })
+
+  it('プロセスは成功したが作業をしていなければ failed にする', async () => {
+    // ストロークは必ず提出（A5・A7）で終わる。提出が無いのは何もせず終わったということ
+    runClaude.mockResolvedValue({ ok: true, sessionId: 'x' })
+
+    const { run, calls } = makeRun({ didWork: () => false })
+    await invokeAi(SESSION_ID, run)
+
+    expect(calls.at(-1)).toEqual({ invocation: 'failed', retries: undefined })
+  })
+
+  it('1回の呼び出しで起こすのは1回だけ（起こし直しは巡回が担う）', async () => {
+    runClaude.mockResolvedValue({ ok: false, sessionMissing: false, detail: 'タイムアウト' })
+
+    const { run } = makeRun({ retries: 0, maxRetries: 2 })
+    await invokeAi(SESSION_ID, run)
+
+    expect(runClaude).toHaveBeenCalledTimes(1)
+  })
+
+  it('上限と同じ回数までは起こす（総起動回数は上限 + 1）', async () => {
+    runClaude.mockResolvedValue({ ok: true, sessionId: 'x' })
+
+    const { run, calls } = makeRun({ retries: 2, maxRetries: 2 })
+    await invokeAi(SESSION_ID, run)
+
+    expect(runClaude).toHaveBeenCalledTimes(1)
+    expect(calls[0]).toEqual({ invocation: 'running', retries: 3 })
+  })
+
+  it('上限が 0 でも1回は起こす', async () => {
+    runClaude.mockResolvedValue({ ok: true, sessionId: 'x' })
+
+    const { run } = makeRun({ retries: 0, maxRetries: 0 })
+    await invokeAi(SESSION_ID, run)
+
+    expect(runClaude).toHaveBeenCalledTimes(1)
   })
 
   it('時間切れ・異常終了で尽きたら failed にする', async () => {
@@ -125,8 +164,8 @@ describe('invokeAi', () => {
     expect(calls.at(-1)).toEqual({ invocation: 'failed', retries: undefined })
   })
 
-  it('リトライ上限に達していたら起動せず error（終端）にする', async () => {
-    const { run, calls } = makeRun({ retries: 2, maxRetries: 2 })
+  it('リトライ上限を超えていたら起動せず error（終端）にする', async () => {
+    const { run, calls } = makeRun({ retries: 3, maxRetries: 2 })
     await invokeAi(SESSION_ID, run)
 
     expect(runClaude).not.toHaveBeenCalled()
