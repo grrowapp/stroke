@@ -5,8 +5,13 @@ import { spawn } from 'node:child_process'
  * 起動後この時間内に endpoint への提出が無ければ、その呼び出しは失敗として扱う
  * （openspec/specs/agent/invocation）。設定ではない
  * （docs/specs/core/settings-reference.md）。
+ *
+ * **10分。** 180秒では初回が必ず時間切れになった（実測 2026-08-25）。claude は
+ * スキルをロードし、`/get-overview` で概要を取り、最初の問いを組み立てるまでに
+ * それ以上かかる。巡回が拾って2回目で通っていたが、ユーザーは最初の問いが出るまで
+ * 4分以上待たされていた。
  */
-export const CLAUDE_TIMEOUT_MS = 180000
+export const CLAUDE_TIMEOUT_MS = 600000
 
 /** 打ち切るときに送るシグナル。 */
 const CLAUDE_TIMEOUT_SIGNAL = 'SIGKILL' as const

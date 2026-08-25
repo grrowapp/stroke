@@ -82,6 +82,8 @@ const { projectShareRoot, claude } = config.runtimeConfig
 
 1回の呼び出しで起こすのは1回だけで、起こし直しは巡回が担う。したがって起動の総回数は「上限 + 1」、総待ち時間は「(上限 + 1) × タイムアウト」で決まる。`0` にすると起こし直さない（1回だけ試す）。
 
+タイムアウトは10分（設定ではない。`server/utils/stroke/claude.ts`）なので、既定の `2` では最大30分で `error` に達する。
+
 ### `claude` の起動定義
 
 `runtimeConfig.claude` の `command` と `args`。`.mcp.json` の記述形式に倣い、**JSON のひとかたまり**で持つ。

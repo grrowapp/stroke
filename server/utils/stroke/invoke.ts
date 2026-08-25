@@ -1,9 +1,8 @@
-import type { Invocation } from '#shared/stroke'
+import type { Invocation, SessionSummary } from '#shared/stroke'
 import { invokeAi, type AiRun } from './ai'
 import { readStrokeConfig } from './config'
 import { initSessionOpenspec } from './openspec'
-import { listSessionsCore } from './session-core'
-import { readState, writeInvocation, writeState } from './session-store'
+import { readState, writeState } from './session-store'
 import { submissionCount } from './submission-signal'
 
 /**
@@ -31,15 +30,28 @@ export function invokePath(sessionId: string, cwd: string): string {
   return `/api/strokes/${encodeURIComponent(sessionId)}/invoke-agent?cwd=${encodeURIComponent(cwd)}`
 }
 
+/** A8 の path。`invocation` の唯一の書き込み口。 */
+export function submissionPath(sessionId: string): string {
+  return `/api/strokes/${encodeURIComponent(sessionId)}/submission`
+}
+
 /**
  * `invocation` を書く口。**A8 を通す**（openspec/specs/agent/invocation）。
  *
- * A8 の endpoint（`submission.post.ts`）と同じ実体（`writeInvocation`）を呼ぶ。書き込みの
- * 規則を2箇所に写さないため、規則そのものは `session-store.ts` の1本に置いてある。
+ * > `invocation` の書き込みは `invocation` を操作する endpoint（A8）を通してのみ行い、
+ * > 書き込むのは invokeAi だけとする SHALL。
+ *
+ * 同一プロセス内で完結する処理でも endpoint を経由する。直接書くと、書き込み口が
+ * 2つになり「A8 を通してのみ」が成立しない。path は相対で、Nitro の `$fetch` が
+ * アプリ内部で解決する（自分の待ち受けを知らなくてよい）。
  */
 function invocationWriter(sessionId: string) {
-  return (invocation: Invocation, retries?: number): Promise<void> =>
-    writeInvocation(sessionId, invocation, retries)
+  return async (invocation: Invocation, retries?: number): Promise<void> => {
+    await $fetch(submissionPath(sessionId), {
+      method: 'POST',
+      body: { invocation, ...(retries === undefined ? {} : { retries }) },
+    })
+  }
 }
 
 /**
@@ -79,7 +91,7 @@ export function buildRun(options: {
   runId?: string
 }): AiRun {
   const { sessionId, cwd, kind, retries, runId } = options
-  const { claude, openspec, projectShareRoot } = readStrokeConfig()
+  const { claude, openspec } = readStrokeConfig()
 
   if (kind === 'steering') {
     return {
@@ -120,9 +132,10 @@ export function buildRun(options: {
     // id を知る前提（docs/specs/architecture/session-workflow.md）に効いている
     conversationId: sessionId,
     // 実体の揃ったセッション（ディレクトリ・openspec ルート・スキーマ設定済み）として
-    // 一覧に載っていれば、初回の起動を済ませている = 続き先が在る
+    // 一覧に載っていれば、初回の起動を済ませている = 続き先が在る。
+    // **参照は API の応答から得る**（openspec/specs/agent/invocation）。
     hasConversation: async () =>
-      (await listSessionsCore(projectShareRoot)).some(s => s.id === sessionId),
+      (await $fetch<SessionSummary[]>('/api/strokes')).some(s => s.id === sessionId),
     setInvocation: invocationWriter(sessionId),
     // ストロークの1回の実行は必ず提出（A5・A7）で終わる。プロセスが正常終了しても
     // 提出が1つも無ければ、作業をせずに終わったということなので起こし直す。

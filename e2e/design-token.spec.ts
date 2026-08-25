@@ -258,6 +258,38 @@ test.describe('アイコンは prototype のものを使っている', () => {
     }
   });
 
+  /**
+   * 押せるものは押せると見て分かる。
+   *
+   * 可否判定を撤去して作成が常に押せるようになったとき、`.sb-btn` には `:disabled` の
+   * `not-allowed` しか無く、押せる状態のカーソル指定が欠けていた（実測で発覚）。
+   * 行（`.sb-row-hit`）は `pointer` を持っており、そちらと扱いが割れていた。
+   */
+  test('押せるボタンは pointer、押せないボタンは not-allowed', async ({ page }) => {
+    await page.goto('/projects');
+
+    const cursorOf = (testId: string) =>
+      page.getByTestId(testId).evaluate(el => getComputedStyle(el).cursor);
+
+    expect(await cursorOf('create-project'), '作成は常に押せる（ADR 0010）').toBe('pointer');
+    expect(await cursorOf('register-project'), '登録は中身が未決で非活性').toBe('not-allowed');
+  });
+
+  test('押せるボタンはキーボードで辿ったときに枠が出る', async ({ page }) => {
+    await page.goto('/projects');
+
+    const button = page.getByTestId('create-project');
+    await button.focus();
+
+    const outline = await button.evaluate((el) => {
+      const style = getComputedStyle(el);
+      return { width: style.outlineWidth, style: style.outlineStyle };
+    });
+
+    expect(outline.style, 'focus-visible の輪郭が無い').not.toBe('none');
+    expect(parseFloat(outline.width), 'focus-visible の輪郭に幅が無い').toBeGreaterThan(0);
+  });
+
   test('下層の戻る導線は back、プロジェクト名は folder', async ({ page }) => {
     await page.goto('/projects/ALPHAID000000001');
 

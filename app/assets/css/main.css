@@ -357,6 +357,20 @@ body {
     background: transparent;
     color: var(--text-secondary);
     border: 1px solid var(--border-default);
+    /* 押せることが手の形で分かる。行（.sb-row-hit）と同じ扱い */
+    cursor: pointer;
+    transition: background-color 0.12s, border-color 0.12s, color 0.12s;
+  }
+
+  .sb-btn:hover:not(:disabled) {
+    background: var(--surface-hover);
+    color: var(--text-primary);
+  }
+
+  /* キーボードだけで辿る人に、今どこに居るかを出す */
+  .sb-btn:focus-visible {
+    outline: 2px solid var(--interactive-primary);
+    outline-offset: 2px;
   }
 
   /* prototype の `.btn`（塗り）。登録は ghost、作成は塗りで出ている */
@@ -364,6 +378,11 @@ body {
     background: var(--interactive-primary);
     color: #fff;
     border-color: var(--interactive-primary);
+  }
+
+  .sb-btn-primary:hover:not(:disabled) {
+    background: var(--interactive-primary-hover);
+    color: #fff;
   }
 
   .sb-btn:disabled {

@@ -102,8 +102,15 @@ export default defineNuxtConfig({
       // （~/.claude/CLAUDE.md）をエンドユーザーのセッションへ持ち込まないためである。
       // project を外すとスキルが一切ロードされない（ADR 0001）。
       //
-      // AI に許すツールは Bash Read Write Edit。取得・提出は endpoint への HTTP 発行
+      // AI に許すツールは Skill Bash Read Write Edit。取得・提出は endpoint への HTTP 発行
       // （Bash で curl）で行い、proposal.md / stroke.md は AI 自身が書いてパスで渡す。
+      //
+      // **`Skill` を外してはならない。** セッション API スキルの curl は
+      // `${CLAUDE_SESSION_ID}` でセッション id を解決するが、この変数が値を持つのは
+      // **スキルの `!` フェンスの中だけ**である（実測 2026-08-25: Bash ツールから
+      // `printenv` すると空、フェンスからは `--session-id` の値が取れる）。
+      // `Skill` が無いと claude はスキルを起動できず、Bash で curl を真似ようとして
+      // 空の id を掴み、提出に至らないままタイムアウトする。
       //
       // `-p` / `--output-format json`、`--session-id` / `--resume` とセッション id、
       // `--mcp-config`、`--` 以降の prompt は呼び出しごとに決まるのでここには入れず、
@@ -111,10 +118,10 @@ export default defineNuxtConfig({
       command: 'claude',
       args: [
         '--setting-sources', SETTING_SOURCES_REQUIRED,
-        '--model', 'fable',
+        '--model', 'sonnet',
         '--add-dir', import.meta.dirname,
         '--add-dir', `${import.meta.dirname}/assets`,
-        '--allowedTools', 'Bash Read Write Edit',
+        '--allowedTools', 'Skill Bash Read Write Edit',
       ],
 
       // エージェント向け endpoint の base URL。spawn 時に環境変数 STROKE_BASEURL として
