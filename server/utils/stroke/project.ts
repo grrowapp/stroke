@@ -1,4 +1,4 @@
-import { mkdir, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { conflict } from './conflict'
 import { projectDir } from './paths'
@@ -6,7 +6,6 @@ import {
   PROJECT_DOCS_DIR,
   PROJECT_NAME_PATTERN,
   PROJECT_PROPOSAL_FILE,
-  resolveProjectsRoot,
 } from './settings'
 
 /**
@@ -57,20 +56,6 @@ export async function generateProject(name: string, proposal: string): Promise<s
   }
 
   return root
-}
-
-/**
- * 候補を `/opt/projects/` の既存名と突合し、衝突しない名前を返す。
- * 衝突していれば `-2`, `-3`, … の連番サフィックスで最初に空く名前にする。
- */
-export async function resolveAvailableProjectName(candidate: string): Promise<string> {
-  const existing = new Set(await readdir(resolveProjectsRoot()))
-  if (!existing.has(candidate)) return candidate
-
-  for (let n = 2; ; n++) {
-    const name = `${candidate}-${n}`
-    if (!existing.has(name)) return name
-  }
 }
 
 /**
