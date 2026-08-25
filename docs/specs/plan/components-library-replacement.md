@@ -184,7 +184,7 @@ flowchart LR
 
 役割の引き受け先は**設定**である。`nuxt.config.ts` に `mdc.rehypePlugins: { 'rehype-raw': false }` を置くと生 HTML が要素化されなくなり、旧実装と同じ振る舞いに戻る。加えて `mdc.components.prose: false`（下記）にすると `ProseScript` も経由しなくなるため、「Prose コンポーネントが script を握り潰す」という当ての方も無くなる。**生 HTML を描かない根拠は `rehype-raw` を切っている一点**であり、この設定を外すと成立しない。
 
-何が落ちて何が残るかは単体テスト `app/components/workspace/markdown-sanitize.test.ts` に固定した（同じ `rehype` オプションで `parseMarkdown` を呼び、`<img>` / `<script>` が要素にならないこと・`javascript:` href が除かれること・強調/リンク/表が残ることを見る）。
+何が落ちて何が残るかは単体テスト `test/app/components/workspace/markdown-sanitize.test.ts` に固定した（同じ `rehype` オプションで `parseMarkdown` を呼び、`<img>` / `<script>` が要素にならないこと・`javascript:` href が除かれること・強調/リンク/表が残ることを見る）。
 
 ---
 

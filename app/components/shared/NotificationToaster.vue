@@ -21,7 +21,7 @@
  */
 import { useToast } from '#imports';
 
-import { useBoardSocket } from '~/composables/shared/useBoardSocket';
+import { useBoardSocket } from '~/composables/useBoardSocket';
 import type { NotificationTone } from '#shared/types';
 
 /** 本家と同じ 5 秒 */

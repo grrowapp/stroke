@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { scanProjects } from './scan';
+import { scanProjects } from '../../../../server/utils/upstream/scan';
 
 const created: string[] = [];
 

@@ -4,7 +4,7 @@ import { computed, definePageMeta, useRoute } from '#imports';
 
 import RecordList from '~/components/workspace/RecordList.vue';
 import WorkspacePanel from '~/components/workspace/WorkspacePanel.vue';
-import { useProjectId, useSpecDocuments } from '~/composables/workspace/useProjectApi';
+import { useProjectId, useSpecDocuments } from '~/composables/useProjectApi';
 
 definePageMeta({ layout: 'workspace' });
 

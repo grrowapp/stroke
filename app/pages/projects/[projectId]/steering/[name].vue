@@ -4,9 +4,9 @@ import { computed, createError, definePageMeta, useRoute } from '#imports';
 
 import DocumentEditor from '~/components/workspace/DocumentEditor.vue';
 import WorkspacePanel from '~/components/workspace/WorkspacePanel.vue';
-import { useBoardSocket } from '~/composables/shared/useBoardSocket';
-import { saveSteeringDocument, useProjectId, useSteeringDocument } from '~/composables/workspace/useProjectApi';
-import { isSteeringName } from '~/composables/workspace/useSteeringDocuments';
+import { useBoardSocket } from '~/composables/useBoardSocket';
+import { saveSteeringDocument, useProjectId, useSteeringDocument } from '~/composables/useProjectApi';
+import { isSteeringName } from '~/composables/useSteeringDocuments';
 
 definePageMeta({ layout: 'workspace' });
 

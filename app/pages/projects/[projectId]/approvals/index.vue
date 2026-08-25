@@ -11,7 +11,7 @@ import { computed, definePageMeta } from '#imports';
 
 import ApprovalCard from '~/components/workspace/ApprovalCard.vue';
 import EmptyState from '~/components/workspace/EmptyState.vue';
-import { useProjectId, usePendingApprovals } from '~/composables/workspace/useProjectApi';
+import { useProjectId, usePendingApprovals } from '~/composables/useProjectApi';
 
 definePageMeta({ layout: 'workspace' });
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveDirectoryActions } from './actions';
+import { resolveDirectoryActions } from '../../../../server/utils/control/actions';
 
 describe('一覧画面の操作の可否', () => {
   it('作成は行えない。接続先の別プロジェクトが未定だから（interview Q40）', () => {

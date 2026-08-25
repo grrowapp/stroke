@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { readRegistry } from './registry';
+import { readRegistry } from '../../../../server/utils/upstream/registry';
 
 /** 稼働中の本家から実際に取得した形（evidence/upstream-v2.2.5.md） */
 const REAL_REGISTRY = {

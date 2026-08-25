@@ -9,8 +9,8 @@
  */
 import { computed, definePageMeta, navigateTo, useFetch, useHead, watch } from '#imports';
 
-import { useBoardSocket } from '~/composables/shared/useBoardSocket';
-import { formatRelativeTime } from '~/composables/shared/useRelativeTime';
+import { useBoardSocket } from '~/composables/useBoardSocket';
+import { formatRelativeTime } from '~/composables/useRelativeTime';
 import type { Notification, ProjectDirectoryResponse } from '#shared/types';
 
 definePageMeta({ layout: 'portal' });

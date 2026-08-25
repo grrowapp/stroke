@@ -6964,6 +6964,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"javascript-time-ago@npm:^2.6.4":
+  version: 2.6.4
+  resolution: "javascript-time-ago@npm:2.6.4"
+  dependencies:
+    relative-time-format: "npm:^1.1.12"
+  checksum: 10c0/7ca5b962d3d0831cbf744093b4fc27164408effeb1fa77e5daba0658bf9a60c9dbfe59e7ac0da1a3b6a353c0574ed6b774daa2837d6a9d9efb6243d268d333f8
+  languageName: node
+  linkType: hard
+
 "jiti@npm:^2.4.2, jiti@npm:^2.6.1, jiti@npm:^2.7.0":
   version: 2.7.0
   resolution: "jiti@npm:2.7.0"
@@ -9958,6 +9967,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"relative-time-format@npm:^1.1.12":
+  version: 1.1.12
+  resolution: "relative-time-format@npm:1.1.12"
+  checksum: 10c0/11ad7079e02c0b880d8546da0f0b6961d8f372d10ab28e135e1344d299c3c925b18965e12617cef0a916c9d86a38047aa702df6b7e103b61f2e882c6d5fa59b7
+  languageName: node
+  linkType: hard
+
 "remark-emoji@npm:^5.0.2":
   version: 5.0.2
   resolution: "remark-emoji@npm:5.0.2"
@@ -10779,6 +10795,7 @@ __metadata:
     "@vueuse/core": "npm:^14.4.0"
     fs-extra: "npm:^11.4.0"
     happy-dom: "npm:^20.11.6"
+    javascript-time-ago: "npm:^2.6.4"
     mermaid: "npm:^10.9.1"
     nuxt: "npm:^4.5.2"
     tailwindcss: "npm:^4.3.2"

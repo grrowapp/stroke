@@ -29,7 +29,7 @@
 | `workspace/MarkdownNodes.ts` | `@nuxtjs/mdc` の `<MDC :value>`（`workspace/DocumentView.vue`） |
 
 - アイコンのコレクションは `nuxt.config.ts` の `icon.customCollections` に登録し、`mode: 'svg'`（inline SVG）で描く。`UIcon :name="sb:…" / "upstream:…"` を書く場所は `workspace/ApprovalCard.vue`（6箇所）・`shared/NotificationToaster.vue`（3）・`workspace/RecordList.vue`（2）・`workspace/EmptyState.vue`（1）と、pages / layouts の5ファイル。
-- markdown の parse 設定は `nuxt.config.ts` の `mdc`（`headings.anchorLinks: false` / `rehypePlugins: {'rehype-raw': false}` / `components.prose: false` / `components.map: { pre: 'MarkdownPre' }`）。生 HTML は要素にならないので、`DocumentView` は自前のサニタイズを持たない。検証は `workspace/markdown-roundtrip.test.ts`（63行）と `workspace/markdown-sanitize.test.ts`（97行）。
+- markdown の parse 設定は `nuxt.config.ts` の `mdc`（`headings.anchorLinks: false` / `rehypePlugins: {'rehype-raw': false}` / `components.prose: false` / `components.map: { pre: 'MarkdownPre' }`）。生 HTML は要素にならないので、`DocumentView` は自前のサニタイズを持たない。検証は `test/app/components/workspace/` の markdown-roundtrip.test.ts（63行）と markdown-sanitize.test.ts（97行）。
 
 ### markdown のフェンスには後段の component が3本ある
 
@@ -72,7 +72,7 @@
 | `workspace/RecordList.vue` | 209 | `items: RecordItem[]` / `testid` / `labels` | — |
 | `workspace/WorkspacePanel.vue` | 28 | `title` / `subtitle` / `testid` + `actions` slot | — |
 
-`workspace/` には他に test が2本（`markdown-roundtrip.test.ts` / `markdown-sanitize.test.ts`）同居している。
+単体テストはソースと同居させない。この2本を検証するテストは `test/app/components/workspace/`（`markdown-roundtrip.test.ts` / `markdown-sanitize.test.ts`）にある。
 
 ### 参照元
 

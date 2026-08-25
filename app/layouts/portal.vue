@@ -6,7 +6,7 @@
  * ヘッダーの bar、その下にタブの bar（padding:0 14px / gap:2px）、本体は padding:16px。
  * 下層は左サイドバーで、形そのものを変えることでどちらの階層にいるかが見て分かる。
  */
-import { useBoardSocket } from '~/composables/shared/useBoardSocket';
+import { useBoardSocket } from '~/composables/useBoardSocket';
 
 const { notifications, upstreamConnected } = useBoardSocket();
 </script>

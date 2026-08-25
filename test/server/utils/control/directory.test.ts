@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildProjectDirectory } from './directory';
-import type { RegistryEntry } from '../upstream/registry';
-import type { ScanResult } from '../upstream/scan';
+import { buildProjectDirectory } from '../../../../server/utils/control/directory';
+import type { RegistryEntry } from '../../../../server/utils/upstream/registry';
+import type { ScanResult } from '../../../../server/utils/upstream/scan';
 
 const SCANNED_AT = '2026-08-21T09:00:00.000Z';
 

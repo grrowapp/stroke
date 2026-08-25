@@ -158,7 +158,29 @@ socket.addEventListener('close', () => {
 
 **実装で判明（刻みの訂正）**: 「`units` で day を最大単位にする」だけでは足りない。vueuse の `DEFAULT_UNITS` は minute の `max` が 2,760,000ms（= **46分**）、hour の `max` が 72,000,000ms（= **20時間**）で、日常表現に寄せた丸めが入っている。最大単位を day にしても、この2段が現行と食い違う（46分が「1時間前」、20時間が「1日前」になる）。**60分 / 24時間で切る指定も要る**。
 
-**実装結果**: 未来時刻は design 決定5により**現行の挙動を維持**した（`messages.future` を関数で上書きし、負の elapsed も「たった今」にする）。`invalid: '—'`・`rounding: 'floor'` は表のとおり注入。ISO→`Date` の変換は `useRelativeTime` の中に残し、シグネチャは変えていない。上記の刻み・丸め・未来・無効値が現行と一致することは単体テスト `app/composables/shared/useRelativeTime.test.ts` に固定した。
+**実装で判明（本家との差・置換先の見直し）**: 本家 `dashboard_frontend/src/lib/dateUtils.ts` の `formatDistanceToNow` を読むと、刻みは 60秒 / 60分 / 24時間 / **7日** で、**7日を超えたら相対表記をやめて絶対日時**（`formatDate`）に切り替える。上の表は「何日経っても N日前」を現状として置いていたが、それは**本家と違う**。判定の方針は「現行と同一」ではなく「本家と同一」なので、7日の打ち切りに寄せる。
+
+vueuse `formatTimeAgo` はこの打ち切りを `max` + `fullDateFormatter` で持てるが、**日本語の文言8種（`justNow` / `past` / 各単位）を手で書く必要が残る**。`formatTimeAgoIntl`（`Intl.RelativeTimeFormat`）は文言を自前で持たずに済むが、**「昨日」「先週」「先月」「昨年」という本家に無い表現を出し、`insertSpace: false` も効かず空白が残る**（実測）。
+
+**置換先を `javascript-time-ago` に変えた。** 軸のライブラリ（vueuse / @nuxt/ui / Nuxt 標準）に、設定だけで本家に一致するものが無かったため。比較は実測で行った。
+
+| ライブラリ | 46分 | 23時間 | 7日超 | 空白 |
+| --- | --- | --- | --- | --- |
+| vueuse `formatTimeAgoIntl` | `46 分前` | `23 時間前` | `先週` / `先月` / `昨年` | 入る |
+| date-fns `formatDistance` | `約1時間前` | `約23時間前` | `約1か月前` | — |
+| dayjs `relativeTime`（既定） | `1時間前` | `1日前` | `1ヶ月前` | 入らない |
+| **`javascript-time-ago`**（`labels: 'narrow'` / `round: 'floor'` / 本家の `steps`） | **`46分前`** | **`23時間前`** | **絶対日時** | 入らない |
+
+`javascript-time-ago` は本家の閾値をそのまま `steps` に写せ、7日超の絶対日時への切り替えも最後の step の `format` で表現できる。**自前で書くのは無効な日付のガード1行だけ**になり、閾値の判定・日本語の文言・丸めはすべてライブラリが持つ。
+
+**実装結果**: 公開インターフェース（`formatRelativeTime(iso, now)`）と参照元5ページは変えていない。振る舞いは2点、現行から変わる。
+
+| 挙動 | 変更前 | 変更後 | 理由 |
+| --- | --- | --- | --- |
+| 7日以上 | `30日前` `400日前` | `7月26日 12:00` `7月21日 12:00` | 本家が7日で打ち切って絶対日時にする |
+| 未来時刻 | 「たった今」に畳む（design 決定5） | `5分後` `3日後` | 本家は未来を想定しておらず、畳む根拠が本家側に無い |
+
+1分未満の文言は「たった今」から「今」に変わる（`ja` ロケールの語）。刻み・丸め・空白・打ち切り・無効値は単体テスト `test/app/composables/useRelativeTime.test.ts` に固定した。
 
 ## useWaitingRetry.ts — 部分置換（timer 管理のみ委譲）
 

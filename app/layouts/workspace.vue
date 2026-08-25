@@ -16,7 +16,7 @@
 import { computed, useCookie, useFetch, useRoute } from '#imports';
 
 import EmptyState from '~/components/workspace/EmptyState.vue';
-import { useBoardSocket } from '~/composables/shared/useBoardSocket';
+import { useBoardSocket } from '~/composables/useBoardSocket';
 
 const route = useRoute();
 const projectId = computed(() => String(route.params.projectId ?? ''));

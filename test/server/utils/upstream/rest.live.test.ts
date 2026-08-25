@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { UpstreamRestClient } from './rest';
+import { UpstreamRestClient } from '../../../../server/utils/upstream/rest';
 
 const baseUrl = process.env.NUXT_UPSTREAM_BASE_URL ?? 'http://127.0.0.1:5000';
 const client = new UpstreamRestClient(baseUrl);

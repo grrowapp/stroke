@@ -6,8 +6,9 @@
 | --- | --- |
 | `pages/strokes/**` | ルーティングを `pages/projects/create/` 配下へ |
 | `components/` が global / shared / workspace / stroke / review ＋直下平置き | `ui/` ＋機能単位へ移す（全数の対応は `docs/specs/core/file-components.md`）。**ただし `global/MarkdownPre.vue` は動かせない** — `mdc.components.map` が `resolveComponent(名前)` で引き、`app.component()` 登録されるのは `components/global/` だけ（実測）。規範の区切りに従えない唯一の例外 |
-| `composables/` が shared / workspace ＋直下平置き | 関心単位の平置きへ統一。`useProposalReview` の分割と、`useAnnotations` の色定数の扱い——**色の実値は CSS へ移し、データ（`Annotation.highlightColor`）は色名のみ持つ**（検討）——を含む（`docs/specs/core/file-composables.md`） |
-| `composables/shared/useRelativeTime.ts` が `useXxx` を持たない | 中身は純関数 `formatRelativeTime` のみで、規範の「関心単位の `useXxx` を平置き」に当てはまらない。参照元は5ページ。**規範のツリーに純関数の置き場（`app/utils/` 等）が無い**ため、置き場の新設を含めて上の平置きと同じ change で決める |
+| ~~`composables/` が shared / workspace ＋直下平置き~~ | **平置きは実施済み**（`replace-handrolled-with-libraries`）。9本すべてが `app/composables/` 直下。残るのは `useProposalReview` の分割と、`useAnnotations` の色定数の扱い——**色の実値は CSS へ移し、データ（`Annotation.highlightColor`）は色名のみ持つ**（検討）——（`docs/specs/core/file-composables.md`） |
+| `composables/useRelativeTime.ts` が `useXxx` を持たない | 中身は純関数 `formatRelativeTime` のみで、規範の「関心単位の `useXxx` を平置き」に当てはまらない。参照元は5ページ。**規範のツリーに純関数の置き場（`app/utils/` 等）が無い**ため、置き場の新設とあわせて決める |
+| auto-import が有効のまま | `file-composables.md` は「平置き後も明示 import を維持する（`nuxt.config` の `autoImport: false` 前提）」と定めるが、`nuxt.config.ts` に `imports` の設定が無い。ストローク側は明示 import 無しで動いている（統一は `align-coding-conventions`） |
 | `server/utils/` が upstream / control / stroke | 関心単位へ再編（区分は `docs/specs/core/server-structure.md`） |
 | `assets/css/stroke.css` | design token の統合（`openspec/changes/adopt-upstream-design-tokens`）とあわせて畳む |
 | コーディング規約（auto-import 不使用・テスト・画面は判断しない） | steering へ移す（steering の連動更新で反映） |

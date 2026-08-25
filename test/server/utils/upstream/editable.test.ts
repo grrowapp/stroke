@@ -8,8 +8,8 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { isSteeringDocument, STEERING_DOCUMENTS } from './rest';
-import { isSpecDocumentName, specDocumentNames } from './schema';
+import { isSteeringDocument, STEERING_DOCUMENTS } from '../../../../server/utils/upstream/rest';
+import { isSpecDocumentName, specDocumentNames } from '../../../../server/utils/upstream/schema';
 
 describe('保存できる文書の名前', () => {
   describe('仕様書', () => {

@@ -11,8 +11,8 @@
  */
 import { computed, definePageMeta, navigateTo, useFetch, useHead } from '#imports';
 
-import { useBoardSocket } from '~/composables/shared/useBoardSocket';
-import { formatRelativeTime } from '~/composables/shared/useRelativeTime';
+import { useBoardSocket } from '~/composables/useBoardSocket';
+import { formatRelativeTime } from '~/composables/useRelativeTime';
 import type {
   ActionAvailability,
   ProjectDirectoryResponse,

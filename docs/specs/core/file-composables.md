@@ -18,9 +18,9 @@
 | 注釈 | `useAnnotations` | 色定義5件をコンポーネントが逆向き import している。**色の実値は CSS へ移し、データ（`Annotation.highlightColor`）は色名のみ持つ**（検討） |
 | 待機とリトライ | `useWaitingRetry` | timer は vueuse の `useIntervalFn` に委譲済み。そのまま |
 
-### 移行後パスの写像
+### 平置き — 実施済み
 
-平置きへ移すのはポータル側の4本のみ。ストローク側の5本は既に直下にあり、移動しない。
+`shared/` と `workspace/` を畳み、9本すべてが `app/composables/` 直下にある。
 
 | 移行前 | 移行後 |
 | --- | --- |
@@ -29,9 +29,11 @@
 | `composables/workspace/useProjectApi.ts` | `composables/useProjectApi.ts` |
 | `composables/workspace/useSteeringDocuments.ts` | `composables/useSteeringDocuments.ts` |
 
-平置き後も**明示 import を維持する**（auto-import は使わない。`nuxt.config` の `autoImport: false` 前提）。
+参照元25箇所の import パスも合わせて直した。
 
-移動の実施は `docs/specs/plan/structure-migration.md`。同資料の冒頭が「いずれも**別 change で寄せる**」と定めており、`replace-handrolled-with-libraries` では行わない。
+平置き後も**明示 import を維持する**（auto-import は使わない。`nuxt.config` の `autoImport: false` 前提）。**この点は未実施** — `nuxt.config.ts` に `imports` の設定が無く、auto-import は既定で有効のまま。ストローク側は明示 import 無しで動いている。
+
+単体テストはソースと同居させない。`test/app/composables/useRelativeTime.test.ts` にある。
 
 `shared/useRelativeTime.ts` は `useXxx` を1つも export していない（中身は純関数 `formatRelativeTime` のみ）。規範の「関心単位の `useXxx` を平置き」に当てはまらないが、**規範のツリーに純関数の置き場が無い**ため、置き場の新設を含めて平置きと同じ change で決める。
 
@@ -121,23 +123,23 @@ export function formatRelativeTime(iso: string, now = Date.now()): string
 
 `use` で始まるが Vue のリアクティブな状態を持たない純関数。ファイル名の慣習に合わせてある。
 
-#### 中身は vueuse の `formatTimeAgo`
+#### 中身は `javascript-time-ago`
 
-刻みと日付の差の計算は自前で持たない（`replace-handrolled-with-libraries`）。ただし**既定のままだと出力が変わる**ため、3つを明示している。
+刻みの判定・日本語の文言・丸め・7日超の絶対日時への切り替えを自前で持たない（`replace-handrolled-with-libraries`）。**自前で書いてあるのは無効な日付のガード1行だけ。**
 
 | 指定 | 既定 | ここでの指定 | 理由 |
 | --- | --- | --- | --- |
-| `units` | minute の上限 46 分・hour の上限 20 時間。週・月・年まで刻む | 60 分 / 24 時間で切り、`day` を最大単位にする | 46 分で「1時間前」、20 時間で「1日前」になるのを避ける。週・月・年は出さない |
-| `rounding` | `'round'` | `'floor'` | 現行が切り捨てだった。`1分59秒` は「1分前」 |
-| `messages` | 未来は「〜後」 | `future: () => 'たった今'`、`invalid: '—'` | 現行は負の経過時間を「たった今」に畳んでいた |
+| `steps` | `now` / minute / hour / day / week / month / year | 本家の閾値の写し（60秒 / 60分 / 24時間 / **7日**）。最後の step の `format` が絶対日時 | 本家 `formatDistanceToNow` は7日で相対表記を打ち切る。**分岐は書かない**（step の切り替えで表現する） |
+| `labels` | `'long'` | `'narrow'` | `long` / `short` / `mini` は `Intl.RelativeTimeFormat` 系で「46 **空白** 分前」になる。`narrow` だけが「46分前」（実測） |
+| `round` | `'round'` | `'floor'` | 本家は `Math.floor`。既定だと `1分59秒` が「2分前」になる |
 
-`showSecond` は既定（false）のまま。1分未満は「たった今」に畳まれるので、`second` の単位定義は刻みの下限を置くためだけにある。
+日本語の文言は `javascript-time-ago/locale/ja` から出る。文言の定義を自前で持たない。
 
-**テスト**（`useRelativeTime.test.ts`、64行）— 上の3点を出力で固定する。既定に戻ると落ちるケース（46分・20時間・`1分59秒`）を明示的に置いてある。
+vueuse は採っていない。`formatTimeAgo` は文言8種を手で書く必要があり、`formatTimeAgoIntl` は「昨日」「先週」「先月」「昨年」という本家に無い表現を出す（`docs/specs/plan/composables-library-replacement.md` に実測の比較表がある）。
+
+**テスト**（`test/app/composables/useRelativeTime.test.ts`）— 設定を落とすと落ちるケースを明示的に置いてある（46分・23時間59分・`1分59秒`・7日の打ち切り・空白の有無）。
 
 **参照元**（5）— 上層2ページ（`index.vue`、`projects/index.vue`）と下層3ページ（`specs/index.vue`、`steering/index.vue`、`tasks/index.vue`）
-
-上層・下層の両方から使われるため `shared/` にある。
 
 ---
 

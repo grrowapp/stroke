@@ -25,7 +25,7 @@ import AnnotateSource from '~/components/review/AnnotateSource.vue';
 import CommentCard from '~/components/review/CommentCard.vue';
 import CommentModal from '~/components/review/CommentModal.vue';
 import { useAnnotations } from '~/composables/useAnnotations';
-import { pendingApprovalsKey, respondToApproval } from '~/composables/workspace/useProjectApi';
+import { pendingApprovalsKey, respondToApproval } from '~/composables/useProjectApi';
 
 import type { Annotation, HighlightColor } from '#shared/stroke';
 

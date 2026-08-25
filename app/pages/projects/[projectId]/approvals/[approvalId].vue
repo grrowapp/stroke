@@ -24,13 +24,13 @@ import DocumentEditor from '~/components/workspace/DocumentEditor.vue';
 import DocumentView from '~/components/workspace/DocumentView.vue';
 import EmptyState from '~/components/workspace/EmptyState.vue';
 import WorkspacePanel from '~/components/workspace/WorkspacePanel.vue';
-import { useBoardSocket } from '~/composables/shared/useBoardSocket';
+import { useBoardSocket } from '~/composables/useBoardSocket';
 import {
   saveTargetOf,
   useApprovalContent,
   useProjectId,
   usePendingApprovals,
-} from '~/composables/workspace/useProjectApi';
+} from '~/composables/useProjectApi';
 
 definePageMeta({ layout: 'workspace' });
 

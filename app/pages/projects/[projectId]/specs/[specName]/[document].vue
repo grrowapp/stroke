@@ -4,8 +4,8 @@ import { computed, createError, definePageMeta, useRoute } from '#imports';
 
 import DocumentEditor from '~/components/workspace/DocumentEditor.vue';
 import WorkspacePanel from '~/components/workspace/WorkspacePanel.vue';
-import { useBoardSocket } from '~/composables/shared/useBoardSocket';
-import { saveSpecDocument, useProjectId, useSpecDocuments } from '~/composables/workspace/useProjectApi';
+import { useBoardSocket } from '~/composables/useBoardSocket';
+import { saveSpecDocument, useProjectId, useSpecDocuments } from '~/composables/useProjectApi';
 
 definePageMeta({ layout: 'workspace' });
 
