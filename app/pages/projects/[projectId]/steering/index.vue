@@ -4,9 +4,9 @@ import { computed, definePageMeta } from '#imports';
 
 import RecordList from '~/components/workspace/RecordList.vue';
 import WorkspacePanel from '~/components/workspace/WorkspacePanel.vue';
-import { useProjectId, useProjectInfo } from '~/composables/workspace/useProjectApi';
-import { formatRelativeTime } from '~/composables/shared/useRelativeTime';
-import { useSteeringEntries } from '~/composables/workspace/useSteeringDocuments';
+import { useProjectId, useProjectInfo } from '~/composables/useProjectApi';
+import { formatRelativeTime } from '~/composables/useRelativeTime';
+import { useSteeringEntries } from '~/composables/useSteeringDocuments';
 
 definePageMeta({ layout: 'workspace' });
 

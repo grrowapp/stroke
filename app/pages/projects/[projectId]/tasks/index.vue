@@ -5,8 +5,8 @@ import { computed, definePageMeta } from '#imports';
 import EmptyState from '~/components/workspace/EmptyState.vue';
 import RecordList from '~/components/workspace/RecordList.vue';
 import WorkspacePanel from '~/components/workspace/WorkspacePanel.vue';
-import { useProjectId, useSpecs } from '~/composables/workspace/useProjectApi';
-import { formatRelativeTime } from '~/composables/shared/useRelativeTime';
+import { useProjectId, useSpecs } from '~/composables/useProjectApi';
+import { formatRelativeTime } from '~/composables/useRelativeTime';
 
 definePageMeta({ layout: 'workspace' });
 

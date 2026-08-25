@@ -1,6 +1,17 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import { ALPHA, resetBoard, stub } from './support';
+
+/**
+ * `RecordList` の行。
+ *
+ * `UTable` の `tr` には任意の属性を張れないため、行の目印は class になる
+ * （押せる行は `.sb-datarow`、押せない行は `.sb-datarow-off`）。
+ * `record-row` は `ApprovalCard` も名乗るので、そちらとは別に指す。
+ */
+function recordRows(scope: Page | Locator): Locator {
+  return scope.locator('tr.sb-datarow, tr.sb-datarow-off');
+}
 
 /**
  * 下層のプロジェクト画面（specs/project-workspace）。
@@ -63,6 +74,96 @@ test.describe('下層のシェル', () => {
     await page.goto('/projects/NOSUCHPROJECT');
     await expect(page.getByTestId('workspace-unresolved')).toBeVisible();
   });
+
+  /**
+   * 本家（PageNavigationSidebar）は畳んでもサイドバーを消さず、`lg:w-16`＝64px の帯にして
+   * アイコンだけ残す。開き直すボタンも同じ場所（帯の一番上）に残る。
+   * 開いた幅は本家の `lg:w-64`＝256px（値の出どころは main.css の `.sb-sidebar`）。
+   */
+  test('サイドバーを畳むと帯になり、畳んだまま行き先を選べる', async ({ page }) => {
+    await page.goto(`/projects/${ALPHA}`);
+
+    const sidebar = page.getByTestId('workspace-sidebar');
+    await expect(sidebar).toHaveCSS('width', '256px');
+
+    await page.getByTestId('sidebar-collapse').click();
+    await expect(sidebar).toHaveCSS('width', '64px');
+
+    // ラベルは落ちるが、項目そのものは押せるまま残る
+    const items = await page.locator('[data-testid="workspace-sidebar"] a').allTextContents();
+    expect(items.map((item) => item.trim())).toEqual(['', '', '', '', '']);
+    await expect(page.getByTestId('sidebar-tasks')).toHaveAttribute('title', 'タスク');
+
+    await page.getByTestId('sidebar-tasks').click();
+    await expect(page).toHaveURL(new RegExp(`/projects/${ALPHA}/tasks$`));
+    await expect(sidebar).toHaveCSS('width', '64px');
+  });
+
+  /**
+   * 本家は畳んでも項目のアイコンを落とさない（落ちるのはラベルの `<span>` だけ）。
+   * 開いているときも絵は出ている。畳んだ瞬間に別の部品に見えないための形。
+   */
+  test('項目のアイコンは開いていても畳んでいても出ている', async ({ page }) => {
+    await page.goto(`/projects/${ALPHA}`);
+
+    const icons = page.locator('[data-testid="workspace-sidebar"] a svg');
+    await expect(icons).toHaveCount(5);
+
+    await page.getByTestId('sidebar-collapse').click();
+    await expect(icons).toHaveCount(5);
+  });
+
+  test('畳んだサイドバーは同じボタンで開き直せる', async ({ page }) => {
+    await page.goto(`/projects/${ALPHA}`);
+
+    const sidebar = page.getByTestId('workspace-sidebar');
+    const toggle = page.getByTestId('sidebar-collapse');
+
+    await toggle.click();
+    await expect(sidebar).toHaveAttribute('data-collapsed', 'true');
+    await expect(toggle).toHaveAttribute('aria-label', 'サイドバーを開く');
+
+    await toggle.click();
+    await expect(sidebar).toHaveAttribute('data-collapsed', 'false');
+    await expect(sidebar).toHaveCSS('width', '256px');
+
+    const items = await page.locator('[data-testid="workspace-sidebar"] a').allTextContents();
+    expect(items.map((item) => item.trim())).toEqual([
+      '概要',
+      'Feature',
+      'ステアリング',
+      'タスク',
+      '承認',
+    ]);
+  });
+
+  /**
+   * 本家は localStorage の `spec-workflow-sidebar-collapsed` に持つ（App.tsx）が、本家は
+   * CSR だけで動くので初回描画の前に読める。stroke-board は SSR があり localStorage を
+   * サーバで読めないため、同じキーの cookie に持つ（理由は `workspace.vue`）。
+   *
+   * 見たいのは保存先ではなく挙動: 読み込み直しても畳んだままで、**開いた形を一度も
+   * 見せない**（サーバが返す HTML の時点で畳んでいる）。
+   */
+  test('畳んだ状態は読み込み直しても残り、途中で開いた形を見せない', async ({ page }) => {
+    await page.goto(`/projects/${ALPHA}`);
+    await page.getByTestId('sidebar-collapse').click();
+
+    await expect
+      .poll(async () =>
+        (await page.context().cookies()).find(
+          (cookie) => cookie.name === 'spec-workflow-sidebar-collapsed',
+        )?.value,
+      )
+      .toBe('true');
+
+    // サーバが返す HTML の時点で畳んでいる（ちらつきの元になる開いた形を通らない）
+    const html = await (await page.request.get(`/projects/${ALPHA}`)).text();
+    expect(html).toContain('data-collapsed="true"');
+
+    await page.reload();
+    await expect(page.getByTestId('workspace-sidebar')).toHaveAttribute('data-collapsed', 'true');
+  });
 });
 
 test.describe('プロジェクト概要', () => {
@@ -104,21 +205,64 @@ test.describe('仕様書', () => {
   test('一覧に並ぶ', async ({ page }) => {
     await page.goto(`/projects/${ALPHA}/specs`);
 
-    await expect(page.getByTestId('record-row')).toHaveCount(1);
-    await expect(page.getByTestId('record-row')).toContainText('auth-spec');
+    await expect(recordRows(page)).toHaveCount(1);
+    await expect(recordRows(page)).toContainText('auth-spec');
   });
 
   test('仕様書ごとに URL を持つ', async ({ page }) => {
     await page.goto(`/projects/${ALPHA}/specs`);
-    await page.getByTestId('record-row').click();
+    await recordRows(page).click();
 
     await expect(page).toHaveURL(new RegExp(`/projects/${ALPHA}/specs/auth-spec$`));
+  });
+
+  /**
+   * 行のどこを押しても開くのは本家と同じ（`SpecsPage.tsx` の `SpecTableRow` は
+   * `tr` に onClick を持つ）。stroke-board は行に押す面を持たせる代わりに、行の中の
+   * リンクを行いっぱいに広げている。「行の端を押す」と「リンクを辿る」の両方を見る。
+   */
+  test('行の端を押しても開き、リンクはキーボードでも辿れる', async ({ page }) => {
+    await page.goto(`/projects/${ALPHA}/specs`);
+
+    // 名前から一番遠い列（操作）の上を押す
+    const row = recordRows(page).first();
+    const rowBox = (await row.boundingBox())!;
+    const lastCell = (await row.locator('td').last().boundingBox())!;
+
+    await row.click({
+      position: {
+        x: lastCell.x + lastCell.width / 2 - rowBox.x,
+        y: lastCell.y + lastCell.height / 2 - rowBox.y,
+      },
+    });
+    await expect(page).toHaveURL(new RegExp(`/projects/${ALPHA}/specs/auth-spec$`));
+
+    await page.goto(`/projects/${ALPHA}/specs`);
+
+    await page.getByTestId('specs-list').getByTestId('record-open').first().focus();
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(new RegExp(`/projects/${ALPHA}/specs/auth-spec$`));
+  });
+
+  /**
+   * `UTable` に `onSelect` を渡すと `tr` に `role="button"` と `tabindex="0"` が付くが、
+   * `UTable` は keydown を持たないので Enter では開けない。本家の `tr` も tabindex を
+   * 持たない。行そのものはタブ順に入れず、タブストップは行あたり1つ（リンク）にする。
+   */
+  test('タブストップは行あたり1つで、行そのものはタブ順に入らない', async ({ page }) => {
+    await page.goto(`/projects/${ALPHA}/specs/auth-spec`);
+
+    const rows = recordRows(page.getByTestId('spec-documents'));
+
+    await expect(rows.first()).not.toHaveAttribute('tabindex');
+    await expect(rows.first()).not.toHaveAttribute('role');
+    await expect(rows.first().locator('a, button, [tabindex]')).toHaveCount(1);
   });
 
   test('文書は3本に分かれ、それぞれ URL を持つ', async ({ page }) => {
     await page.goto(`/projects/${ALPHA}/specs/auth-spec`);
 
-    const rows = page.getByTestId('spec-documents').getByTestId('record-row');
+    const rows = recordRows(page.getByTestId('spec-documents'));
     await expect(rows).toHaveCount(3);
   });
 
@@ -155,15 +299,32 @@ test.describe('ステアリング', () => {
   });
 
   test('3本固定で並び、未作成が分かる', async ({ page }) => {
-    const rows = page.getByTestId('steering-list').getByTestId('record-row');
+    const rows = recordRows(page.getByTestId('steering-list'));
 
     await expect(rows).toHaveCount(3);
     await expect(rows.filter({ hasText: 'structure.md' })).toContainText('未作成');
   });
 
   test('未作成の文書は開けない', async ({ page }) => {
-    const row = page.getByTestId('record-row').filter({ hasText: 'structure.md' });
-    await expect(row).toHaveAttribute('data-disabled', 'true');
+    const row = recordRows(page).filter({ hasText: 'structure.md' });
+
+    await expect(row).toHaveClass(/sb-datarow-off/);
+    await expect(row.getByTestId('record-open')).toHaveCount(0);
+  });
+
+  /** 開けない行に止まるタブストップを作らない。行にも中身にもフォーカスを置かない */
+  test('未作成の文書の行はフォーカスを受けない', async ({ page }) => {
+    const row = recordRows(page).filter({ hasText: 'structure.md' });
+
+    await expect(row).not.toHaveAttribute('tabindex');
+    await expect(row).not.toHaveAttribute('role');
+    await expect(row.locator('a, button, [tabindex]')).toHaveCount(0);
+
+    // 前の行のリンクから Tab で進んでも、この行を飛ばして次の行のリンクへ行く
+    await recordRows(page).filter({ hasText: 'tech.md' }).getByTestId('record-open').focus();
+    await page.keyboard.press('Tab');
+
+    await expect(row.locator(':focus')).toHaveCount(0);
   });
 
   test('ある文書は URL で直接開ける', async ({ page }) => {
@@ -185,8 +346,8 @@ test.describe('タスク', () => {
   test('タスクを持つ仕様書が並ぶ', async ({ page }) => {
     await page.goto(`/projects/${ALPHA}/tasks`);
 
-    await expect(page.getByTestId('record-row')).toHaveCount(1);
-    await expect(page.getByTestId('record-row')).toContainText('auth-spec');
+    await expect(recordRows(page)).toHaveCount(1);
+    await expect(recordRows(page)).toContainText('auth-spec');
   });
 
   test('仕様書ごとに URL を持つ', async ({ page }) => {
@@ -242,8 +403,10 @@ test.describe('承認', () => {
 
     await expect(page.getByTestId('approval-meta')).toContainText('.spec-workflow/steering/tech.md');
 
-    // 対象文書はそのまま直せる状態で開く（specs/document-editing）
-    await expect(page.getByTestId('document-input')).toContainText('本文');
+    // 承認は読んで判断する場なので、まず整形して出る。直すときに編集へ入る
+    // （specs/document-editing の改定・`ApprovalAnnotator` の preview 面）
+    await expect(page.getByTestId('document-content')).toContainText('本文');
+    await expect(page.getByTestId('document-edit')).toBeVisible();
   });
 
   test('既に処理済みの承認依頼はその旨が出る', async ({ page }) => {
@@ -334,7 +497,8 @@ test.describe('通知からの導線', () => {
     await page.getByTestId('notification-open').click();
 
     await expect(page).toHaveURL(new RegExp(`/projects/${ALPHA}/approvals/nav1$`));
-    await expect(page.getByTestId('document-input')).toBeVisible();
+    // 着地先は承認画面の preview 面。対象文書は整形して出る
+    await expect(page.getByTestId('document-content')).toBeVisible();
   });
 
   test('キーボードだけで通知から対象を開ける', async ({ page }) => {
@@ -356,9 +520,10 @@ test.describe('未作成の文書は開けない', () => {
   test('未作成の仕様書文書にはリンクを張らない', async ({ page }) => {
     await page.goto(`/projects/${ALPHA}/specs/auth-spec`);
 
-    const design = page.getByTestId('record-row').filter({ hasText: '設計' });
+    const design = recordRows(page).filter({ hasText: '設計' });
     await expect(design).toContainText('未作成');
-    await expect(design).toHaveAttribute('data-disabled', 'true');
+    await expect(design).toHaveClass(/sb-datarow-off/);
+    await expect(design.getByTestId('record-open')).toHaveCount(0);
   });
 
   test('未作成の文書を URL で直接開くと、その旨が出る', async ({ page }) => {

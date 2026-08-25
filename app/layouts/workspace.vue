@@ -3,16 +3,20 @@
  * 下層（プロジェクト単位）のシェル。
  *
  * prototype の案A をそのまま写している。ヘッダーに「← ポータルへ戻る」、フォルダアイコン付き
- * のプロジェクト名、状態チップ、右端に接続 dot。サイドバーは幅 170px / padding 10px /
- * パネル面。
+ * のプロジェクト名、状態チップ、右端に接続 dot。
+ *
+ * サイドバーだけは prototype ではなく本家の寸法を使う（理由は main.css の `.sb-sidebar`）。
+ *
+ * サイドバーは畳める。本家（PageNavigationSidebar）と同じで、畳んでも消えず 64px の帯に
+ * なり、そこに残るボタンで開き直す。項目のアイコンは開いていても畳んでいても出したままで、
+ * 畳んだときにラベルだけが落ちる（本家も同じ。畳んだ瞬間に別の部品に見えない）。
  *
  * プロジェクト切替の口はここに置かない。別のプロジェクトへ移るときは上層を経由する。
  */
-import { computed, useFetch, useRoute } from '#imports';
+import { computed, useCookie, useFetch, useRoute } from '#imports';
 
-import SbIcon from '~/components/shared/SbIcon.vue';
 import EmptyState from '~/components/workspace/EmptyState.vue';
-import { useBoardSocket } from '~/composables/shared/useBoardSocket';
+import { useBoardSocket } from '~/composables/useBoardSocket';
 
 const route = useRoute();
 const projectId = computed(() => String(route.params.projectId ?? ''));
@@ -30,17 +34,45 @@ const { data: info, error } = await useFetch(() => `/api/projects/${projectId.va
 const unresolved = computed(() => Boolean(error.value));
 const connected = computed(() => upstreamConnected.value && !unresolved.value);
 
+/**
+ * アイコンは常に出す。本家（PageNavigationSidebar）の nav 項目に付いている絵をそのまま
+ * 割り当てている（概要＝nav.statistics、Feature＝nav.specs の文書、承認＝nav.approvals）。
+ */
 const sections = [
-  { to: '', label: '概要' },
-  { to: 'specs', label: 'Feature' },
-  { to: 'steering', label: 'ステアリング' },
-  { to: 'tasks', label: 'タスク' },
-  { to: 'approvals', label: '承認' },
+  { to: '', label: '概要', icon: 'upstream:statistics' },
+  { to: 'specs', label: 'Feature', icon: 'upstream:document' },
+  { to: 'steering', label: 'ステアリング', icon: 'upstream:steering' },
+  { to: 'tasks', label: 'タスク', icon: 'upstream:tasks' },
+  { to: 'approvals', label: '承認', icon: 'upstream:check-circle' },
 ] as const;
 
 /** 概要だけは完全一致でないと、下層のどこにいても選択中に見えてしまう */
 function linkOf(to: string): string {
   return to === '' ? `/projects/${projectId.value}` : `/projects/${projectId.value}/${to}`;
+}
+
+/**
+ * サイドバーを畳んだかどうか。
+ *
+ * 本家は localStorage（`App.tsx` の `SIDEBAR_COLLAPSE_KEY`）に持つが、本家は CSR だけで
+ * 動くので初回描画の前に読める。stroke-board は SSR があり、localStorage はサーバでは
+ * 読めない。そこで持つと、サーバは必ず「開いた形」を返し、ブラウザに渡ってから畳むため、
+ * 畳んだまま読み込み直すたびに 200ms かけて閉じるちらつきが出る。
+ *
+ * 見た目と挙動を本家に合わせるのが最優先なので、保存先だけをサーバでも読める cookie に
+ * 替える。キーの名前と値（真偽値）は本家のまま。
+ */
+const collapsedStore = useCookie<boolean>('spec-workflow-sidebar-collapsed', {
+  default: () => false,
+  // 畳んだ状態は端末の好みで、期限を切る理由が無い（本家の localStorage も消えない）
+  maxAge: 60 * 60 * 24 * 365,
+  sameSite: 'lax',
+});
+
+const collapsed = computed(() => collapsedStore.value === true);
+
+function toggleCollapsed(): void {
+  collapsedStore.value = !collapsed.value;
 }
 </script>
 
@@ -53,12 +85,12 @@ function linkOf(to: string): string {
   <div class="flex min-h-screen flex-col bg-[var(--surface-base)] text-[var(--text-primary)]">
     <header class="sb-bar">
       <NuxtLink to="/" class="sb-navitem sb-bar-back pl-0" data-testid="back-to-portal">
-        <SbIcon name="back" :size="16" />
+        <UIcon name="sb:back" class="size-4 shrink-0" />
         ポータルへ戻る
       </NuxtLink>
 
       <span class="sb-bar-title inline-flex items-center gap-1.5" data-testid="workspace-project-name">
-        <SbIcon name="folder" :size="14" />
+        <UIcon name="sb:folder" class="size-3.5 shrink-0" />
         {{ info?.projectName ?? projectId }}
       </span>
 
@@ -76,23 +108,62 @@ function linkOf(to: string): string {
     </header>
 
     <div class="flex min-h-0 flex-1">
-      <nav class="sb-sidebar" aria-label="プロジェクト" data-testid="workspace-sidebar">
-        <ul>
+      <!--
+        畳むボタンはサイドバーの中の一番上。本家もここに置き、畳んだ帯にも残るので
+        開き直す口が同じ場所になる（PageNavigationSidebar のヘッダー行）。
+      -->
+      <nav
+        class="sb-sidebar"
+        :class="collapsed ? 'sb-sidebar-collapsed' : ''"
+        aria-label="プロジェクト"
+        data-testid="workspace-sidebar"
+        :data-collapsed="collapsed"
+      >
+        <div class="sb-sidebar-head">
+          <!--
+            開いているときは見出しが入る。本家はここに製品名を置くが、下層のヘッダーが既に
+            プロジェクト名を出しているので、このナビが何の並びかを示す語（＝この nav の
+            aria-label と同じ）を使う
+          -->
+          <h2 v-if="!collapsed" class="sb-sidebar-title">プロジェクト</h2>
+
+          <button
+            type="button"
+            class="sb-sidebar-toggle"
+            :aria-label="collapsed ? 'サイドバーを開く' : 'サイドバーを畳む'"
+            :title="collapsed ? 'サイドバーを開く' : 'サイドバーを畳む'"
+            data-testid="sidebar-collapse"
+            @click="toggleCollapsed"
+          >
+            <!-- 本家は同じ絵を 180 度回して「開く」に使う -->
+            <UIcon
+              name="upstream:chevron-double-left"
+              class="block size-5 transition-transform"
+              :class="collapsed ? 'rotate-180' : ''"
+            />
+          </button>
+        </div>
+
+        <ul class="sb-sidebar-nav">
           <li v-for="section in sections" :key="section.to">
             <NuxtLink
               :to="linkOf(section.to)"
               class="sb-navitem"
+              :class="collapsed ? 'justify-center' : ''"
               :active-class="section.to === '' ? '' : 'sb-navitem-on'"
               exact-active-class="sb-navitem-on"
+              :title="collapsed ? section.label : undefined"
               :data-testid="`sidebar-${section.to || 'overview'}`"
             >
-              {{ section.label }}
+              <!-- 絵は畳んでも出したまま。落ちるのはラベルだけ（本家と同じ） -->
+              <UIcon :name="section.icon" class="size-5 shrink-0" />
+              <span v-if="!collapsed" class="sb-sidebar-label">{{ section.label }}</span>
             </NuxtLink>
           </li>
         </ul>
       </nav>
 
-      <!-- 本家の本文余白は px-6 py-6（App.tsx の main）。サイドバーは prototype の 170px -->
+      <!-- 本家の本文余白は px-6 py-6（App.tsx の main）。サイドバーの幅は main.css -->
       <main class="min-w-0 flex-1 overflow-auto px-6 py-6">
         <div v-if="unresolved" class="sb-panel">
           <EmptyState testid="workspace-unresolved" title="未接続" icon="check-circle">

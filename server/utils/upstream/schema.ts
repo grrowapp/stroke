@@ -63,6 +63,11 @@ export const phaseStatusSchema = z.object({
 /** `GET /api/projects/:projectId/specs` と `initial` の `specs` */
 export const specDataSchema = z.object({
   name: z.string(),
+  /**
+   * 本家が name から起こす表示名（`core-structure` → `Core Structure`）。
+   * 本家の一覧は上段にこれ、下段に name を出す（`SpecsPage.tsx` の `SpecTableRow`）。
+   */
+  displayName: z.string().optional(),
   description: z.string().optional(),
   createdAt: z.string(),
   lastModified: z.string(),

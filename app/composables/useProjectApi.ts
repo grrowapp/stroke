@@ -14,7 +14,9 @@ import { $fetch, useFetch, useRoute } from '#imports';
 import { computed, toValue, type MaybeRefOrGetter } from 'vue';
 
 import type {
+  ApprovalActionName,
   ApprovalDto,
+  ApprovalRevisionPayload,
   DocumentContentDto,
   ProjectInfoDto,
   SpecDocumentsDto,
@@ -66,9 +68,24 @@ export function useSteeringDocument(
   return useFetch<DocumentContentDto>(() => `${base(projectId)}/steering/${toValue(name)}`);
 }
 
+/**
+ * 保留中の承認依頼を数えるためのキー。
+ *
+ * 承認一覧と承認詳細の両方がこの composable を呼ぶ。キーを自動生成に任せると
+ * **呼び出し位置（この関数の中の1箇所）から作られるため両ページで同じ値になり**、
+ * 詳細ページで取ったものを一覧ページがそのまま使い回して再取得しない（実測）。
+ * 共有すること自体は正しい（同じデータなので）が、**応答を送った後に捨てる口**が要る。
+ * その口が `refreshNuxtData(pendingApprovalsKey(projectId))`。
+ */
+export function pendingApprovalsKey(projectId: MaybeRefOrGetter<string>): string {
+  return `approvals:${toValue(projectId)}`;
+}
+
 /** 保留中の承認依頼。本家は保留中しか返さない */
 export function usePendingApprovals(projectId: MaybeRefOrGetter<string>) {
-  return useFetch<ApprovalDto[]>(() => `${base(projectId)}/approvals`);
+  return useFetch<ApprovalDto[]>(() => `${base(projectId)}/approvals`, {
+    key: () => pendingApprovalsKey(projectId),
+  });
 }
 
 /** 承認依頼の対象文書の中身 */
@@ -116,6 +133,61 @@ export function saveSteeringDocument(
   content: string,
 ): Promise<string | null> {
   return put(`/api/projects/${projectId}/steering/${name}`, content);
+}
+
+// --- 承認への応答 ---
+
+/**
+ * 承認への応答を送る。失敗した理由の文字列を返す。成功なら null。
+ *
+ * 本家が受ける3つ（`approve` / `reject` / `needs-revision`）をそのまま出す。注釈を
+ * 運べるのは `needs-revision` だけで、`approve` / `reject` は `response` しか持たない
+ * （サーバー側でも弾く）。
+ */
+export async function respondToApproval(
+  projectId: string,
+  approvalId: string,
+  action: ApprovalActionName,
+  body: { response?: string } | ApprovalRevisionPayload,
+): Promise<string | null> {
+  try {
+    await $fetch(`/api/projects/${projectId}/approvals/${approvalId}/${action}`, {
+      method: 'POST',
+      body,
+    });
+    return null;
+  } catch (error) {
+    return approvalReasonOf(error);
+  }
+}
+
+/**
+ * 承認への応答が通らなかった理由を、画面に出せる言葉にする。
+ *
+ * 保存（`reasonOf`）と混ぜないのは、同じ `statusMessage` でも意味が違うため。
+ * 「見つからない」は保存では文書、承認では承認依頼そのものを指す。
+ */
+function approvalReasonOf(error: unknown): string {
+  const status = (error as { statusMessage?: string } | null)?.statusMessage;
+
+  switch (status) {
+    case 'upstream-not-configured':
+      return '本家ダッシュボードの URL が設定されていません。';
+    case 'upstream-unreachable':
+      return '本家に繋がりません。本家が動いているか確かめてください。';
+    case 'upstream-not-found':
+      return 'この承認依頼が本家に見つかりません。既に処理済みの可能性があります。';
+    case 'revision-needs-comments':
+      return 'コメントが1件もありません。差し戻すにはコメントが要ります。';
+    case 'reject-needs-reason':
+      return '却下の理由が要ります。';
+    case 'annotations-need-revision':
+      return 'コメントを運べるのは差し戻しだけです。';
+    case 'invalid-body':
+      return '送る内容の形が正しくありません。';
+    default:
+      return '送れませんでした。もう一度試してください。';
+  }
 }
 
 /**

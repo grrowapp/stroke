@@ -15,7 +15,6 @@
  */
 import { $fetch, navigateTo, ref } from '#imports';
 
-import UpstreamIcon from '~/components/shared/UpstreamIcon.vue';
 import type { ApprovalDto } from '#shared/types';
 
 const props = defineProps<{ approval: ApprovalDto; to: string; projectId: string }>();
@@ -26,14 +25,25 @@ function open(): void {
   void navigateTo(props.to);
 }
 
-/** 本家は日時を `Aug 17, 02:26 PM` の形で出す。ここは日本語のみなので同じ粒度で和文にする */
+/**
+ * 本家は日時を `Aug 17, 02:26 PM` の形で出す。ここは日本語のみなので同じ粒度で和文にする。
+ *
+ * `month: 'numeric'` だと `8/25` になるため `'long'`。`hour: '2-digit'` だけでは
+ * 12時間制になる環境があるので `hourCycle: 'h23'` を明示する。
+ */
+const DATE_FORMAT = new Intl.DateTimeFormat('ja-JP', {
+  month: 'long',
+  day: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+
 function formatDate(iso: string): string {
   const at = new Date(iso);
   if (Number.isNaN(at.getTime())) return '不明';
 
-  return `${at.getMonth() + 1}月${at.getDate()}日 ${String(at.getHours()).padStart(2, '0')}:${String(
-    at.getMinutes(),
-  ).padStart(2, '0')}`;
+  return DATE_FORMAT.format(at);
 }
 
 const busy = ref<'approve' | 'reject' | null>(null);
@@ -67,8 +77,14 @@ async function respond(action: 'approve' | 'reject', response?: string): Promise
 </script>
 
 <template>
+  <!--
+    `shadow` は本家のカードと同じクラス（`ApprovalsPage.tsx` の
+    `bg-[var(--surface-panel)] border … shadow rounded-lg`）。Tailwind v4 の `--shadow` は
+    `0 1px 3px 0 rgb(0 0 0/.1), 0 1px 2px -1px rgb(0 0 0/.1)` で、稼働中の本家で実測した影と
+    同じ。`--shadow-sm` は本家の design token 側（`0 1px 2px rgba(0,0,0,.2)`）を指すので使わない。
+  -->
   <div
-    class="cursor-pointer rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-panel)] transition-colors hover:border-[var(--border-strong)]"
+    class="cursor-pointer rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-panel)] shadow transition-colors hover:border-[var(--border-strong)]"
     data-testid="record-row"
     :data-key="approval.id"
     @click="open"
@@ -91,7 +107,7 @@ async function respond(action: 'approve' | 'reject', response?: string): Promise
             class="mb-2 flex min-w-0 max-w-full items-center gap-1 text-sm text-[var(--text-muted)]"
             data-testid="approval-path"
           >
-            <UpstreamIcon name="document" class="h-4 w-4 flex-shrink-0" />
+            <UIcon name="upstream:document" class="h-4 w-4 flex-shrink-0" />
             <span class="min-w-0 truncate break-all text-xs">{{ approval.filePath }}</span>
           </div>
 
@@ -102,7 +118,7 @@ async function respond(action: 'approve' | 'reject', response?: string): Promise
               style="background: var(--status-warning-muted); color: var(--status-warning)"
               data-testid="approval-status"
             >
-              <UpstreamIcon name="clock" class="mr-1 h-3 w-3" />
+              <UIcon name="upstream:clock" class="mr-1 h-3 w-3" />
               保留中
             </span>
 
@@ -110,7 +126,7 @@ async function respond(action: 'approve' | 'reject', response?: string): Promise
               class="flex items-center gap-1 font-mono tabular-nums text-[var(--text-faint)]"
               data-testid="approval-created"
             >
-              <UpstreamIcon name="calendar" class="h-4 w-4" />
+              <UIcon name="upstream:calendar" class="h-4 w-4" />
               {{ formatDate(approval.createdAt) }}
             </span>
             <!--
@@ -123,7 +139,7 @@ async function respond(action: 'approve' | 'reject', response?: string): Promise
           <div class="flex flex-wrap items-center gap-3" @click.stop>
             <!-- 押した先で対象文書がそのまま直せる（specs/document-editing） -->
             <NuxtLink :to="to" class="sb-action" data-testid="record-open">
-              <UpstreamIcon name="eye" class="h-4 w-4" />
+              <UIcon name="upstream:eye" class="h-4 w-4" />
               レビューする
             </NuxtLink>
 
@@ -134,7 +150,7 @@ async function respond(action: 'approve' | 'reject', response?: string): Promise
               data-testid="approval-approve"
               @click="respond('approve')"
             >
-              <UpstreamIcon name="check-circle" class="h-4 w-4" />
+              <UIcon name="upstream:check-circle" class="h-4 w-4" />
               {{ busy === 'approve' ? '承認中…' : '承認' }}
             </button>
 
@@ -145,7 +161,7 @@ async function respond(action: 'approve' | 'reject', response?: string): Promise
               data-testid="approval-reject"
               @click="rejecting = !rejecting"
             >
-              <UpstreamIcon name="alert-circle" class="h-4 w-4" />
+              <UIcon name="upstream:alert-circle" class="h-4 w-4" />
               却下
             </button>
           </div>

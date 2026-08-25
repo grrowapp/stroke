@@ -11,7 +11,7 @@ import { computed, definePageMeta, useRoute } from '#imports';
 
 import EmptyState from '~/components/workspace/EmptyState.vue';
 import WorkspacePanel from '~/components/workspace/WorkspacePanel.vue';
-import { useProjectId, useTaskProgress } from '~/composables/workspace/useProjectApi';
+import { useProjectId, useTaskProgress } from '~/composables/useProjectApi';
 
 definePageMeta({ layout: 'workspace' });
 

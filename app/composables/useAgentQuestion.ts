@@ -2,7 +2,7 @@
 // 質疑応答をさせたい画面は、セッション id を渡してこれを呼ぶだけでよい（design 決定1・決定2）。
 //
 // 状態は全て返り値として出し、外から渡す口は持たない（design 決定3）。
-// 面（`AgentQuestionModal`）はここに依存せず、props と emit だけで繋がる。
+// 面（`AgentQuestion`）はここに依存せず、props と emit だけで繋がる。
 import type { Answer, Question } from '#shared/stroke'
 
 /** $fetch が投げるエラー。ofetch の FetchError に statusCode / data が乗る。 */
@@ -55,7 +55,8 @@ export interface AgentQuestionReturn {
 }
 
 export function useAgentQuestion(sessionId: MaybeRefOrGetter<string>): AgentQuestionReturn {
-  const { question } = useQuestionChannel(sessionId)
+  // W1 `/ws/question` を購読する。届くのは今の1問で、最後の1件で上書きされる。
+  const question = useSessionChannel<Question>(sessionId, 'question')
   const waitingRetry = useWaitingRetry(sessionId)
 
   const answered = ref(0)

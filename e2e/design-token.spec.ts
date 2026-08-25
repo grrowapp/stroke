@@ -221,7 +221,7 @@ test.describe('アイコンは prototype のものを使っている', () => {
     ] as const) {
       const d = await page
         .getByTestId(testId)
-        .locator(`svg[data-icon="${name}"] path`)
+        .locator('svg.iconify--sb path')
         .getAttribute('d');
 
       expect(d, `${testId} のアイコンが prototype と違う`).toBe(expected[name]);
@@ -234,7 +234,7 @@ test.describe('アイコンは prototype のものを使っている', () => {
     const d = await page
       .getByTestId('project-row')
       .first()
-      .locator('svg[data-icon="folder"] path')
+      .locator('svg.iconify--sb path')
       .getAttribute('d');
 
     expect(d).toBe(prototypeIconPaths().folder);
@@ -251,7 +251,7 @@ test.describe('アイコンは prototype のものを使っている', () => {
     ] as const) {
       const d = await page
         .getByTestId(testId)
-        .locator(`svg[data-icon="${name}"] path`)
+        .locator('svg.iconify--sb path')
         .getAttribute('d');
 
       expect(d, `${testId} のアイコンが prototype と違う`).toBe(expected[name]);
@@ -297,25 +297,34 @@ test.describe('アイコンは prototype のものを使っている', () => {
 
     const back = await page
       .getByTestId('back-to-portal')
-      .locator('svg[data-icon="back"] path')
+      .locator('svg.iconify--sb path')
       .getAttribute('d');
     expect(back).toBe(expected.back);
 
     const folder = await page
       .getByTestId('workspace-project-name')
-      .locator('svg[data-icon="folder"] path')
+      .locator('svg.iconify--sb path')
       .getAttribute('d');
     expect(folder).toBe(expected.folder);
   });
 
-  test('下層のサイドバーは prototype と同じ幅', async ({ page }) => {
+  /*
+   * サイドバーの幅だけは prototype ではなく本家に合わせている。
+   *
+   * prototype が決めたのは「下層のナビは左サイドバーにする」という**形**（ui.md Q34/Q35）で、
+   * 170px はその模型がたまたま持っていた寸法である。畳む機能は prototype に無く、畳んだ
+   * 64px は本家の `lg:w-16` から来ている。開いた幅だけ prototype に残すと、同じ部品の
+   * 開閉が別々の出どころになる。開いた幅も本家の `lg:w-64`＝256px に揃える。
+   * 実測の根拠は main.css の `.sb-sidebar` にある。
+   */
+  test('下層のサイドバーは本家と同じ幅', async ({ page }) => {
     await page.goto('/projects/ALPHAID000000001');
 
     const width = await page
       .getByTestId('workspace-sidebar')
       .evaluate((element) => getComputedStyle(element).width);
 
-    expect(width).toBe('170px');
+    expect(width).toBe('256px');
   });
 });
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { NotificationFeed, toApprovalNotification, toTaskNotification } from './notify';
-import type { ApprovalRequest } from '../upstream/schema';
+import { NotificationFeed, toApprovalNotification, toTaskNotification } from '../../../../server/utils/control/notify';
+import type { ApprovalRequest } from '../../../../server/utils/upstream/schema';
 import type { Notification } from '#shared/types';
 
 const context = {

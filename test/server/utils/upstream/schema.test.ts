@@ -10,7 +10,7 @@ import {
   taskStatusUpdateMessageSchema,
   taskSummarySchema,
   upstreamMessageSchema,
-} from './schema';
+} from '../../../../server/utils/upstream/schema';
 
 /** 2.2.7 の `task-status-update`。`blocked` を含む */
 function taskUpdate2_2_7() {

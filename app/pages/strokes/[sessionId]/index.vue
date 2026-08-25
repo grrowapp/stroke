@@ -4,7 +4,7 @@
 // (design.md 決定2・6)。待機・失敗は U2 のポーリングで拾う(task 6.3)。
 // 器は `stroke` レイアウト（fullscreen の UModal・閉じ操作なし）。どの場面に居るかは
 // URL が持つので、リロードすれば同じ途中画面がモーダルとして開き直る（design.md D1）。
-import type { Answer, Phase, SessionStatus, Stroke } from '#shared/stroke'
+import type { Answer, Phase, Question, SessionStatus, Stroke } from '#shared/stroke'
 
 definePageMeta({ layout: 'stroke' })
 
@@ -41,10 +41,15 @@ const { data: strokesData } = await useFetch<{ strokes: Stroke[] }>(`/api/stroke
 })
 const strokes = ref<Stroke[]>(strokesData.value?.strokes ?? [])
 
-const { question } = useQuestionChannel(sessionId)
+// W1 `/ws/question` を購読する。届くのは今の1問で、最後の1件で上書きされる。
+const question = useSessionChannel<Question>(sessionId, 'question')
 const waitingRetry = useWaitingRetry(sessionId)
 
 const errorMessage = ref(loadError.value && !notFound ? 'セッションを読み込めませんでした。' : '')
+
+// この面でここまでに答えた数。総数は持たない(AI が決めるため事前に分からない)。
+// 数え方は画面2 の `useAgentQuestion.answered` と同じで、受理が通った回数を数える。
+const answered = ref(0)
 
 // 初期表示: reload 直後などで実行中・失敗・終端のことがある(U2 の契約)
 if (status.value?.invocation === 'running') {
@@ -105,6 +110,7 @@ async function answer(given: Answer) {
     return
   }
   strokes.value = [...strokes.value, { proposal: false, question: asked, answer: given }]
+  answered.value += 1
 
   // 受理と起動は分かれている(specs/api/answer)。成功応答の直後に起動を要求する
   // (design.md 決定6)。cwd は U2 が返した path を渡す——endpoint に導出させない
@@ -164,12 +170,17 @@ async function answer(given: Answer) {
       </template>
     </UAlert>
 
-    <!-- 応答待ち。待機中は問いも回答欄も出さないので追加送信できない -->
-    <WaitingIndicator v-if="waitingRetry.waiting.value" message="AI が次を考えています…" class="py-32" />
-
-    <StrokeQuestionCard
-      v-else-if="question && !waitingRetry.errored.value"
+    <!-- 問いの面。オーバーレイの外殻を持たず、この画面に素置きする(design 決定3)。
+         待機は面の中で示され、そのあいだ回答欄も送信も出ないので追加送信できない。
+         問いも待機も無いあいだは面ごと出さない(問いが届く前に「問いがありません」を
+         出さないため)。終端に達したときは面を畳み、上の回復操作だけを見せる -->
+    <AgentQuestion
+      v-if="(waitingRetry.waiting.value || question) && !waitingRetry.errored.value"
       :question="question"
+      :waiting="waitingRetry.waiting.value"
+      waiting-message="AI が次を考えています…"
+      :answered="answered"
+      submit-label="送信"
       @answer="answer"
     />
   </div>

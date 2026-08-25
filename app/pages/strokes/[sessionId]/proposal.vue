@@ -2,8 +2,6 @@
 // 画面2(proposal 確認)。ui.md の採用案 = B(右パネル常設)。
 // 決める操作(差し戻す・承認)はビュー切替と同じ上部固定バーに集約する。
 // 差し戻し後の問い返しは画面1 へ戻さず、この画面の帯とモーダルで受ける。
-import DOMPurify from 'isomorphic-dompurify'
-import { marked } from 'marked'
 import type { Phase, SessionStatus, Stroke } from '#shared/stroke'
 
 // 器は `stroke` レイアウト（fullscreen の UModal・閉じ操作なし）。承認すると
@@ -60,10 +58,6 @@ const {
   answered,
   deleteId,
 } = review
-
-// proposal は AI が書いた Markdown。整形した HTML は必ずサニタイズしてから流し込む。
-// isomorphic-dompurify はサーバ(jsdom)でもブラウザでも同じ口で動く。
-const html = computed(() => DOMPurify.sanitize(marked.parse(proposal.value, { async: false })))
 
 const hasProposal = computed(() => !!proposal.value)
 const approved = computed(() => phase.value === 'approved')
@@ -157,8 +151,9 @@ const modes = [
         <div
           v-if="shownMode === 'preview'"
           class="prose prose-sm dark:prose-invert max-w-none px-8 py-8"
-          v-html="html"
-        />
+        >
+          <MDC :value="proposal" />
+        </div>
 
         <!-- 注釈: 生テキスト。指摘を付けられるのはこの面だけ -->
         <ReviewAnnotateSource
@@ -179,7 +174,9 @@ const modes = [
             @select="review.onSelect"
             @click-mark="review.editComment"
           />
-          <div class="prose prose-sm dark:prose-invert min-w-0 max-w-none px-6 py-6" v-html="html" />
+          <div class="prose prose-sm dark:prose-invert min-w-0 max-w-none px-6 py-6">
+            <MDC :value="proposal" />
+          </div>
         </div>
       </section>
 
@@ -212,14 +209,39 @@ const modes = [
     </div>
 
     <ReviewModals :review="review" />
-    <AgentQuestionModal
+
+    <!-- 問い返しはこの画面の上にオーバーレイで開く。答え終わるまで閉じない:
+         ESC・背景クリック(:dismissible="false")も閉じるボタン(:close="false")も
+         受け付けない。幅は画面を覆い切らない大きさに留め、背後の本文を残す。
+         中身は画面1 と同じ `AgentQuestion` で、送信ボタンもその中にある
+         (design 決定3)。footer には注記だけを置く。
+
+         body の既定は `overflow-y-auto` で、body そのものがスクロールする。それだと
+         問いが長いとき送信ボタンが下へ流れて押せなくなるので、body 側のスクロールを
+         止めて縦の flex にし、スクロールは `AgentQuestion` の中の「問いの中身」だけに
+         任せる(tasks 6.7)。ボタンはそのスクロール領域の外に残るので常に見える -->
+    <UModal
       v-model:open="followupOpen"
-      :question="followupQuestion"
-      :waiting="followupWaiting"
-      :answered="answered"
-      waiting-message="AI が次を考えています…"
-      @answer="review.answerFollowup"
-    />
+      title="AI からの質問"
+      :dismissible="false"
+      :close="false"
+      :ui="{ content: 'max-w-2xl', body: 'flex min-h-0 flex-col overflow-y-hidden' }"
+    >
+      <template #body>
+        <AgentQuestion
+          :question="followupQuestion"
+          :waiting="followupWaiting"
+          waiting-message="AI が次を考えています…"
+          :answered="answered"
+          submit-label="答える"
+          @answer="review.answerFollowup"
+        />
+      </template>
+
+      <template #footer>
+        <span class="text-xs text-muted">答えると、AI がさらに聞いてくることがあります</span>
+      </template>
+    </UModal>
     </template>
   </div>
 </template>

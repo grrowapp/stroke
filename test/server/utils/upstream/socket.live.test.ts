@@ -4,8 +4,8 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { UpstreamSocket } from './socket';
-import type { UpstreamMessage } from './schema';
+import { UpstreamSocket } from '../../../../server/utils/upstream/socket';
+import type { UpstreamMessage } from '../../../../server/utils/upstream/schema';
 
 const baseUrl = process.env.NUXT_UPSTREAM_BASE_URL ?? 'http://127.0.0.1:5000';
 

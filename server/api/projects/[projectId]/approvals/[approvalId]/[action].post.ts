@@ -16,16 +16,56 @@ import { APPROVAL_ACTIONS, type ApprovalAction } from '../../../../../utils/upst
 import { toHttpError, upstreamClient } from '../../../../../utils/control/upstream-proxy';
 
 /**
- * 本家は body の `response` を応答本文として保存する。
+ * 注釈1件。`#shared/stroke` の `Annotation` と同じ形を、境界で検証できるように zod で持つ。
+ *
+ * ここを緩めて素通しにすると、本家の approval JSON に何でも書けてしまう。書くのは
+ * 本家でも、何を書かせるかを決めているのはこの口である。
+ */
+const highlightColorSchema = z.object({
+  name: z.enum(['yellow', 'green', 'blue', 'pink', 'orange']),
+  bg: z.string().max(64),
+  border: z.string().max(64),
+});
+
+const annotationSchema = z.discriminatedUnion('type', [
+  z.object({
+    id: z.string().max(128),
+    type: z.literal('general'),
+    comment: z.string().trim().min(1).max(2000),
+    timestamp: z.string().max(64),
+  }),
+  z.object({
+    id: z.string().max(128),
+    type: z.literal('selection'),
+    comment: z.string().trim().min(1).max(2000),
+    timestamp: z.string().max(64),
+    selectedText: z.string().max(20000),
+    startOffset: z.number().int().nonnegative(),
+    endOffset: z.number().int().nonnegative(),
+    highlightColor: highlightColorSchema,
+  }),
+]);
+
+/**
+ * 本家は body の `response` を応答本文として保存し、`annotations` / `comments` を
+ * 同じファイルの別フィールドに書く。
+ *
  * 却下は理由が要るので空を通さない。承認は既定文を使うので省略できる。
+ *
+ * `response` の上限は 2000 字だったが、差し戻しの `response` は人が書いた文ではなく
+ * コメントから組み立てた要約で、件数に比例して伸びる。上限は action ごとに変えず、
+ * 一番長くなる差し戻しに合わせて 1 本で持つ。
  */
 const bodySchema = z.object({
-  response: z.string().trim().max(2000).optional(),
+  response: z.string().trim().max(200000).optional(),
+  annotations: z.string().max(1000000).optional(),
+  comments: z.array(annotationSchema).max(100).optional(),
 });
 
 const DEFAULT_RESPONSE: Record<ApprovalAction, string> = {
   approve: 'stroke-board から承認',
   reject: 'stroke-board から却下',
+  'needs-revision': 'stroke-board から差し戻し',
 };
 
 export default defineEventHandler(async (event) => {
@@ -34,7 +74,6 @@ export default defineEventHandler(async (event) => {
   const action = getRouterParam(event, 'action') ?? '';
 
   if (!isApprovalAction(action)) {
-    // 本家は needs-revision も受けるが、stroke-board からは出さない
     throw createError({ statusCode: 400, statusMessage: 'unknown-approval-action' });
   }
 
@@ -45,10 +84,28 @@ export default defineEventHandler(async (event) => {
   }
 
   const response = parsed.data.response?.trim();
+  const { annotations, comments } = parsed.data;
 
   // 却下は理由が本家に残る。空のまま送ると「なぜ却下されたか」が失われる
   if (action === 'reject' && (response === undefined || response.length === 0)) {
     throw createError({ statusCode: 400, statusMessage: 'reject-needs-reason' });
+  }
+
+  /*
+   * 注釈を運べるのは差し戻しだけである。
+   *
+   * 本家は `approve` / `reject` にも `annotations` / `comments` を渡せてしまうが、
+   * あちらの画面はそこへ渡していない（`ApprovalsPage.tsx` は `needs-revision` の
+   * ときだけ組む）。ここで弾いておけば、承認したのにコメントが残っている
+   * approval JSON を作らずに済む。
+   */
+  if (action !== 'needs-revision' && (annotations !== undefined || comments !== undefined)) {
+    throw createError({ statusCode: 400, statusMessage: 'annotations-need-revision' });
+  }
+
+  // 差し戻しはコメントが本体である。0件で送ると、本家には理由の無い差し戻しだけが残る
+  if (action === 'needs-revision' && (comments === undefined || comments.length === 0)) {
+    throw createError({ statusCode: 400, statusMessage: 'revision-needs-comments' });
   }
 
   const result = await upstreamClient().respondToApproval(
@@ -56,6 +113,7 @@ export default defineEventHandler(async (event) => {
     approvalId,
     action,
     response === undefined || response.length === 0 ? DEFAULT_RESPONSE[action] : response,
+    comments === undefined ? undefined : { annotations: annotations ?? '', comments },
   );
 
   if (!result.ok) throw toHttpError(result.failure);

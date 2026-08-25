@@ -14,9 +14,8 @@
  */
 import { computed, definePageMeta, navigateTo, useFetch, useHead } from '#imports';
 
-import SbIcon from '~/components/shared/SbIcon.vue';
-import { useBoardSocket } from '~/composables/shared/useBoardSocket';
-import { formatRelativeTime } from '~/composables/shared/useRelativeTime';
+import { useBoardSocket } from '~/composables/useBoardSocket';
+import { formatRelativeTime } from '~/composables/useRelativeTime';
 import type { ProjectDirectoryResponse, ProjectSummary } from '#shared/types';
 
 definePageMeta({ layout: 'portal' });
@@ -84,7 +83,7 @@ function unread(project: ProjectSummary): number | null {
           title="登録が何を指すか（本家への登録なのか、走査対象の親パスを足すのか）が決まっていません。"
           data-testid="register-project"
         >
-          <SbIcon name="link" :size="14" />
+          <UIcon name="sb:link" class="size-3.5 shrink-0" />
           登録
         </button>
         <button
@@ -93,7 +92,7 @@ function unread(project: ProjectSummary): number | null {
           data-testid="create-project"
           @click="startStroke"
         >
-          <SbIcon name="plus" :size="14" />
+          <UIcon name="sb:plus" class="size-3.5 shrink-0" />
           作成
         </button>
       </div>
@@ -156,7 +155,7 @@ function unread(project: ProjectSummary): number | null {
                 data-testid="project-enter"
                 @click.stop="enter(project)"
               >
-                <SbIcon name="folder" :size="14" />
+                <UIcon name="sb:folder" class="size-3.5 shrink-0" />
                 {{ project.name }}
               </button>
               <span
@@ -164,7 +163,7 @@ function unread(project: ProjectSummary): number | null {
                 class="inline-flex items-center gap-1.5"
                 data-testid="project-name-disabled"
               >
-                <SbIcon name="folder" :size="14" />
+                <UIcon name="sb:folder" class="size-3.5 shrink-0" />
                 {{ project.name }}
               </span>
             </td>

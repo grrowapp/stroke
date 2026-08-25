@@ -6,8 +6,8 @@ import {
   diffTasks,
   seedApprovals,
   seedTasks,
-} from './diff';
-import type { ApprovalRequest, TaskSummary } from '../upstream/schema';
+} from '../../../../server/utils/control/diff';
+import type { ApprovalRequest, TaskSummary } from '../../../../server/utils/upstream/schema';
 
 /** 2.2.5 の形（blocked 無し）。基準は 2.2.7 だが両方通す（ADR-0008） */
 function summary(completed: number, total: number, inProgress = 0): TaskSummary {

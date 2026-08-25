@@ -146,15 +146,6 @@ body {
     gap: 2px;
   }
 
-  /* 下層のサイドバー。prototype は幅 170px / padding 10px / パネル面 */
-  .sb-sidebar {
-    width: 170px;
-    flex-shrink: 0;
-    padding: 10px;
-    border-right: 1px solid var(--border-default);
-    background: var(--surface-panel);
-  }
-
   /* 画面の見出し。prototype の pageTitle は 15px / 600 / margin-bottom 12px */
   .sb-page-title {
     font-size: 15px;
@@ -404,9 +395,173 @@ body {
  */
 @layer components {
   /*
+   * 下層のサイドバー。値は稼働中の本家（`PageNavigationSidebar`）から実測して写している。
+   *
+   * prototype（案A）はここを 170px / padding 10px で描いていたが、prototype が決めたのは
+   * 「下層のナビは左サイドバーにする」という**形**であって寸法ではない（ui.md Q34/Q35）。
+   * しかも prototype には畳む機能が無く、畳んだ 64px は本家の `lg:w-16` から来ている。
+   * 開いた幅だけ prototype に残すと、同じ部品の開閉が別々の出どころになる。開いた幅も
+   * 本家の `lg:w-64`＝256px に合わせる。
+   *
+   * 実測（127.0.0.1:5000 / 1440x900）: 開 256px / 閉 64px / 面 #1e293b /
+   * 右に 1px の線 / transition all 200ms cubic-bezier(0.4, 0, 0.2, 1)。
+   * CSS の `ease-in-out` **キーワード**は cubic-bezier(0.42, 0, 0.58, 1) で本家とは別物なので、
+   * Tailwind の `ease-in-out` が展開する値をそのまま書く。
+   */
+  .sb-sidebar {
+    display: flex;
+    flex-direction: column;
+    width: 256px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border-default);
+    background: var(--surface-panel);
+    transition: width 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /*
+   * 畳んだサイドバー。本家（`isCollapsed`）は `lg:w-16`＝64px の細い帯にする。消しはしない。
+   * 畳むボタンと項目のアイコンはこの帯に残り、そのまま行き先を選べる。
+   */
+  .sb-sidebar-collapsed {
+    width: 64px;
+  }
+
+  /*
+   * 畳むボタンの行。本家は `p-4` と下の 1px 線を持ち、開いているときだけ見出しが入る
+   * （畳むと見出しが消え、ボタンだけが `ml-auto` で残る）。
+   */
+  .sb-sidebar-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 16px;
+    border-bottom: 1px solid var(--border-default);
+  }
+
+  /* 本家の見出しは `text-lg font-semibold`。実測 16px / 600 */
+  .sb-sidebar-title {
+    font-size: var(--text-lg);
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  /* 本家のボタンは 32px 四方（`p-1.5` に 20px の絵）。面は hover のときだけ付く */
+  .sb-sidebar-toggle {
+    margin-left: auto;
+    flex-shrink: 0;
+    padding: 6px;
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+
+  .sb-sidebar-toggle:hover {
+    background: var(--surface-hover);
+  }
+
+  /* 本家の nav は `flex-1 overflow-y-auto p-4 space-y-1`（項目の間は 4px） */
+  .sb-sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+  }
+
+  /*
+   * サイドバーの項目だけ本家の寸法にする（`py-2 px-3 gap-3` に 20px の絵で高さ 36px）。
+   * `.sb-navitem` 本体は prototype 由来で、ヘッダーの戻る導線も名乗る。そちらは動かさない。
+   */
+  .sb-sidebar-nav .sb-navitem {
+    gap: 12px;
+    padding: 8px 12px;
+  }
+
+  /* ラベルは本家と同じ `text-sm font-medium`。実測 12px / 500 */
+  .sb-sidebar-label {
+    font-size: var(--text-sm);
+    font-weight: 500;
+  }
+
+  /*
+   * 面の切替（segmented control）。本家の承認画面（`ApprovalsPage` の View Mode Tabs）の写し。
+   *
+   * 枠と影を持つ入れ物に、選んでいるものだけをアクセントで塗ったボタンを並べる。
+   * 選んでいないものは塗らない。3つとも塗ると、どれが選ばれているか見て分からない。
+   *
+   * 実測: 入れ物 padding 4px / 枠 1px / 角丸 8px / 面 #1e293b、
+   * ボタン padding 6px 12px / 角丸 6px / 選択時 #6366f1 に白抜き / 非選択は text-muted。
+   *
+   * 影は本家が `shadow-sm` を当てており、実測は
+   * `0 1px 3px 0 rgb(0 0 0/.1), 0 1px 2px -1px rgb(0 0 0/.1)`（Tailwind の既定）。
+   * 本家は design token の `--shadow-sm` も持つが、バンドルの並びで Tailwind の
+   * `@theme` があとに来るため画面に出ているのは Tailwind の値のほう。stroke-board は
+   * `:root` を `@import` のあとに置いているので `--shadow-sm` は token の値
+   * （`0 1px 2px rgba(0,0,0,.2)`）になり、そのままでは本家と違う影になる。
+   *
+   * `var(--shadow)` も使えない。Tailwind v4 の `shadow` ユーティリティは値を直に
+   * 展開するだけで `--shadow` を `:root` へ出さないため、参照すると解決できず
+   * `box-shadow: none` になる（実測）。値を書き下す。
+   */
+  .sb-segmented {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    background: var(--surface-panel);
+    box-shadow:
+      0 1px 3px 0 rgb(0 0 0 / 0.1),
+      0 1px 2px -1px rgb(0 0 0 / 0.1);
+  }
+
+  .sb-segmented-item {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 6px 12px;
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
+    /*
+     * 本家は `text-sm` を当てており字送りも付いてくる（`--text-sm--line-height` = 1.25/0.875）。
+     * 実測 12px に対して 17.1429px。高さは余白 12px を足して 29px。
+     */
+    line-height: calc(1.25 / 0.875);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition:
+      color var(--transition-fast),
+      background var(--transition-fast);
+  }
+
+  /*
+   * 本家は非選択のボタンにだけ `hover:text-[var(--text-primary)]` を当てる（選択中の側には
+   * その class を渡していない）。ここも選択中には効かせない。効かせると、押した直後に
+   * マウスが乗ったままの選択中のボタンだけ文字色が白から外れる。
+   */
+  .sb-segmented-item:not(.sb-segmented-item-on):hover {
+    color: var(--text-primary);
+  }
+
+  .sb-segmented-item-on {
+    background: var(--accent-primary);
+    color: #fff;
+  }
+
+  /*
    * 下層は画面まるごとこの枠に載る（SteeringPage / SpecsPage の Content）。
    * 本家の `.card` は影を持つが、ページの枠として使っているこの箱には影が付いていない
    * （稼働中の本家で実測: box-shadow は none）。実物に合わせて影は持たせない。
+   *
+   * 同じ箱を「データの領域」にも使う。本家は操作の帯と本文を必ず別の箱に分けており、
+   * `SpecViewerPage` は panel を2枚（操作 / 本文）並べ、`ApprovalsAnnotator` は本文の列を
+   * `bg-[var(--surface-panel)] border rounded-lg` で囲う。値はどちらも `.panel` と同じで、
+   * パネルの上にパネルを重ねて 1px の枠で領域を切るのが本家のやり方である。
    */
   .sb-panel {
     background: var(--surface-panel);
@@ -415,9 +570,18 @@ body {
     padding: 16px;
   }
 
-  /* 画面の見出しブロック。本家は h2 が `text-lg sm:text-xl`、副題が text-sm の secondary */
+  /*
+   * 画面の見出しブロック。本家は h2 が `text-lg sm:text-xl`、副題が text-sm の secondary。
+   *
+   * 本家は Tailwind の**ユーティリティ**を当てているので字送りも一緒に付いてくる
+   * （`--text-lg--line-height` = 1.75/1.125、`--text-xl--line-height` = 1.75/1.25、
+   * `--text-sm--line-height` = 1.25/0.875）。font-size だけ真似ると body の 1.5 を継承して
+   * 高さがずれる。実測（本家 1440px）: 見出し 18px / 25.2px、副題 12px / 17.14px。
+   * `.sb-action` と同じ扱いで、展開後の比をそのまま書く。
+   */
   .sb-panel-title {
     font-size: var(--text-lg);
+    line-height: calc(1.75 / 1.125);
     font-weight: 600;
     color: var(--text-primary);
   }
@@ -425,11 +589,13 @@ body {
   @media (min-width: 640px) {
     .sb-panel-title {
       font-size: var(--text-xl);
+      line-height: calc(1.75 / 1.25);
     }
   }
 
   .sb-panel-subtitle {
     font-size: var(--text-sm);
+    line-height: calc(1.25 / 0.875);
     color: var(--text-secondary);
     margin-top: 4px;
   }
@@ -472,9 +638,17 @@ body {
     padding-left: 24px;
   }
 
+  /*
+   * セル。本家は `px-4 py-4` だけで字の大きさを指定しない（表の 14px をそのまま継ぐ）。
+   * ここに `--text-sm`（12px）を入れていたが、本家の実測は 14px で、一覧の字が本家より
+   * 一段小さくなっていた。指定を持たず継がせる。
+   *
+   * 1列目の見出しに足していた `padding-left: 24px` も外した。本家は見出しもセルも 16px で、
+   * 足すと見出しの文字だけが下のセルの中身より 8px 右にずれる（実測: 見出し x=306 に対し
+   * セルの中身 x=314）。左が枠に張り付いて見えるのは本家も同じで、そこは本家に合わせる。
+   */
   .sb-datatable td {
     padding: 16px;
-    font-size: var(--text-sm);
     vertical-align: middle;
   }
 
@@ -484,6 +658,15 @@ body {
 
   .sb-datatable tbody tr {
     transition: background var(--transition-fast);
+  }
+
+  /*
+   * 押せる行。行の中のリンクが `::after` を行いっぱいに広げて「行のどこを押しても開く」を
+   * 作る（`RecordList.vue`）ので、その起点をここに置く。`.sb-datarow` は `RecordList` の
+   * 行だけが名乗るため、同じ様式を使う `task-table`（tasks/[specName].vue）には効かない。
+   */
+  .sb-datatable tbody tr.sb-datarow {
+    position: relative;
   }
 
   .sb-datatable tbody tr.sb-datarow:hover {
@@ -532,7 +715,11 @@ body {
     border-radius: 9999px;
     font-size: var(--text-xs);
     font-weight: 500;
-    line-height: 1.4;
+    /*
+     * 本家は `text-xs` を当てており字送りも一緒に付く（`--text-xs--line-height` = 1/0.75）。
+     * 実測 11px に対して 14.6667px。1.4 を書いていたときは 15.4px で 1px 高かった。
+     */
+    line-height: calc(1 / 0.75);
     white-space: nowrap;
   }
 
@@ -659,9 +846,22 @@ body {
     flex-shrink: 0;
   }
 
-  /* 本家の `.progress-track` / `.progress-fill`。高さ 6px・単色・グラデーション無し */
+  /*
+   * 進捗バー。
+   *
+   * 出どころを本家の `.progress-track` / `.progress-fill`（tailwind.css）から、実際に
+   * 画面へ出ている `SpecsPage.tsx` の一覧の指定へ移した。`.progress-track` は
+   * `.markdown-content` と同じく**本家のどの `.tsx` も名乗っていない使われていない CSS**
+   * （`grep -rn "progress-track" src` のヒットは tailwind.css だけ）で、高さ 6px はそこから
+   * 来ていた。
+   *
+   * 本家が出しているのは `w-20 bg-[var(--surface-sunken)] rounded-full h-2` の溝に
+   * `bg-[var(--interactive-primary)] h-2 rounded-full` を敷いた形。稼働中の本家へ同じ
+   * markup を差して実測: 溝 80x8 / 面 rgb(15,23,42) / 角丸は全周、
+   * 中身 高さ 8 / 面 rgb(99,102,241) / 角丸は全周。
+   */
   .sb-progress-track {
-    height: 6px;
+    height: 8px;
     background: var(--surface-inset);
     border-radius: 9999px;
     overflow: hidden;
@@ -669,6 +869,7 @@ body {
 
   .sb-progress-fill {
     height: 100%;
+    border-radius: 9999px;
     background: var(--interactive-primary);
     transition: width 200ms ease;
   }
@@ -676,122 +877,306 @@ body {
   .sb-progress-fill-success {
     background: var(--status-success);
   }
+}
 
+/*
+ * ここから文書本文。**`components` ではなく `sb-doc` レイヤーに置く。**
+ *
+ * `@tailwindcss/typography` が出す `prose` 一式は Tailwind v4 では `utilities` レイヤーに
+ * 入る（CSSOM で確認済み）。レイヤーは詳細度より強いので、`components` に置いた
+ * `.sb-markdown th`（0,1,1）でも `utilities` の `.prose :where(thead th)`（0,1,0）に負ける。
+ * 実際に負けた: table の margin が 16px ではなく prose の 2em(28px)、th の padding が
+ * 4px 8px ではなく prose の padding-inline/padding-bottom になっていた。
+ *
+ * `@layer sb-doc;` を `@import "tailwindcss"` より後に宣言することで、レイヤーの並びが
+ * theme → base → components → utilities → sb-doc になり、ここの規則が prose に勝つ。
+ * prose に任せる型（見出し・段落・箇条書き・引用の骨格・罫線）はここに**書かない**。
+ * 書いたものだけが上書きになる。
+ */
+@layer sb-doc;
+
+@layer sb-doc {
   /*
-   * 空の状態。本家は中央寄せの `py-12` に 48px のアイコン・`text-lg` の見出し・
-   * `text-sm` の説明を積む（SteeringPage / SpecsPage の Empty State）。
-   * 破線の枠は本家に無い（prototype が「対象外」を示すために置いていたもの）。
+   * 文書の本文。
+   *
+   * **型（見出し・段落・箇条書き・引用・罫線）はここに持たない。**
+   * 本家が本文へ当てているのは Tailwind Typography の
+   * `prose prose-sm sm:prose-base dark:prose-invert …`（`MDXEditorWrapper.tsx` の
+   * `contentEditableClassName`）で、その class 列は `DocumentView.vue` /
+   * `ApprovalAnnotator.vue` が本家と同じ並びで名乗っている。
+   *
+   * 以前ここにあった写しの出どころ（本家 `theme.css` の `.markdown-content`）は、
+   * 本家のどの `.tsx` も名乗っていない**使われていない CSS** だった
+   * （`grep -rn "markdown-content" src` のヒットは `theme.css` だけ）。そのため
+   * 本文が本家と別物になっていた（実測: h1 36px→16px / h2 24px→16px / p の余白
+   * 20px→8px / hr 48px→16px）。写しをやめ、本家と同じプラグインに委ねる。
+   *
+   * ここに残すのは **prose では出せない本家側の差分**だけ。本家の本文は素の prose では
+   * なく、その上に MDXEditor（`MDXEditorWrapper.css` と `@mdxeditor/editor` の
+   * scoped CSS）が重なった状態で描かれている。以下はその重なりの実測値。
    */
-  .sb-empty {
-    text-align: center;
-    padding: 48px 16px;
-  }
-
-  .sb-empty > svg {
-    width: 48px;
-    height: 48px;
-    margin: 0 auto 16px;
-    color: var(--text-muted);
-  }
-
-  .sb-empty-title {
-    font-size: var(--text-lg);
-    font-weight: 500;
-    color: var(--text-primary);
-    margin-bottom: 8px;
-  }
-
-  .sb-empty-description {
-    font-size: var(--text-sm);
-    color: var(--text-secondary);
-  }
 
   /*
-   * 文書の本文。本家の `.markdown-content`（theme.css）をそのまま写している。
-   * 本文だけ `--text-lg`（16px）で、行間も本文用に広い（1.7）。一覧の 12px とは別。
+   * 本文の面。本家は contentEditable の入れ物（`.mdxeditor-root-contenteditable`）に
+   * ダークで #111827 を敷き、その内側 12px から本文が始まる（`MDXEditorWrapper.css`
+   * の `min-height:200px` / `background-color:#111827` ＋ `_contentEditable_` の padding）。
+   * パネル（#1e293b）の中に一段暗い矩形が入るのが本家の見え方（実測・目視とも）。
    */
   .sb-markdown {
-    line-height: var(--leading-relaxed);
-    font-size: var(--text-lg);
-    color: var(--text-primary);
+    min-height: 200px;
+    padding: 12px;
+    background: #111827;
+    /*
+     * 本家の contentEditable は `word-break: break-word` を持ち、子まで継がれる（実測）。
+     * 切れない長い語（`specs/api/session/approve` のような見出し）が欄からはみ出さず、
+     * 語の途中で折り返る。並列表示のように欄が狭いところでこれが効く。
+     *
+     * 本家は同じ要素に `white-space: pre-wrap` も持つが、そちらは Lexical が編集中の
+     * 空白を保つための指定で、読むだけの MDC 出力に移すと markdown 側の字下げや
+     * 連続空白がそのまま出る。見え方の一致には要らないので写さない。
+     */
+    word-break: break-word;
   }
 
-  .sb-markdown h1,
-  .sb-markdown h2,
-  .sb-markdown h3,
-  .sb-markdown h4 {
-    margin: 16px 0 8px;
+  /*
+   * コードブロック。本家（spec-workflow-mcp）は MDXEditor の `codeMirrorPlugin` に渡して
+   * いて `pre` を使わず、`div._codeMirrorWrapper_` > `div._codeMirrorToolbar_` + `.cm-editor`
+   * になる。stroke-board は読み取り表示なので CodeMirror は持ち込まず、本家が画面に出す形
+   * （枠・右上の帯・行番号・折り返し）を素の `pre` で組み立てる（`CodeBlock.vue`）。
+   *
+   * 値の出どころは稼働中の本家（`/#/specs/view`）の実測と、その CSS の重ね
+   * （`@mdxeditor` の `_codeMirrorWrapper_` ＋ `MDXEditorWrapper.css` のダーク時）。
+   * `.sb-mermaid` と同じく、ダーク一本なので重ねた後の値だけを持つ。
+   *
+   * 外枠: margin 16px 0 / padding .8rem / border 1px #374151 / radius 8px / overflow hidden
+   *       / background #1f2937
+   */
+  .sb-code {
+    /* 行番号の桁数。`CodeBlock.vue` が行数から決めて inline で入れる */
+    --sb-code-digits: 1;
+    /* 番号の欄の幅。本家は1桁で 22px（左右 8px の余白＋数字1文字）。9.6px の等幅1文字は約 5.76px */
+    --sb-code-gutter: calc(16px + var(--sb-code-digits) * 5.76px);
+    /*
+     * 本文の左位置。本家は 番号の欄 ＋ 折り畳みの欄 8px ＋ 区切り線 1px ＋ 行の内側 6px。
+     * 折り畳みは編集の仕掛けなので中身は持たないが、幅は空けて同じ位置に本文を置く
+     */
+    --sb-code-indent: calc(var(--sb-code-gutter) + 15px);
+
+    position: relative;
+    margin: 16px 0;
+    padding: 12.8px;
+    border: 1px solid #374151;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #1f2937;
+  }
+
+  /*
+   * 右上に重なる帯。本家の `_codeMirrorToolbar_`（position:absolute / right:0 / top:0 /
+   * padding .5rem 1rem / background #374151 / border-bottom-left-radius 4px / z-index 1）。
+   *
+   * 本家はこの中に言語セレクタと「Delete code block」を置くが、文書表示ではどちらも
+   * `disabled` で押せない。操作としては存在しないので、ここは言語名の札だけを出す。
+   */
+  .sb-code-toolbar {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 1;
+    display: flex;
+    gap: 4px;
+    padding: 8px 16px;
+    border-bottom-left-radius: 4px;
+    background: #374151;
+    color: #9ca3af;
+    font-size: 12px;
+  }
+
+  /*
+   * 本文。本家の `.cm-scroller`（font-family:monospace / line-height:1.4）と
+   * `.cm-content.cm-lineWrapping`（padding 4px 0 / color #e5e7eb / 折り返す）の重ね。
+   * 横スクロールはさせない（本家は折り返す）。
+   *
+   * 左の番号の欄は本家では別の列（`.cm-gutters`）だが、行が折り返しても背景が続くように
+   * ここでは背景の帯として敷く。色は本家の `.cm-gutters`（#374151 と区切り線 #4b5563）。
+   */
+  /*
+   * `.sb-code` を重ねて詳細度を (0,2,0) にしてある。prose の `.prose :where(pre):not(…)`
+   * は (0,1,0) で `pre` の面・余白・角丸・字送りを全部持つため、同じ強さでは
+   * 並び順しだいで負ける。
+   */
+  .sb-code .sb-code-body {
+    margin: 0;
+    padding: 4px 2px 4px var(--sb-code-indent);
+    border: 0;
+    border-radius: 0;
+    overflow: visible;
+    background: linear-gradient(
+      to right,
+      #374151 0 calc(var(--sb-code-gutter) + 8px),
+      #4b5563 calc(var(--sb-code-gutter) + 8px) calc(var(--sb-code-gutter) + 9px),
+      transparent calc(var(--sb-code-gutter) + 9px)
+    );
+    color: #e5e7eb;
+    font-family: monospace;
+    font-size: 16px;
+    line-height: 1.4;
+    white-space: break-spaces;
+    word-break: break-word;
+    counter-reset: sb-code-line;
+  }
+
+  /*
+   * インラインコードの指定（prose の `code` と `.sb-markdown :not(pre) > code`）を
+   * コードブロックの中へ持ち込ませない。本家のコードブロックは 16px・等幅のまま。
+   */
+  .sb-code .sb-code-body code {
+    padding: 0;
+    background: none;
+    color: inherit;
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+  }
+
+  /*
+   * 行番号。本家の `.cm-lineNumbers .cm-gutterElement`（font-size .6rem / padding 0 .5rem
+   * / 右寄せ / color #6b7280）。`span.line` は shiki が行ごとに出すもので、無い言語のときは
+   * `CodeBlock.vue` が同じ形で組み立てる。
+   *
+   * 番号は行の内側に置いて左の余白へずらす。折り返しても番号が付くのは先頭の1行だけで、
+   * 続きは本文の左端に揃う（本家の CodeMirror と同じ）。
+   */
+  .sb-code .sb-code-body .line::before {
+    counter-increment: sb-code-line;
+    content: counter(sb-code-line);
+    display: inline-block;
+    box-sizing: border-box;
+    width: var(--sb-code-gutter);
+    margin-left: calc(-1 * var(--sb-code-indent));
+    margin-right: 15px;
+    padding: 0 8px;
+    color: #6b7280;
+    font-size: 9.6px;
+    line-height: 1.4;
+    text-align: right;
+    vertical-align: top;
+  }
+
+  /*
+   * インラインコード。
+   *
+   * 本家は Lexical が `code > span._code_` の二重構造で出しており、外の `code` に
+   * prose（`prose-code:` の色 ＋ 前後のバッククォート ＋ 0.875em ＋ 600）が、内の
+   * `span` に MDXEditor の scoped CSS（0.94em / 面 #212225 / padding 1px 4px /
+   * 角丸なし）が当たる。実測（本文 16px の `li` の中）:
+   *   外 code  14px / 600 / 面 gray-800 / padding 0 / radius 0 / ::before ::after = `
+   *   内 span  13.16px / 600 / 面 rgb(33,34,37) / padding 1px 4px / radius 0
+   *
+   * MDC は `code` 1枚しか出さないので、目に入る側（内の span）の値をその `code` に
+   * 持たせる。バッククォートは prose の `code::before/::after` がそのまま出す。
+   * 二重構造でしか出せないのは「バッククォートだけ外の面色になる」ところで、両者の差は
+   * rgb(31,41,55) と rgb(33,34,37) の1段。ここは合わせられないので落としている。
+   */
+  .sb-markdown :not(pre) > code {
+    padding: 1px 4px;
+    border-radius: 0;
+    background: rgb(33, 34, 37);
+    /* 0.875em（prose）× 0.94（MDXEditor の `_code_`）＝ 本文 16px に対して 13.16px */
+    font-size: 0.8225em;
     font-weight: 600;
   }
 
-  .sb-markdown pre {
-    padding: 12px;
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-md);
-    overflow: auto;
-    background: var(--surface-inset);
-    font-family: var(--font-mono);
-  }
-
-  .sb-markdown code {
-    font-family: var(--font-mono);
-    font-size: 0.9em;
-  }
-
-  .sb-markdown :not(pre) > code {
-    padding: 2px 6px;
-    background: var(--surface-inset);
-    border-radius: var(--radius-sm);
-  }
-
+  /*
+   * 表。本家の表は prose ではなく MDXEditor の table editor（`_tableEditor_` /
+   * `_leftAlignedCell_`）が描いている。`MDXEditorWrapper.css` にも表の指定はあるが
+   * （padding .5rem 1rem / border #374151）、あとから読まれる `@mdxeditor/editor` の
+   * scoped CSS が同じ強さで上書きするので、画面に出ているのは下の値のほう。
+   *
+   * 実測（/#/specs/view の design.md）: 罫線 1px rgb(46,49,53) / セル padding 4px 8px /
+   * 字 14px（prose の 0.875em）/ th は 600・白・面 #1f2937 / 縦は baseline 揃え。
+   */
   .sb-markdown table {
+    margin: 16px 0;
     border-collapse: collapse;
     width: 100%;
   }
 
-  .sb-markdown table th,
-  .sb-markdown table td {
-    border: 1px solid var(--border-default);
-    padding: 8px 12px;
+  .sb-markdown th,
+  .sb-markdown td {
+    padding: 4px 8px;
+    border: 1px solid rgb(46, 49, 53);
     text-align: left;
+    vertical-align: baseline;
   }
 
-  .sb-markdown table th {
-    background: var(--surface-inset);
-    font-weight: 500;
+  .sb-markdown th {
+    background: #1f2937;
+    color: #fff;
+    font-weight: 600;
+  }
+
+  /* prose は thead と行に区切り線を足す。本家はセルの罫線で格子を引くので重ねない */
+  .sb-markdown thead,
+  .sb-markdown tbody tr {
+    border: 0;
   }
 
   /*
-   * 本家の markdown-content は箇条書きと引用の指定を持たない（ブラウザ既定に任せている）。
-   * Tailwind の preflight が list-style と margin を消すので、既定相当をここで戻す。
-   * これは本家に無い指定を足しているのではなく、本家と同じ見え方に揃えるための埋め合わせ。
+   * リンク。prose（invert）の既定は白。本家は `MDXEditorWrapper.css` の
+   * `.mdx-editor-wrapper a { color: var(--accentText) }` で青にしている。
+   * 実測 rgb(112,184,255)（`--accentText` は @mdxeditor のダークテーマ側が勝つ）。
+   * 太さ 500 と下線は prose のまま。
    */
-  .sb-markdown ul,
-  .sb-markdown ol {
-    margin: 8px 0;
-    padding-left: 24px;
-    list-style: revert;
-  }
-
-  .sb-markdown p {
-    margin: 8px 0;
-  }
-
-  .sb-markdown blockquote {
-    margin: 8px 0;
-    padding-left: 12px;
-    border-left: 3px solid var(--border-default);
-    color: var(--text-secondary);
-  }
-
   .sb-markdown a {
-    color: var(--interactive-primary);
-    text-decoration: underline;
+    color: rgb(112, 184, 255);
   }
 
-  .sb-markdown hr {
+  /*
+   * 引用。`MDXEditorWrapper.css` の `blockquote`（border-left 4px var(--accentBase) /
+   * padding-left 1rem / margin 1rem 0 / ダーク時 color #9ca3af）。斜体と 500 は prose のまま。
+   * 実測の枠色 rgb(13,21,32) は @mdxeditor のダークテーマが入れた `--accentBase`。
+   */
+  .sb-markdown blockquote {
     margin: 16px 0;
-    border-top: 1px solid var(--border-default);
+    padding-left: 16px;
+    border-left: 4px solid rgb(13, 21, 32);
+    color: #9ca3af;
+  }
+}
+
+@layer components {
+  /*
+   * mermaid の図の入れ物。本家の `.mermaid-container` の写し。
+   *
+   * 本家は Tailwind のクラス（`my-4 overflow-auto bg-white dark:bg-gray-800 rounded-lg
+   * p-4 border border-gray-200 dark:border-gray-700`）に `MDXEditorWrapper.css` の
+   * `.mdx-editor-wrapper .mermaid-container` を重ねている。stroke-board はダーク一本
+   * （`:root` がダークの値そのもの）なので、重ねた後のダーク時の値だけを持つ。
+   *
+   * 背景の #1f2937 は本家 CSS の `.mdx-editor-wrapper.dark-theme .mermaid-container`、
+   * 枠の色は Tailwind v4 の gray-700（本家の `dark:border-gray-700`）。
+   * `.sb-markdown pre` に当たらないよう、図は `pre` ではなく `div` で出している。
+   */
+  .sb-mermaid {
+    display: flex;
+    justify-content: center;
+    overflow: auto;
+    margin: 16px 0;
+    padding: 16px;
+    border: 1px solid oklch(0.373 0.034 259.733);
+    border-radius: 8px;
+    background: #1f2937;
+  }
+
+  /*
+   * mermaid は SVG に `width="100%"` と `style="max-width: <実寸>px"` を付けて返す。
+   * インラインの max-width が勝つので原寸が上限になり、入れ物が狭いときだけ縮む。
+   * ここは本家と同じく、その指定が無い場合の受けとして置いている。
+   */
+  .sb-mermaid svg {
+    max-width: 100%;
+    height: auto;
   }
 
   /*

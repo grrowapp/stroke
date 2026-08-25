@@ -9,6 +9,6 @@ import { defineVitestConfig } from '@nuxt/test-utils/config';
  */
 export default defineVitestConfig({
   test: {
-    include: ['{app,server,shared}/**/*.live.test.ts'],
+    include: ['test/**/*.live.test.ts'],
   },
 });

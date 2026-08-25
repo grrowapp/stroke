@@ -53,6 +53,8 @@ function seed() {
       specs: [
         {
           name: 'auth-spec',
+          // 本家は name から表示名を起こして必ず返す（`core-structure` → `Core Structure`）
+          displayName: 'Auth Spec',
           createdAt: '2026-08-21T00:00:00.000Z',
           lastModified: '2026-08-21T00:00:00.000Z',
           phases: {
@@ -135,6 +137,8 @@ function handleControl(rest, body) {
     case 'reset':
       seed();
       stats.progressRequests = 0;
+      // 前のテストが送った応答を残さない。「何も届いていない」を確かめられなくなる
+      stats.lastApprovalAction = null;
       return { ok: true };
 
     case 'stats':
@@ -313,8 +317,19 @@ function handleApi(segments, respond, method = 'GET', body = null) {
     const target = project.approvals.find((item) => item.id === approvalId);
     if (target === undefined) return respond(404, { error: 'Approval not found' });
 
-    // テストから「何を送ったか」を確かめられるように残す
-    stats.lastApprovalAction = { id: approvalId, action, response: body?.response ?? null };
+    /*
+     * テストから「何を送ったか」を確かめられるように残す。
+     *
+     * 本家は `response` / `annotations` / `comments` を承認リクエストと同じ1ファイルに
+     * 3つのフィールドとして書く。差し戻し（needs-revision）だけがこの3つを持つ。
+     */
+    stats.lastApprovalAction = {
+      id: approvalId,
+      action,
+      response: body?.response ?? null,
+      annotations: body?.annotations ?? null,
+      comments: body?.comments ?? null,
+    };
 
     project.approvals = project.approvals.filter((item) => item.id !== approvalId);
     broadcast(segments[2], {
@@ -354,8 +369,8 @@ function handleApi(segments, respond, method = 'GET', body = null) {
 
   /*
    * ステアリングだけ markdown の要素を一通り持たせてある。本文が markdown として
-   * 描かれていること（見出し・箇条書き・表・コードブロック）と、文書に混ざった生 HTML を
-   * 描かないことを E2E で押さえるため。
+   * 描かれていること（見出し・箇条書き・表・コードブロック）と、mermaid フェンスが図に
+   * なること、文書に混ざった生 HTML を描かないことを E2E で押さえるため。
    */
   /* ステアリングの保存。文書名がそのままファイル名になるので3本以外は弾く */
   if (method === 'PUT' && rest[0] === 'steering' && rest.length === 2) {
@@ -380,6 +395,11 @@ function handleApi(segments, respond, method = 'GET', body = null) {
         '',
         '本文と `インラインコード`。',
         '',
+        // 見出しの段（h1 と h2 で寸法が変わることを押さえる）
+        '## 見出し2',
+        '',
+        '2段目の本文。',
+        '',
         '- 箇条書き1',
         '- 箇条書き2',
         '',
@@ -389,6 +409,11 @@ function handleApi(segments, respond, method = 'GET', body = null) {
         '',
         '```ts',
         "const x = 'コードブロック';",
+        '```',
+        '',
+        '```mermaid',
+        'flowchart LR',
+        '  a["はじめ"] --> b["おわり"]',
         '```',
         '',
         '<img src=x onerror="window.__xss = true">',

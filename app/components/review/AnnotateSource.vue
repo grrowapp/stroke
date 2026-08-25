@@ -118,8 +118,16 @@ function onMouseUp(): void {
 </script>
 
 <template>
+  <!--
+    字と余白は本家の実測。本家は `TextAnnotate` に inline style を渡している
+    （`ApprovalsAnnotator.tsx` の `renderTextAnnotate`）:
+      font-size 0.875rem（= 14px。`--text-sm` の 12px ではない）/ line-height 1.625 /
+      white-space pre-wrap / word-break break-word
+    箱の余白は `p-3 sm:p-4` だが、本家自身の素のクラス `.p-3` が Tailwind の
+    レスポンシブ指定を打ち消すので実測は常に 12px（承認カードと同じ現象）。
+  -->
   <pre
-    class="whitespace-pre-wrap break-words p-4 font-mono text-sm leading-relaxed"
+    class="whitespace-pre-wrap p-3 font-mono text-[0.875rem]/[1.625] [word-break:break-word]"
     @mouseup="onMouseUp"
   ><template v-for="(seg, i) in segments" :key="i"><mark
       v-if="seg.paint"

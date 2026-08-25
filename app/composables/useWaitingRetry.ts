@@ -2,6 +2,7 @@
 // `invocation: failed` ならエラー表示にする。通常は W1 / W2 の配信が先に届いて
 // 呼び出し側が stopWaiting() を呼ぶため、ポーリングは保険（design.md 決定6）。
 // 回復（同じ入力 POST の再送）はここでは行わない。呼び出し側の役割。
+import { useIntervalFn } from '@vueuse/core'
 import type { Invocation } from '#shared/stroke'
 
 const POLL_INTERVAL_MS = 3000
@@ -15,44 +16,46 @@ export function useWaitingRetry(sessionId: MaybeRefOrGetter<string>) {
    * `error` はシステムが何もせずユーザーへ引き渡す状態だからである。
    */
   const errored = ref(false)
-  let timer: ReturnType<typeof setInterval> | null = null
 
-  function stopPolling(): void {
-    if (timer !== null) clearInterval(timer)
-    timer = null
-  }
-
-  function startWaiting(): void {
-    waiting.value = true
-    failed.value = false
-    errored.value = false
-    stopPolling()
-    // ポーリングはブラウザでのみ意味を持つ。SSR で `setInterval` を張ると Nuxt が
-    // 例外にする（実測: reload 直後の SSR で `invocation: running` を踏んで判明）。
-    if (import.meta.server) return
-    timer = setInterval(async () => {
+  // `resume()` は張り直しのたびに前の timer を捨てるので、手で clear する必要がない。
+  // scope が壊れたときの停止も内蔵している
+  const poll = useIntervalFn(
+    async () => {
       const status = await $fetch<{ invocation: Invocation }>(`/api/strokes/${toValue(sessionId)}`)
       if (status.invocation === 'error') {
         // 終端。巡回は拾わないので、ユーザーが再実行か削除を選ぶまで動かない。
         errored.value = true
         waiting.value = false
-        stopPolling()
+        poll.pause()
       } else if (status.invocation === 'failed') {
         failed.value = true
         waiting.value = false
-        stopPolling()
+        poll.pause()
       } else if (status.invocation === 'idle') {
         waiting.value = false
-        stopPolling()
+        poll.pause()
       }
-    }, POLL_INTERVAL_MS)
+    },
+    POLL_INTERVAL_MS,
+    { immediate: false },
+  )
+
+  function startWaiting(): void {
+    waiting.value = true
+    failed.value = false
+    errored.value = false
+    // ポーリングはブラウザでのみ意味を持つ。SSR で `setInterval` を張ると Nuxt が
+    // 例外にする（実測: reload 直後の SSR で `invocation: running` を踏んで判明）。
+    // `resume()` は client 限定のガードを持たないので、ここで止める必要がある
+    if (import.meta.server) return
+    poll.resume()
   }
 
   function stopWaiting(): void {
     waiting.value = false
     failed.value = false
     errored.value = false
-    stopPolling()
+    poll.pause()
   }
 
   /**
@@ -70,8 +73,6 @@ export function useWaitingRetry(sessionId: MaybeRefOrGetter<string>) {
   async function discard(): Promise<void> {
     await $fetch(`/api/strokes/${toValue(sessionId)}/delete`, { method: 'POST' })
   }
-
-  onScopeDispose(stopPolling)
 
   return { waiting, failed, errored, startWaiting, stopWaiting, retryFromError, discard }
 }
