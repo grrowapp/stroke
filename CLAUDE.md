@@ -46,6 +46,7 @@ Use fresh agents, not `fork`, when the goal is to keep context out. See `docs/ag
 ### `docs/specs/reference/`
 
 - `stroke-modules.md` — stroke のモジュール（`useAgentQuestion` / `AgentQuestionModal`）の使い方
+- `upstream-observations.md` — 本家 spec-workflow-mcp をソースから調べた事実（WS メッセージ9種・接続の制約・反映までの遅延）。方針は ADR-0006、基準バージョンは ADR-0008
 
 ### `docs/specs/plan/`
 

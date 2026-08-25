@@ -9,6 +9,8 @@ stroke-board は本家 spec-workflow-mcp の**公開 API だけでなく、実�
 
 以下は稼働中の v2.2.5 と、そのソースから確認した事実である。同じ調査を繰り返さないために残す。本家を更新するときは、まずここを検証すること。
 
+WS メッセージの全量・接続の制約（CORS / レート制限 / ハートビート）・更新が画面に届くまでの遅延といった、決定に至るまでに調べた事実そのものは [`docs/specs/reference/upstream-observations.md`](../specs/reference/upstream-observations.md) にある。
+
 ## 観測した事実
 
 ### アクティブなプロジェクトの判定
