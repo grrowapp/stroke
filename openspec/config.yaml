@@ -4,10 +4,6 @@ schema: custom
 # This is shown to AI when creating artifacts.
 # Add your tech stack, conventions, style guides, domain knowledge, etc.
 context: |
-  stroke-board — プロジェクトを起こす「ストローク」と、起きたプロジェクトを見張る
-  「ポータル」を1つにした Nuxt アプリ。旧 stroke-board-frontier は統合済み
-  （docs/specs/plan/mainline-merge.md / docs/adr/0002-merge-into-stroke-board.md）。
-
   artifact を書く前に、次の3つを必ず読むこと。
 
   - `.scratch/stroke-board-frontier/decisions.md`
@@ -19,10 +15,15 @@ context: |
   - `docs/adr/`
     後から変えにくい決定の記録。矛盾する提案をする場合は、その旨を明示すること。
 
+  次のスキルをロードして使え
+
+  - '/coding-standardst', '/contract-first', '/api-design' '/nuxt4-patterns'
+
 rules:
   tasks:
-    - 成果物を git に入れるところまでを1本の change の範囲とする。tasks の最後に
-      commit を1項目置くこと。個々のタスクに commit を混ぜず、まとめて1つにする
+    - >-
+      'typescript-reviewer' エージェントに '/santa-method' でレビュー実行を
+      必ず最後のタスクに含めろ。レビューが完全にパスするまで続けろ
 
 # Per-operation guidance (optional)
 # Add advisory guidance for how apply and archive work should be conducted.
