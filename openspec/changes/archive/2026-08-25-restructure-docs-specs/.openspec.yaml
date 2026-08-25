@@ -1,0 +1,4 @@
+schema: apply-tasks-flow
+created: 2026-08-24
+skip_specs: true
+note: "docs/ 直下に平置きの資料15本を docs/specs/ の要素区分へ再配置し、steering の structure を追随させる"

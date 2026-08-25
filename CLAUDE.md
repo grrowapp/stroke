@@ -50,6 +50,10 @@ Use fresh agents, not `fork`, when the goal is to keep context out. See `docs/ag
 ### `docs/specs/plan/`
 
 - `artifact-extension-plan.md` — 拡張 artifact の検討資料（未決定）
+- `portal-stroke-entrance.md` — 入口の接合の対応方法（作成ボタン→ストローク概要入力。ADR-0009/0010 の俯瞰）
+- `portal-stroke-exit.md` — 出口の接合の対応方法（承認→steering 工程の自動開始。ADR-0011 の俯瞰）
+- `composables-library-replacement.md` — composables のライブラリ置換と集約の可否（置換3・集約2→1・据置5。spec-workflow 承認済み）
+- `components-library-replacement.md` — components のライブラリ置換・再編・markdown 統一の可否（置換5・部分置換3・再編2→1・削除1・据置8 + MDC 統一。spec-workflow 承認済み）
 - `next-agent-run.md` — エージェント実行の3区分への汎用化案（未着手）
 - `mainline-merge.md` — 旧 stroke-board-frontier 統合の道筋（change 一覧・依存・区分の基準・終了条件）
 - `structure-migration.md` — 構造の規範に対する現状の差分（移行課題）

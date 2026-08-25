@@ -1,0 +1,15 @@
+# flatten-composables
+
+app/composables/ を関心単位の useXxx 平置きへ統一する（shared / workspace の境界ディレクトリを廃止）。
+
+触るファイル（10本）:
+- 移動 app/composables/shared/useBoardSocket.ts → app/composables/useBoardSocket.ts
+- 移動 app/composables/shared/useRelativeTime.ts → app/composables/useRelativeTime.ts
+- 移動 app/composables/workspace/useProjectApi.ts → app/composables/useProjectApi.ts
+- 移動 app/composables/workspace/useSteeringDocuments.ts → app/composables/useSteeringDocuments.ts
+- 据置 useAgentQuestion.ts useQuestionChannel.ts useProposalChannel.ts useWaitingRetry.ts
+- 分割 app/composables/useProposalReview.ts（46 プロパティ・Modals.vue と密結合。注釈 / 差し戻し / 承認の関心で切る）
+- 変更 app/composables/useAnnotations.ts（色定義5件を shared/ へ出し、コンポーネントからの逆向き import を解消）
+- 新規 shared/annotation.ts（色定数の移設先。ファイル名は design で確定）
+- 更新 参照元の import 文（app/pages/** app/layouts/** app/components/**）
+- 更新 docs/specs/core/file-composables.md / docs/specs/plan/structure-migration.md

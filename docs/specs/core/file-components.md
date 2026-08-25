@@ -15,6 +15,10 @@
 | `proposal/` | `AnnotateSource` `CommentCard` `CommentModal` `Modals`（review/） | proposal の確認・注釈・差し戻し。`Annotation` / `HighlightColor` 型を扱う |
 | `approval/` | `ApprovalCard`（workspace/） | 承認1件の表示 |
 
+### markdown 操作の集約（方向のみ。詳細設計は未定）
+
+`MarkdownNodes.ts`（md4x の AST を Vue のノードに落とす defineComponent）は `DocumentView.vue` へマージして Vue コンポーネント化し、markdown 操作のコンポーネント——名前は `MarkdownComponent`、または `MarkdownView` / `MarkdownEdit` の対——へ集約する。本家 spec-workflow-mcp の mdx（`MDXEditorWrapper`）と md4x の使い方を参考に、まず markdown 操作のコンポーネントを固める。**詳細設計は未定**（名前の最終決定・props の設計は集約の change で行う）。
+
 移動の実施は `docs/specs/plan/structure-migration.md`。
 
 ---
@@ -34,7 +38,7 @@
 | `review/AnnotateSource.vue` | 132 | `source: string` / `comments: Annotation[]` | 選択・編集など |
 | `review/CommentCard.vue` | 57 | `comment: Annotation` | `edit: [id]` / `remove: [id]` |
 | `review/CommentModal.vue` | 62 | 編集対象ほか + `v-model:open` | `save: [comment, color]` |
-| `review/FollowupModal.vue` | 107 | 問いほか + `v-model:open` | `answer: [Answer]` |
+| `review/FollowupModal.vue`（**削除済み**） | 107 | 問いほか + `v-model:open` | `answer: [Answer]` |
 | `review/Modals.vue` | 94 | **`review: ReturnType<typeof useProposalReview>`** | — |
 
 ## 置き場の区分
@@ -52,7 +56,7 @@ app/components/
     ├── AnnotateSource.vue
     ├── CommentCard.vue
     ├── CommentModal.vue
-    ├── FollowupModal.vue
+    ├── FollowupModal.vue   ← 削除済み（現存しない）
     └── Modals.vue
 ```
 
@@ -80,7 +84,7 @@ const props = defineProps<{ review: ReturnType<typeof useProposalReview> }>()
 | 型 | 使うコンポーネント |
 |---|---|
 | `Stroke` | `StrokeBreadcrumb` |
-| `Question` / `Answer` | `stroke/QuestionCard`、`review/FollowupModal` |
+| `Question` / `Answer` | `stroke/QuestionCard`、`review/FollowupModal`（**削除済み**） |
 | `Annotation` | `review/AnnotateSource`、`review/CommentCard` |
 | `HighlightColor` | `review/AnnotateSource`、`review/CommentModal` |
 

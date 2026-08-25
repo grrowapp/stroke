@@ -15,9 +15,22 @@
 | 問いの往復 | `useAgentQuestion` | 回答送信・AI 起動（契約 U7 / U13）。そのまま |
 | 問いの配信 | `useQuestionChannel` | 契約 W1 の受け口 |
 | proposal の配信 | `useProposalChannel` | 契約 W2 の受け口 |
-| proposal のレビュー | `useProposalReview` | 46 プロパティに肥大し `Modals.vue` と密結合。関心（注釈・差し戻し・承認）での分割が課題 |
-| 注釈 | `useAnnotations` | 色定義5件をコンポーネントが逆向き import している。定数は `shared/` へ出す |
+| proposal のレビュー | `useProposalReview` | 39 プロパティに肥大し `Modals.vue` と密結合。分割は**保留** — markdown コンポーネント集約の確定後、`flatten-composables` の design で決める（分割案はここで固定しない） |
+| 注釈 | `useAnnotations` | 色定義5件をコンポーネントが逆向き import している。**色の実値は CSS へ移し、データ（`Annotation.highlightColor`）は色名のみ持つ**（検討） |
 | 待機とリトライ | `useWaitingRetry` | そのまま |
+
+### 移行後パスの写像
+
+平置きへ移すのはポータル側の4本のみ。ストローク側の6本は既に直下にあり、移動しない。
+
+| 移行前 | 移行後 |
+| --- | --- |
+| `composables/shared/useBoardSocket.ts` | `composables/useBoardSocket.ts` |
+| `composables/shared/useRelativeTime.ts` | `composables/useRelativeTime.ts` |
+| `composables/workspace/useProjectApi.ts` | `composables/useProjectApi.ts` |
+| `composables/workspace/useSteeringDocuments.ts` | `composables/useSteeringDocuments.ts` |
+
+平置き後も**明示 import を維持する**（auto-import は使わない。`nuxt.config` の `autoImport: false` 前提）。
 
 移動の実施は `docs/specs/plan/structure-migration.md`。
 
@@ -113,7 +126,7 @@ export function formatRelativeTime(iso: string, now = Date.now()): string
 
 ### useProjectApi.ts
 
-**下層の画面が本家の情報を取るための唯一の口。** 82行。8つの関数を export する。
+**下層の画面が本家の情報を取るための唯一の口。** 192行。11 の関数を export する（※2026-08-24 実測。旧記述は 82行・8関数）。
 
 ```ts
 export function useProjectId()                                        // route から projectId
@@ -128,6 +141,9 @@ export function useApprovalContent(projectId, approvalId) → DocumentContentDto
 // 保存（取得と違い、押したときに1回だけ走る）
 export function saveSpecDocument(projectId, specName, document, content) → Promise<string | null>
 export function saveSteeringDocument(projectId, name, content)           → Promise<string | null>
+
+// 承認依頼の filePath から保存先の文書を導く。編集を許していない文書なら null（読むだけ）
+export function saveTargetOf(filePath) → { save(projectId, content) } | null
 ```
 
 #### 保存だけ `$fetch` を直に使う
@@ -162,7 +178,7 @@ function base(projectId) { return `/api/projects/${toValue(projectId)}`; }
 
 ### useSteeringDocuments.ts
 
-ステアリング文書の有無を組み立てる。41行。
+ステアリング文書の有無を組み立てる。50行（※2026-08-24 実測。旧記述は 41行）。
 
 ```ts
 export const STEERING_DOCUMENTS = [
@@ -244,9 +260,10 @@ Toaster / 通知一覧                   本家 REST
 |---|---|---|---|
 | `useQuestionChannel.ts` | W1 を購読し、今の1問を持つ | WebSocket | 画面1、`useProposalReview` |
 | `useProposalChannel.ts` | W2 を購読し、proposal と名前候補を持つ | WebSocket | `useProposalReview` |
-| `useWaitingRetry.ts` | 送信後の待機と失敗の判定 | HTTP（`GET /api/<id>` をポーリング） | 画面1、`useProposalReview` |
+| `useWaitingRetry.ts` | 送信後の待機と失敗の判定 | HTTP（`GET /api/strokes/<id>` をポーリング） | 画面1、`useProposalReview` |
 | `useAnnotations.ts` | 差し戻しコメントを積み、4層のペイロードに組む | なし（純粋な状態と変換） | `useProposalReview`、`CommentModal` |
-| `useProposalReview.ts` | 画面2の状態と往復の全部 | 上の4本 + HTTP | 画面2、`Modals.vue` |
+| `useAgentQuestion.ts` | 問いの往復（W1 購読・回答送信・AI 起動要求・待機）を1つにまとめる | `useQuestionChannel`・`useWaitingRetry` + HTTP | `useProposalReview`（※2026-08-24 追記。棚卸しから漏れていた） |
+| `useProposalReview.ts` | 画面2の状態と往復の全部 | 上の各本 + HTTP | 画面2、`Modals.vue` |
 
 ## 個別
 
@@ -274,7 +291,7 @@ useProposalChannel(sessionId) → { message }
 useWaitingRetry(sessionId) → { waiting, failed, startWaiting, stopWaiting }
 ```
 
-待機中だけ3秒おきに `GET /api/<id>` を読み、`invocation` が `failed` / `idle` になったら止まる。**通常は W1 / W2 の配信が先に届くので、これは保険。**
+待機中だけ3秒おきに `GET /api/strokes/<id>` を読み、`invocation` が `failed` / `idle` になったら止まる。**通常は W1 / W2 の配信が先に届くので、これは保険。**
 
 SSR では `setInterval` を張らない（Nuxt が例外にする、と実測のコメントあり）。
 
@@ -293,13 +310,25 @@ useAnnotations() → { comments, addSelection, addGeneral, update, remove, clear
 
 注釈は生テキストへの文字オフセット（`startOffset` / `endOffset`）と引用文字列で持つ。
 
-### `useProposalReview.ts`（410行）
+### `useAgentQuestion.ts`（132行）
+
+※2026-08-24 追記。棚卸しから漏れていた。
 
 ```
-useProposalReview(sessionId, { phase, strokes }) → 46 個のプロパティ
+useAgentQuestion(sessionId) → { question, waiting, failed, error, answered, send }
 ```
 
-**突出して大きい。** 他の4本を全部束ね、画面2の状態と往復を丸ごと持つ。返すものは自分でコメントを付けて6群に区切ってある。
+W1 の購読（`useQuestionChannel`）・回答の送信（U7）・AI の起動要求（U13）・待機（`useWaitingRetry`）を1つに束ねる。状態は全て返り値として出し、外から渡す口は持たない。面（`AgentQuestionModal`）はこれに依存せず props と emit だけで繋がる。使い方は `docs/specs/reference/stroke-modules.md`。
+
+### `useProposalReview.ts`（412行）
+
+```
+useProposalReview(sessionId, { phase, strokes }) → 39 個のプロパティ
+```
+
+（※2026-08-24 実測。旧記述は 410行・46 プロパティ）
+
+**突出して大きい。** 他の5本を束ね（`useQuestionChannel` は `useAgentQuestion` 越し）、画面2の状態と往復を丸ごと持つ。返すものは自分でコメントを付けて6群に区切ってある。
 
 ```
 本文と局面   phase / strokes / proposal / projectName /
@@ -325,6 +354,6 @@ useProposalReview(sessionId, { phase, strokes }) → 46 個のプロパティ
 ## 気づいたこと
 
 - **`useQuestionChannel` と `useProposalChannel` が構造的に同じ。** WS の URL 組み立ても重複
-- **`useProposalReview` が 410 行で、他の4本の合計（274行）より大きい。** 状態・モーダル・HTTP エラー解体・送信の決着追跡が1箇所に集まっている
+- **`useProposalReview` が 412 行で、他の5本の合計（406行）より大きい。** 状態・モーダル・HTTP エラー解体・送信の決着追跡が1箇所に集まっている（※2026-08-24 実測で更新）
 - **色の定義が composable にある。** `useAnnotations.ts` の `highlightColors` を `CommentModal.vue` が直接 import している
 - **画面1側には composable が無い。** `app/pages/strokes/[sessionId]/index.vue` は `useQuestionChannel` と `useWaitingRetry` を直接呼び、送信も自前で書いている。画面2だけが `useProposalReview` にまとまっている

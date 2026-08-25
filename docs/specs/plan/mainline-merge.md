@@ -49,11 +49,11 @@
 
 | id | タイトル | 概要 |
 |---|---|---|
-| [connect-portal-and-strokes](../../../openspec/changes/connect-portal-and-strokes/) | 入口と出口を繋ぐ | 作成ボタンから入れない・承認後に一覧へ出ない、両端の断絶を埋める |
+| [connect-portal-and-strokes](../../../openspec/changes/connect-portal-and-strokes/) | 入口と出口を繋ぐ | 入口: 作成ボタンからモーダルでストロークへ（ADR-0009/0010）。出口: 承認＝rename 昇格で steering 作成を自動開始（ADR-0011）。出口の断絶はこれで解ける |
 | [adopt-upstream-design-tokens](../../../openspec/changes/adopt-upstream-design-tokens/) | design token の採用 | 1つのアプリの中で見た目が割れないようにする |
 | [unify-agent-conventions](../../../openspec/changes/unify-agent-conventions/) | エージェント規約の統合 | 両側にあって食い違う規約を1組にする |
 
-`connect-portal-and-strokes` は区分 B（統合しても目的が立たない）だが、有力な案の実装先が**マージ先のコード**にあり、統合するまでこのリポジトリに存在しない（proposal「どちら側のコードに落ちるかも design で決める」）。マージ前に消化しろと課すと、マージしないと着手できない作業を待つ循環になるため、統合後に回す。断絶の存在自体は「統合後の姿」に記録済みで、統合の判断材料としては足りている。
+`connect-portal-and-strokes` は区分 B（統合しても目的が立たない）だが、実装先が**マージ先のコード**にあり、統合するまでこのリポジトリに存在しなかったため、統合後に回した。統合後、出口側は ADR-0011 の決定により `start-steering-after-approval` へ一度分離したが、入口と出口は一続きの流れで分けると動く姿にならないため、2026-08-25 に再統合した（経緯は proposal の「吸収した change」）。
 
 ## 依存関係
 

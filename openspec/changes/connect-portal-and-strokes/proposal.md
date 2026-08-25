@@ -2,106 +2,54 @@
 
 ## Why
 
-統合の狙いは、**プロジェクトを起こす側と、起きたプロジェクトを見張る側を1つにする**ことである。ところが両者の実装を突き合わせると、**入口と出口の両方が繋がっていない**。
+統合の狙いは、**プロジェクトを起こす側と、起きたプロジェクトを見張る側を1つにする**ことである。ところが流れの両端が切れている。
 
-### 入口 — 作成ボタンから概要画面へ入れない
+- **入口**: `/projects` の **作成** ボタンは非活性で、ストロークへ入る道が無い。`project-directory` の「実処理は接続先の別プロジェクトが担う」という統合前の前提によるもので、統合でその「別プロジェクト」は同一アプリ内の `/strokes` として実在するようになり、非活性の理由は成立しなくなった
+- **出口**: 承認は proposal.md を生成して終わり、工程が途切れる。生成されたプロジェクトは `.spec-workflow/` を持たないため一覧に現れず、承認の瞬間に行方不明になる
 
-マージ先の `/projects` には既に **作成** ボタンが置かれている。ただし非活性で、押せない理由が画面に出るようになっている。
-
-> 作成の実処理を担う接続先の別プロジェクトに繋がっていません。stroke-board が持つのは入口だけで、接続が無い間は作成できません。
-
-使えるかどうかはサーバーが返す `actions.create.available` で決まり、今の理由コードは `target-undecided`。**入口だけ先に置いて、実処理は別プロジェクトに任せる**という形になっていて、その別プロジェクトがこちらである。
-
-統合しても、この状態を有効にする実装が無ければボタンは非活性のままで、概要画面へ入れない。
-
-### 出口 — 承認して生成したプロジェクトが一覧に現れない
-
-こちらが承認時に作るのは、次の2つだけである。
-
-```
-/opt/projects/<name>/
-└── docs/proposal.md
-```
-
-`.spec-workflow/` の内部構造は作らない。これは `project-generation` が「作るのはトップのディレクトリのみ」と明示的に規定していて、`.scratch/stroke-board-frontier/decisions.md` でも確定している決定である。後に spec-workflow がプロジェクトルートとして受け取る場所であって、その中身は別の製品が作るもの、という線引きになっている。
-
-マージ先はプロジェクト一覧の母集合を走査で作る。拾うのは **`.spec-workflow/` を持つディレクトリだけ**である（`server/utils/upstream/scan.ts` の `hasSpecWorkflow()`）。持たないディレクトリは母集合に入らない。API 側も同様で、本家 registry は停止中のプロジェクトを返さないため、走査だけが唯一の入口になっている。
-
-**この2つを足すと、承認して生成したプロジェクトはポータルの一覧に1件も現れない。**
-
-```
-承認 ─▶ /opt/projects/<name>/docs/proposal.md
-                    │
-                    │   誰も居ない区間
-                    │   ・ポータルの一覧に出ない
-                    │   ・frontier 側もセッションが終わって画面2で止まる
-                    │   ・生成した proposal.md を読む画面がどこにも無い
-                    ▼
-         spec-workflow が .spec-workflow/ を作る（人の手）
-                    ▼
-         ポータルの一覧に現れる
-```
-
-統合しても流れは繋がらない。ユーザーから見ると、承認を押した後にプロジェクトが**消える**。次にそれを見るのは、自分で spec-workflow を立ち上げてポータルを開き直したときになる。
-
-「見に行かずに承認待ちを知る」がポータルの目的であるのに、起こしたばかりのプロジェクトだけは見に行かないと分からない状態になる。
-
-### 両端は同じ問題である
-
-```
-  [作成] ボタン  ✗ 押せない          ← 入口
-       │
-       ▼
-  概要 → ストローク → proposal → 承認
-                                  │
-                                  ▼
-                     /opt/projects/<name>/
-                                  │
-                                  ✗ 一覧に出ない        ← 出口
-                                  ▼
-                          プロジェクト一覧
-```
-
-どちらも「ポータルとストローク側が繋がっていない」ことの現れで、片方だけ埋めても流れは1本にならない。入口だけ繋げば概要は投げられるが、承認した先が見えない。出口だけ繋げば見えるようになるが、そこへ至る入口が無い。
+入口と出口は一続きの流れ（作成→モーダル→承認→一覧に戻り steering が裏で走る）であり、片方だけでは動く姿にならないため、1つの change で実装する。
 
 ## What Changes
 
-- **入口を繋ぐ。** `actions.create.available` が立つ条件を決め、作成ボタンから概要画面へ入れるようにする。統合後は「接続先の別プロジェクト」が同一プロセス内になるため、`target-undecided` という理由コードの意味そのものを見直す
-- **出口を繋ぐ。** 承認した後、ユーザーがそのプロジェクトの居場所を見失わないようにする
-- 出口の埋め方は design で確定する。突き合わせの時点で3つの案があり、どれも代償が違う
+設計は資料2枚が持つ（spec-workflow の approval で確定）。この change はそれを仕様と実装に落とす。
 
-| 案 | やること | 代償 |
-|---|---|---|
-| 母集合を広げる | ポータルが `.spec-workflow/` を持たないディレクトリも「未着手」として並べる | 一覧の意味が「本家が知っているもの」から「そこに在るもの」へ広がる。マージ先の `project-directory` の仕様が変わる。実装はマージ先のコードに落ちる |
-| 生成側が作る | 承認時に本家が認識できる最小の内部構造まで作る | `project-generation` の「内部構造は作らない」と `.scratch/decisions.md` の決定を覆す。本家の内部構造への依存が増え、本家が変わったときに追随する範囲が広がる |
-| 承認後の行き先を作る | 一覧には出さないが、承認したセッションから生成物へ辿れる導線を残す | 断絶そのものは残る。一覧を見ている限り気付けない状態は変わらない |
+**入口** — [`docs/specs/plan/portal-stroke-entrance.md`](../../../docs/specs/plan/portal-stroke-entrance.md)（ADR-0009/0010）:
 
-- **どちら側のコードに落ちるかも design で決める。** 統合後は1つのリポジトリなので最終的な置き場は1つだが、実施の時期が変わる。マージ先に落ちるならマージ後、こちら側に落ちるならマージ前に済ませられる
+- 作成ボタンは**ただのボタン**にする。サーバーの可否判定の仕組みから作成を外し（理由コード `target-undecided` と `DirectoryActions.create` を削除）、仕組みは登録専用に残す
+- 押すと **@nuxt/ui `UModal`**（fullscreen・閉じ操作なし）でストローク3画面（概要入力→AI と往復→proposal 確認）を**最後まで**行う。器は自作しない。開き方（パスルーティング / components 起動）は実装の最後に決める
+
+**出口** — [`docs/specs/plan/portal-stroke-exit.md`](../../../docs/specs/plan/portal-stroke-exit.md)（ADR-0011）:
+
+- セッションとプロジェクトの置き場を **`SPEC_WORKFLOW_SHARED_ROOT`** に統一する
+- **proposal.md はサーバーのコードが作らない。** claude 自身がセッション時点から `docs/` 配下に書く
+- **承認＝セッションディレクトリをプロジェクト名へ rename** して昇格させるだけ（生成もファイル移動も無し）。画面はモーダルを閉じて一覧へ戻る
+- **`invokeAi` を引数化**する。呼び出し側が直前に設定 JSON を引き、起動定義・prompt・cwd を渡す1系統。承認処理は `--mcp-config`（生成先パスから導出した JSON 文字列）と steering 用 prompt・cwd＝生成先で、完了を待たずに呼ぶ
+- **実行の記録**: 起動時にメモリへ session-id ＝ running を登録し、timeout で false に変える。文書を提出し終えた claude が API 経由で提出を告知し、その API が記録を消す（＝完了）。**サーバーの巡回**が false の session-id を API で拾ってリトライをかける
+- 設定に足すのは **steering 用の定型 prompt 1キー**（mcp-config は設定に持たず導出）
 
 ## Capabilities
 
-この change は振る舞いを変える。**どの capability の差分になるかは、上の3案のどれを採るかで変わる。**
+### New Capabilities
+
+- `steering-stage`: 承認後の次工程。開始のきっかけ（承認の成功）、起動する claude の形（別セッション・`--mcp-config` で本家 MCP・作業場所は生成されたプロジェクト）、実行の記録と巡回リトライを規定する
 
 ### Modified Capabilities
 
-- `project-generation`: 承認時に何を作るかの規定。「作るのはトップのディレクトリのみで、`.spec-workflow/` の内部構造は作らない」が対象になる。ただし変わるのは案2を採った場合に限る
+- `project-directory`: 「登録と作成は非活性の入口として持つ」— 非活性は登録だけになる。「作成は接続先が無ければ行えず、その状態を画面に出す」— 廃止相当
+- `project-generation`: プロジェクトの作り方が「新規生成」から「セッションディレクトリの rename 昇格」に変わる。proposal.md はセッション時点から docs/ 配下に claude が書く
+- `ai-invocation`: 呼び出しの引数化（起動定義・prompt・cwd を呼び出し側が渡す）と、承認処理からの `--mcp-config` 付き呼び出しの追加
+- `agent-api`: 提出告知の口・retry 対象一覧の口の追加。A7 の受理でサーバーが proposal.md を書く挙動の廃止
 
-案1を採ると、差分はマージ先の `project-directory`（一覧の母集合の規定）に落ち、こちら側の spec は動かない。案3を採ると、承認後の導線として `proposal-review` または新しい capability に落ちる。
-
-**specs は design の後に書く。** 埋め方が決まるまで、どの要求が変わるのかを正直には書けない。schema 上 `specs` と `design` はどちらも `proposal` にしか依存していないので、この順で進められる。
+`stroke-session` は変えない。概要入力画面そのものは不変で、そこへ至る入口が増えるだけである。
 
 ## Impact
 
-案によって触る先が変わる。共通して影響を受けるものは次のとおり。
+- サーバー: `server/utils/control/actions.ts`・`shared/types.ts`（作成の可否判定の撤去）／`approve.post.ts`・`project.ts`・`session-store.ts`（rename 昇格・proposal 保存の廃止）／`ai.ts`・`claude.ts`・`invoke-agent.get.ts`（引数化・実行の記録）／提出告知・retry 対象の API 2口と巡回の新設
+- 画面: `app/pages/projects/index.vue`（ただのボタン化・モーダル起動）／`app/pages/strokes/**` 3画面（UModal の中身へ）／proposal 確認画面（承認成功でモーダルを閉じて一覧へ）
+- 設定: `nuxt.config.ts`・`docs/specs/core/settings-reference.md` — 置き場の `SPEC_WORKFLOW_SHARED_ROOT` 統一と steering 用 prompt の追加。設定の正の改定には change とユーザー承認が要る（ADR-0004）
+- specs 文書の追随（現実装の記述が変わる）: `docs/specs/api/api-contract.md`（A7「サーバが書く」・承認 409 の生成前提）／`docs/specs/architecture/question-flow.md`（proposal.md を書く Note）／`docs/specs/architecture/session-workflow.md`（セッション置き場のパス）
+- `docs/adr/0009` / `0010` / `0011` — この change の起点となった決定
 
-- `openspec/specs/project-generation/spec.md` — 承認時に作るものの規定
-- `docs/adr/` — 「内部構造は作らない」は後から変えにくい線引きとして置かれている。覆すなら記録が要る
-- `.scratch/stroke-board-frontier/decisions.md` — 確定済みの決定と食い違う場合、その旨を明示する
-- マージ先の `server/utils/upstream/scan.ts` と `openspec/specs/project-directory/` — 出口の案1の場合
-- マージ先の `server/api/projects.get.ts`（`actions.create` の可否を返している側）と `app/pages/projects/index.vue` — 入口
+**前提**: 設計資料2枚（portal-stroke-entrance / portal-stroke-exit）の spec-workflow 承認が実装着手の前提。
 
-**前提**: なし。他の change を待たない。
-
-**この change の位置づけ**: 他の change は「統合できる形に整える」ための作り替えで、振る舞いを変えない。これは違う。**統合して初めて成立するはずの振る舞いが、実は成立しないと分かった**ことへの対応であり、統合の目的そのものに関わる。整えるだけでは繋がらない。
-
-**吸収した change**: `surface-generated-projects`（生成プロジェクトの可視化）。出口だけを扱っていたが、入口も同じ性質の断絶なので1本にした。
+**吸収した change**: `surface-generated-projects`（生成プロジェクトの可視化。ADR-0011 で出口側へ引き継ぎ）、`start-steering-after-approval`（出口側。ADR-0011 起点。2026-08-25 に再統合——入口と出口は一続きの流れで、分けると動く姿にならないため）。

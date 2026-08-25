@@ -1,0 +1,4 @@
+schema: apply-tasks-flow
+created: 2026-08-24
+skip_specs: true
+note: "yarn session create が出力する URL を /s/ から /strokes/ へ直す（404 の修正）"
