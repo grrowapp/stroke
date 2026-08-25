@@ -9,7 +9,6 @@
 import { defineEventHandler } from 'h3';
 
 import { readServerConfig } from '../utils/config';
-import { resolveDirectoryActions } from '../utils/control/actions';
 import { buildProjectDirectory } from '../utils/control/directory';
 import { readRegistry, type RegistryEntry } from '../utils/upstream/registry';
 import { UpstreamRestClient } from '../utils/upstream/rest';
@@ -32,7 +31,6 @@ export default defineEventHandler(async (): Promise<ProjectDirectoryResponse> =>
       { entries, readable: registry.status === 'ok' },
       await countPendingApprovals(config.upstreamBaseUrl, entries),
     ),
-    actions: resolveDirectoryActions(),
   };
 });
 

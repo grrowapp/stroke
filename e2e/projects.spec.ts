@@ -53,9 +53,10 @@ test.describe('プロジェクト一覧', () => {
     await expect(page.getByTestId('workspace-sidebar')).toBeVisible();
   });
 
-  test('登録と作成は非活性の入口として置かれている', async ({ page }) => {
+  test('登録は非活性、作成は常に押せる', async ({ page }) => {
+    // 作成の可否判定は仕組みごと廃止した（ADR 0010）。前提の欠けは概要投稿時に出る
     await expect(page.getByTestId('register-project')).toBeDisabled();
-    await expect(page.getByTestId('create-project')).toBeDisabled();
+    await expect(page.getByTestId('create-project')).toBeEnabled();
   });
 });
 
@@ -99,38 +100,52 @@ test.describe('一覧の列は prototype と同じ', () => {
 });
 
 /**
- * 作成の接続先（interview Q40）。stroke-board は入口だけを持ち、接続が無ければ作成は
- * 行えず、その状態は画面に出る。
+ * 入口の接合（ADR 0009・0010）。作成ボタンはただのボタンで、押すとストロークへ入る。
+ * 可否判定は仕組みごと廃止したので、サーバーは可否を返さない。
  */
-test.describe('登録・作成が行えない理由が画面に出る', () => {
+test.describe('作成の入口', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/projects');
   });
 
-  test('接続先に繋がっていないため作成できないことが文言で分かる', async ({ page }) => {
-    await expect(page.getByTestId('actions-blocked')).toContainText('接続先の別プロジェクト');
+  test('可否の理由表示は無くなった', async ({ page }) => {
+    await expect(page.getByTestId('actions-blocked')).toHaveCount(0);
   });
 
-  test('登録の理由は作成とは別に出る', async ({ page }) => {
-    const reasons = await page.getByTestId('actions-blocked').locator('li').allTextContents();
-
-    expect(reasons).toHaveLength(2);
-    expect(new Set(reasons).size).toBe(2);
-    expect(reasons.some((reason) => reason.includes('登録が何を指すか'))).toBe(true);
-  });
-
-  test('理由は title 属性だけでなく画面の文言として出ている', async ({ page }) => {
-    await expect(page.getByTestId('actions-blocked')).toBeVisible();
-  });
-
-  test('可否はサーバーが返す状態から決まる', async ({ request }) => {
+  test('一覧の応答は可否を返さない', async ({ request }) => {
     const response = await request.get('/api/projects');
-    const body = (await response.json()) as {
-      actions: { create: { available: boolean; reason?: string } };
-    };
+    const body = (await response.json()) as Record<string, unknown>;
 
-    expect(body.actions.create.available).toBe(false);
-    expect(body.actions.create.reason).toBe('target-undecided');
+    expect(body).not.toHaveProperty('actions');
+    expect(body).toHaveProperty('directory');
+  });
+
+  test('作成を押すと概要入力がモーダルで開く', async ({ page }) => {
+    await page.getByTestId('create-project').click();
+
+    await expect(page).toHaveURL(/\/strokes$/);
+    await expect(page.getByTestId('stroke-modal')).toBeVisible();
+  });
+
+  test('モーダルには閉じる操作が無い', async ({ page }) => {
+    await page.getByTestId('create-project').click();
+    await expect(page.getByTestId('stroke-modal')).toBeVisible();
+
+    // Esc も背景クリックも効かない。ストロークは最後まで行く（design.md D1）
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('stroke-modal')).toBeVisible();
+    await expect(page).toHaveURL(/\/strokes$/);
+  });
+
+  test('リロードしても同じ場面がモーダルとして開き直る', async ({ page }) => {
+    await page.getByTestId('create-project').click();
+    await expect(page.getByTestId('stroke-modal')).toBeVisible();
+
+    // 復帰は URL が担う。開閉の状態を画面側に持たない（design.md D1）
+    await page.reload();
+
+    await expect(page).toHaveURL(/\/strokes$/);
+    await expect(page.getByTestId('stroke-modal')).toBeVisible();
   });
 });
 

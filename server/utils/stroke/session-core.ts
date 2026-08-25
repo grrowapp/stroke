@@ -3,13 +3,8 @@ import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from 'node:
 import { join } from 'node:path'
 import fse from 'fs-extra'
 import type { Invocation, SessionSummary } from '#shared/stroke'
+import { OPENSPEC_CONFIG_FILE, OPENSPEC_DIR } from './openspec'
 import { sessionDir, sessionFile } from './paths'
-import {
-  OPENSPEC_CONFIG_FILE,
-  OPENSPEC_DIR,
-  SESSION_FILES,
-  resolveSessionsRoot,
-} from './settings'
 
 /**
  * セッションの作成・削除・列挙の実体。endpoint（Nitro）と script（tsx）の両方から
@@ -18,6 +13,10 @@ import {
  * Nitro に依存しない: `useRuntimeConfig` は呼ばず必要な値は引数で受け、失敗は
  * `createError` ではなく種別を持つ `SessionCoreError` で表す。HTTP のステータスへの
  * 写しは endpoint 側、終了コードへの写しは script 側の責務。
+ *
+ * 保存先（`root` = `projectShareRoot`）も設定から引かず第1引数で受け取る。解決するのは
+ * 端だけで、endpoint 側は `session-store.ts`、CLI 側は `scripts/session.ts` が渡す
+ * （docs/specs/core/settings-reference.md「設定を引くのは端だけである」）。
  */
 
 export type SessionCoreErrorKind = 'not-found' | 'io'
@@ -32,18 +31,39 @@ export class SessionCoreError extends Error {
   }
 }
 
-// セッション内のファイル名の出どころは settings.ts の `SESSION_FILES`（固定値）。
+/**
+ * セッションディレクトリ内のファイル名。中身の書式とセットで決まるものなので、
+ * 名前だけを外から差し替えられる意味がない。設定ではない
+ * （docs/specs/core/settings-reference.md）。
+ */
+export const SESSION_FILES = {
+  state: 'state.json',
+  strokes: 'strokes.json',
+  overview: 'overview.txt',
+  sendBack: 'send-back.json',
+} as const
 
-/** uuid の形をしていないものはディレクトリ名として受け付けない。 */
+/** uuid の形をしているか。セッション（昇格前）の id はこの形である。 */
 export function isSessionId(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value)
 }
 
-/** セッションとして成立しているか。`state.json` が在ることをもって在るとする。 */
-export async function sessionExistsCore(sessionId: string): Promise<boolean> {
-  if (!isSessionId(sessionId)) return false
+/**
+ * 保存先の直下の1つとして、ディレクトリ名にそのまま使える形か。
+ *
+ * 対象の id は昇格でプロジェクト名に変わるので、uuid の形では絞れない。代わりに
+ * **保存先の外へ出られる形を通さない**ことだけを見る。`project.ts` の
+ * `assertProjectName` と同じ線引きで、緩めれば保存先の外を読み書きできてしまう。
+ */
+export function isSafeSegment(value: string): boolean {
+  return /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value) && !value.includes('..')
+}
+
+/** 対象として成立しているか。`state.json` が在ることをもって在るとする。 */
+export async function sessionExistsCore(root: string, sessionId: string): Promise<boolean> {
+  if (!isSafeSegment(sessionId)) return false
   try {
-    const s = await stat(sessionFile(sessionId, SESSION_FILES.state))
+    const s = await stat(sessionFile(root, sessionId, SESSION_FILES.state))
     return s.isFile()
   } catch {
     return false
@@ -59,19 +79,20 @@ export async function sessionExistsCore(sessionId: string): Promise<boolean> {
  * （半端なセッションを残さない・design.md 決定1）。
  */
 export async function createSessionCore(
+  root: string,
   overview: string,
   invocation: Invocation,
 ): Promise<string> {
   const sessionId = randomUUID()
   try {
-    await mkdir(sessionDir(sessionId), { recursive: true })
-    await writeAtomic(sessionId, SESSION_FILES.overview, overview)
-    await writeAtomic(sessionId, SESSION_FILES.strokes, `${JSON.stringify([], null, 2)}\n`)
+    await mkdir(sessionDir(root, sessionId), { recursive: true })
+    await writeAtomic(root, sessionId, SESSION_FILES.overview, overview)
+    await writeAtomic(root, sessionId, SESSION_FILES.strokes, `${JSON.stringify([], null, 2)}\n`)
     const state = { phase: 'stroking', currentQuestion: null, invocation }
-    await writeAtomic(sessionId, SESSION_FILES.state, `${JSON.stringify(state, null, 2)}\n`)
+    await writeAtomic(root, sessionId, SESSION_FILES.state, `${JSON.stringify(state, null, 2)}\n`)
     return sessionId
   } catch (error) {
-    await fse.remove(sessionDir(sessionId)).catch(() => {})
+    await fse.remove(sessionDir(root, sessionId)).catch(() => {})
     throw new SessionCoreError(
       'io',
       `セッションを作れなかった: ${error instanceof Error ? error.message : String(error)}`,
@@ -84,12 +105,12 @@ export async function createSessionCore(
  * 存在しない id は何も消さず失敗にする（`remove` は存在しないパスで沈黙するため、
  * 検査を先に置くことで「無いものを消した」ことにしない）。
  */
-export async function deleteSessionCore(sessionId: string): Promise<void> {
-  if (!(await sessionExistsCore(sessionId))) {
+export async function deleteSessionCore(root: string, sessionId: string): Promise<void> {
+  if (!(await sessionExistsCore(root, sessionId))) {
     throw new SessionCoreError('not-found', `そのセッションは無い: ${sessionId}`)
   }
   try {
-    await fse.remove(sessionDir(sessionId))
+    await fse.remove(sessionDir(root, sessionId))
   } catch (error) {
     throw new SessionCoreError(
       'io',
@@ -103,14 +124,14 @@ export async function deleteSessionCore(sessionId: string): Promise<void> {
  * あるか・その `config.yaml` が変更された内容（`schema: <名前>` の書き込み済み）に
  * なっているかを検査する。全部パスしたものだけを一覧に出す。
  */
-async function passesListChecks(sessionId: string): Promise<boolean> {
+async function passesListChecks(root: string, sessionId: string): Promise<boolean> {
   try {
-    const dir = await stat(sessionDir(sessionId))
+    const dir = await stat(sessionDir(root, sessionId))
     if (!dir.isDirectory()) return false
-    const openspecDir = await stat(join(sessionDir(sessionId), OPENSPEC_DIR))
+    const openspecDir = await stat(join(sessionDir(root, sessionId), OPENSPEC_DIR))
     if (!openspecDir.isDirectory()) return false
     const config = await readFile(
-      join(sessionDir(sessionId), OPENSPEC_DIR, OPENSPEC_CONFIG_FILE),
+      join(sessionDir(root, sessionId), OPENSPEC_DIR, OPENSPEC_CONFIG_FILE),
       'utf8',
     )
     return /^schema:\s*\S+/m.test(config)
@@ -124,21 +145,28 @@ async function passesListChecks(sessionId: string): Promise<boolean> {
  * の検査を全部パスしたものだけを載せる。各件は id・phase・時点情報（`state.json` の mtime）。
  * `state.json` が読めない・phase が取れないものは `unknown` として載せる（見えなくすると
  * 消す判断ができない）。新しいものから並べる。
+ *
+ * 保存先にはセッション（uuid）と昇格したプロジェクト（名前）が並ぶ。**どちらも載せる。**
+ * 昇格後の対象は steering の巡回・再キックの対象になるためである（design.md Risks）。
+ * 名前の形では絞らない——絞ると昇格した瞬間に一覧から消え、巡回が拾えなくなる。
+ *
+ * 保存先には無関係なディレクトリも並びうるが、`state.json` を持たないものは下の検査で
+ * 落ちるので載らない。
  */
-export async function listSessionsCore(): Promise<SessionSummary[]> {
+export async function listSessionsCore(root: string): Promise<SessionSummary[]> {
   let entries
   try {
-    entries = await readdir(resolveSessionsRoot(), { withFileTypes: true })
+    entries = await readdir(root, { withFileTypes: true })
   } catch {
     return []
   }
   const sessions: SessionSummary[] = []
   for (const entry of entries) {
-    if (!entry.isDirectory() || !isSessionId(entry.name)) continue
-    if (!(await passesListChecks(entry.name))) continue
+    if (!entry.isDirectory()) continue
+    if (!(await passesListChecks(root, entry.name))) continue
     let mtime: Date
     try {
-      const s = await stat(sessionFile(entry.name, SESSION_FILES.state))
+      const s = await stat(sessionFile(root, entry.name, SESSION_FILES.state))
       if (!s.isFile()) continue
       mtime = s.mtime
     } catch {
@@ -146,7 +174,7 @@ export async function listSessionsCore(): Promise<SessionSummary[]> {
     }
     sessions.push({
       id: entry.name,
-      phase: await readPhase(entry.name),
+      phase: await readPhase(root, entry.name),
       updatedAt: mtime.toISOString(),
     })
   }
@@ -157,18 +185,25 @@ export async function listSessionsCore(): Promise<SessionSummary[]> {
  * `state.json` の `invocation` を読む。script の削除受理判定に使う（design.md 決定5:
  * サーバ無しの経路では保存された状態を実行中判定の材料にする）。読めなければ null。
  */
-export async function readInvocationCore(sessionId: string): Promise<string | null> {
+export async function readInvocationCore(
+  root: string,
+  sessionId: string,
+): Promise<string | null> {
   try {
-    const raw = JSON.parse(await readFile(sessionFile(sessionId, SESSION_FILES.state), 'utf8'))
+    const raw = JSON.parse(
+      await readFile(sessionFile(root, sessionId, SESSION_FILES.state), 'utf8'),
+    )
     return typeof raw?.invocation === 'string' ? raw.invocation : null
   } catch {
     return null
   }
 }
 
-async function readPhase(sessionId: string): Promise<SessionSummary['phase']> {
+async function readPhase(root: string, sessionId: string): Promise<SessionSummary['phase']> {
   try {
-    const raw = JSON.parse(await readFile(sessionFile(sessionId, SESSION_FILES.state), 'utf8'))
+    const raw = JSON.parse(
+      await readFile(sessionFile(root, sessionId, SESSION_FILES.state), 'utf8'),
+    )
     const phase = raw?.phase
     return phase === 'stroking' || phase === 'proposed' || phase === 'approved' ? phase : 'unknown'
   } catch {
@@ -180,8 +215,13 @@ async function readPhase(sessionId: string): Promise<SessionSummary['phase']> {
  * 書きかけを残さない。同じディレクトリへ書いてから rename するので、
  * 読み手が見るのは常に前の版か新しい版のどちらかになる。
  */
-export async function writeAtomic(sessionId: string, name: string, contents: string): Promise<void> {
-  const target = sessionFile(sessionId, name)
+export async function writeAtomic(
+  root: string,
+  sessionId: string,
+  name: string,
+  contents: string,
+): Promise<void> {
+  const target = sessionFile(root, sessionId, name)
   const temp = `${target}.${randomUUID()}.tmp`
   try {
     await writeFile(temp, contents, 'utf8')

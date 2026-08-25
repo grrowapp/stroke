@@ -36,20 +36,25 @@ flowchart TB
 
 - `UModal` の `fullscreen`（画面全体を覆う）と `dismissible`（外側クリック・Esc での閉じを禁止）で、決定済みの挙動（全面・閉じる操作なし）を設定だけで満たせる（props は導入済みパッケージの型定義で確認済み）
 
-### 未決: モーダルの開き方（最後に決める）
+### 決定: ページ遷移で開く（design.md D1）
 
-作成ボタン押下で概要入力を出す方法は2案あり、**決定は設計の最後に回す**。
+作成ボタンは概要入力のページへ**遷移**し、ページ自身が `UModal` で画面全体を占める。
 
 ```mermaid
 flowchart LR
-  btn["作成ボタン押下"] --> q{"開き方"}
-  q -- "案A" --> route["Nuxt のパスルーティング<br>（URL を進めてページとして開く）"]
-  q -- "案B" --> comp["components 起動<br>（一覧画面の状態でモーダルを表示）"]
-  route & comp --> must["どちらでも満たすこと:<br>リロードで途中の場面に復帰（ADR-0009）<br>URL は変わってよい"]
+  btn["作成ボタン押下"] --> route["navigateTo('/strokes')<br>Nuxt のパスルーティング"]
+  route --> layout["layouts/stroke.vue<br>UModal fullscreen・dismissible false・close false"]
+  layout --> pages["3画面はそのまま中身になる<br>（中身と流れは変えない）"]
+  pages --> url["復帰は URL が担う<br>リロードで同じ場面がモーダルとして開き直る"]
 ```
 
-- 入れ子ルート方式（一覧を親ルート・ストロークを子ルートにして重ねる）は**不採用**
-- 既存 ticket `relocate-stroke-routes`（ストロークのルートを `/projects/create/**` へ移す）の扱いは、この開き方の決定に連動して決める
+- **代替案（components 起動）は不採用。** セッション id の保存先を URL とは別に持つことに
+  なり、URL が既に持つ情報を二重化する
+- 入れ子ルート方式（一覧を親ルート・ストロークを子ルートにして重ねる）も**不採用**
+- 器は `app/layouts/stroke.vue` の1枚。3画面は `definePageMeta({ layout: 'stroke' })` を
+  置くだけで、中身は触らない
+- 既存 ticket `relocate-stroke-routes`（ストロークのルートを `/projects/create/**` へ移す）は
+  **据え置き**。パスを動かさなくても開き方の決定は成立する
 
 ## エラーの出方（前提が欠けていても押せる）
 

@@ -6,8 +6,7 @@ import { readState } from '../../../utils/stroke/session-store'
 export default defineEventHandler(async (event): Promise<SessionStatus> => {
   const sessionId = await requireSessionId(event)
   const state = await readState(sessionId)
-  return {
-    phase: state.phase,
-    invocation: state.phase === 'approved' ? 'idle' : state.invocation,
-  }
+  // `approved` も `invocation` を持つ（openspec/specs/agent/invocation）。
+  // 昇格後は steering の実行が起こるので、ここで潰さずそのまま返す。
+  return { phase: state.phase, invocation: state.invocation }
 })

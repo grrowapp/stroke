@@ -2,7 +2,6 @@ import { conflict } from '../../../utils/stroke/conflict'
 import { parseQuestion } from '../../../utils/stroke/question'
 import { requireSessionId } from '../../../utils/stroke/session-param'
 import { readState, writeState } from '../../../utils/stroke/session-store'
-import { notifySubmission } from '../../../utils/stroke/submission-signal'
 import { questionChannel } from '../../../utils/stroke/ws-channels'
 
 /**
@@ -27,9 +26,10 @@ export default defineEventHandler(async (event) => {
     throw conflict('phase', '承認済みのセッションには提出できない。')
   }
 
-  await writeState(sessionId, { ...state, currentQuestion: question, invocation: 'idle' })
+  // `invocation` には触れない。実行の記録を書くのは invokeAi だけで、完了は invokeAi が
+  // 子プロセスの output stream で検知する（openspec/specs/agent/invocation の MUST）。
+  await writeState(sessionId, { ...state, currentQuestion: question })
   questionChannel.publish(sessionId, question)
-  notifySubmission(sessionId)
 
   setResponseStatus(event, 200)
   return null

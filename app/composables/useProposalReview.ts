@@ -349,6 +349,9 @@ export function useProposalReview(
       phase.value = 'approved'
       approveOpen.value = false
       notice.value = null
+      // 承認で流れは終わる。モーダルごと閉じて一覧へ戻る（ADR 0011: この後の steering は
+      // サーバーが裏で起こすので、ユーザーは待たない）。
+      await navigateTo('/projects')
     } catch (error) {
       // サーバは 409 を3つの意味で返す(名前の衝突 / AI が実行中 / phase 不整合)。
       // 名前を変えるまで承認を止めるのは、衝突と分かったときだけにする。

@@ -1,11 +1,13 @@
 import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { z } from 'zod'
 import type { Answer, Invocation, Question, SendBackPayload, Stroke } from '#shared/stroke'
 import { sessionFile } from './paths'
+import { PROJECT_DOCS_DIR, PROJECT_PROPOSAL_FILE } from './project'
 import { questionSchema } from './question'
 import { sendBackBody } from './request-schemas'
-import { SESSION_FILES } from './settings'
 import {
+  SESSION_FILES,
   SessionCoreError,
   createSessionCore,
   sessionExistsCore,
@@ -13,14 +15,28 @@ import {
 } from './session-core'
 
 /**
+ * 保存先を解決する端。
+ *
+ * core（`session-core.ts` / `paths.ts`）は設定を引かず `root` を引数で受け取る。
+ * このモジュールは `createError` を使う Nitro 専用なので、ここが endpoint 側の端になる
+ * （CLI 側の端は `scripts/session.ts`）。docs/specs/core/settings-reference.md 参照。
+ */
+function shareRoot(): string {
+  return useRuntimeConfig().projectShareRoot
+}
+
+/**
  * `state.json` の中身。
  *
  * uuid はディレクトリ名なので持たない。会話の全文も持たない（`--resume` が持つ）。
  * proposal 本文は `proposal.md` を読めば得られるため、状態には持たない。
  *
- * `stroking` / `proposed` は「今の1問」と呼び出し実行状態を持つ点で同じ形（design.md
- * 決定3・決定4: 問いと問い返しを区別せず、phase で受理の動きを変えない）。`approved` は
- * 呼び出しが二度と起きないので、その2つを持たない。
+ * `stroking` / `proposed` は「今の1問」を持つ点で同じ形（design.md 決定3・決定4: 問いと
+ * 問い返しを区別せず、phase で受理の動きを変えない）。`approved` は問いを持たない。
+ *
+ * **`invocation` と `retries` は3つの phase すべてが持つ。** 承認で昇格したプロジェクトでも
+ * steering の実行が起こるため、実行の記録は `approved` でも要る
+ * （openspec/specs/agent/invocation「phase が `approved` の対象も `invocation` を持つ」）。
  */
 export type SessionState =
   | {
@@ -30,26 +46,48 @@ export type SessionState =
       /** AI が提案した kebab-case のプロジェクト名候補。取れないことがある */
       projectName?: string
       invocation: Invocation
+      /** 起こし直した回数。上限判定は invokeAi が行う。省略は 0 と同じ */
+      retries?: number
     }
   | {
       phase: 'approved'
       /** 承認時に確定した名前 */
       projectName: string
+      invocation: Invocation
+      retries?: number
+      /**
+       * steering の会話 id。
+       *
+       * ストロークと違い自前採番しない——ディレクトリ名がプロジェクト名になっており
+       * uuid ではないためで、`--session-id` は uuid しか受け付けない（実測）。初回は
+       * claude に採番させ、output stream から拾った id をここに覚えて次から `--resume`
+       * する。**あるかどうかが初回/継続の判定でもある。**
+       */
+      runId?: string
     }
 
 const projectNameSchema = z.string().trim().min(1)
-const invocationSchema = z.enum(['running', 'idle', 'failed'])
+const invocationSchema = z.enum(['running', 'idle', 'failed', 'error'])
+const retriesSchema = z.number().int().min(0).optional()
 
 const activeStateFields = {
   currentQuestion: z.union([z.null(), questionSchema]),
   projectName: projectNameSchema.optional(),
   invocation: invocationSchema,
+  retries: retriesSchema,
 }
 
 const stateSchema = z.discriminatedUnion('phase', [
   z.object({ phase: z.literal('stroking'), ...activeStateFields }),
   z.object({ phase: z.literal('proposed'), ...activeStateFields }),
-  z.object({ phase: z.literal('approved'), projectName: projectNameSchema }),
+  z.object({
+    phase: z.literal('approved'),
+    projectName: projectNameSchema,
+    // 既存の `approved` は `invocation` を持たないので、読めるように既定値を与える
+    invocation: invocationSchema.default('idle'),
+    retries: retriesSchema,
+    runId: z.string().trim().min(1).optional(),
+  }),
 ])
 
 const answerSchema = z.discriminatedUnion('kind', [
@@ -76,7 +114,7 @@ const strokesSchema = z.array(strokeSchema)
 export async function createSession(overview: string): Promise<string> {
   // 実体は core（design.md 決定3: endpoint と script で同じ実装を呼ぶ）。
   try {
-    return await createSessionCore(overview, 'idle')
+    return await createSessionCore(shareRoot(), overview, 'idle')
   } catch (error) {
     throw sessionErrorToHttp(error)
   }
@@ -84,7 +122,7 @@ export async function createSession(overview: string): Promise<string> {
 
 /** セッションとして成立しているか。`state.json` が在ることをもって在るとする。 */
 export async function sessionExists(sessionId: string): Promise<boolean> {
-  return sessionExistsCore(sessionId)
+  return sessionExistsCore(shareRoot(), sessionId)
 }
 
 /** core の失敗を HTTP へ写す。endpoint 側の共通の出口。 */
@@ -99,7 +137,7 @@ export function sessionErrorToHttp(error: unknown) {
 
 export async function readState(sessionId: string): Promise<SessionState> {
   const name = SESSION_FILES.state
-  const raw = await readFile(sessionFile(sessionId, name), 'utf8')
+  const raw = await readFile(sessionFile(shareRoot(), sessionId, name), 'utf8')
   const parsed = stateSchema.safeParse(readJson(raw, name, sessionId))
   if (!parsed.success) throw corrupt(name, sessionId)
   return parsed.data
@@ -112,7 +150,7 @@ export async function writeState(sessionId: string, state: SessionState): Promis
 /** U1 で投稿された概要。A1 が読む。 */
 export async function readOverview(sessionId: string): Promise<string | undefined> {
   try {
-    return await readFile(sessionFile(sessionId, SESSION_FILES.overview), 'utf8')
+    return await readFile(sessionFile(shareRoot(), sessionId, SESSION_FILES.overview), 'utf8')
   } catch {
     return undefined
   }
@@ -123,7 +161,7 @@ export async function readSendBack(sessionId: string): Promise<SendBackPayload |
   const name = SESSION_FILES.sendBack
   let raw: string
   try {
-    raw = await readFile(sessionFile(sessionId, name), 'utf8')
+    raw = await readFile(sessionFile(shareRoot(), sessionId, name), 'utf8')
   } catch {
     return undefined
   }
@@ -144,7 +182,7 @@ export async function readStrokes(sessionId: string): Promise<Stroke[]> {
   const name = SESSION_FILES.strokes
   let raw: string
   try {
-    raw = await readFile(sessionFile(sessionId, name), 'utf8')
+    raw = await readFile(sessionFile(shareRoot(), sessionId, name), 'utf8')
   } catch {
     return []
   }
@@ -183,23 +221,29 @@ async function writeStrokes(sessionId: string, strokes: Stroke[]): Promise<void>
   await writeAtomic(sessionId, SESSION_FILES.strokes, `${JSON.stringify(strokes, null, 2)}\n`)
 }
 
-/** 最新の proposal 本文。A7 の受理でサーバが書く（decisions 7: 書き手はサーバの1つだけ）。 */
+/**
+ * 最新の proposal 本文。
+ *
+ * 書き手は claude で、セッションの時点から `docs/proposal.md` に置く
+ * （openspec/specs/project/generation）。承認はこのファイルを動かさないため、昇格後は
+ * `<name>/docs/proposal.md` としてそのまま読める。**サーバーは書かない。**
+ * 書かれていなければ undefined を返し、承認は 409 で止まる。
+ */
 export async function readProposal(sessionId: string): Promise<string | undefined> {
   try {
-    return await readFile(sessionFile(sessionId, SESSION_FILES.proposal), 'utf8')
+    return await readFile(
+      sessionFile(shareRoot(), sessionId, join(PROJECT_DOCS_DIR, PROJECT_PROPOSAL_FILE)),
+      'utf8',
+    )
   } catch {
     return undefined
   }
 }
 
-export async function writeProposal(sessionId: string, proposal: string): Promise<void> {
-  await writeAtomic(sessionId, SESSION_FILES.proposal, proposal)
-}
-
 /** 原子的な書き込みの実体は core。失敗はここで HTTP へ写す。 */
 async function writeAtomic(sessionId: string, name: string, contents: string): Promise<void> {
   try {
-    await writeAtomicCore(sessionId, name, contents)
+    await writeAtomicCore(shareRoot(), sessionId, name, contents)
   } catch (error) {
     throw sessionErrorToHttp(error)
   }

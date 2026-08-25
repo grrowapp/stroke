@@ -38,8 +38,14 @@ export interface AgentQuestionReturn {
   question: Ref<Question | null>
   /** 次が返るのを待っているか */
   waiting: Ref<boolean>
-  /** AI から応答が得られなかったか */
+  /** AI から応答が得られなかったか。巡回が起こし直すので待てば回復しうる */
   failed: Ref<boolean>
+  /** リトライ上限に達した終端。自動では回復せず、再実行か削除をユーザーが選ぶ */
+  errored: Ref<boolean>
+  /** `errored` からの再実行。リトライ回数を戻して起動をキックする */
+  retryFromError: () => Promise<void>
+  /** `errored` からの削除 */
+  discard: () => Promise<void>
   /** 送れなかったときの理由。送れていれば null */
   error: Ref<AgentQuestionError | null>
   /** ここまでに答えた数。総数は持たない */
@@ -80,7 +86,7 @@ export function useAgentQuestion(sessionId: MaybeRefOrGetter<string>): AgentQues
     () => waitingRetry.waiting.value,
     (isWaiting, wasWaiting) => {
       if (!wasWaiting || isWaiting) return
-      if (waitingRetry.failed.value) return
+      if (waitingRetry.failed.value || waitingRetry.errored.value) return
       if (question.value !== null && question.value === asked) question.value = null
       asked = null
     },
@@ -125,6 +131,9 @@ export function useAgentQuestion(sessionId: MaybeRefOrGetter<string>): AgentQues
     question,
     waiting: waitingRetry.waiting,
     failed: waitingRetry.failed,
+    errored: waitingRetry.errored,
+    retryFromError: waitingRetry.retryFromError,
+    discard: waitingRetry.discard,
     error,
     answered,
     send,

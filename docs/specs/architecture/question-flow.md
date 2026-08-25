@@ -40,7 +40,8 @@ sequenceDiagram
 
     Note over A: 把握完了
     A->>S: A7 POST /api/:id/proposal
-    Note over S: proposal.md を書く<br/>strokes.json にマーカー行（初回のみ）<br/>phase=proposed / 問い無し / idle
+    Note over A: docs/proposal.md を書く<br/>（書き手は claude。サーバーは書かない）
+    Note over S: strokes.json にマーカー行（初回のみ）<br/>phase=proposed / 問い無し / idle
     S-->>V: W2 proposal と名前候補
     Note over V: 待機が明け、新しい問いは来ない<br/>画面が今の1問を手放す
 
@@ -120,14 +121,17 @@ W1（今の1問）と W2（proposal）は、どちらも2つの経路で流れ�
 flowchart LR
     subgraph サーバ
         SJ[(state.json)]
-        PM[(proposal.md)]
         A5W[A5 の受理]
         A7W[A7 の受理]
         REG[["接続の集合<br/>Map: sessionId → peers"]]
     end
 
+    subgraph claude
+        PM[("docs/proposal.md<br/>書き手は claude だけ")]
+    end
+
     A5W -->|書く| SJ
-    A7W -->|書く| PM
+    A7W -->|書かない| PM
     A5W -->|提出時配信| REG
     A7W -->|提出時配信| REG
 

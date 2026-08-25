@@ -1,17 +1,7 @@
 import { defineNuxtConfig } from 'nuxt/config';
-import {
-  DEFAULT_API_BASE_URL,
-  DEFAULT_CLAUDE_COMMAND,
-  DEFAULT_CONTINUE_PROMPT,
-  DEFAULT_FIRST_PROMPT,
-  DEFAULT_OPENSPEC_BIN,
-  DEFAULT_OPENSPEC_INIT_ARGS,
-  DEFAULT_PROJECTS_ROOT,
-  DEFAULT_SESSIONS_ROOT,
-  DEFAULT_WORKFLOW_SCHEMA,
-  DEFAULT_WS_PATH_PATTERN,
-  defaultClaudeArgs,
-} from './server/utils/stroke/settings';
+
+/** ADR 0001: ここを外すとスキルが一切ロードされない。 */
+const SETTING_SOURCES_REQUIRED = 'project';
 
 export default defineNuxtConfig({
   compatibilityDate: '2026-08-21',
@@ -58,71 +48,108 @@ export default defineNuxtConfig({
   typescript: { typeCheck: false, strict: true },
 
   // 起動の待ち受け。3000 はこのマシンで別のプロセスが使っているのでずらしてある。
-  // 3001 はストロークの `apiBaseUrl` 既定（docs/specs/core/settings-reference.md）と揃える値。
+  // 3001 はストロークの `claude.apiBaseUrl` と揃える値。
   // 別マシンのブラウザから開くため、localhost ではなく全インタフェースで待つ
   devServer: { host: '0.0.0.0', port: 3001 },
 
   // ===========================================================================
   // 実行時に決まる設定
   //
-  // ストローク側の値の中身はここに書かず、`server/utils/stroke/settings.ts` を import して
-  // 宣言する。設定の正は docs/specs/core/settings-reference.md（ADR 0004）で、そこに無いものは設定では
-  // ない。**差し替えられるのは置き場の2件だけ**である（`NUXT_SESSIONS_ROOT` /
-  // `NUXT_PROJECTS_ROOT`）。読み手が endpoint と CLI（`yarn session`、Nitro の外）に
-  // 分かれる値は、`useRuntimeConfig()` を使えない CLI のために `settings.ts` の解決関数を通る。
+  // 設定の正は docs/specs/core/settings-reference.md（ADR 0004）で、そこに無いものは
+  // 設定ではない。ストローク側の値の実体はこのファイルにだけ在り、**環境変数からは
+  // 読まない**。既定値を並べた別モジュールも作らない（出どころが2箇所に割れるため）。
   //
-  // ポータル側の4件（upstream〜syncIntervalMs）はこの流儀に未統合で、環境変数で差し替え
-  // られる（README の「設定（ポータル側）」）。一本化は align-settings-conventions の続き
+  // 読み手は endpoint が `useRuntimeConfig()`、CLI（`yarn session`、Nitro の外）は
+  // このファイルを直接 import する。環境変数を見ないので両者は同じ値になる。
+  // 共有のモジュール（session-core / paths / claude など）は設定を引かず、
+  // 端で解決した値を引数で受け取る。
+  //
+  // ポータル側の4件（upstream〜syncIntervalMs）はこの流儀に未統合で、環境変数で
+  // 差し替えられる（README の「設定（ポータル側）」）。一本化は別 change で行う
   // ===========================================================================
 
   runtimeConfig: {
-    // --- ポータル: 本家に触るために要る3つ。読み方は server/utils/config.ts に閉じる
+    // --- セッションとプロジェクトの共通の親。ポータルとストロークが共有する1つの場所。
+    //
+    // ストローク: 承認はこの下でのディレクトリ改名だけで昇格を行うので、セッションと
+    // プロジェクトが同じ親に居ることが前提になる。
+    // ポータル: 一覧はここの直下1階層を走査し、`.spec-workflow/` を持つものを拾う。
+    //
+    // 昇格したプロジェクトが一覧に現れるのは、両者がこの1つの値を見ているからである。
+    // 2つの設定に分けると、食い違ったときに承認したプロジェクトが一覧から消える
+    projectShareRoot: '/opt/projects',
+
+    // --- ポータル: 本家に触るために要る2つ。読み方は server/utils/config.ts に閉じる
     upstreamBaseUrl: 'http://127.0.0.1:5000',
-    projectsParentPath: '/opt/projects',
     specWorkflowHome: '/opt/projects/.spec-workflow-mcp',
 
     // --- ポータル: アクティブ集合を見直す間隔（ミリ秒）
     syncIntervalMs: '30000',
 
-    // --- ストローク: 置き場。`NUXT_SESSIONS_ROOT` / `NUXT_PROJECTS_ROOT` で差し替えられる
-    sessionsRoot: DEFAULT_SESSIONS_ROOT,
-    projectsRoot: DEFAULT_PROJECTS_ROOT,
-
-    // --- ストローク: AI（claude -p）の呼び出しの中で使う値。起動定義そのものは public 側にある
+    // --- ストローク: AI（claude -p）の起動定義と、呼び出しの中で使う値。
+    // 画面は1つも読まないのでサーバー専用（public に置かない）
     claude: {
+      // 起動定義。`.mcp.json` の command / args の記述形式に倣い、分解済みの配列
+      // そのものを持つ（空白区切りの文字列を後から割らない）。
+      //
+      // `--add-dir` に渡すのはリポジトリのルートで、`.claude` や skills をパスに
+      // 含めない（ADR 0001）。1つ目が grilling / domain-modeling / write-steering-v2 と
+      // opsx コマンドの置き場、2つ目がセッション API スキル（assets/.claude/skills/）の
+      // 置き場。どちらもこのリポジトリの中にあるので、置き場所を直書きせずルートから
+      // 導く（nuxt.config.ts はリポジトリルートに在る）。
+      //
+      // `--setting-sources` に user を含めないのは、開発者個人の設定
+      // （~/.claude/CLAUDE.md）をエンドユーザーのセッションへ持ち込まないためである。
+      // project を外すとスキルが一切ロードされない（ADR 0001）。
+      //
+      // AI に許すツールは Bash Read Write Edit。取得・提出は endpoint への HTTP 発行
+      // （Bash で curl）で行い、proposal.md / stroke.md は AI 自身が書いてパスで渡す。
+      //
+      // `-p` / `--output-format json`、`--session-id` / `--resume` とセッション id、
+      // `--mcp-config`、`--` 以降の prompt は呼び出しごとに決まるのでここには入れず、
+      // 呼び出し側が args の後ろに足す
+      command: 'claude',
+      args: [
+        '--setting-sources', SETTING_SOURCES_REQUIRED,
+        '--model', 'fable',
+        '--add-dir', import.meta.dirname,
+        '--add-dir', `${import.meta.dirname}/assets`,
+        '--allowedTools', 'Bash Read Write Edit',
+      ],
+
       // エージェント向け endpoint の base URL。spawn 時に環境変数 STROKE_BASEURL として
       // 渡し、セッション API スキルがそこから接続先を解決する（prompt には載せない）
-      apiBaseUrl: DEFAULT_API_BASE_URL,
+      apiBaseUrl: 'http://127.0.0.1:3001',
+
       // セッションの openspec/config.yaml に書くワークフロースキーマ名。実体は
       // user レベル（~/.local/share/openspec/schemas/）に配置されたものが解決される
-      workflowSchema: DEFAULT_WORKFLOW_SCHEMA,
-      // AI へ渡す定型。本文をコードに持たない（specs/ai-invocation）。初回はスキル起動＋
-      // 最低限の固定指示、継続は続きを促すだけ（入力は prompt に載せず、エージェントが
-      // 取得スキルで読む）
-      firstPrompt: DEFAULT_FIRST_PROMPT,
-      continuePrompt: DEFAULT_CONTINUE_PROMPT,
+      workflowSchema: 'flontier-strokeflow',
+
+      // AI へ渡す定型。指示の本文はコードに持たない（specs/agent/invocation）。従う手順は
+      // スキル自身が持つ。初回はスキル起動＋最低限の固定指示、継続は続きを促すだけ
+      // （入力は prompt に載せず、エージェントが取得スキルで読む）
+      firstPrompt: '/openspec-ff-change draft-proposal\n\nスキルの指示に従って作業を実施する。',
+      continuePrompt: '続きを進めろ。状況は取得スキルで確認してから判断しろ。',
+
+      // 承認で昇格した直後に steering 文書を作らせる定型（ADR 0011）。cwd は昇格先の
+      // プロジェクトで、--mcp-config は呼び出し側がそこから組み立てて足す。
+      // write-steering（v2 でない方）は対話インタビュー（grill）を含み、無人実行では
+      // 進まないため使わない
+      steeringPrompt: '/write-steering-v2\n\nスキルの指示に従って steering 文書を作成する。',
+
+      // 失敗した実行を起こし直す回数の上限。上限に達したら起動せず invocation を
+      // error（終端）にする。総待ち時間は「(回数 + 1) × タイムアウト」で決まる
+      maxRetries: 2,
     },
 
     // --- ストローク: セッションの openspec ルートを初期化する CLI とその引数
     openspec: {
-      bin: DEFAULT_OPENSPEC_BIN,
-      initArgs: DEFAULT_OPENSPEC_INIT_ARGS,
+      bin: 'openspec',
+      initArgs: 'init --tools none',
     },
 
-    // --- ストローク: WS の URL からセッション id を抜くパターン。`{channel}` がチャネル名に置き換わる
-    wsPathPattern: DEFAULT_WS_PATH_PATTERN,
-
-    public: {
-      // `claude` の起動定義。`.mcp.json` の記述形式に倣い、command と args のひとかたまりで
-      // 持つ（docs/specs/core/settings-reference.md）。`-p` / `--output-format json` と、
-      // `--session-id` / `--resume` とセッション id、`--` 以降の prompt は呼び出しごとに
-      // 決まるので、ここには入れず claude.ts が args の後ろに付ける。
-      // `--add-dir` に渡す置き場はどちらもこのリポジトリの中にあるので、直書きせず
-      // ルートから導く（nuxt.config.ts はリポジトリルートに在る）
-      claude: {
-        command: DEFAULT_CLAUDE_COMMAND,
-        args: defaultClaudeArgs(import.meta.dirname),
-      },
-    },
+    // --- ストローク: WS の URL からセッション id を抜くパターン。`{channel}` がチャネル名に置き換わる。
+    // リバースプロキシでサブパス配信する構成にするときは、ここを配信の形に合わせる
+    wsPathPattern: '/api/strokes/([^/]+)/ws/{channel}(?:$|[/?#])',
   },
 });

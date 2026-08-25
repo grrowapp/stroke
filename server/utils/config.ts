@@ -1,12 +1,12 @@
 /**
  * 本家に触るために要る3つの設定を読む唯一の場所。
  *
- * いずれも環境変数から入る（tech.md の Security Practices「ソースに埋めない」）。
+ * `upstreamBaseUrl` / `specWorkflowHome` / `syncIntervalMs` は環境変数から入る
+ * （`NUXT_UPSTREAM_BASE_URL` / `NUXT_SPEC_WORKFLOW_HOME` / `NUXT_SYNC_INTERVAL_MS`）。
  * 対応する環境変数は `runtimeConfig` のキーから Nuxt が導く。
  *
- *   upstreamBaseUrl    <- NUXT_UPSTREAM_BASE_URL
- *   projectsParentPath <- NUXT_PROJECTS_PARENT_PATH
- *   specWorkflowHome   <- NUXT_SPEC_WORKFLOW_HOME
+ * 走査の親パスだけは `projectShareRoot` を見る。ストローク側の保存先と同じ場所を
+ * 指す必要があるため、設定を分けない（docs/specs/core/settings-reference.md）。
  */
 
 import { homedir } from 'node:os';
@@ -22,7 +22,13 @@ const DEFAULT_SPEC_WORKFLOW_DIR = '.spec-workflow-mcp';
 export interface ServerConfig {
   /** 本家ダッシュボードの URL。未設定なら null */
   upstreamBaseUrl: string | null;
-  /** `.spec-workflow` を持つディレクトリを探す親パス。未設定なら null */
+  /**
+   * `.spec-workflow` を持つディレクトリを探す親パス。未設定なら null。
+   *
+   * ストローク側のセッションと昇格したプロジェクトの保存先（`projectShareRoot`）と
+   * 同じ1つの設定を見る。分けると食い違ったときに、承認したプロジェクトが一覧から
+   * 消える（docs/specs/core/settings-reference.md）。
+   */
   projectsParentPath: string | null;
   /**
    * 本家のグローバル状態の置き場。`activeProjects.json` がここにある。
@@ -71,7 +77,7 @@ export function readServerConfig(): ServerConfig {
   return {
     // 末尾のスラッシュを落として、パスの結合が `//` にならないようにする
     upstreamBaseUrl: upstreamBaseUrl?.replace(TRAILING_SLASHES, '') ?? null,
-    projectsParentPath: normalize(runtimeConfig.projectsParentPath),
+    projectsParentPath: normalize(runtimeConfig.projectShareRoot),
     specWorkflowHome: resolveSpecWorkflowHome(normalize(runtimeConfig.specWorkflowHome)),
     syncIntervalMs: toPositiveInteger(runtimeConfig.syncIntervalMs) ?? DEFAULT_SYNC_INTERVAL_MS,
   };

@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 
 import { defineConfig } from '@playwright/test';
 
@@ -12,8 +12,29 @@ import { defineConfig } from '@playwright/test';
  * ずれていないことは `yarn test:live` が本物に対して確かめる。
  */
 
-export const STUB_PORT = 5199;
-export const APP_PORT = 3199;
+/**
+ * 待ち受けは**作業ツリーごとに固定**する。
+ *
+ * 同じマシンで `base` / `base2` / … を並べて動かすため、共通のポートにすると
+ * 「既に使われている」で起動できないだけでなく、先に立っている別ツリーのアプリへ
+ * テストが当たってしまう（実測: 別ツリーの実行と混ざって通知の件数が合わなくなった）。
+ *
+ * 割り当ては固定表で持つ。ハッシュで散らすと、どのツリーがどのポートかを人が引けない。
+ */
+const PORT_SLOT: Record<string, number> = {
+  base: 1,
+  base2: 2,
+  base3: 3,
+  base4: 4,
+  mvp: 5,
+};
+
+/** 表に無い作業ツリーはまとめて 9 番。並列で使うなら表に足すこと。 */
+const slot = PORT_SLOT[basename(process.cwd())] ?? 9;
+
+/** base=5199/3199、base2=5299/3299、base3=5399/3399 … */
+export const STUB_PORT = 5099 + slot * 100;
+export const APP_PORT = 3099 + slot * 100;
 
 /** 走査対象と registry をここに作る */
 export const E2E_ROOT = join(process.cwd(), '.e2e-tmp');
@@ -59,6 +80,29 @@ for (const name of [...ACTIVE.map((project) => project.name), ...DISCONNECTED]) 
   mkdirSync(join(PROJECTS_PARENT, name, '.spec-workflow'), { recursive: true });
 }
 
+/**
+ * 承認まで進んだセッション。
+ *
+ * ストロークの往復は claude が要るので E2E では回せない。承認の一手前の状態を直接
+ * 置いて、そこから先（承認 → 昇格 → 一覧へ戻る）だけを確かめる。
+ *
+ * `docs/proposal.md` を置くのは、承認がそれを前提にするためである（サーバーは書かない）。
+ */
+export const SEEDED_SESSION_ID = '11111111-2222-4333-8444-555555555555';
+export const SEEDED_PROJECT_NAME = 'promoted-project';
+
+const seeded = join(PROJECTS_PARENT, SEEDED_SESSION_ID);
+mkdirSync(join(seeded, 'docs'), { recursive: true });
+mkdirSync(join(seeded, 'openspec'), { recursive: true });
+writeFileSync(join(seeded, 'openspec', 'config.yaml'), 'schema: flontier-strokeflow\n');
+writeFileSync(join(seeded, 'docs', 'proposal.md'), '# 承認できる proposal\n\n本文。\n');
+writeFileSync(join(seeded, 'overview.txt'), 'E2E のための概要\n');
+writeFileSync(join(seeded, 'strokes.json'), '[{"proposal":true,"question":null,"answer":null}]\n');
+writeFileSync(
+  join(seeded, 'state.json'),
+  `${JSON.stringify({ phase: 'proposed', currentQuestion: null, invocation: 'idle', retries: 0 }, null, 2)}\n`,
+);
+
 mkdirSync(SPEC_WORKFLOW_HOME, { recursive: true });
 writeFileSync(REGISTRY_PATH, registryContent());
 
@@ -89,7 +133,14 @@ export default defineConfig({
       env: {
         PORT: String(APP_PORT),
         NUXT_UPSTREAM_BASE_URL: `http://127.0.0.1:${STUB_PORT}`,
-        NUXT_PROJECTS_PARENT_PATH: PROJECTS_PARENT,
+        // 設定は `nuxt.config.ts` が正で、運用では環境変数から読まない
+        // （docs/specs/core/settings-reference.md）。ただし Nuxt の `NUXT_*` 上書きは
+        // 機構として残っており、E2E はそれを使って走査先を一時ディレクトリへ向ける。
+        // 本物の `/opt/projects` に書かないための、テスト限定の差し替えである。
+        NUXT_PROJECT_SHARE_ROOT: PROJECTS_PARENT,
+        // 承認は昇格の直後に steering の claude を起こす（ADR 0011）。E2E で本物を
+        // 走らせないよう、起動する実行ファイルだけ何もしないものに差し替える。
+        NUXT_CLAUDE_COMMAND: '/bin/true',
         NUXT_SPEC_WORKFLOW_HOME: SPEC_WORKFLOW_HOME,
         NUXT_SYNC_INTERVAL_MS: String(SYNC_INTERVAL_MS),
       },

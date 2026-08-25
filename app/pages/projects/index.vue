@@ -3,8 +3,11 @@
  * 上層 — プロジェクト一覧。
  *
  * アクティブが上、未接続が下。未接続は選択できず、キーボードのフォーカスも受けない
- * （specs/project-directory）。登録と作成は非活性の入口として置く。中身が未決なため
- * （proposal.md の「MVP から外すもの」）。
+ * （specs/project-directory）。
+ *
+ * 作成は常に押せるただのボタンで、押すとストロークの概要入力へ入る（ADR 0009・0010）。
+ * 可否をサーバーに問わない。前提の欠けは概要投稿時の 503 として現れる（既存経路）。
+ * 登録は中身が未決のため非活性固定にする。
  *
  * アクティブ / 未接続の区別は色ではなく、チップの文言と行の不透明度で示す
  * （ui.md の Visual Language）。アイコンと寸法は prototype に合わせる。
@@ -14,11 +17,7 @@ import { computed, definePageMeta, navigateTo, useFetch, useHead } from '#import
 import SbIcon from '~/components/shared/SbIcon.vue';
 import { useBoardSocket } from '~/composables/shared/useBoardSocket';
 import { formatRelativeTime } from '~/composables/shared/useRelativeTime';
-import type {
-  ActionAvailability,
-  ProjectDirectoryResponse,
-  ProjectSummary,
-} from '#shared/types';
+import type { ProjectDirectoryResponse, ProjectSummary } from '#shared/types';
 
 definePageMeta({ layout: 'portal' });
 useHead({ title: 'プロジェクト一覧 — stroke-board' });
@@ -26,33 +25,14 @@ useHead({ title: 'プロジェクト一覧 — stroke-board' });
 const { data, status } = await useFetch<ProjectDirectoryResponse>('/api/projects');
 
 const directory = computed(() => data.value?.directory);
-const actions = computed(() => data.value?.actions);
 const projects = computed<ProjectSummary[]>(() =>
   directory.value?.status === 'ok' ? directory.value.projects : [],
 );
 
-/**
- * 操作が使えない理由。
- *
- * 非活性にするだけだと、画面から「なぜ使えないのか」が消える。interview Q39・Q40 は
- * どちらも「その状態は画面に出る」で決着している。
- */
-const REASON_TEXT: Record<'target-undecided' | 'meaning-undecided', string> = {
-  'target-undecided':
-    '作成の実処理を担う接続先の別プロジェクトに繋がっていません。stroke-board が持つのは入口だけで、接続が無い間は作成できません。',
-  'meaning-undecided':
-    '登録が何を指すか（本家への登録なのか、走査対象の親パスを足すのか）が決まっていません。',
-};
-
-function reasonOf(action: ActionAvailability | undefined): string | null {
-  return action === undefined || action.available ? null : REASON_TEXT[action.reason];
+/** 作成の入口。ストロークの概要入力へ入る（ADR 0009） */
+function startStroke(): void {
+  void navigateTo('/strokes');
 }
-
-const blockedReasons = computed(() =>
-  [reasonOf(actions.value?.create), reasonOf(actions.value?.register)].filter(
-    (reason): reason is string => reason !== null,
-  ),
-);
 
 function enter(project: ProjectSummary): void {
   if (project.connection !== 'active' || project.projectId === null) return;
@@ -95,13 +75,13 @@ function unread(project: ProjectSummary): number | null {
       <div class="ml-auto flex gap-2">
         <!--
           登録・作成は一覧画面の操作として持つ。独立したメニュー項目にはしない。
-          使えるかどうかはサーバーが返す状態で決める。画面側で非活性をベタ書きしない。
+          登録は中身が未決のため非活性固定。作成は常に押せる（ADR 0010）。
         -->
         <button
           type="button"
-          :disabled="!actions?.register.available"
+          disabled
           class="sb-btn"
-          :title="reasonOf(actions?.register) ?? ''"
+          title="登録が何を指すか（本家への登録なのか、走査対象の親パスを足すのか）が決まっていません。"
           data-testid="register-project"
         >
           <SbIcon name="link" :size="14" />
@@ -109,34 +89,15 @@ function unread(project: ProjectSummary): number | null {
         </button>
         <button
           type="button"
-          :disabled="!actions?.create.available"
           class="sb-btn sb-btn-primary"
-          :title="reasonOf(actions?.create) ?? ''"
           data-testid="create-project"
+          @click="startStroke"
         >
           <SbIcon name="plus" :size="14" />
           作成
         </button>
       </div>
     </div>
-
-    <!--
-      使えない理由を画面に出す。interview Q39・Q40 はどちらも「その状態は画面に出る」で
-      決着している。title 属性はポインタを載せないと読めないので、これだけでは満たさない。
-    -->
-    <ul
-      v-if="blockedReasons.length > 0"
-      class="mb-3 space-y-1"
-      data-testid="actions-blocked"
-    >
-      <li
-        v-for="reason in blockedReasons"
-        :key="reason"
-        class="text-[12px] text-[var(--text-muted)]"
-      >
-        {{ reason }}
-      </li>
-    </ul>
 
     <p v-if="status === 'pending'" class="sb-placeholder">読み込み中…</p>
 
@@ -145,8 +106,9 @@ function unread(project: ProjectSummary): number | null {
       class="sb-placeholder"
       data-testid="projects-not-configured"
     >
-      監視する親パスが設定されていません。<code>NUXT_PROJECTS_PARENT_PATH</code>
-      に、<code>.spec-workflow</code> を持つディレクトリが並ぶ親パスを設定してください。
+      監視する親パスが設定されていません。<code>nuxt.config.ts</code> の
+      <code>projectShareRoot</code> に、<code>.spec-workflow</code> を持つディレクトリが
+      並ぶ親パスを設定してください。
     </p>
 
     <p

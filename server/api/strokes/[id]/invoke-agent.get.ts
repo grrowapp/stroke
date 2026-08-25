@@ -1,16 +1,30 @@
 import { missingPrerequisites } from '../../../utils/readiness'
-import { invokeAi } from '../../../utils/stroke/ai'
-import { conflict } from '../../../utils/stroke/conflict'
+import { readStrokeConfig } from '../../../utils/stroke/config'
+import { kick } from '../../../utils/stroke/invoke'
+import { LOG_PREFIX } from '../../../utils/stroke/log'
+import { sessionDir } from '../../../utils/stroke/paths'
 import { beginRun, endRun } from '../../../utils/stroke/running'
 import { requireSessionId } from '../../../utils/stroke/session-param'
-import { readState, writeState } from '../../../utils/stroke/session-store'
-import { LOG_PREFIX } from '../../../utils/stroke/settings'
+import { readState } from '../../../utils/stroke/session-store'
 
 /**
- * AI（claude）を起動する唯一の入口（specs/api/invoke-agent）。受理系 endpoint は起動を
+ * U13: AI を起動する唯一の入口（specs/api/invoke-agent）。受理系 endpoint は起動を
  * 持たず、フロントが受理の成功応答の直後にここを GET で呼ぶ（design.md 決定6）。
- * 初回か継続か・渡す定型はここでは決めない（invokeAi が保存済み記録から導く）。
- * 受理して即返し、結果はエージェントの提出（A5・A7）が届ける。
+ *
+ * **応答は受理で即完結する。** `running` 化・起動・完了検知・タイムアウト・上限判定は
+ * すべて非同期の invokeAi が担い、応答はそれを待たない
+ * （openspec/specs/agent/invocation）。
+ *
+ * **cwd はクエリ `cwd` で受け取る。** endpoint が自分で導出しない
+ * （openspec/specs/api/session/invoke-agent・design.md D5）。渡されなければセッション
+ * ディレクトリを既定にする——昇格前のストロークはそれで足りるためで、昇格後の対象と
+ * 巡回の再キックは呼び出し側が path を添える。
+ *
+ * クエリ `reset` はユーザーの再実行。リトライ回数を戻してから起こす。**`invocation` を
+ * 画面が直接書かない**ため（A8 を叩けるのは invokeAi だけ）、回数のリセットもここで行う。
+ *
+ * 承認済み（`approved`）でも受け付ける。昇格したプロジェクトでは steering の実行が
+ * 起こるためで、渡す定型と cwd だけが変わる。
  */
 export default defineEventHandler(async (event) => {
   const sessionId = await requireSessionId(event)
@@ -28,21 +42,29 @@ export default defineEventHandler(async (event) => {
   }
 
   const state = await readState(sessionId)
-  if (state.phase === 'approved') {
-    // 承認後は提出も受け付けない（specs/agent-api）。起動だけが通る宙吊りを作らない。
-    throw conflict('phase', '承認済みのセッションは起動できない。')
-  }
 
   // busy ガード。多重起動はここで止める（specs/api/invoke-agent）。
   beginRun(sessionId)
-  try {
-    await writeState(sessionId, { ...state, invocation: 'running' })
-  } catch (error) {
-    endRun(sessionId)
-    throw error
-  }
 
-  invokeAi(sessionId)
+  const query = getQuery(event)
+  const cwd = typeof query.cwd === 'string' && query.cwd.trim() !== ''
+    ? query.cwd
+    : sessionDir(readStrokeConfig().projectShareRoot, sessionId)
+
+  // 承認後の対象は steering、それ以外はストロークの往復。渡す値だけが違う。
+  const kind = state.phase === 'approved' ? 'steering' : 'stroke'
+
+  // `reset` はユーザーの再実行。リトライ回数を戻してから起こす
+  // （openspec/specs/agent/invocation「ユーザーが再実行する」）。巡回は付けない。
+  const retries = query.reset === undefined ? (state.retries ?? 0) : 0
+
+  kick({
+    sessionId,
+    cwd,
+    kind,
+    retries,
+    runId: state.phase === 'approved' ? state.runId : undefined,
+  })
     .catch((error) => {
       console.error(`${LOG_PREFIX} AI 呼び出しの管理に失敗: ${sessionId}`, error)
     })

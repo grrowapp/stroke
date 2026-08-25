@@ -53,21 +53,25 @@ flowchart TB
 
 ## 完了とリトライ
 
-開始点は claude の起動と session-id の登録:
+> **この節は change の design.md D6 に置き換わった（2026-08-25）。** 当初は「claude 自身が API で提出を告知して完了とする」案だったが、並走している invokeAi が子プロセスの output stream を見れば足り、スキルへの依存が増えるだけなので採らなかった。実装は下の形である。
 
-1. **起動と登録**: claude を起動し、サーバーのメモリへ **session-id を running として登録**する
-2. **インラインは timeout の管理**: timeout したら、その session-id の記録を **false（失敗）** に変える
-3. **提出の告知**: steering 文書を提出し終えた claude が **API 経由で提出を告知**する。**この API が session-id の記録を消す**（＝完了）
-4. **リトライ**: サーバーの巡回が **false の session-id を API で拾い、リトライをかける**（→ 1. からやり直し）。巡回に条件判定は持たせない
+1. **起動**: invokeAi が claude を起こし、`invocation` を `running` にする（A8 経由）
+2. **完了**: invokeAi が子プロセスの **output stream**（`--output-format json` の成功エンベロープ）で検知し、`idle` に変える。**AI 自身に告知させない**
+3. **時間切れ**: タイムアウトで `failed` に変える
+4. **リトライ**: サーバーの巡回が `failed` の件だけを拾い、path を cwd に添えて U13 を叩く。巡回に他の判定は持たせない
+5. **終端**: リトライ上限に達したら起動せず `error`。回復はユーザーの再実行か削除だけ
 
 ```mermaid
 flowchart TB
-  launch["1. 起動と登録: claude を起動し<br>メモリに session-id = <b>running</b> を登録"] --> inline["2. インライン: timeout の管理"]
-  inline -- "timeout" --> f["記録を <b>false</b> に（失敗）"]
-  launch -.-> claude["3. claude: 文書を提出したら<br><b>API で提出を告知</b>"] --> del["API が session-id の記録を<b>消す</b>（完了）"]
-  f --> crawl["4. サーバーの巡回"] --> fetch["false の session-id を<br><b>API で拾う</b>"] --> relaunch["リトライをかける"] --> launch
+  launch["1. invokeAi が起動<br>invocation = <b>running</b>（A8 経由）"] --> watch["2. output stream を見る"]
+  watch -- "成功エンベロープ" --> idle["<b>idle</b>（完了）"]
+  watch -- "timeout" --> f["<b>failed</b>"]
+  f --> crawl["4. サーバーの巡回"] --> fetch["failed の件だけを拾う"] --> relaunch["U13 を cwd 付きで叩く"] --> launch
+  f -- "上限に達した状態で再キック" --> err["<b>error</b>（終端・ユーザーへ引き渡す）"]
 ```
-- **提出告知の口を1つ足す**。既存の提出口（A5 question・A7 proposal）は「承認済みセッションには提出できない」ガードを持つため使えない。受理したら session-id の記録を消すだけの薄い口を agent-api に追加する
+
+- **提出告知の口は足さない。** 完了の検知に AI の協力を要らなくしたため（design.md D6）
+- **retry 対象の口も足さない。** 巡回はセッション一覧（U12）の `invocation` を見れば足りる
 
 ## 設定に足すもの
 

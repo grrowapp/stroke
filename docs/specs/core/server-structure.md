@@ -9,8 +9,8 @@
 | 関心 | モジュール（現在の置き場 →） |
 | --- | --- |
 | 本家接続 | `rest` `socket` `schema` `scan` `registry`（upstream/） |
-| 監視・通知 | `monitor` `diff` `notify` `board` `directory` `actions` `upstream-proxy`（control/） |
-| セッション | `session-core` `session-store` `session-param` `paths` `ai` `claude` `claude-config` `prompt` `running` `submission-signal` `request-schemas` `question` `conflict` `project` `openspec` `ws-channels` `settings`（stroke/） |
+| 監視・通知 | `monitor` `diff` `notify` `board` `directory` `upstream-proxy`（control/） |
+| セッション | `session-core` `session-store` `session-param` `paths` `ai` `invoke` `claude` `config` `log` `running` `sweep` `request-schemas` `question` `conflict` `project` `openspec` `ws-channels`（stroke/） |
 | 設定・起動 | `config` `readiness`（直下） |
 
 移動の実施は `docs/specs/plan/structure-migration.md`。

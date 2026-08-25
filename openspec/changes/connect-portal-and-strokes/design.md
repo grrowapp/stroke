@@ -2,166 +2,87 @@
 
 ## Context
 
-動機は proposal.md（Why）、決定は ADR-0009 / 0010 / 0011、俯瞰は `docs/specs/plan/portal-stroke-entrance.md` と `portal-stroke-exit.md` が持つ。ここではその2枚を実装の形へ落とす。
-
-現状のコードで、この change が触る所だけを挙げる。
+動機は proposal.md（Why）、要件は specs/ の delta、決定の経緯は ADR-0009/0010/0011 と spec-workflow 承認済み requirements（2026-08-25）が持つ。ここでは現状のコードとの対応だけを押さえる。
 
 | 場所 | 今の形 |
 |---|---|
-| `server/utils/control/actions.ts` | `resolveDirectoryActions()` が `register` と `create` の可否を固定値で返す |
-| `shared/types.ts` | `DirectoryActions` が `register` / `create` の2つ、理由コードに `target-undecided` |
+| `server/utils/control/actions.ts`・`shared/types.ts` | `resolveDirectoryActions()` が登録・作成の可否を固定値で返す。`DirectoryActions` と理由コード |
 | `app/pages/projects/index.vue` | 作成ボタンは `:disabled="!actions?.create.available"` |
-| `app/pages/strokes/**` | 概要入力・往復・proposal 確認の3ページ（素の独立ページ） |
-| `server/utils/stroke/settings.ts` | 置き場が2本（`NUXT_SESSIONS_ROOT` / `NUXT_PROJECTS_ROOT`） |
-| `server/utils/stroke/ai.ts` | `invokeAi(sessionId)`。起動定義・定型・cwd を中で導出。失敗を `state.json` に書く |
-| `server/utils/stroke/claude.ts` | `runClaude()` が `useRuntimeConfig().public.claude` を中で引く |
+| `app/pages/strokes/**` | 3画面が素の独立ページ。API 参照は `/api/strokes/:id/...` |
+| `server/utils/stroke/settings.ts`・`paths.ts` | 保存先が2本（`NUXT_SESSIONS_ROOT` / `NUXT_PROJECTS_ROOT`） |
+| `server/utils/stroke/ai.ts` | `invokeAi(sessionId)`。起動定義・定型・cwd を中で導出。失敗は `invocation: 'failed'` を直接書く |
+| `server/utils/stroke/claude.ts` | `runClaude()` が `useRuntimeConfig()` を中で引く |
 | `server/utils/stroke/project.ts` | `generateProject()` が `mkdir` + `docs/proposal.md` を書く |
 | `server/api/strokes/[id]/proposal.post.ts` | A7 が `writeProposal()` でセッション直下の `proposal.md` を書く |
-| `server/utils/stroke/running.ts` / `submission-signal.ts` | セッション単位の実行中フラグと提出待ちをメモリで持つ |
+| `shared/stroke.ts` | `Invocation = 'running' | 'idle' | 'failed'` の3値 |
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- 入口と出口を1本の流れとして通す（一覧の作成 → ストローク → 承認 → 一覧へ戻り、steering が裏で走る）
-- AI の起動を1系統に保ったまま、用途の違いを引数の違いだけで表す
-- steering の成否をユーザーに見せず、サーバー側だけで完了とリトライを閉じる
+- 一覧の作成 → モーダルのストローク → 承認 = rename 昇格 → 一覧へ戻り、裏で steering が走る、を1本で通す
+- AI の実行管理（起動・完了検知・タイムアウト・リトライ上限）を invokeAi に集約し、`invocation` の書き込みを A8 経由に一本化する
+- U 系 API を `/api/sessions` 系へ移し、capability を6つに畳む
 
 **Non-Goals:**
 
-- ストロークの3画面の中身と流れ（不変。器が変わるだけ）
-- `relocate-stroke-routes`（`/projects/create/**` への移設）— 別 change のまま。この change では既存のパスを動かさない
+- ストローク3画面の中身と流れ（不変。器がモーダルになるだけ）
+- `relocate-stroke-routes`（`/projects/create/**` への移設）— 別 change のまま
 - steering 完了後の承認待ち・通知（既存の仕組みに乗るだけ）
 - 登録の中身（未決のまま）
 
 ## Decisions
 
-### D1: モーダルはパスルーティングで開く（案A）。親子ルートにはしない
+### D1: モーダルはページ遷移で開く
 
-作成ボタンは概要入力のページへ遷移し、**そのページ自身が `UModal` で画面全体を占める**。一覧を親ルートにしてその上に子ルートを重ねる形は採らない。
+作成ボタンは概要入力のページへ遷移し、ページ自身が `UModal`（fullscreen・dismissible 無効）で画面全体を占める。親子ルートにはしない。リロードの復帰は URL が担う。**代替案**（components 起動）はセッション id の保存先を別に持つことになり、URL が既に持つ情報を二重化するため採らない。
 
-```mermaid
-flowchart LR
-  btn["作成ボタン<br>（常に押せる）"] -- "navigateTo" --> page["ストロークのページ<br>app/pages/strokes/**"]
-  page --> modal["ページの中身を UModal で開く<br>fullscreen ／ 閉じ操作なし"]
-  reload["リロード"] --> page
-```
+### D2: 可否判定は仕組みごと消す
 
-満たすべきは見た目と復帰の3点だけで、実装方式は縛られない（ADR-0009）。
+`resolveDirectoryActions()`・`DirectoryActions`・理由コードを型ごと削除し、画面は可否をサーバーに聞かない。作成は常に活性、登録は非活性固定。**代替案**（登録だけ判定を残す）は、常に同じ値を返す判定を残すことになり採らない。前提の欠けは概要投稿時の 503 として現れる（既存経路、不変）。
 
-- 画面全体を占める（一覧は見えない）
-- 閉じる操作が無い
-- リロードで同じ途中画面に戻る
+### D3: 保存先を1本にし、承認は rename＋巻き戻しで宙吊りを作らない
 
-**なぜ案A か**: ADR-0009 が「実装はページ遷移でよく、リロードで同じ途中画面に復帰できる形を採る」と決めており、ページ遷移なら復帰は URL が担う。案B（components 起動）は同じ復帰を満たすためにセッション id の保存先を別に用意することになり、URL が既に持っている情報を二重に持つ。
+`settings.ts` の保存先2本を `SPEC_WORKFLOW_SHARED_ROOT` の1本にし、`sessionDir()` と `projectDir()` が同じ親を指す。承認は「衝突確認 → phase 書き換え → rename」。rename が失敗したら phase を `proposed` へ書き戻す。**`approved` かつ未改名の宙吊りを作らない**（specs: project/generation）。衝突確認は rename の前に行う——`rename` は空ディレクトリを黙って置き換えうるため EEXIST 任せにしない。
 
-**なぜ親子にしないか**: 入れ子ルート方式は `portal-stroke-entrance.md` で不採用と決まっている。覆われていて閉じられない以上、背後に一覧が実在するかはユーザーには観測できず、重ねる実装の利得が無い。
+### D4: proposal の書き手を claude に一本化する
 
-**`relocate-stroke-routes` の扱い**: 案A では3画面は pages のまま残る。`/projects/create/**` への移設は構造移行の話なので、この change では行わず ticket に残す（`portal-stroke-entrance.md`「開き方の決定に連動して決める」への回答）。
+A7 は本文を検証して受理・配信するだけでファイルを書かない。claude がセッション時点から `docs/proposal.md` を書く（スキルに明記）。`readProposal()` の読み先を `docs/proposal.md` へ移し、`writeProposal()` を削る。書かずに A7 だけ提出された場合は「proposal が見つからない」として既存の 409 経路で現れる。
 
-### D2: 作成の可否は仕組みごと外す。登録だけを残す
+### D5: U13 は cwd を引数で受け取り、invokeAi が全部を担う
 
-`resolveDirectoryActions()` は `register` だけを返し、`DirectoryActions.create` と理由コード `target-undecided` を型ごと消す。画面は作成ボタンについてサーバーの応答を見ない。
+`invokeAi(id, run)` — `run = { launch, cwd, prompts, prepare? }`。起動定義・定型は U13 の実装が設定から引き、**cwd はキック側が U13 の引数として渡す**（画面・巡回は U12 の応答の path、承認処理は生成先の path）。U13 の応答は受理で即完結し、処理の実体（`running` 化・起動・完了検知・タイムアウト・上限判定）は非同期の invokeAi が担う。初回/継続の符合判定は invokeAi に残し、呼び出し側は定型の候補（初回・続き）を渡す。**代替案**（U13 が cwd を `:id` から導出）は、昇格後の対象と巡回の再キックで導出の分岐が要るため採らない。
 
-**代替案**: `create: { available: true }` を返し続ける（型を触らない）。採らない。常に `true` を返す判定は判定ではなく、「接続先が決まったらここで見る」という `actions.ts` の存在理由（コメントに明記）も既に消えているため、残すと次に読む者を誤らせる。ADR-0010 の「判定箇所を2つに増やさない」とも合う。
+### D6: `invocation` は4値、書き込みは A8 だけ
 
-前提の欠け（置き場に書けない・起動定義が不正）は、モーダルの中で概要を投稿したときの `invoke-agent` の 503 として現れる。この経路は既存のまま触らない。
+`Invocation` に `error` を加えて4値にし、`approved` の対象でも持つ。書き込みは A8（`POST /api/strokes/:id/submission`、値指定）経由で invokeAi だけが行う。完了は invokeAi が子プロセスの **output stream** で検知して `idle`（claude に告知させない）。タイムアウトで `failed`。リトライ回数は `state.json` 側に持ち、上限判定は invokeAi——上限到達なら起動せず `error`（終端。回復はユーザーの再実行 = 回数リセット、または削除）。**代替案**（メモリの実行記録を新設）はプロセス再起動で消えるため採らない。**代替案**（claude が A8 で完了を告知）は、並走している invokeAi が output stream を見れば足り、スキルへの依存が増えるだけなので採らない。
 
-### D3: 置き場を1つにし、承認は rename だけにする
+### D7: mcp-config は cwd から導出する
 
-`settings.ts` の置き場2本を1本にまとめ、`sessionDir()` と `projectDir()` が同じ親を指すようにする。これで承認は同じ親の下での改名になり、ファイルは1バイトも動かない。
+`--mcp-config` は JSON 文字列を直接受け取れる（実機確認済み）。steering の起動時に生成先パス（＝渡された cwd）から組み立てて args に足す。設定には持たず、ファイルも作らない。JSON の中身は本家 `spec-workflow-mcp` の起動方法を実機で確認して確定する。
 
-```mermaid
-flowchart TB
-  subgraph root["共有の置き場（SPEC_WORKFLOW_SHARED_ROOT）"]
-    s["&lt;uuid&gt;/<br>state.json ／ strokes.json ／ docs/proposal.md"]
-    p["&lt;name&gt;/<br>中身は同じもの"]
-  end
-  s -- "承認: rename（衝突確認 → 改名）" --> p
-  p --> mcp["steering の claude が<br>.spec-workflow/ を作る"] --> list["一覧の走査に載る"]
-```
+### D8: 巡回はサーバー内 HTTP で U13 を叩く
 
-- 衝突確認は `rename` の前に行う。`rename` は空ディレクトリを黙って置き換えうるため、EEXIST 任せにしない（`generateProject` の `mkdir` 非 recursive による衝突検出は使えなくなる）
-- セッションは `.spec-workflow/` を持たないので、置き場を共有しても一覧には出ない（`project-directory` の走査条件は無改定）
-- `generateProject()` は `promoteSessionToProject(sessionId, name)` に置き換わる。`assertProjectName()` はそのまま使う（置き場の外へ出る名前を通さない）
+`server/plugins/` の `setInterval`（`upstream.ts` と同じ形）。U12 の応答から `invocation === 'failed'` の件だけを取り、その path を cwd に添えて自身の U13 を HTTP で叩く。それ以外の判定・状態変更を持たない。
 
-### D4: proposal.md の書き手を claude に一本化する
+### D9: steering の初回は承認処理が U13 を叩く
 
-A7（proposal 提出）は本文を検証して受理・配信するが、**ファイルを書かない**。ファイルは claude がセッションの時点から `docs/proposal.md` に書く。`readProposal()` の読み先をセッション直下から `docs/proposal.md` へ移す。
-
-```mermaid
-flowchart LR
-  claude["claude"] -- "自分で書く" --> f["&lt;uuid&gt;/docs/proposal.md"]
-  claude -- "A7: 本文を提出" --> api["proposal.post.ts<br>受理・W2 配信・phase を proposed へ"]
-  f --> read["画面の表示・承認時の読み取り"]
-  api -. "書かない" .-> f
-```
-
-**なぜ書き手を1つにするか**: 承認を rename だけにするための前提。サーバーが承認時に書くと、書き出し先が生成先に依存し、rename では済まなくなる。
-
-**副作用**: claude が `docs/proposal.md` を書かずに A7 だけ提出すると、画面に proposal が出ず承認も通らない。書かせるのはセッション側のスキルの責務であり、サーバーはその欠如を「proposal が見つからない」として扱う（既存の 409 経路がそのまま働く）。
-
-### D5: `invokeAi` は起動定義・定型・cwd を受け取り、成否を返す
-
-```mermaid
-flowchart TB
-  ia["invoke-agent.get.ts<br>設定 JSON を引いて無加工で渡す"] --> call
-  ap["approve.post.ts<br>args に --mcp-config を足し<br>定型を steering 用へ替える"] --> call
-  call["invokeAi(sessionId, run)<br>run = { launch, cwd, prompts, prepare? }"] --> rc["runClaude<br>渡されたものだけを使う"]
-  call -- "'submitted' | 'failed'" --> back["後始末は呼び出し側"]
-  back --> st1["ストローク: state.json に invocation: failed"]
-  back --> st2["steering: 実行の記録を false へ"]
-```
-
-- `run.launch` = `{ command, args }`。`runClaude` は `useRuntimeConfig()` を引かない
-- `run.prompts` = `{ first, continue }`。初回／継続の判定は `invokeAi` に残す（`ai-invocation` の既存要件。呼び出し側は判定ではなく定型の候補を渡す）
-- `run.prepare?` — 初回に整える実行環境。ストロークは `initSessionOpenspec` を包んで渡し、steering は渡さない。渡されなければ何もしない（用途ごとの分岐を `invokeAi` の中に持たない）
-- 返り値を `'submitted' | 'failed'` にし、`markInvocationFailed()`（`state.json` への書き込み）は呼び出し側へ出す。steering には `state.json` を持つセッションディレクトリが無く、共通の後始末が成立しないため
-
-**代替案**: 用途ごとに `invokeStroke` / `invokeSteering` の2入口を作る。採らない。タイムアウト・リトライ・提出待ちという核が二重化し、片方だけ直る事故を招く。
-
-### D6: steering の完了は提出の告知で、失敗は巡回で拾う
-
-実行の記録は `running.ts` と同じ割り切りでメモリに持つ（単一プロセスの MVP）。提出待ちは既存の `submission-signal.ts` をそのまま使い、告知の口が `notifySubmission()` を呼ぶ。
-
-```mermaid
-flowchart TB
-  ap["承認: rename 成功"] --> launch["steering の claude を起動<br>（完了を待たない）"]
-  launch --> reg["記録: session-id = running"]
-  launch --> wait["invokeAi のタイムアウト管理"]
-  claude["claude: steering 文書を提出したら<br>告知の口を叩く"] --> sig["notifySubmission → 記録を消す（完了）"]
-  wait -- "timeout / リトライ尽き" --> f["記録を false（失敗）へ"]
-  f --> api["GET: retry 対象一覧"]
-  crawl["巡回（server/plugins の setInterval）"] --> api --> relaunch["拾った分を起動し直す<br>（条件判定を持たない）"] --> launch
-```
-
-- 告知の口は `phase` を見ない（steering は承認後にしか走らないため、既存 A5・A7 のガードに掛かる）
-- **リトライは新しい session-id で起動する。** 同じ id で `--session-id` を再指定すると既存の会話と衝突し、`--resume` では死んだ会話の続きを求めることになる。古い記録は消し、新しい id を running として登録する
-- 巡回の間隔は `upstream.ts` の `setInterval` と同じ形で持つ
-
-### D7: mcp-config は生成先パスから導出する
-
-`--mcp-config` は JSON 文字列を直接受け取れる（`claude --help` 実機確認済み）。承認処理が生成先のパスから JSON を組み立てて `args` の末尾に足す。設定には持たず、ファイルも作らない。組み立てる JSON の中身（本家 spec-workflow MCP の起動の形）は実装時に本家（`/home/vagrant/work/repo/spec-workflow-mcp`）の起動方法を見て確定する。
-
-### D8: 承認の成功でモーダルを閉じて一覧へ戻る
-
-`app/pages/strokes/[sessionId]/proposal.vue` は、承認の応答が成功したら `/projects` へ遷移する。承認の応答は steering の起動完了を待たない。
+承認処理（U10 実装）は rename 成功の直後、U13 を cwd＝生成先の path で叩き、完了を待たずに応答を返す。steering の定型は設定の1キー。ここで claude の会話が出来るため、以後の失敗は巡回の再キック（継続＝続きを促す定型）だけで作業が続く。
 
 ## Risks / Trade-offs
 
-- **承認後のセッションを id で開けなくなる** → rename でセッションディレクトリが消えるため、`readState()` が失敗する。`proposal-review` の既存要件「approved で画面2を開くと承認済みであることと確定したプロジェクト名が表示される」が成立しなくなる。新しい流れでは承認後に画面2へ戻る導線が無いが、**要件としては残っている**。この change の Capabilities には `proposal-review` が挙がっていないため、扱いはユーザーの判断を仰ぐ（この design では変更しない）
-- **リトライが止まらない** → 巡回は条件判定を持たない（`portal-stroke-exit.md` の決定）ため、原因が環境側にある失敗は無限に起動し直される。単一ユーザーの MVP として受け入れる。歯止めが要ると判明したら、巡回ではなく記録側（回数を持つ）で足す
-- **記録がプロセスのメモリにある** → 再起動で running / false の記録が消え、途中の steering は誰にも拾われない。`running.ts` と同じ割り切り。復旧の口は設けない
-- **置き場の共有で人の目には混ざる** → uuid のディレクトリとプロジェクト名のディレクトリが同じ親に並ぶ。一覧は `.spec-workflow/` の有無で分けるので画面には影響しない
-- **claude が `docs/proposal.md` を書く保証はサーバーに無い** → D4 の副作用。既存の 409 経路で「proposal が見つからない」として現れる
+- **サーバー再起動で `running` が宙に浮く** → invokeAi の見張りはプロセス内にあり、実行中に再起動すると `running` のまま誰も `failed` に変えない。巡回は `failed` しか拾わないため放置される。→ 起動時（`server/plugins/`）に `running` の残骸を `failed` へ倒す処理を置き、巡回に拾わせる
+- **リトライの failed ループ** → 環境起因の失敗は巡回が起こし直し続けるが、上限で `error` 終端に達し、ユーザーに引き渡される（判断済み）
+- **保存先の共有で uuid と名前のディレクトリが並ぶ** → 一覧の走査条件（`.spec-workflow/` の有無）は不変のため画面には影響しない。セッション一覧（U12）は昇格後の対象も載せるが、これは巡回・再キックに必要な仕様である
+- **claude が `docs/proposal.md` を書かない** → 既存の 409 経路で「proposal が見つからない」として現れる（D4）
 
 ## Migration Plan
 
-1. 設定（置き場の統一・steering の定型）の改定案を `docs/specs/core/settings-reference.md` に対して出し、ユーザーの承認を取る（ADR-0004）
-2. 承認が下りてから `settings.ts` / `nuxt.config.ts` を触る。以降の実装（rename 昇格・steering の起動）は置き場の統一が前提
-3. 既存のセッションディレクトリと `/opt/projects` の中身の引っ越しは行わない。統一後の置き場から作られるものだけがこの流れに乗る
+1. 設定の改定案（保存先統一・steering の定型・リトライ上限）を `docs/specs/core/settings-reference.md` に対して出し、ユーザー承認を得る（ADR-0004）
+2. 承認後に `settings.ts` / `nuxt.config.ts` を触る。以降の実装は保存先統一が前提
+3. 既存セッションと `/opt/projects` の中身の引っ越しは行わない。統一後の保存先から作られるものだけがこの流れに乗る
+4. U 系 path の移設は画面・スキル資産の参照と同時に切り替える（旧 path の互換は残さない）
 
 ## Open Questions
 
-- 共有の置き場（`SPEC_WORKFLOW_SHARED_ROOT`）の既定値をどのパスにするか。設定の値の話であり、`portal-stroke-exit.md` も「ここでは決めない」としている。1 の承認手続きの中で決める
-- steering の定型の本文。定型そのものはコードに持たない（`ai-invocation`）ため、設定の改定案と同じ手続きで決める
+- 共有保存先の既定値・steering の定型の本文・リトライ上限の既定値——いずれも設定の値の話で、Migration 1 の承認手続きの中で決める

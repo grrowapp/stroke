@@ -54,30 +54,14 @@ export type ProjectDirectory =
   | { status: 'ok'; parentPath: string; projects: ProjectSummary[]; registryReadable: boolean };
 
 /**
- * 一覧画面の操作が使えるかどうか。
+ * `GET /api/projects` が返すもの。
  *
- * どちらも今は使えないが、理由が違う。理由を持たずに非活性だけ置くと、画面から
- * 「なぜ使えないのか」が消える（interview Q39・Q40 はどちらも「その状態は画面に出る」で
- * 決着している）。
- *
- * - `target-undecided` — 作成の実処理を担う接続先の別プロジェクトが何であるか未定。
- *   stroke-board は入口だけを持ち、接続が無ければ作成は行えない（interview Q40）
- * - `meaning-undecided` — stroke-board の「登録」が何を指すかが未定。本家に
- *   `POST /api/projects/add` が実在する一方、一覧は親パスの走査で作っている（interview Q39）
+ * 操作（作成・登録）の可否は返さない。作成は常に押せるただのボタンで、押すとストローク
+ * へ入る（ADR 0010）。登録は画面側で非活性固定にする。可否をサーバーに問う仕組みは
+ * 持たない（specs/project-directory）。
  */
-export type ActionAvailability =
-  | { available: true }
-  | { available: false; reason: 'target-undecided' | 'meaning-undecided' };
-
-export interface DirectoryActions {
-  register: ActionAvailability;
-  create: ActionAvailability;
-}
-
-/** `GET /api/projects` が返すもの */
 export interface ProjectDirectoryResponse {
   directory: ProjectDirectory;
-  actions: DirectoryActions;
 }
 
 /** 通知の種別。本家 NotificationProvider と同じ4種だけ（specs/notification-feed） */

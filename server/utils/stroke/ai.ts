@@ -1,124 +1,130 @@
-import { readClaudeConfig } from './claude-config'
-import { runClaude, type ClaudeMode, type ClaudeRunResult } from './claude'
-import { sessionDir } from './paths'
-import { initSessionOpenspec } from './openspec'
-import { continuePrompt, firstPrompt } from './prompt'
-import { listSessionsCore } from './session-core'
-import { readState, writeState } from './session-store'
-import { CLAUDE_MAX_RETRIES, CLAUDE_TIMEOUT_MS, LOG_PREFIX } from './settings'
-import { waitForSubmission } from './submission-signal'
+import type { Invocation } from '#shared/stroke'
+import { runClaude, type ClaudeLaunch, type ClaudeMode } from './claude'
+import { LOG_PREFIX } from './log'
 
-type AttemptOutcome =
-  | { kind: 'submitted' }
-  | { kind: 'failed', detail: string, sessionMissing: boolean }
+/**
+ * 1回の呼び出しに要るものすべて。
+ *
+ * 起動定義・定型・作業場所は呼び出し側が設定から引いて渡す。invokeAi は設定を引かない
+ * （openspec/specs/agent/invocation「起動処理の内部で設定値を引き直してはならない」）。
+ * 用途の違い（ストロークの往復 / 承認後の steering）は、渡す値の違いだけで表す。
+ */
+export interface AiRun {
+  /** `claude` の起動定義。呼び出し側が要るフラグを足して渡してよい */
+  launch: ClaudeLaunch
+  /** `claude -p` の cwd。AI が書く生成物はここへ落ちる */
+  cwd: string
+  /** 定型の**候補**。どちらを使うかは invokeAi が初回/継続の判定で決める */
+  prompts: { first: string, continue: string }
+  /** 失敗を起こし直す回数の上限。到達していたら起動しない */
+  maxRetries: number
+  /** これまでに起こし直した回数。`state.json` 側が持つ */
+  retries: number
+  /**
+   * 会話の続け先。**あるかどうかが初回/継続の判定そのものである。**
+   *
+   * - ストローク: 自前採番の uuid。スキルが `${CLAUDE_SESSION_ID}` でセッション id を
+   *   知る前提（docs/specs/architecture/session-workflow.md）に効くので必ず渡す。
+   *   初回か継続かは `hasConversation` が決める
+   * - steering: 初回は `undefined`（claude に採番させる）。走った後に `remember` で
+   *   受け取った id が次回の続き先になる
+   */
+  conversationId?: string
+  /**
+   * 続き先が既に在るか。`true` なら `--resume`、`false` なら新しい会話として始める。
+   *
+   * ストロークは実体の揃ったセッション一覧との符合から、steering は覚えている会話 id の
+   * 有無から決まる。どちらも呼び出し側が事実を渡すだけで、**どの定型を使うかの指示では
+   * ない**（それは invokeAi が決める）。
+   */
+  hasConversation: () => Promise<boolean>
+  /** 実行の記録を書く。A8（`POST /api/strokes/:id/submission`）を通す */
+  setInvocation: (invocation: Invocation, retries?: number) => Promise<void>
+  /** 走った会話の id を覚える。続きが要る用途だけ渡す */
+  remember?: (conversationId: string) => Promise<void>
+  /** 初回と判定されたときに実行環境を整える。要らない用途では省く */
+  prepare?: () => Promise<void>
+}
 
 /**
  * AI を呼ぶ。呼び出し側は結果を待たない（design.md 決定2・6: HTTP は受理・返却して
- * 即完結する）。結果はエージェントの提出（A5・A7）が endpoint へ直接届けるため、この関数の
- * 返り値には載らない。
+ * 即完結する）。
  *
- * 初回か継続か・渡す定型は呼び出し側から受け取らない。一覧 API の実体
- * （`listSessionsCore`）を叩き、符合する id があれば有効（= 継続）、無ければ初回と判定する。
+ * **完了は子プロセスの output stream で検知する**（openspec/specs/agent/invocation）。
+ * `--output-format json` の成功エンベロープが出たらその実行は終わりで、`invocation` を
+ * `idle` に変える。AI 自身に完了を告知させない。時間切れ・異常終了は `failed`。
+ *
+ * `invocation` の書き込みはすべて `setInvocation`（A8）を通る。起動で `running`、
+ * 完了で `idle`、失敗で `failed`、リトライ上限に達したら起動せず `error`（終端）。
  *
  * 呼び出し側は、この呼び出しを始める前に `beginRun(sessionId)` を済ませ、返ってきた
  * promise に `.finally(() => endRun(sessionId))` を付けること（busy ガードの対称性）。
- *
- * 起動後タイムアウト時間内に endpoint への提出が無ければ、その試行を失敗として扱い、
- * 既存のリトライ（続きを促す再起動・入力は送り直さない）へ流す（specs/ai-invocation）。
- * 尽きたら `invocation: failed` を state.json に書く。502 は返さない。
  */
-export async function invokeAi(sessionId: string): Promise<void> {
-  const cwd = sessionDir(sessionId)
-  const config = readClaudeConfig()
+export async function invokeAi(sessionId: string, run: AiRun): Promise<void> {
+  const {
+    launch, cwd, prompts, maxRetries, retries,
+    conversationId, hasConversation, setInvocation, remember, prepare,
+  } = run
 
-  // 初回判定: 一覧 API の実体を叩き、符合する id があれば有効（= 継続）、無ければ初回。
-  // 一覧はディレクトリ・openspec・config.yaml（スキーマ書き込み済み）の検査を
-  // 全部パスしたものだけを載せる。
-  const valid = (await listSessionsCore()).some((s) => s.id === sessionId)
-  const first = !valid
+  // 上限判定は起動の前。到達していたら起こさず終端へ倒し、ユーザーに引き渡す。
+  if (retries >= maxRetries) {
+    console.warn(`${LOG_PREFIX} リトライ上限に達した: ${sessionId}（${retries}/${maxRetries}）`)
+    await setInvocation('error')
+    return
+  }
 
-  if (first) {
-    // 実行環境（openspec ルート初期化 + config.yaml）は invokeAi が初回に自分で作る
-    // （ユーザー決定）。これを終えると一覧の検査を通るので、以降の判定は継続になる。
+  await setInvocation('running', retries + 1)
+
+  const continuing = await hasConversation()
+
+  if (!continuing && prepare) {
+    // 実行環境（openspec ルート初期化 + config.yaml）は初回に整える（ユーザー決定）。
     try {
-      await initSessionOpenspec(cwd, config.workflowSchema)
+      await prepare()
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       console.warn(`${LOG_PREFIX} AI 呼び出しが失敗: ${sessionId}`, [`実行環境を作れない: ${detail}`])
-      await markInvocationFailed(sessionId)
+      await setInvocation('failed')
       return
     }
   }
-  let mode: ClaudeMode = first ? 'new' : 'resume'
-  let prompt = first ? firstPrompt() : continuePrompt()
+
+  let mode: ClaudeMode = continuing ? 'resume' : 'new'
+  let prompt = continuing ? prompts.continue : prompts.first
+  let id = conversationId
   const failures: string[] = []
 
-  for (let attempt = 0; attempt <= CLAUDE_MAX_RETRIES; attempt += 1) {
-    const outcome = await attemptOnce({ sessionId, cwd, prompt, mode })
+  for (let attempt = retries; attempt < maxRetries; attempt += 1) {
+    const result = await runClaude({ sessionId: id, launch, cwd, prompt, mode })
 
-    if (outcome.kind === 'submitted') return
+    if (result.ok) {
+      // output stream の成功エンベロープ = 完了。会話 id を覚えて平常へ返す。
+      if (remember && result.sessionId !== null) await remember(result.sessionId)
+      await setInvocation('idle', 0)
+      return
+    }
 
-    failures.push(outcome.detail)
-    if (outcome.sessionMissing) {
-      if (!first) {
-        // 往復の途中で継続先を失った。ここから `--session-id` で始め直すと、概要も
-        // 過去のストロークも無い会話へ入力だけを流し込むことになる。
-        failures.push('継続先のセッションが失われた（初回ではないので作り直さない）')
+    failures.push(result.detail)
+    if (result.sessionMissing) {
+      if (continuing) {
+        // 往復の途中で継続先を失った。ここから新しい会話で始め直すと、概要も過去の
+        // ストロークも無いところへ入力だけを流し込むことになる。
+        failures.push('継続先の会話が失われた（初回ではないので作り直さない）')
         break
       }
       // 初回。継続先が無い = 履歴には何も入っていない。送り直してよい。
       mode = 'new'
-      prompt = firstPrompt()
+      prompt = prompts.first
       continue
     }
 
     mode = 'resume'
-    prompt = continuePrompt()
+    prompt = prompts.continue
+    id = conversationId
   }
 
+  // 尽きた。`failed` は巡回（openspec/specs/portal/batch）が拾って起こし直す。
+  // 回数が上限に届いていれば、次のキックが `error` へ倒す。
   console.warn(`${LOG_PREFIX} AI 呼び出しが失敗: ${sessionId}`, failures)
-  await markInvocationFailed(sessionId)
-}
-
-/**
- * 1回の試行。提出到着とプロセスの終了を競わせ、先に決着した方で結果を決める。
- * 提出が届けば即成功。プロセスが（成功・失敗いずれであれ）提出より先に終われば、
- * その試行は失敗として扱う（提出が受け取り口であり、応答の中身は見ない）。
- */
-function attemptOnce(options: {
-  sessionId: string
-  cwd: string
-  prompt: string
-  mode: ClaudeMode
-}): Promise<AttemptOutcome> {
-  const { sessionId, cwd, prompt, mode } = options
-
-  return new Promise((resolve) => {
-    let settled = false
-    const finish = (outcome: AttemptOutcome): void => {
-      if (settled) return
-      settled = true
-      resolve(outcome)
-    }
-
-    // 待つ長さは子プロセスを打ち切るまでの待ち時間と同じ（settings.ts の固定値）。
-    // 提出が来ないまま子が終わるのを待たず、同じ時間で決着させる
-    waitForSubmission(sessionId, CLAUDE_TIMEOUT_MS).then((submitted) => {
-      if (submitted) finish({ kind: 'submitted' })
-    })
-
-    runClaude({ sessionId, cwd, prompt, mode }).then((run: ClaudeRunResult) => {
-      if (run.ok) {
-        finish({ kind: 'failed', detail: '応答は成功したが提出が届かない', sessionMissing: false })
-      } else {
-        finish({ kind: 'failed', detail: run.detail, sessionMissing: run.sessionMissing })
-      }
-    })
-  })
-}
-
-async function markInvocationFailed(sessionId: string): Promise<void> {
-  const state = await readState(sessionId)
-  if (state.phase === 'approved') return
-  await writeState(sessionId, { ...state, invocation: 'failed' })
+  await setInvocation('failed')
 }

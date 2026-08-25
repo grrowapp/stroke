@@ -1,4 +1,5 @@
 import type { SessionSummary } from '#shared/stroke'
+import { readStrokeConfig } from '../../utils/stroke/config'
 import { listSessionsCore } from '../../utils/stroke/session-core'
 
 /**
@@ -6,5 +7,5 @@ import { listSessionsCore } from '../../utils/stroke/session-core'
  * 何が残っているか分からなければ消す判断ができない（specs/api/session）。
  */
 export default defineEventHandler(async (): Promise<SessionSummary[]> => {
-  return listSessionsCore()
+  return listSessionsCore(readStrokeConfig().projectShareRoot)
 })

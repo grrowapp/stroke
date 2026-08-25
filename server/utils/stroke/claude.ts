@@ -1,18 +1,64 @@
 import { spawn } from 'node:child_process'
-import { readClaudeConfig } from './claude-config'
-import {
-  CLAUDE_BASE_URL_ENV_NAME,
-  CLAUDE_SESSION_MISSING_MESSAGE,
-  CLAUDE_TIMEOUT_MS,
-  CLAUDE_TIMEOUT_SIGNAL,
-} from './settings'
+
+/**
+ * 子プロセスを打ち切るまでの待ち時間。超えたらリトライ経路へ流す。
+ * 起動後この時間内に endpoint への提出が無ければ、その呼び出しは失敗として扱う
+ * （openspec/specs/agent/invocation）。設定ではない
+ * （docs/specs/core/settings-reference.md）。
+ */
+export const CLAUDE_TIMEOUT_MS = 180000
+
+/** 打ち切るときに送るシグナル。 */
+const CLAUDE_TIMEOUT_SIGNAL = 'SIGKILL' as const
+
+/**
+ * 継続しようとしたセッションが存在しないときに `claude` が出す文言（実測）。
+ * こちらが出すメッセージではなく、子プロセスの stdout/stderr に対する照合文字列である。
+ * CLI 側が文言を変えたらここを追随させる。
+ */
+const CLAUDE_SESSION_MISSING_MESSAGE = 'No conversation found with session ID'
+
+/**
+ * 子プロセスへ接続先を渡す環境変数の名前。
+ * **これはこちらが読む設定ではなく、渡す名前である。** セッション API スキルがこの名前で
+ * 接続先を読むので、変えるならスキル側と揃える。
+ */
+const CLAUDE_BASE_URL_ENV_NAME = 'STROKE_BASEURL'
 
 /** 呼び出しモード。セッションの最初だけ `--session-id`、以降は `--resume`。 */
 export type ClaudeMode = 'new' | 'resume'
 
+/**
+ * `claude` の起動定義。実行ファイルと、呼び出しに依らないフラグ一式。
+ *
+ * 出どころは `runtimeConfig.claude`（docs/specs/core/settings-reference.md）だが、
+ * 引くのは呼び出し側である。`--mcp-config` のように用途ごとに要るフラグは、
+ * 呼び出し側が `args` の後ろに足して渡す。ここでは解釈も補正もしない。
+ */
+export interface ClaudeLaunch {
+  command: string
+  args: readonly string[]
+  /**
+   * 子プロセスへ `STROKE_BASEURL` として渡すエージェント向け endpoint の base URL。
+   * prompt には載せない（design.md 決定7）
+   */
+  apiBaseUrl: string
+}
+
 export interface ClaudeRunOptions {
-  /** セッション uuid。ディレクトリ名と `--session-id` / `--resume` で同じものを使う */
-  sessionId: string
+  /**
+   * 会話 id。`mode: 'new'` で与えれば `--session-id`、`mode: 'resume'` なら `--resume`。
+   *
+   * `mode: 'new'` で**省けば claude が自分で採番する**。その値は output stream の
+   * `session_id` として返るので、続きが要る用途はそれを覚えて次に渡す。
+   *
+   * ストロークは自前採番の uuid を渡す。スキルが `${CLAUDE_SESSION_ID}` でセッション id を
+   * 知る前提（docs/specs/architecture/session-workflow.md の実測記録）に効いているため、
+   * ここを claude 任せにできない。
+   */
+  sessionId?: string
+  /** 起動定義。呼び出し側が設定から引いて渡す */
+  launch: ClaudeLaunch
   /** `claude -p` の cwd。AI が書く生成物はここへ落ちる */
   cwd: string
   /** prompt。`--` の後ろに位置引数として渡す */
@@ -21,8 +67,12 @@ export interface ClaudeRunOptions {
 }
 
 export type ClaudeRunResult =
-  /** プロセスが成功として終わった。応答の中身はここでは扱わない（endpoint への提出が受け取り口）。 */
-  | { ok: true }
+  /**
+   * プロセスが成功として終わった。**これが完了の検知である**
+   * （openspec/specs/agent/invocation「完了は output stream で検知して idle に変える」）。
+   * `sessionId` は output stream の `session_id`。続きが要る用途はこれを覚える。
+   */
+  | { ok: true, sessionId: string | null }
   /** 失敗。`sessionMissing` は継続先のセッションが無かったことを指す */
   | { ok: false, sessionMissing: boolean, detail: string }
 
@@ -30,17 +80,23 @@ export type ClaudeRunResult =
  * `claude -p` を子プロセスとして1回だけ起動する。リトライはここでは扱わない。
  */
 export async function runClaude(options: ClaudeRunOptions): Promise<ClaudeRunResult> {
-  const config = readClaudeConfig()
-  // 起動定義（`command` / `args`）は runtimeConfig.public.claude が丸ごと持つ。ここで足すのは
-  // **呼び出しごとに決まる分だけ**で、出力形式と、セッション id と、prompt の3つである。
-  const launch = useRuntimeConfig().public.claude
+  // 起動定義は呼び出し側が渡す。ここでは設定を引かず、渡されたフラグを解釈も補正も
+  // しない（openspec/specs/agent/invocation）。足すのは**呼び出しごとに決まる分だけ**で、
+  // 出力形式と、セッション id と、prompt の3つである。
+  const { launch, sessionId, mode } = options
+
+  // 会話 id は与えられたときだけ付ける。`new` で省けば claude が自分で採番し、
+  // その値は output stream の `session_id` として返る。
+  const conversation = sessionId === undefined
+    ? []
+    : [mode === 'new' ? '--session-id' : '--resume', sessionId]
+
   const args = [
     ...launch.args,
     '-p',
     '--output-format',
     'json',
-    options.mode === 'new' ? '--session-id' : '--resume',
-    options.sessionId,
+    ...conversation,
     // `--` で option の解釈を打ち切る。以降は位置引数として届くので、`--allowedTools` の
     // ような可変長フラグの後ろに置いても飲み込まれない。フラグを増減しても影響しない。
     '--',
@@ -53,7 +109,7 @@ export async function runClaude(options: ClaudeRunOptions): Promise<ClaudeRunRes
     const child = spawn(launch.command, args, {
       cwd: options.cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, [CLAUDE_BASE_URL_ENV_NAME]: config.apiBaseUrl },
+      env: { ...process.env, [CLAUDE_BASE_URL_ENV_NAME]: launch.apiBaseUrl },
     })
 
     let stdout = ''
@@ -92,29 +148,36 @@ export async function runClaude(options: ClaudeRunOptions): Promise<ClaudeRunRes
         finish({ ok: false, sessionMissing: missing, detail: stderr.trim() || `終了コード ${code}` })
         return
       }
-      if (!isSuccessResult(stdout)) {
+      const envelope = readEnvelope(stdout)
+      if (envelope === null) {
         finish({ ok: false, sessionMissing: missing, detail: '応答が成功として読み取れない' })
         return
       }
-      finish({ ok: true })
+      finish({ ok: true, sessionId: envelope.sessionId })
     })
 
   })
 }
 
 /**
- * `--output-format json` の出力から、プロセスが成功として終わったかだけを見る。
- * 応答の中身（`result` フィールド）は読み取らない（specs/ai-invocation: 標準出力は
- * プロセスの成否の判定にのみ使う）。
+ * `--output-format json` の出力（= output stream）を読む。
+ *
+ * 見るのはプロセスが成功として終わったかと、会話 id だけである。応答の中身
+ * （`result` フィールド）は読み取らない。**この成功が完了の検知である**
+ * （openspec/specs/agent/invocation「完了は output stream で検知して idle に変える」）。
+ *
+ * @returns 成功なら会話 id 付き、そうでなければ null
  */
-function isSuccessResult(stdout: string): boolean {
+function readEnvelope(stdout: string): { sessionId: string | null } | null {
   let parsed: unknown
   try {
     parsed = JSON.parse(stdout)
   } catch {
-    return false
+    return null
   }
-  if (typeof parsed !== 'object' || parsed === null) return false
+  if (typeof parsed !== 'object' || parsed === null) return null
   const envelope = parsed as Record<string, unknown>
-  return envelope.type === 'result' && envelope.is_error !== true && envelope.subtype === 'success'
+  const ok = envelope.type === 'result' && envelope.is_error !== true && envelope.subtype === 'success'
+  if (!ok) return null
+  return { sessionId: typeof envelope.session_id === 'string' ? envelope.session_id : null }
 }

@@ -2,7 +2,11 @@
 // 画面1(ストローク)。uuid は URL で持つ。
 // 今の1問は W1(WS)で受信して描画する。往復の結果は endpoint への返り値には載らない
 // (design.md 決定2・6)。待機・失敗は U2 のポーリングで拾う(task 6.3)。
+// 器は `stroke` レイアウト（fullscreen の UModal・閉じ操作なし）。どの場面に居るかは
+// URL が持つので、リロードすれば同じ途中画面がモーダルとして開き直る（design.md D1）。
 import type { Answer, Invocation, Phase, Stroke } from '#shared/stroke'
+
+definePageMeta({ layout: 'stroke' })
 
 const route = useRoute()
 const sessionId = String(route.params.sessionId)
@@ -42,11 +46,35 @@ const waitingRetry = useWaitingRetry(sessionId)
 
 const errorMessage = ref(loadError.value && !notFound ? 'セッションを読み込めませんでした。' : '')
 
-// 初期表示: reload 直後などで実行中・失敗のことがある(U2 の契約)
+// 初期表示: reload 直後などで実行中・失敗・終端のことがある(U2 の契約)
 if (status.value?.invocation === 'running') {
   waitingRetry.startWaiting()
 } else if (status.value?.invocation === 'failed') {
   waitingRetry.failed.value = true
+} else if (status.value?.invocation === 'error') {
+  waitingRetry.errored.value = true
+}
+
+/** 終端からの回復。再実行はリトライ回数を戻して起こし直す。 */
+async function retry() {
+  errorMessage.value = ''
+  try {
+    await waitingRetry.retryFromError()
+  } catch {
+    errorMessage.value = 'AI を起動できませんでした。'
+  }
+}
+
+/** 終端からの回復のもう一方。消したら一覧へ戻る。 */
+async function discard() {
+  errorMessage.value = ''
+  try {
+    await waitingRetry.discard()
+  } catch {
+    errorMessage.value = 'セッションを削除できませんでした。'
+    return
+  }
+  await navigateTo('/projects')
 }
 
 // 新しい問いが届いたら待機を終える(通常はこちらが W1 の配信で先に決着する)
@@ -58,7 +86,7 @@ watch(question, (q) => {
 watch(
   () => waitingRetry.waiting.value,
   async (isWaiting, wasWaiting) => {
-    if (!wasWaiting || isWaiting || waitingRetry.failed.value) return
+    if (!wasWaiting || isWaiting || waitingRetry.failed.value || waitingRetry.errored.value) return
     const current = await $fetch<{ phase: Phase }>(`/api/strokes/${sessionId}`)
     if (current.phase !== 'stroking') {
       await navigateTo(`/strokes/${sessionId}/proposal`)
@@ -110,9 +138,36 @@ async function answer(given: Answer) {
       title="AI からの応答が得られませんでした。もう一度送信してください。"
     />
 
+    <!--
+      終端（リトライ上限に達した）。システムは自動では何もしないので、ユーザーが
+      再実行か削除を選ぶまでここで止まる（openspec/specs/agent/invocation）。
+    -->
+    <UAlert
+      v-if="waitingRetry.errored.value"
+      class="mb-6"
+      color="error"
+      variant="subtle"
+      title="AI の起動を繰り返しましたが応答が得られませんでした"
+      description="このセッションは自動では再開しません。もう一度試すか、削除してください。"
+      data-testid="invocation-error"
+    >
+      <template #actions>
+        <UButton color="error" variant="solid" data-testid="invocation-retry" @click="retry">
+          もう一度試す
+        </UButton>
+        <UButton color="neutral" variant="ghost" data-testid="invocation-discard" @click="discard">
+          削除する
+        </UButton>
+      </template>
+    </UAlert>
+
     <!-- 応答待ち。待機中は問いも回答欄も出さないので追加送信できない -->
     <WaitingIndicator v-if="waitingRetry.waiting.value" message="AI が次を考えています…" class="py-32" />
 
-    <StrokeQuestionCard v-else-if="question" :question="question" @answer="answer" />
+    <StrokeQuestionCard
+      v-else-if="question && !waitingRetry.errored.value"
+      :question="question"
+      @answer="answer"
+    />
   </div>
 </template>

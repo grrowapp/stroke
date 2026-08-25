@@ -1,53 +1,56 @@
-## ADDED Requirements
+## REMOVED Requirements
 
-### Requirement: 承認の成功で画面2を離れてプロジェクト一覧へ戻る
+### Requirement: proposal を Markdown プレビューで示す
 
-システムは、承認が成功したときに画面2を閉じ、プロジェクト一覧へ戻す SHALL。承認の応答は、承認の次の工程（`steering-stage`）の完了を待ってはならない（MUST NOT）。
+**Reason**: capability の畳み込み（承認済み requirements 2026-08-25）。
+**Migration**: `stroke/frontier` の同名要件が引き継ぐ。
 
-承認が成功したセッションは、そのセッション id では開けなくなる SHALL。セッションはプロジェクトへ昇格して同じ id のセッションとしては存在しなくなるためである（`project-generation`）。したがって承認後に承認・差し戻しの操作が現れる余地は無い。
+### Requirement: proposal の見せ方を切り替えられる
 
-承認が成功しなかったときは画面2に留まり、ユーザーが同じセッションで承認し直せる状態を保つ SHALL。
+**Reason**: capability の畳み込み。
+**Migration**: `stroke/frontier` の同名要件が引き継ぐ。
 
-#### Scenario: 承認が成功する
+### Requirement: 指摘は proposal の本文に紐づけて積める
 
-- **WHEN** ユーザーがプロジェクト名を確定して承認し、昇格が成功する
-- **THEN** 画面2が閉じてプロジェクト一覧が表示される。次の工程の完了は待たない
+**Reason**: capability の畳み込み。
+**Migration**: `stroke/frontier` の同名要件が引き継ぐ。
 
-#### Scenario: 承認したセッションを開こうとする
+### Requirement: 積んだ指摘を見直し、直し、取り消せる
 
-- **WHEN** 承認が成功した後、そのセッション id の画面2を開こうとする
-- **THEN** そのセッションは存在せず画面2は開かない。承認・差し戻しの操作は現れない
+**Reason**: capability の畳み込み。
+**Migration**: `stroke/frontier` の同名要件が引き継ぐ。
 
-#### Scenario: 承認が失敗する
+### Requirement: 差し戻すと proposal が出し直される
 
-- **WHEN** 名前の衝突や昇格の失敗で承認が成立しない
-- **THEN** 画面2に留まり、phase は `proposed` のままで、別の名前で承認し直せる
+**Reason**: capability の畳み込み。
+**Migration**: `stroke/frontier` の同名要件が引き継ぐ。
 
-## MODIFIED Requirements
+### Requirement: 差し戻しの応答待ちは修正中と分かる待ち受け画面で示す
+
+**Reason**: capability の畳み込み。
+**Migration**: `stroke/frontier` の同名要件が引き継ぐ。
+
+### Requirement: 差し戻しに対して AI が問い返せる
+
+**Reason**: capability の畳み込み。
+**Migration**: `stroke/frontier` の同名要件が引き継ぐ。
+
+### Requirement: 問い返しは1問1答を繰り返す
+
+**Reason**: capability の畳み込み。
+**Migration**: `stroke/frontier` の同名要件が引き継ぐ。
+
+### Requirement: プロジェクト名を提案し、ユーザーが確定する
+
+**Reason**: capability の畳み込み。生成の失敗は昇格の失敗として `project/generation` が扱う。
+**Migration**: `stroke/frontier` の同名要件が引き継ぐ。
 
 ### Requirement: 承認はプロジェクト生成の唯一の引き金
 
-システムはユーザーの承認以外でプロジェクトを作ってはならない SHALL。承認時に phase を `approved` に変える。確認や結果の表示にパスを出さず、プロジェクト名で示す。
-
-#### Scenario: 承認する
-
-- **WHEN** ユーザーがプロジェクト名を確定して承認する
-- **THEN** システムは後戻りできないことを示して確認を求め、確認が取れたらセッションをプロジェクトへ昇格させ、成功したら phase を `approved` にする
-
-#### Scenario: 指摘を積んだまま承認する
-
-- **WHEN** 指摘が積まれている状態で承認しようとする
-- **THEN** システムは、その指摘が渡らないまま確定することを承認の前に示す
-
-#### Scenario: 承認していない
-
-- **WHEN** phase が `stroking` または `proposed` である
-- **THEN** 置き場にはそのセッションのディレクトリしか無く、プロジェクトは作られていない
-
-## REMOVED Requirements
+**Reason**: capability の畳み込み。プロジェクトの作り方が rename 昇格に変わる。
+**Migration**: `stroke/frontier` の「承認はプロジェクト昇格の唯一の引き金」が引き継ぐ。
 
 ### Requirement: 承認後は承認と差し戻しを提供しない
 
-**Reason**: 承認がセッションディレクトリの改名による昇格になり（ADR-0011 / `project-generation`）、承認後のセッションは同じ id では存在しなくなった。「phase が `approved` のセッションで画面2を開く」という状態そのものが起こらない。
-
-**Migration**: 承認後に承認・差し戻しの操作が現れないことは「承認の成功で画面2を離れてプロジェクト一覧へ戻る」が引き継ぐ。承認済みのセッション id で画面2を開こうとしても開かない。
+**Reason**: 承認がセッションディレクトリの改名による昇格になり、承認後のセッションは同じ id では存在しなくなった。「phase が `approved` のセッションで画面2を開く」という状態が起こらない。
+**Migration**: `stroke/frontier` の「承認の成功で画面2を離れてプロジェクト一覧へ戻る」が引き継ぐ。

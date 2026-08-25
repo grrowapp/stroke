@@ -1,87 +1,26 @@
-## ADDED Requirements
+## REMOVED Requirements
 
-### Requirement: steering の提出の告知を受ける endpoint を公開する
+### Requirement: リクエストはセッション id を指定して行う
 
-システムは、steering 文書を提出し終えたエージェントが**提出を告知する** endpoint を1つ公開する SHALL。この口は告知を受理したこと以外の意味を持たず、文書の中身を受け取ってはならない（MUST NOT）。
+**Reason**: capability を endpoint 単位に分割する（承認済み requirements 2026-08-25）。横断の規定は各 endpoint の spec が個別に持つ。
+**Migration**: `api/stroke/overview`・`api/stroke/send-back`・`api/stroke/question`・`api/stroke/proposal`・`api/stroke/submission` の各 spec が、存在しないセッション id の拒否を個別に規定する。
 
-受理したとき、システムはそのセッション id の実行の記録を消す SHALL（＝完了。`steering-stage` が規定する）。
+### Requirement: 入力は取得の endpoint で読める
 
-この口は、そのセッションの phase を判定の材料にしてはならない（MUST NOT）。steering は承認の後に走るため、phase は常に `approved` である。
+**Reason**: capability の分割。取得の口は入力の種類ごとの capability になる。
+**Migration**: 概要の取得は `api/stroke/overview`（A1）、差し戻しの指摘一式の取得は `api/stroke/send-back`（A4）が引き継ぐ。
 
-#### Scenario: steering の提出を告知する
+### Requirement: 問いの提出を受ける endpoint を公開する
 
-- **WHEN** steering 文書を提出し終えたエージェントが、自分のセッション id で提出を告知する
-- **THEN** システムは受理し、そのセッション id の実行の記録が消える
-
-#### Scenario: 承認済みのセッションから告知する
-
-- **WHEN** phase が `approved` のセッション id で提出が告知される
-- **THEN** システムは受理する
-
-#### Scenario: 記録の無いセッション id で告知する
-
-- **WHEN** 実行の記録に無いセッション id で提出が告知される
-- **THEN** システムは何も消さず、エラーを返す
-
-### Requirement: リトライ対象の一覧を返す endpoint を公開する
-
-システムは、**失敗として記録されているセッション id の一覧**を返す endpoint を1つ公開する SHALL。この口は一覧を返すだけで、起動・記録の更新を行ってはならない（MUST NOT）。
-
-#### Scenario: 失敗した実行がある
-
-- **WHEN** 失敗として記録されたセッション id がある状態でリトライ対象を取得する
-- **THEN** そのセッション id が一覧に入って返る
-
-#### Scenario: 失敗した実行が無い
-
-- **WHEN** 失敗の記録が1件も無い状態でリトライ対象を取得する
-- **THEN** 空の一覧が返る
-
-#### Scenario: 取得しても状態は変わらない
-
-- **WHEN** リトライ対象を続けて2回取得する
-- **THEN** 2回とも同じ一覧が返り、記録は取得によって変化しない
-
-## MODIFIED Requirements
+**Reason**: capability の分割。
+**Migration**: `api/stroke/question` の「A5 POST /api/strokes/:id/question — 問いの提出を受ける」が引き継ぐ。
 
 ### Requirement: proposal の提出を受ける endpoint を公開する
 
-システムはエージェントが proposal の全文を提出する endpoint を公開する SHALL。提出には `projectName`（kebab-case のプロジェクト名の提案）を添えられる。名前の確定はユーザーの決定であり、`projectName` は画面2に当てる候補にすぎない。
-
-システムは、受理した proposal をファイルへ書き出してはならない（MUST NOT）。proposal のファイル（セッションディレクトリの `docs/proposal.md`）はエージェント自身が書く（`project-generation` が規定する）。この口が受け取るのは、ユーザーに表示するための本文である。
-
-#### Scenario: proposal を提出する
-
-- **WHEN** エージェントが proposal の全文を endpoint へ提出する
-- **THEN** システムはそれを受け取り、ユーザーに proposal として表示する。ファイルへの書き出しは行わない
-
-#### Scenario: プロジェクト名の提案を添える
-
-- **WHEN** 提出に kebab-case の `projectName` が添えられている
-- **THEN** システムはそれを、ユーザーが画面2で編集して確定する候補として受け取る
-
-#### Scenario: kebab-case でない projectName を添える
-
-- **WHEN** 添えられた `projectName` が kebab-case でない
-- **THEN** システムはその名前を候補として採用しない。proposal 自体の受理は妨げない
-
-#### Scenario: 本文が空の proposal を提出する
-
-- **WHEN** 提出された proposal の本文が空または空白のみである
-- **THEN** システムは提出を受理せず、エラーを返す
+**Reason**: capability の分割。受理した proposal をサーバーがファイルへ保存する挙動は廃止される。
+**Migration**: `api/stroke/proposal` の「A7 POST /api/strokes/:id/proposal — proposal の提出を受ける」が引き継ぐ。ファイルは AI 自身が `docs/proposal.md` に書く（`project/generation`）。
 
 ### Requirement: 承認後のセッションは提出を受け付けない
 
-システムは、受信した時点で phase が `approved` のセッションへの**問いと proposal の提出**を受理せず、エラーを返す SHALL。判定は受信時点の phase だけで行い、時刻・順序・どの呼び出しに属する提出かは見ない。
-
-この規定は steering の提出の告知には適用しない。告知の口は承認後にしか使われないため、phase を判定の材料にしない。
-
-#### Scenario: 承認後のセッションへ提出する
-
-- **WHEN** phase が `approved` のセッションへ問いまたは proposal が提出される
-- **THEN** システムは受理せず、エラーを返す
-
-#### Scenario: 承認後のセッションへ steering の提出を告知する
-
-- **WHEN** phase が `approved` のセッションから steering の提出が告知される
-- **THEN** システムは受理する
+**Reason**: capability の分割。承認後の提出拒否は提出の口ごとの要件として持つ。
+**Migration**: `api/stroke/question` の「承認後のセッションは問いの提出を受け付けない」と `api/stroke/proposal` の「承認後のセッションは proposal の提出を受け付けない」が引き継ぐ。

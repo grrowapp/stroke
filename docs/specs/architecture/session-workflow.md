@@ -11,12 +11,15 @@ store（マシン共有の登録簿）は使わない。**登録作業は不要*
 ├── schema.yaml                 artifact は stroke → proposal の2段
 └── templates/{stroke,proposal}.md
 
-/var/lib/stroke-board/sessions/<uuid>/                 セッションディレクトリ = openspec ルート
-                                                       （置き場もファイル名も設定値。既定値を示す）
-├── openspec/
-│   ├── config.yaml             schema: flontier-strokeflow（サーバが書く）
-│   └── changes/draft-proposal/ 初回呼び出しの openspec-ff-change スキルが作る
-├── state.json / strokes.json / overview.txt ほか      アプリが書く状態と生成物
+/opt/projects/                                         projectShareRoot（設定値。既定値を示す）
+├── <uuid>/                                            セッションディレクトリ = openspec ルート
+│   ├── openspec/
+│   │   ├── config.yaml         schema: flontier-strokeflow（サーバが書く）
+│   │   └── changes/draft-proposal/ 初回呼び出しの openspec-ff-change スキルが作る
+│   ├── docs/proposal.md        claude が書く（サーバーは書かない）
+│   └── state.json / strokes.json / overview.txt       アプリが書く状態
+└── <name>/                                            承認で <uuid> を改名しただけ
+    └── docs/proposal.md        位置は変わらない
 
 assets/.claude/skills/                                 セッション API スキル6本
 ├── get-overview/  get-strokes/  get-send-back/        取得
@@ -24,7 +27,9 @@ assets/.claude/skills/                                 セッション API ス�
 └── guidance/                                          案内
 ```
 
-セッションに属するものは、セッションディレクトリ1箇所に収まる。
+セッションに属するものは、セッションディレクトリ1箇所に収まる。**セッションと昇格した
+プロジェクトは同じ親（`projectShareRoot`）の下に並ぶ。** 承認はこの親の下での改名だけで
+昇格を行うためで、ポータルの一覧もこの親を走査する（`docs/specs/core/settings-reference.md`）。
 
 ## 配線
 
@@ -32,18 +37,43 @@ assets/.claude/skills/                                 セッション API ス�
 |---|---|---|
 | スキーマ名 | `runtimeConfig.claude.workflowSchema` | セッション作成時に `openspec/config.yaml` へ書かれる |
 | 起動するスキル | `runtimeConfig.claude.firstPrompt` | 初回 prompt `/openspec-ff-change draft-proposal` |
-| 接続先 | `runtimeConfig.claude.apiBaseUrl` | spawn 時の環境変数 `STROKE_BASEURL`。名前は `settings.ts` の固定値で、変えるならスキル側と揃えること |
+| 接続先 | `runtimeConfig.claude.apiBaseUrl` | spawn 時の環境変数 `STROKE_BASEURL`。名前は `claude.ts` の固定値で、変えるならスキル側と揃えること |
 | セッション id | — | cwd のディレクトリ名と `${CLAUDE_SESSION_ID}` |
-| スキル・コマンドの置き場 | `runtimeConfig.public.claude.args` | `--add-dir`（起動定義の配列に2件並ぶ） |
+| スキル・コマンドの置き場 | `runtimeConfig.claude.args` | `--add-dir`（起動定義の配列に2件並ぶ） |
+| steering の定型 | `runtimeConfig.claude.steeringPrompt` | 承認の直後、cwd＝生成先で起こすときに渡る |
 
-設定はどれも環境変数で差し替えない（`.env` で差し替えられるのは置き場の2件だけである）。一覧は `docs/specs/core/settings-reference.md`。
+設定は**環境変数から一切読まない**。値は `nuxt.config.ts` と `app/app.config.ts` に書かれた
+ものだけで、読み口は `server/utils/stroke/config.ts` の1本である。一覧は
+`docs/specs/core/settings-reference.md`。
 
 セッション作成（`server/utils/stroke/session-core.ts`）は「ディレクトリ作成 → `openspec init --tools none` → `config.yaml` 上書き → 状態ファイル書き込み」。**サーバは change を作らない**。change（固定名 `draft-proposal`）は初回呼び出しの `openspec-ff-change` スキルが `openspec new change` から作る。openspec コマンドの実行は全て cwd = セッションディレクトリで、`--store` はどのコードパスからも使わない。
 
 ## 畳み方
 
 - **サーバが動いているとき**: `GET /api/strokes` で一覧し、`POST /api/strokes/<uuid>/delete` で消す（実行中の呼び出しを持つ間は 409）。
-- **サーバが動いていないとき**: `yarn session list` / `yarn session delete <uuid>` / `yarn session create "<概要>"`。endpoint と同じ実体（`session-core.ts`）を呼ぶ。実行中判定は `state.json` の `invocation` を材料にする。
+- **サーバが動いていないとき**: `yarn session list` / `yarn session delete <uuid>` / `yarn session create "<概要>"`。endpoint と同じ実体（`session-core.ts`）を呼ぶ。実行中判定は `state.json` の `invocation` を材料にする。設定は `nuxt.config.ts` を直接 import して得る（Nitro の外なので `useRuntimeConfig()` は使えない）。
+
+## 実行の記録（`invocation`）
+
+`state.json` が4値で持つ。書き込みは A8（`POST /api/strokes/:id/submission`）経由で
+invokeAi だけが行う（`openspec/specs/agent/invocation`）。
+
+```mermaid
+stateDiagram-v2
+    [*] --> idle: セッション作成
+    idle --> running: U13 で起動
+    running --> idle: output stream で完了を検知
+    running --> failed: タイムアウト・起動失敗
+    failed --> running: 巡回が起こし直す（上限内）
+    failed --> error: 上限に達した状態で再キック
+    error --> running: ユーザーの再実行（回数リセット）
+    error --> [*]: ユーザーの削除
+```
+
+- `phase: 'approved'` の対象も `invocation` を持つ。昇格後は steering の実行が起こる
+- 上限（`runtimeConfig.claude.maxRetries`）の判定は invokeAi。巡回は `failed` だけを拾う
+- サーバー再起動で宙に浮いた `running` は、起動時に `failed` へ倒して巡回に拾わせる
+  （`server/plugins/01.reap-running.ts`）
 
 ## 実測で確定していること
 

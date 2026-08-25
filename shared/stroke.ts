@@ -103,8 +103,19 @@ export interface SendBackPayload {
 /** セッションの局面。design.md 決定4: phase では POST の受理の動きを変えない。 */
 export type Phase = 'stroking' | 'proposed' | 'approved'
 
-/** `claude -p` の呼び出し実行状態（U2 の `invocation`）。 */
-export type Invocation = 'running' | 'idle' | 'failed'
+/**
+ * 実行の記録（U2 の `invocation`）。
+ *
+ * - `running` — 実行中
+ * - `idle` — 平常
+ * - `failed` — 失敗。巡回が拾って起こし直す（openspec/specs/portal/batch）
+ * - `error` — リトライ上限に達した**終端**。システムは自動では何もせず、ユーザーの
+ *   再実行（回数リセット）か削除だけが回復手段になる
+ *
+ * 書き込みは A8（`POST /api/strokes/:id/submission`）経由で invokeAi だけが行う
+ * （openspec/specs/agent/invocation）。
+ */
+export type Invocation = 'running' | 'idle' | 'failed' | 'error'
 
 /** U2 `GET /api/:id` の出力。 */
 export interface SessionStatus {

@@ -77,6 +77,17 @@ export const proposalSubmitBody = z.object({
   projectName: z.string().trim().optional(),
 })
 
+/**
+ * A8 の入力。`invocation` を指定の値に変えるだけの口。
+ * 叩くのは invokeAi だけで、claude と画面は叩かない（openspec/specs/api/stroke/submission）。
+ *
+ * `retries` は省略可。渡されたときだけ回数を上書きする（再実行でのリセットに使う）。
+ */
+export const submissionBody = z.object({
+  invocation: z.enum(['running', 'idle', 'failed', 'error']),
+  retries: z.number().int().min(0).optional(),
+})
+
 /** 契約に合わないボディは 400。最初の問題だけを画面へ返す。 */
 export function parseBody<T>(schema: z.ZodType<T>, body: unknown): T {
   const parsed = schema.safeParse(body)

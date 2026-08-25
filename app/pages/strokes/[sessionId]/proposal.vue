@@ -6,6 +6,10 @@ import DOMPurify from 'isomorphic-dompurify'
 import { marked } from 'marked'
 import type { Invocation, Phase, Stroke } from '#shared/stroke'
 
+// 器は `stroke` レイアウト（fullscreen の UModal・閉じ操作なし）。承認すると
+// モーダルごと閉じて一覧へ戻る。
+definePageMeta({ layout: 'stroke' })
+
 // セッション uuid は URL に載る(/s/<uuid>/proposal)。cookie では持たない。
 const route = useRoute()
 const rawId = route.params.sessionId

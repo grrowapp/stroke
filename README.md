@@ -41,9 +41,13 @@
 | 環境変数 | 意味 |
 |---|---|
 | `NUXT_UPSTREAM_BASE_URL` | 本家ダッシュボードの URL |
-| `NUXT_PROJECTS_PARENT_PATH` | `.spec-workflow` を持つディレクトリを探す親パス。**直下1階層だけ**を走査する |
 | `NUXT_SPEC_WORKFLOW_HOME` | 本家のグローバル状態の置き場。`activeProjects.json` がここにある。本家の `SPEC_WORKFLOW_HOME` と同じ値を指すこと。未設定なら `~/.spec-workflow-mcp` |
 | `NUXT_SYNC_INTERVAL_MS` | アクティブなプロジェクト集合を見直す間隔（ミリ秒）。既定 30000 |
+
+走査の親パス（`.spec-workflow` を持つディレクトリを探す先。**直下1階層だけ**を走査する）は
+環境変数を持たない。ストローク側の保存先と同じ1つの設定
+（`nuxt.config.ts` の `projectShareRoot`）を見る。分けると食い違ったときに、承認した
+プロジェクトが一覧から消えるためである。
 
 プロジェクト一覧の母集合は親パスの走査で作る。本家 API は停止中のプロジェクトを返さないため、
 API だけでは一覧が作れない（`docs/adr/0006-upstream-observed-behaviour.md`）。
@@ -123,15 +127,13 @@ store（`openspec store register`）への登録は**不要**。
 （[ADR 0004](docs/adr/0004-settings-reference-is-authoritative.md)）。ここに無いものは
 設定ではない。**既定値の一覧を README に重ねない。**
 
-**`.env` で差し替えられるのは置き場の2件だけ**（`NUXT_SESSIONS_ROOT` /
-`NUXT_PROJECTS_ROOT`）。動かす機械ごとに変わるためである。他の設定は機械が変わっても
-変わらないので、`nuxt.config.ts` に書かれた値だけを使う。
+**ストローク側は環境変数から設定を読まない。** 値は `nuxt.config.ts` の `runtimeConfig` と
+`app/app.config.ts` に書かれたものだけである。`.env` はポータル側の未統合分にしか効かない。
 
-```bash
-cp .env.example .env   # 変えたい行のコメントを外す
-```
+読み手は endpoint が `useRuntimeConfig()`、CLI（`yarn session`、Nitro の外）が
+`nuxt.config.ts` を直接 import する。環境変数を見ないので両者は同じ値に解決される。
 
-置き場が絶対パスでなければ起動時チェックが警告を出す。どちらが不正かはメッセージに出る。
+保存先（`projectShareRoot`）が絶対パスでない・書き込めない場合は起動時チェックが警告を出す。
 
 **ビルド時に決まるもの**（`modules` / `css` / `devtools` / `ignore` /
 `nitro.experimental.websocket`）は環境変数で変えられない。変えるにはアプリを作り直す。

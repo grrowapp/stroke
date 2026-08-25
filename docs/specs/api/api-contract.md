@@ -43,16 +43,17 @@
 | U10 | `POST /api/strokes/:id/approve` | 承認する |
 | U11 | `POST /api/strokes/:id/delete` | セッションを消す（セッションに属するものが残らない） |
 | U12 | `GET /api/strokes` | 残っているセッションを一覧する |
-| U13 | `GET /api/strokes/:id/invoke-agent` | AI を起動する（claude 起動の唯一の入口） |
+| U13 | `GET /api/strokes/:id/invoke-agent` | AI を起動する（claude 起動の唯一の入口。cwd をクエリで受け取る） |
 
-### エージェントが操作する — 4本
+### エージェントが操作する — 5本
 
 | # | メソッド / パス | 内容 |
 |---|---|---|
 | A1 | `GET /api/strokes/:id/overview` | 概要を取得する |
 | A4 | `GET /api/strokes/:id/send-back` | 差し戻しの指摘一式を取得する |
 | A5 | `POST /api/strokes/:id/question` | 今の1問を提出する（ストロークの問い・問い返しの区別なし） |
-| A7 | `POST /api/strokes/:id/proposal` | proposal を提出する |
+| A7 | `POST /api/strokes/:id/proposal` | proposal を提出する（ファイルは書かない） |
+| A8 | `POST /api/strokes/:id/submission` | 実行の記録（`invocation`）を変える。**叩くのは invokeAi だけ** |
 
 ### WS 配信 — 2本（サーバ → 画面のみ。画面からは何も送らない）
 
@@ -70,6 +71,10 @@
 | `/send-back` | U9 | A4 |
 | `/question` | A5 | W1（画面）・U3（記録） |
 | `/proposal` | A7 | W2（画面）・U3（マーカー） |
+| `/submission` | A8 | U2（`invocation`） |
+
+A8 だけはエージェントの口に置かれているが、**claude は叩かない**。実行の記録を書くのは
+invokeAi だけである（`openspec/specs/api/stroke/submission`）。
 
 ## 各 endpoint の入出力
 
@@ -80,10 +85,15 @@
 
 ### U2 `GET /api/strokes/:id`
 
-- output: `{ phase: 'stroking' | 'proposed' | 'approved', invocation: 'running' | 'idle' | 'failed' }`
+- output: `{ phase: 'stroking' | 'proposed' | 'approved', invocation: 'running' | 'idle' | 'failed' | 'error' }`
 - リロード時に1回読み、画面の行き先（`stroking`=画面1 / `proposed` 以降=画面2）と
   待機・失敗表示を決める。**回答や差し戻しを送って待っている間だけ**、数秒おきに読み直す。
+- `phase: 'approved'` も `invocation` を持つ。昇格したプロジェクトでは steering の実行が
+  起こるためで、`idle` に潰さずそのまま返す。
 - `failed` のとき、ユーザーの再試行は同じ入力 POST（U7 / U9）の再送と、その成功応答後の U13。
+  巡回（`server/plugins/02.retry-failed.ts`）も `failed` を拾って起こし直す。
+- `error` はリトライ上限に達した**終端**。システムは自動では何もしない。画面は再実行
+  （`U13?reset=1`。回数のリセットは U13 が行う）か削除（U11）を出す。**画面は A8 を叩かない。**
 - エラー: 404 セッションなし
 
 ### U3 `GET /api/strokes/:id/strokes`
@@ -111,7 +121,16 @@
 
 - input: `{ projectName: string }`
 - output: 本文なし（204）
-- エラー: 400 形式不正 / 404 / 409 name-conflict / 409 phase（`proposed` のみ受理）/ 500 生成失敗
+- 承認は**セッションディレクトリを `<projectName>` へ改名するだけ**である。新しい
+  ディレクトリを作らず、ファイルも動かさない（`openspec/specs/project/generation`）。
+- 前提: `docs/proposal.md` が在ること。**サーバーは proposal を書かない**ので、claude が
+  書いていなければ 409（proposal が見つからない）で止まる。
+- 順序は「衝突確認 → phase 書き換え → 改名」で、改名が失敗したら phase を `proposed` へ
+  書き戻す。`approved` かつ未改名の宙吊りは作らない。
+- 改名の成功直後に steering の claude を起こす（cwd＝生成先。完了は待たない・ADR 0011）。
+  昇格に失敗したときは起こさない。
+- エラー: 400 形式不正 / 404 / 409 name-conflict / 409 phase（`proposed` のみ受理）/
+  409 proposal なし / 500 改名失敗
 
 ### U11 `POST /api/strokes/:id/delete`
 
@@ -132,13 +151,21 @@
 
 ### U13 `GET /api/strokes/:id/invoke-agent`
 
-- input: なし（セッション id はパスのみ。body・クエリを持たない）
+- input: クエリ `cwd`（省略可。実行する場所）と `reset`（省略可。ユーザーの再実行）。
+  **endpoint は cwd を自分で導出しない**——キックする側（画面・巡回・承認処理）が path を
+  渡す。省略時はセッションディレクトリ。`reset` があればリトライ回数を 0 に戻してから起こす。
 - output: 本文なし
-- 受理したとき AI の呼び出しを開始し、応答の完了を待たずに返す。初回か継続か・渡す定型は、
-  セッション一覧（U12）に符合するかで導く（specs/ai-invocation）。初回は実行環境
-  （openspec ルート・スキーマ設定）を整えてから起動する。
+- 受理で即完結する。`running` 化・起動・完了検知・タイムアウト・上限判定は非同期の
+  invokeAi が担い、応答はそれを待たない。
+- **完了は invokeAi が子プロセスの output stream で検知する。** 提出（A5・A7）は完了の
+  合図ではない（`openspec/specs/agent/invocation`）。
+- 初回か継続か・渡す定型は、セッション一覧（U12）に符合するかで導く
+  （`openspec/specs/agent/invocation`）。初回は実行環境（openspec ルート・スキーマ設定）を
+  整えてから起動する。
+- `phase: 'approved'` でも受け付ける。昇格したプロジェクトでは steering を起こすためで、
+  渡す定型と cwd だけが変わる（起動処理は呼び出し元を区別しない）。
 - 画面は U1・U7・U9 の成功応答の直後にこれを呼ぶ。
-- エラー: 404 セッションなし / 409 busy（実行中の多重起動）/ 409 phase（`approved` は拒否）
+- エラー: 404 セッションなし / 409 busy（実行中の多重起動）/ 503 前提が欠けている
 
 ### A1 `GET /api/strokes/:id/overview`
 
@@ -160,7 +187,21 @@
 
 - input: `{ proposal: string, projectName?: string }`（`projectName` は kebab-case のときだけ候補採用）
 - output: 本文なし（204）
+- **ファイルは書かない。** proposal を書くのは claude で、セッションの時点から
+  `docs/proposal.md` に置く。ここは本文を検証して受理・W2 配信し、phase を進めるだけ
+  （`openspec/specs/project/generation`）。
 - エラー: 400 本文が空 / 404 / 409 phase（`approved` は拒否）
+
+### A8 `POST /api/strokes/:id/submission`
+
+- input: `{ invocation: 'running' | 'idle' | 'failed' | 'error', retries?: number }`
+- output: 本文なし
+- 実行の記録を指定の値に変えるだけの口。**`invocation` の唯一の書き込み口**であり、
+  叩くのは invokeAi だけとする。claude（エージェント）と画面は叩かない
+  （`openspec/specs/api/stroke/submission`）。A5・A7 も `invocation` に触れない。
+- 値の意味づけも遷移の判定もここでは持たない。`retries` は渡されたときだけ上書きする
+  （`error` からの再実行で 0 に戻すのに使う）。
+- エラー: 400 形式不正 / 404 セッションなし
 
 ### W1 `/api/strokes/:id/ws/question`
 

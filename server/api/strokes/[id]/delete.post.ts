@@ -1,3 +1,4 @@
+import { readStrokeConfig } from '../../../utils/stroke/config'
 import { conflict } from '../../../utils/stroke/conflict'
 import { isRunning } from '../../../utils/stroke/running'
 import { deleteSessionCore } from '../../../utils/stroke/session-core'
@@ -17,7 +18,7 @@ export default defineEventHandler(async (event): Promise<null> => {
   }
 
   try {
-    await deleteSessionCore(sessionId)
+    await deleteSessionCore(readStrokeConfig().projectShareRoot, sessionId)
   } catch (error) {
     throw sessionErrorToHttp(error)
   }
