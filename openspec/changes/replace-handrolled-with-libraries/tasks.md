@@ -108,7 +108,7 @@
 - [x] 9.1 `skip_specs: true` を取り下げ、proposal の Capabilities 欄を新設1・改定1に改める
 - [x] 9.2 `specs/markdown-rendering/spec.md`（新設）を書く。生 HTML を要素にしない・mermaid を図にする・それ以外をコードブロックにする
 - [x] 9.3 `specs/project-workspace/spec.md`（改定）を書く。差し戻しを持たない記述を外し、注釈と3フィールド送信を定める
-- [ ] 9.4 `.openspec.yaml` から `skip_specs: true` を外す（**ユーザーの操作。`Edit(/openspec/changes/**/.openspec.yaml)` が deny のため**）
+- [x] 9.4 `.openspec.yaml` から `skip_specs: true` を外す（**ユーザーの操作。`Edit(/openspec/changes/**/.openspec.yaml)` が deny のため**）
 
 ## 10. 検証と commit
 
