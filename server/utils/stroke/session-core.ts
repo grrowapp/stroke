@@ -187,6 +187,9 @@ export async function listSessionsCore(root: string): Promise<SessionSummary[]> 
       id: entry.name,
       phase: await readPhase(root, entry.name),
       updatedAt: mtime.toISOString(),
+      // キックする側がこれを cwd として U13 に渡す。endpoint に導出させない（D5）
+      path: sessionDir(root, entry.name),
+      invocation: await readInvocation(root, entry.name),
     })
   }
   return sessions.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
@@ -208,6 +211,17 @@ export async function readInvocationCore(
   } catch {
     return null
   }
+}
+
+/**
+ * 一覧に載せる `invocation`。読めない・知らない値は `idle` として載せる。
+ *
+ * 巡回は `failed` だけを拾うので、読めないものを `failed` に倒すと、壊れた
+ * `state.json` を延々と起こし直すことになる。
+ */
+async function readInvocation(root: string, sessionId: string): Promise<Invocation> {
+  const raw = await readInvocationCore(root, sessionId)
+  return raw === 'running' || raw === 'failed' || raw === 'error' ? raw : 'idle'
 }
 
 async function readPhase(root: string, sessionId: string): Promise<SessionSummary['phase']> {

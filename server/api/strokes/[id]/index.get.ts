@@ -1,4 +1,6 @@
 import type { SessionStatus } from '#shared/stroke'
+import { readStrokeConfig } from '../../../utils/stroke/config'
+import { sessionDir } from '../../../utils/stroke/paths'
 import { requireSessionId } from '../../../utils/stroke/session-param'
 import { readState } from '../../../utils/stroke/session-store'
 
@@ -8,5 +10,10 @@ export default defineEventHandler(async (event): Promise<SessionStatus> => {
   const state = await readState(sessionId)
   // `approved` も `invocation` を持つ（openspec/specs/agent/invocation）。
   // 昇格後は steering の実行が起こるので、ここで潰さずそのまま返す。
-  return { phase: state.phase, invocation: state.invocation }
+  // `path` は画面が cwd として U13 に渡すためのもの（design.md D5）。
+  return {
+    phase: state.phase,
+    invocation: state.invocation,
+    path: sessionDir(readStrokeConfig().projectShareRoot, sessionId),
+  }
 })

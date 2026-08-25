@@ -121,6 +121,11 @@ export type Invocation = 'running' | 'idle' | 'failed' | 'error'
 export interface SessionStatus {
   phase: Phase
   invocation: Invocation
+  /**
+   * 対象のディレクトリのパス。画面はこれを cwd として U13 に渡す。
+   * **endpoint に導出させない**（design.md D5）。
+   */
+  path: string
 }
 
 /** W2 `/api/:id/ws/proposal` の配信1件分。A7 の入力と対になる。 */
@@ -137,4 +142,14 @@ export interface SessionSummary {
   id: string
   phase: Phase | 'unknown'
   updatedAt: string
+  /**
+   * 対象のディレクトリのパス。
+   *
+   * 起動をキックする側（画面・巡回・承認処理）は、これを cwd として U13 に渡す。
+   * **endpoint に導出させない**（design.md D5）——昇格の前後で id の意味が uuid から
+   * プロジェクト名へ変わるため、導出側が分岐を持つことになる。
+   */
+  path: string
+  /** 実行の記録。巡回はこれが `failed` の件だけを拾う */
+  invocation: Invocation
 }

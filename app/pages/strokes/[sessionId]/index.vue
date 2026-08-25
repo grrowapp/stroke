@@ -4,7 +4,7 @@
 // (design.md 決定2・6)。待機・失敗は U2 のポーリングで拾う(task 6.3)。
 // 器は `stroke` レイアウト（fullscreen の UModal・閉じ操作なし）。どの場面に居るかは
 // URL が持つので、リロードすれば同じ途中画面がモーダルとして開き直る（design.md D1）。
-import type { Answer, Invocation, Phase, Stroke } from '#shared/stroke'
+import type { Answer, Phase, SessionStatus, Stroke } from '#shared/stroke'
 
 definePageMeta({ layout: 'stroke' })
 
@@ -19,7 +19,7 @@ function statusOf(error: unknown): number | undefined {
   return undefined
 }
 
-const { data: status, error: loadError } = await useFetch<{ phase: Phase; invocation: Invocation }>(
+const { data: status, error: loadError } = await useFetch<SessionStatus>(
   `/api/strokes/${sessionId}`,
   { key: `status:${sessionId}` },
 )
@@ -107,9 +107,12 @@ async function answer(given: Answer) {
   strokes.value = [...strokes.value, { proposal: false, question: asked, answer: given }]
 
   // 受理と起動は分かれている(specs/api/answer)。成功応答の直後に起動を要求する
-  // (design.md 決定6)。
+  // (design.md 決定6)。cwd は U2 が返した path を渡す——endpoint に導出させない
+  // (design.md D5)。
   try {
-    await $fetch(`/api/strokes/${sessionId}/invoke-agent`)
+    await $fetch(`/api/strokes/${sessionId}/invoke-agent`, {
+      query: { cwd: status.value?.path },
+    })
     waitingRetry.startWaiting()
   } catch {
     errorMessage.value = 'AI を起動できませんでした。'

@@ -57,6 +57,28 @@ describe('listSessionsCore', () => {
     expect((await listSessionsCore(root)).map(s => s.id)).not.toContain('some-repo')
   })
 
+  it('各件に path と invocation を載せる', async () => {
+    await place(SESSION_ID, 'stroking')
+
+    const [session] = await listSessionsCore(root)
+
+    // キックする側がこれを cwd として U13 に渡す（endpoint に導出させない）
+    expect(session?.path).toBe(join(root, SESSION_ID))
+    expect(session?.invocation).toBe('idle')
+  })
+
+  it('state.json が壊れていても failed にはしない（巡回が延々と起こし直さない）', async () => {
+    const dir = join(root, 'broken')
+    await mkdir(join(dir, 'openspec'), { recursive: true })
+    await writeFile(join(dir, 'openspec', 'config.yaml'), 'schema: x\n', 'utf8')
+    await writeFile(join(dir, 'state.json'), 'not json', 'utf8')
+
+    const broken = (await listSessionsCore(root)).find(s => s.id === 'broken')
+
+    expect(broken?.invocation).toBe('idle')
+    expect(broken?.phase).toBe('unknown')
+  })
+
   it('openspec ルートが無いディレクトリは載せない', async () => {
     await mkdir(join(root, 'bare'), { recursive: true })
     await writeFile(join(root, 'bare', 'state.json'), '{"phase":"stroking"}\n', 'utf8')

@@ -1,7 +1,9 @@
+import { defineNitroPlugin } from 'nitropack/runtime'
+
 import { readStrokeConfig } from '../utils/stroke/config'
 import { LOG_PREFIX } from '../utils/stroke/log'
 import { listSessionsCore } from '../utils/stroke/session-core'
-import { readState, writeState } from '../utils/stroke/session-store'
+import { writeInvocation } from '../utils/stroke/session-store'
 
 /**
  * 起動時に `running` の残骸を `failed` へ倒す。
@@ -23,13 +25,12 @@ export default defineNitroPlugin(async () => {
 
   let reaped = 0
   for (const session of await listSessionsCore(root)) {
+    if (session.invocation !== 'running') continue
     try {
-      const state = await readState(session.id)
-      if (state.invocation !== 'running') continue
-      await writeState(session.id, { ...state, invocation: 'failed' })
+      await writeInvocation(session.id, 'failed')
       reaped += 1
     } catch {
-      // 読めない・書けない1件で全体を止めない。
+      // 書けない1件で全体を止めない。
     }
   }
 

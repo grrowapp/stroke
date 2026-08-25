@@ -85,7 +85,8 @@ invokeAi だけである（`openspec/specs/api/stroke/submission`）。
 
 ### U2 `GET /api/strokes/:id`
 
-- output: `{ phase: 'stroking' | 'proposed' | 'approved', invocation: 'running' | 'idle' | 'failed' | 'error' }`
+- output: `{ phase: 'stroking' | 'proposed' | 'approved', invocation: 'running' | 'idle' | 'failed' | 'error', path: string }`
+- `path` は対象のディレクトリ。画面はこれを cwd として U13 に渡す（endpoint に導出させない）
 - リロード時に1回読み、画面の行き先（`stroking`=画面1 / `proposed` 以降=画面2）と
   待機・失敗表示を決める。**回答や差し戻しを送って待っている間だけ**、数秒おきに読み直す。
 - `phase: 'approved'` も `invocation` を持つ。昇格したプロジェクトでは steering の実行が
@@ -146,11 +147,17 @@ invokeAi だけである（`openspec/specs/api/stroke/submission`）。
 
 ### U12 `GET /api/strokes`
 
-- output: `SessionSummary[]`（`{ id, phase, updatedAt }`。`updatedAt` は `state.json` の
-  mtime。読めない `state.json` は `phase: 'unknown'`）。新しいものから並ぶ。1件も無ければ `[]`
+- output: `SessionSummary[]`（`{ id, phase, updatedAt, path, invocation }`。`updatedAt` は
+  `state.json` の mtime。読めない `state.json` は `phase: 'unknown'`）。新しいものから並ぶ。
+  1件も無ければ `[]`
+- `path` は対象のディレクトリ。**キックする側はこれを cwd として U13 に渡す**（endpoint に
+  導出させない）。`invocation` は実行の記録で、巡回はこれが `failed` の件だけを拾う
 - 一覧には実体の揃ったセッション（ディレクトリ・openspec ルート・スキーマ設定済み）だけが
   載る。**作成直後（初回起動前）のセッションはまだ載らない**。U13 はこの符合で初回か継続かを
   判定する
+- **承認で昇格した対象も載る。** 昇格後は id がプロジェクト名に変わるが、steering の
+  巡回・再キックの対象になるため一覧から外さない。`state.json` を持たないディレクトリは
+  載らない
 - サーバが動いていないときの削除・一覧・作成は `yarn session`（`docs/specs/architecture/session-workflow.md`）
 
 ### U13 `GET /api/strokes/:id/invoke-agent`

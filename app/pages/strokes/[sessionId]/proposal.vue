@@ -4,7 +4,7 @@
 // 差し戻し後の問い返しは画面1 へ戻さず、この画面の帯とモーダルで受ける。
 import DOMPurify from 'isomorphic-dompurify'
 import { marked } from 'marked'
-import type { Invocation, Phase, Stroke } from '#shared/stroke'
+import type { Phase, SessionStatus, Stroke } from '#shared/stroke'
 
 // 器は `stroke` レイアウト（fullscreen の UModal・閉じ操作なし）。承認すると
 // モーダルごと閉じて一覧へ戻る。
@@ -15,7 +15,7 @@ const route = useRoute()
 const rawId = route.params.sessionId
 const sessionId = Array.isArray(rawId) ? (rawId[0] ?? '') : (rawId ?? '')
 
-const { data: status, error } = await useFetch<{ phase: Phase; invocation: Invocation }>(
+const { data: status, error } = await useFetch<SessionStatus>(
   `/api/strokes/${sessionId}`,
   { key: `status:${sessionId}` },
 )

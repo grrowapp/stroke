@@ -55,13 +55,13 @@ design.md の Open Questions（保存先の既定値・steering の定型の本�
 
 ## 7. API の再編（U 系 path・U13 cwd・U12 path）
 
-**7.1〜7.3・7.5・7.6 はユーザー判断で見送り（2026-08-25）。** path の移設は入口・出口の接合には要らない。cwd の引数化（7.4）だけが接合に効くので、path を動かさずに実施した。
+**path の移設（7.1・7.2・7.6）はユーザー判断で見送り（2026-08-25）。** 入口・出口の接合には要らない。**7.3〜7.5 は実施する**——U12 の中身と cwd の引数化は接合に効くので、path を動かさずに行う。
 
 - [ ] 7.1 U 系・W 配信のルートを `/api/sessions` 系へ移す（`server/api/` のディレクトリ移設。旧 path の互換は残さない）
 - [ ] 7.2 U11 を `DELETE /api/sessions/:id` にする
-- [ ] 7.3 U12 の応答の各件に path と `invocation` を載せる
+- [x] 7.3 U12 の応答の各件に path と `invocation` を載せる
 - [x] 7.4 U13 が cwd を引数で受け取るようにする（自分で導出しない）— path は動かさず、クエリ `cwd` で受ける
-- [ ] 7.5 画面（composables・pages）の API 参照 path を追随させる。ストロークの起動キックは U12/U2 由来の path を cwd として渡す
+- [x] 7.5 画面（composables・pages）の API 参照 path を追随させる。ストロークの起動キックは U12/U2 由来の path を cwd として渡す
 - [ ] 7.6 エージェントスキル（`assets/.claude/skills/`）の U3 参照 path を `/api/sessions/:id/strokes` へ直す。A 系の path は変えない
 
 ## 8. AI 実行の引数化と invocation の4値
