@@ -7,6 +7,7 @@ import type {
   Answer,
   HighlightColor,
   Phase,
+  ProposalMessage,
   Stroke,
 } from '#shared/stroke'
 import { useAnnotations } from '~/composables/useAnnotations'
@@ -74,7 +75,8 @@ export function useProposalReview(
   const phase = ref<Phase>(initial.phase)
   const strokes = ref<Stroke[]>(initial.strokes)
 
-  const { message: proposalMessage } = useProposalChannel(sessionId)
+  // W2 `/ws/proposal` を購読する。届くのは proposal と名前候補で、最後の1件で上書きされる。
+  const proposalMessage = useSessionChannel<ProposalMessage>(sessionId, 'proposal')
 
   // 問いの往復は1つの機構が持つ。W1 の購読も回答の送信もこの中にあり、この画面は
   // 開く引き金と、差し戻しとの兼ね合いだけを見る（design 決定2）。

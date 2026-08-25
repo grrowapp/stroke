@@ -6,7 +6,6 @@
  * ヘッダーの bar、その下にタブの bar（padding:0 14px / gap:2px）、本体は padding:16px。
  * 下層は左サイドバーで、形そのものを変えることでどちらの階層にいるかが見て分かる。
  */
-import SbIcon from '~/components/shared/SbIcon.vue';
 import { useBoardSocket } from '~/composables/shared/useBoardSocket';
 
 const { notifications, upstreamConnected } = useBoardSocket();
@@ -32,7 +31,7 @@ const { notifications, upstreamConnected } = useBoardSocket();
     <nav class="sb-bar sb-tabbar" aria-label="ポータル">
       <NuxtLink to="/" class="sb-tab" active-class="sb-tab-on" data-testid="tab-notifications">
         <span class="inline-flex items-center gap-1.5">
-          <SbIcon name="bell" :size="14" />
+          <UIcon name="sb:bell" class="size-3.5 shrink-0" />
           通知
           <span v-if="notifications.length > 0" class="sb-badge">{{ notifications.length }}</span>
         </span>
@@ -44,7 +43,7 @@ const { notifications, upstreamConnected } = useBoardSocket();
         data-testid="tab-projects"
       >
         <span class="inline-flex items-center gap-1.5">
-          <SbIcon name="grid" :size="14" />
+          <UIcon name="sb:grid" class="size-3.5 shrink-0" />
           プロジェクト一覧
         </span>
       </NuxtLink>

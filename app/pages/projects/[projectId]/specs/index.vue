@@ -15,15 +15,23 @@ const { data, error } = await useSpecs(projectId);
 
 /**
  * 本家の仕様書一覧は 名前 / 進捗 / 最終更新 の3列で、進捗はバーと `完了/全体` を並べる
- * （`SpecsPage.tsx` の `SpecTableRow`）。タスクを持たない仕様書はバーを出さない。
+ * （`SpecsPage.tsx` の `SpecTableRow`）。
+ *
+ * 名前の欄は2段。上段が本家の作る表示名（`displayName`。`core-structure` →
+ * `Core Structure`）、下段が実体の名前（`name`）。片方だけ出していたときは本家の
+ * 上段が消えていた。
+ *
+ * 進捗の列は**タスクが無くても畳まない**。本家は総数 0 のときバーの代わりに
+ * 「タスクなし」を出して列は残す（`SpecsPage.tsx` の三項）。`taskProgress` が
+ * 来ないものにも 0/0 を渡して、列そのものが消えないようにする。
  */
 const items = computed(() =>
   (data.value ?? []).map((spec) => ({
     key: spec.name,
-    label: spec.name,
-    detail: spec.description,
+    label: spec.displayName ?? spec.name,
+    detail: spec.name,
     icon: 'document' as const,
-    progress: spec.taskProgress,
+    progress: spec.taskProgress ?? { completed: 0, total: 0 },
     meta: formatRelativeTime(spec.lastModified),
     to: `/projects/${projectId.value}/specs/${spec.name}`,
   })),

@@ -9,7 +9,6 @@
  */
 import { computed, definePageMeta, navigateTo, useFetch, useHead, watch } from '#imports';
 
-import SbIcon from '~/components/shared/SbIcon.vue';
 import { useBoardSocket } from '~/composables/shared/useBoardSocket';
 import { formatRelativeTime } from '~/composables/shared/useRelativeTime';
 import type { Notification, ProjectDirectoryResponse } from '#shared/types';
@@ -103,7 +102,7 @@ function open(notification: Notification): void {
               data-testid="notification-open"
               @click.stop="open(row)"
             >
-              <SbIcon name="folder" :size="14" />
+              <UIcon name="sb:folder" class="size-3.5 shrink-0" />
               {{ row.projectName }}
             </button>
           </td>
@@ -137,7 +136,7 @@ function open(notification: Notification): void {
               :data-name="project.name"
             >
               <span class="inline-flex items-center gap-1.5">
-                <SbIcon name="folder" :size="14" />
+                <UIcon name="sb:folder" class="size-3.5 shrink-0" />
                 {{ project.name }}
               </span>
               <span class="sb-badge">{{ project.pendingApprovals }}</span>

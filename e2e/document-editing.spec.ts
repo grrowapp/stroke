@@ -44,6 +44,21 @@ test.describe('仕様書の文書を直す', () => {
     await expect(page.getByText('直した要件')).toBeVisible();
   });
 
+  test('保存の直後に別の文書へ移ると、前の文書の「保存しました」は残らない', async ({ page }) => {
+    await page.goto(SPEC_DOC);
+    await page.getByTestId('document-edit').click();
+
+    await page.getByTestId('document-input').fill('# 直した要件\n\n新しい本文');
+    await page.getByTestId('document-save').click();
+    await expect(page.getByTestId('document-saved')).toBeVisible();
+
+    // チップが自動で消える3秒を待たずに移る。
+    // 消す責務を timer だけに預けると、ここでチップが残る
+    await page.goto(STEERING_DOC);
+
+    await expect(page.getByTestId('document-saved')).toHaveCount(0);
+  });
+
   test('保存する前は未保存であることが分かる', async ({ page }) => {
     await page.goto(SPEC_DOC);
     await page.getByTestId('document-edit').click();
@@ -137,20 +152,24 @@ test.describe('承認依頼から対象文書を直す', () => {
     });
   });
 
-  test('レビューするを押すと編集画面がそのまま開く', async ({ page }) => {
+  test('レビューするを押すと、まず本文が整形して出る', async ({ page }) => {
     await page.goto(`/projects/${ALPHA}/approvals`);
     await page.getByTestId('record-open').click();
 
     await expect(page).toHaveURL(new RegExp(`/projects/${ALPHA}/approvals/r1$`));
 
-    // 「編集」を押さずに入力欄が出ている。承認から来た人は読んで直すために来ている
-    await expect(page.getByTestId('document-input')).toBeVisible();
-    await expect(page.getByTestId('document-edit')).toHaveCount(0);
+    // 承認は読んで判断する場。いきなり生テキストの入力欄にしない
+    await expect(page.getByTestId('document-content')).toBeVisible();
+    await expect(page.getByTestId('document-input')).toHaveCount(0);
+
+    // 直すときは編集へ入れる
+    await expect(page.getByTestId('document-edit')).toBeVisible();
   });
 
   test('承認画面で直すと、その文書の画面にも反映される', async ({ page }) => {
     await page.goto(`/projects/${ALPHA}/approvals/r1`);
 
+    await page.getByTestId('document-edit').click();
     await page.getByTestId('document-input').fill('# 承認画面から直した');
     await page.getByTestId('document-save').click();
     await expect(page.getByTestId('document-saved')).toBeVisible();

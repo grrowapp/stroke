@@ -5,12 +5,22 @@
  * それぞれの画面に何件あるかを出す。入ってすぐ空の画面に着くと、繋がっていないのか
  * 中身が無いのかが分からない。
  *
- * 数の出し方は本家の統計カード（`TasksPage.tsx` の stats）に合わせる。小さなアイコン
- * タイル + 見出し、その下に大きな数、さらに下に説明。
+ * 数の出し方は本家の統計カード（`DashboardStatistics.tsx` の Stats Grid）に合わせる。
+ * 小さなアイコンタイル + 見出し、その下に大きな数、さらに下に説明。
+ *
+ * 稼働中の本家（`/#/`）で実測した1枚の中身:
+ *   カード   padding 16 / 枠 1px / 角丸 8 / 面 surface-panel、格子の間 16
+ *   見出し行 gap 12 / 下に 12
+ *   タイル   32x32 / 角丸 6 / 面 surface-inset、絵 16x16 / 色 text-secondary
+ *   見出し   12px / 500 / text-secondary
+ *   数       24px / 600 / 等幅 + tabular-nums / text-primary / 下に 4
+ *   説明     12px / 400 / text-muted
+ *
+ * 本家のタイルは無彩色（surface-inset ＋ text-secondary の絵）で、一覧の行頭タイル
+ * （`.sb-icon-tile` の青）とは別物。ここは統計カードの側に合わせる。
  */
 import { computed, definePageMeta, useFetch, useRoute } from '#imports';
 
-import UpstreamIcon from '~/components/shared/UpstreamIcon.vue';
 import WorkspacePanel from '~/components/workspace/WorkspacePanel.vue';
 
 definePageMeta({ layout: 'workspace' });
@@ -85,15 +95,22 @@ const sections = computed(() => [
           :data-testid="`overview-${section.to}`"
         >
           <div class="mb-3 flex items-center gap-3">
-            <span class="sb-icon-tile !h-8 !w-8">
-              <UpstreamIcon :name="section.icon" class="!h-4 !w-4" />
+            <span
+              class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--surface-inset)]"
+            >
+              <UIcon
+                :name="`upstream:${section.icon}`"
+                class="h-4 w-4 text-[var(--text-secondary)]"
+              />
             </span>
-            <span class="font-medium text-[var(--text-secondary)]">{{ section.label }}</span>
+            <span class="text-sm font-medium text-[var(--text-secondary)]">
+              {{ section.label }}
+            </span>
           </div>
-          <div class="mb-1 text-xl font-semibold text-[var(--text-primary)]">
+          <div class="mb-1 font-mono text-2xl font-semibold tabular-nums text-[var(--text-primary)]">
             {{ section.count }}
           </div>
-          <div class="text-[var(--text-muted)]">{{ section.unit }}</div>
+          <div class="text-sm text-[var(--text-muted)]">{{ section.unit }}</div>
         </NuxtLink>
       </li>
     </ul>

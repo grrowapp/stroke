@@ -2,14 +2,24 @@
 /**
  * 下層 — 承認依頼1件と、その対象文書の中身。
  *
+ * 本家の承認画面と同じ3つの面を持つ（プレビュー / 注釈 / 並列表示）。指摘を付けられるのは
+ * 生テキストが出ている面だけで、溜めた指摘は差し戻し（`needs-revision`）で本家へ渡る。
+ * 面と指摘の扱いは `ReviewApprovalAnnotator` が持ち、ここは対象文書の取得と、
+ * プレビューに何を置くかだけを決める。
+ *
  * 対象文書はここで直せる。承認依頼が来た文書を読んで直したくなる場面はまさにこの画面で、
  * 別の画面へ移り直させない（specs/document-editing）。開いている実体は仕様書や
  * ステアリングの画面で開くものと同じファイルである。
  *
- * 承認・却下の操作はここに置かない。それは承認一覧の `ApprovalCard` が持つ。
+ * 編集はプレビューの面に置く。本家も整形して読む面（`MDXEditorWrapper`）がそのまま
+ * 編集の口を兼ねており、生テキストの面は指摘を付けるためだけにある。
+ *
+ * 承認・却下はここに置かない。それは承認一覧の `ApprovalCard` が持つ。差し戻しだけを
+ * ここに置くのは、それが運ぶ指摘がこの画面にしか無いためである。
  */
 import { computed, definePageMeta, useRoute } from '#imports';
 
+import ApprovalAnnotator from '~/components/review/ApprovalAnnotator.vue';
 import DocumentEditor from '~/components/workspace/DocumentEditor.vue';
 import DocumentView from '~/components/workspace/DocumentView.vue';
 import EmptyState from '~/components/workspace/EmptyState.vue';
@@ -45,6 +55,9 @@ const { upstreamConnected } = useBoardSocket();
 const target = computed(() =>
   approval.value === null ? null : saveTargetOf(approval.value.filePath),
 );
+
+/** 注釈のオフセットが指す生テキスト。保存されている中身そのもの */
+const source = computed(() => document.value?.content ?? '');
 
 async function save(content: string): Promise<string | null> {
   if (target.value === null) return 'この文書は編集できません。';
@@ -85,15 +98,38 @@ const CATEGORY: Record<string, string> = { spec: '仕様', steering: 'ステア�
       {{ approval.filePath }}
     </p>
 
-    <!-- 承認から来た人は読んで直すために来ている。編集を1回押させない -->
-    <DocumentEditor
-      v-if="target !== null"
-      :content="document?.content"
-      :save="save"
-      :can-save="upstreamConnected"
-      edit-on-open
-      testid="approval-document"
-    />
-    <DocumentView v-else :content="document?.content" missing="対象の文書を取得できませんでした。" />
+    <ApprovalAnnotator
+      :source="source"
+      :project-id="projectId"
+      :approval-id="approvalId"
+      :can-respond="upstreamConnected"
+    >
+      <!--
+        整形して読む面。承認から来た人は読んで判断するので、開いた直後はこれが出る。
+        直したくなったらこの場で編集に入れる（別の画面へ移らせない）。
+      -->
+      <template #preview>
+        <!--
+          `framed` を立てるのは、本家の承認画面が注釈の面と同じく本文を
+          `bg-panel border rounded-lg` の中に置くため（`ApprovalsAnnotator.tsx` の
+          左列）。仕様書・ステアリングの画面はパネル1枚なので立てない。
+        -->
+        <DocumentEditor
+          v-if="target !== null"
+          :content="document?.content"
+          :save="save"
+          :can-save="upstreamConnected"
+          framed
+          testid="approval-document"
+        />
+        <!-- 直せない文書は読むだけ。枠は `DocumentEditor` が持つものと同じ -->
+        <div v-else class="sb-panel">
+          <DocumentView
+            :content="document?.content"
+            missing="対象の文書を取得できませんでした。"
+          />
+        </div>
+      </template>
+    </ApprovalAnnotator>
   </WorkspacePanel>
 </template>

@@ -13,4 +13,4 @@
 ## WS の受信
 
 - 通知は `useBoardSocket`（シングルトン。画面ごとに接続を張らない。SSR では接続しない）
-- セッションの問いと proposal は契約 W1 / W2 の受け口（`useQuestionChannel` / `useProposalChannel`）。画面は最後に届いた1件で表示を上書きする
+- セッションの問いと proposal は契約 W1 / W2 の受け口（`useSessionChannel` にチャンネル名と型を渡して呼ぶ）。画面は最後に届いた1件で表示を上書きする

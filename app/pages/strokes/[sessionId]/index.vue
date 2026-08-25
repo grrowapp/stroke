@@ -2,7 +2,7 @@
 // 画面1(ストローク)。uuid は URL で持つ。
 // 今の1問は W1(WS)で受信して描画する。往復の結果は endpoint への返り値には載らない
 // (design.md 決定2・6)。待機・失敗は U2 のポーリングで拾う(task 6.3)。
-import type { Answer, Invocation, Phase, Stroke } from '#shared/stroke'
+import type { Answer, Invocation, Phase, Question, Stroke } from '#shared/stroke'
 
 const route = useRoute()
 const sessionId = String(route.params.sessionId)
@@ -37,10 +37,15 @@ const { data: strokesData } = await useFetch<{ strokes: Stroke[] }>(`/api/stroke
 })
 const strokes = ref<Stroke[]>(strokesData.value?.strokes ?? [])
 
-const { question } = useQuestionChannel(sessionId)
+// W1 `/ws/question` を購読する。届くのは今の1問で、最後の1件で上書きされる。
+const question = useSessionChannel<Question>(sessionId, 'question')
 const waitingRetry = useWaitingRetry(sessionId)
 
 const errorMessage = ref(loadError.value && !notFound ? 'セッションを読み込めませんでした。' : '')
+
+// この面でここまでに答えた数。総数は持たない(AI が決めるため事前に分からない)。
+// 数え方は画面2 の `useAgentQuestion.answered` と同じで、受理が通った回数を数える。
+const answered = ref(0)
 
 // 初期表示: reload 直後などで実行中・失敗のことがある(U2 の契約)
 if (status.value?.invocation === 'running') {
@@ -77,6 +82,7 @@ async function answer(given: Answer) {
     return
   }
   strokes.value = [...strokes.value, { proposal: false, question: asked, answer: given }]
+  answered.value += 1
 
   // 受理と起動は分かれている(specs/api/answer)。成功応答の直後に起動を要求する
   // (design.md 決定6)。
@@ -110,9 +116,18 @@ async function answer(given: Answer) {
       title="AI からの応答が得られませんでした。もう一度送信してください。"
     />
 
-    <!-- 応答待ち。待機中は問いも回答欄も出さないので追加送信できない -->
-    <WaitingIndicator v-if="waitingRetry.waiting.value" message="AI が次を考えています…" class="py-32" />
-
-    <StrokeQuestionCard v-else-if="question" :question="question" @answer="answer" />
+    <!-- 問いの面。オーバーレイの外殻を持たず、この画面に素置きする(design 決定3)。
+         待機は面の中で示され、そのあいだ回答欄も送信も出ないので追加送信できない。
+         問いも待機も無いあいだは面ごと出さない(問いが届く前に「問いがありません」を
+         出さないため) -->
+    <AgentQuestion
+      v-if="waitingRetry.waiting.value || question"
+      :question="question"
+      :waiting="waitingRetry.waiting.value"
+      waiting-message="AI が次を考えています…"
+      :answered="answered"
+      submit-label="送信"
+      @answer="answer"
+    />
   </div>
 </template>

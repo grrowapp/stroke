@@ -39,8 +39,19 @@ export const stub = {
     control<{
       sockets: number;
       progressRequests: number;
-      /** 直近に届いた承認への応答。何を送ったかを確かめるのに使う */
-      lastApprovalAction: { id: string; action: string; response: string | null } | null;
+      /**
+       * 直近に届いた承認への応答。何を送ったかを確かめるのに使う。
+       *
+       * `annotations` / `comments` は差し戻し（needs-revision）だけが持つ。
+       * 承認・却下では null になる。
+       */
+      lastApprovalAction: {
+        id: string;
+        action: string;
+        response: string | null;
+        annotations: string | null;
+        comments: unknown[] | null;
+      } | null;
     }>('stats'),
 
   /** 完了数を1つ増やす */

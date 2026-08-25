@@ -11,7 +11,8 @@
  * 開いて保存しただけで内容が変わることが構造的に起こらない（design.md の決定）。
  * WYSIWYG を採らなかった理由は `markdown-roundtrip.test.ts` に残してある。
  */
-import { computed, onBeforeUnmount, onMounted, ref, watch } from '#imports';
+import { useEventListener, useMounted, useTimeoutFn } from '@vueuse/core';
+import { computed, ref, watch } from '#imports';
 import { onBeforeRouteLeave } from 'vue-router';
 
 import DocumentView from '~/components/workspace/DocumentView.vue';
@@ -30,6 +31,18 @@ const props = defineProps<{
    * そこで「編集」を1回押させる理由が無い（specs/document-editing）。
    */
   editOnOpen?: boolean;
+  /**
+   * 本文を枠付きの箱（`.sb-panel`）に入れる。
+   *
+   * 本家は画面によって枠の数が違う。仕様書・ステアリング（`SpecViewerPage`）は本文の
+   * パネル1枚だけで、その内側いっぱいに contentEditable の暗い面が入る。一方で承認の
+   * 注釈画面（`ApprovalsAnnotator`）は、外側の承認カードの中にもう1枚
+   * `bg-panel border rounded-lg` を置き、どの面（プレビュー / 注釈 / 並列表示）でも
+   * 同じ枠に本文を入れる。
+   *
+   * 既定は枠なし。枠が要るのは承認の画面だけなので、そちらが立てる。
+   */
+  framed?: boolean;
   testid?: string;
 }>();
 
@@ -46,7 +59,23 @@ const saving = ref(false);
 const justSaved = ref(false);
 const error = ref<string | null>(null);
 
-let savedNotice: ReturnType<typeof setTimeout> | null = null;
+/** 編集中に直しかけを整形して見ているか。画面は移らず、下の面だけが入れ替わる */
+const preview = ref(false);
+
+/**
+ * 「保存しました」を3秒で消す。`start()` は前の待ちを捨ててから張り直す。
+ *
+ * `stop()` が止めるのは timer だけで、`justSaved` は下がらない。表示を消すのは
+ * `clearSavedNotice()` の責務として残す（`stop()` に置き換えると、保存の3秒以内に
+ * 別の文書へ切り替えたときチップが残る）。
+ */
+const savedNotice = useTimeoutFn(
+  () => {
+    justSaved.value = false;
+  },
+  3000,
+  { immediate: false },
+);
 
 /**
  * 変更の有無は、保存されている内容との比較で決める。編集操作をしたかどうかではない。
@@ -64,10 +93,7 @@ const editable = computed(() => props.content !== null && props.content !== unde
  * それをそのまま出すと「保存できません」が一瞬出てから消える（hydration mismatch）。
  * 繋がっているかどうかが確定するまでは、その表示を出さない。
  */
-const mounted = ref(false);
-onMounted(() => {
-  mounted.value = true;
-});
+const mounted = useMounted();
 
 const cannotSave = computed(() => mounted.value && props.canSave === false);
 
@@ -80,6 +106,7 @@ watch(
     saved.value = next ?? '';
     draft.value = next ?? '';
     mode.value = props.editOnOpen === true && next !== null && next !== undefined ? 'edit' : 'read';
+    preview.value = false;
     error.value = null;
     clearSavedNotice();
   },
@@ -87,10 +114,7 @@ watch(
 
 function clearSavedNotice(): void {
   justSaved.value = false;
-  if (savedNotice !== null) {
-    clearTimeout(savedNotice);
-    savedNotice = null;
-  }
+  savedNotice.stop();
 }
 
 function startEditing(): void {
@@ -102,6 +126,7 @@ function startEditing(): void {
 function discard(): void {
   draft.value = saved.value;
   mode.value = 'read';
+  preview.value = false;
   error.value = null;
 }
 
@@ -124,10 +149,7 @@ async function submit(): Promise<void> {
 
   saved.value = draft.value;
   justSaved.value = true;
-  savedNotice = setTimeout(() => {
-    justSaved.value = false;
-    savedNotice = null;
-  }, 3000);
+  savedNotice.start();
 }
 
 // --- 直しかけのまま離れようとしたら引き止める ---
@@ -138,12 +160,8 @@ function warnOnUnload(event: BeforeUnloadEvent): void {
   event.preventDefault();
 }
 
-onMounted(() => window.addEventListener('beforeunload', warnOnUnload));
-
-onBeforeUnmount(() => {
-  window.removeEventListener('beforeunload', warnOnUnload);
-  clearSavedNotice();
-});
+// 対象を渡さないと window。SSR では何もしない。解除は scope の破棄に任せる
+useEventListener('beforeunload', warnOnUnload);
 
 onBeforeRouteLeave(() => {
   if (!dirty.value) return true;
@@ -155,10 +173,14 @@ onBeforeRouteLeave(() => {
   <div :data-testid="testid" :data-dirty="dirty">
     <div class="mb-4 flex items-center gap-2">
       <template v-if="mode === 'read'">
+        <!--
+          下層のボタンは `.sb-action`（本家の `.btn`）。prototype 由来の `.sb-btn` は
+          上層のもので、寸法（padding 7px / 600）が本家と違う（main.css の注釈）。
+        -->
         <button
           v-if="editable"
           type="button"
-          class="sb-btn"
+          class="sb-action"
           data-testid="document-edit"
           @click="startEditing"
         >
@@ -167,16 +189,35 @@ onBeforeRouteLeave(() => {
       </template>
 
       <template v-else>
+        <!--
+          直しかけを整形して見る。画面は移らず、この場で下の面が切り替わる。
+          本家の承認画面もプレビューと生テキストを同じ場で行き来する
+        -->
         <button
           type="button"
-          class="sb-btn sb-btn-primary"
+          class="sb-action"
+          :class="preview ? '' : 'sb-action-secondary'"
+          :aria-pressed="preview"
+          data-testid="document-preview"
+          @click="preview = !preview"
+        >
+          プレビュー
+        </button>
+        <button
+          type="button"
+          class="sb-action"
           :disabled="!savable"
           data-testid="document-save"
           @click="submit"
         >
           {{ saving ? '保存中…' : '保存' }}
         </button>
-        <button type="button" class="sb-btn" data-testid="document-cancel" @click="discard">
+        <button
+          type="button"
+          class="sb-action sb-action-secondary"
+          data-testid="document-cancel"
+          @click="discard"
+        >
           やめる
         </button>
       </template>
@@ -195,16 +236,31 @@ onBeforeRouteLeave(() => {
     </p>
 
     <!--
+      本文の箱。既定では枠を持たない（`framed` の説明を見ること）。
+
+      本家（`SpecViewerPage`）は本文を `.panel p-4` 1枚だけで囲み、その内側いっぱいに
+      contentEditable の暗い面（#111827）を敷く。パネルは1枚で、暗い矩形がそのまま
+      本文の領域を示す（実測: パネル x=280 w=1136 → 暗い面 x=297 w=1102 → 本文 x=309 w=1078）。
+
+      ここに `.sb-panel` を常に置いていたときは枠と余白が二重になり、本文の欄が本家より
+      34px 狭く・17px 内側にずれていた（実測）。
+
       編集中は markdown の生テキストを出す。読みのときは既存の描画を通す。
-      同じ文字列が行き来するだけで、変換は挟まない
+      同じ文字列が行き来するだけで、変換は挟まない。
+
+      プレビューは**直しかけ（draft）**を描く。保存済みの内容ではないので、
+      書いたものがどう出るかをその場で確かめられる。
     -->
-    <textarea
-      v-if="mode === 'edit'"
-      v-model="draft"
-      class="sb-textarea"
-      spellcheck="false"
-      data-testid="document-input"
-    />
-    <DocumentView v-else :content="content" />
+    <div :class="framed === true ? 'sb-panel' : ''" data-testid="document-body">
+      <DocumentView v-if="mode === 'edit' && preview" :content="draft" />
+      <textarea
+        v-else-if="mode === 'edit'"
+        v-model="draft"
+        class="sb-textarea"
+        spellcheck="false"
+        data-testid="document-input"
+      />
+      <DocumentView v-else :content="content" />
+    </div>
   </div>
 </template>

@@ -16,6 +16,8 @@
 import { ofetch } from 'ofetch';
 import type { z } from 'zod';
 
+import type { Annotation } from '#shared/stroke';
+
 import {
   approvalRequestSchema,
   documentContentSchema,
@@ -32,10 +34,12 @@ import {
 } from './schema';
 
 /**
- * 承認への応答。本家が受けるのは3つだが、stroke-board が出すのは approve と reject だけ。
- * `needs-revision` は本家の注釈コメントを前提にした流れで、こちらはコメントを持たない。
+ * 承認への応答。本家が受ける3つをそのまま出す。
+ *
+ * `needs-revision` は注釈コメントを運ぶ経路で、承認画面で付けたコメントはこれでしか
+ * 本家に渡らない（`approve` / `reject` は `response` しか持たない）。
  */
-export const APPROVAL_ACTIONS = ['approve', 'reject'] as const;
+export const APPROVAL_ACTIONS = ['approve', 'reject', 'needs-revision'] as const;
 export type ApprovalAction = (typeof APPROVAL_ACTIONS)[number];
 
 /** ステアリング文書は常にこの3本。本家に一覧 API は無い */
@@ -110,9 +114,13 @@ export class UpstreamRestClient {
   /**
    * `POST /api/projects/:projectId/approvals/:id/:action` — 承認への応答。
    *
-   * 本家は `approve` / `reject` / `needs-revision` を受け、body の `response` を
-   * 応答本文として保存する（`src/dashboard/multi-server.ts`）。`needs-revision` は
-   * 注釈コメントを前提にした流れなので、コメントを持たない stroke-board からは出さない。
+   * 本家は `approve` / `reject` / `needs-revision` を受け、body の `response` /
+   * `annotations` / `comments` を承認リクエストと同じ1ファイル
+   * （`.spec-workflow/approvals/<categoryName>/approval_<id>.json`）に書く
+   * （`src/dashboard/multi-server.ts` → `approvalStorage.updateApproval`）。
+   *
+   * 注釈を運ぶのは `needs-revision` だけである。`approve` / `reject` で `revision` を
+   * 渡さないのは本家の呼び方に合わせたもので、あちらも `response` しか送っていない。
    *
    * 本家の応答は `{ success: true }`。中身を使わないので形の検証は状態コードに任せる。
    */
@@ -121,6 +129,8 @@ export class UpstreamRestClient {
     approvalId: string,
     action: ApprovalAction,
     response: string,
+    /** `needs-revision` のときだけ載る注釈。無ければ `response` だけを送る */
+    revision?: { annotations: string; comments: Annotation[] },
   ): Promise<UpstreamResult<null>> {
     const path = `/api/projects/${enc(projectId)}/approvals/${enc(approvalId)}/${action}`;
 
@@ -132,7 +142,7 @@ export class UpstreamRestClient {
       await ofetch(path, {
         baseURL: this.baseUrl,
         method: 'POST',
-        body: { response },
+        body: revision === undefined ? { response } : { response, ...revision },
         retry: 0,
       });
     } catch (error) {

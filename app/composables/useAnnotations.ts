@@ -2,6 +2,7 @@
 // 注釈はレンダリング後の HTML ではなく proposal の生テキストに対して付け、
 // 位置は文字オフセット（startOffset / endOffset）と引用文字列で持つ。
 import type { Annotation, HighlightColor, SendBackPayload, SendBackRecord } from '#shared/stroke'
+import type { ApprovalRevisionPayload, ApprovalRevisionRecord } from '#shared/types'
 
 /** 色を選ばずに書き始めたときの色。 */
 export const defaultHighlightColor: HighlightColor = {
@@ -164,6 +165,32 @@ export function useAnnotations() {
     }
   }
 
+  /**
+   * 本家 approvals の `needs-revision` として送る形を組む。
+   *
+   * ストロークの `buildPayload` と同じ材料（`summary` と `comments`）から組むが、
+   * 送り先が違うので層が1つ少ない。`nextSteps` を持たないのは、本家の
+   * `POST /approvals/:id/:action` が `response` / `annotations` / `comments` の
+   * 3つしか読まないため（`multi-server.ts`）。載せても捨てられる。
+   *
+   * `decision` も `'sent-back'` ではなく `'needs-revision'`。本家の approval JSON を
+   * あとから読むのは本家側のエージェントなので、本家の語で書く。
+   */
+  function buildRevisionPayload(): ApprovalRevisionPayload {
+    const snapshot: Annotation[] = comments.value.map((c) => ({ ...c }))
+    const record: ApprovalRevisionRecord = {
+      decision: 'needs-revision',
+      comments: snapshot,
+      summary: summary.value,
+      timestamp: new Date().toISOString(),
+    }
+    return {
+      response: summary.value,
+      annotations: JSON.stringify(record, null, 2),
+      comments: snapshot,
+    }
+  }
+
   return {
     comments,
     addSelection,
@@ -174,5 +201,6 @@ export function useAnnotations() {
     summary,
     nextSteps,
     buildPayload,
+    buildRevisionPayload,
   }
 }

@@ -2,26 +2,25 @@
 
 `app/composables/` の現状の実態と、規範（`docs/specs/core/system-structure.md` の区切り）への対応。
 
-## 規範への対応 — 全10本
+## 規範への対応 — 全9本
 
-規範は**関心単位の `useXxx` を平置き**（境界のディレクトリ shared / workspace を作らない）。現在の10本:
+規範は**関心単位の `useXxx` を平置き**（境界のディレクトリ shared / workspace を作らない）。現在の9本:
 
 | 関心 | composable | 整理の方向 |
 | --- | --- | --- |
-| 通知の受信 | `useBoardSocket` | シングルトン WS。そのまま |
-| 時刻表示 | `useRelativeTime` | そのまま |
+| 通知の受信 | `useBoardSocket` | vueuse の `createSharedComposable` で1本に共有。そのまま |
+| 時刻表示 | `useRelativeTime` | vueuse の `formatTimeAgo` の包み。そのまま |
 | プロジェクトの読み書き | `useProjectApi` | プロジェクト単位画面の唯一の口。そのまま |
 | ステアリングの読み書き | `useSteeringDocuments` | `useProjectApi` と同じ関心の口として並べる |
 | 問いの往復 | `useAgentQuestion` | 回答送信・AI 起動（契約 U7 / U13）。そのまま |
-| 問いの配信 | `useQuestionChannel` | 契約 W1 の受け口 |
-| proposal の配信 | `useProposalChannel` | 契約 W2 の受け口 |
+| セッションの WS 購読 | `useSessionChannel` | W1 / W2 の唯一の受け口。購読先のパスと届く型を引数で受け、呼び出し側が直接呼ぶ |
 | proposal のレビュー | `useProposalReview` | 39 プロパティに肥大し `Modals.vue` と密結合。分割は**保留** — markdown コンポーネント集約の確定後、`flatten-composables` の design で決める（分割案はここで固定しない） |
 | 注釈 | `useAnnotations` | 色定義5件をコンポーネントが逆向き import している。**色の実値は CSS へ移し、データ（`Annotation.highlightColor`）は色名のみ持つ**（検討） |
-| 待機とリトライ | `useWaitingRetry` | そのまま |
+| 待機とリトライ | `useWaitingRetry` | timer は vueuse の `useIntervalFn` に委譲済み。そのまま |
 
 ### 移行後パスの写像
 
-平置きへ移すのはポータル側の4本のみ。ストローク側の6本は既に直下にあり、移動しない。
+平置きへ移すのはポータル側の4本のみ。ストローク側の5本は既に直下にあり、移動しない。
 
 | 移行前 | 移行後 |
 | --- | --- |
@@ -39,7 +38,7 @@
 以下は統合前の棚卸しの記録。2系統が同居している。
 
 - **ポータル側** — `shared/` と `workspace/` の4本（階層で分ける規約。以下「ポータル側」）
-- **ストローク側** — 直下に平置きの6本（棚卸しは「ストローク側」の章）
+- **ストローク側** — 直下に平置きの5本（棚卸しは「ストローク側」の章）
 
 ---
 
@@ -69,7 +68,7 @@ interface BoardSocket {
   onNotification: (handler: (notification: Notification) => void) => void;
 }
 
-export function useBoardSocket(): BoardSocket
+export const useBoardSocket = createSharedComposable((): BoardSocket => { ... });
 ```
 
 | 返り値 | 用途 |
@@ -78,35 +77,39 @@ export function useBoardSocket(): BoardSocket
 | `upstreamConnected` | 本家への接続状態。ヘッダーの dot に出す |
 | `onNotification` | 新しく発生した通知のハンドラ。トーストの発火に使う |
 
-**`onNotification` に初回スナップショットは流れない。** 画面を開いた瞬間に既存の通知が全部トーストで出てしまうのを避けるため。
+**`onNotification` に初回スナップショットは流れない。** 画面を開いた瞬間に既存の通知が全部トーストで出てしまうのを避けるため。`snapshot` は `notifications` を差し替えるだけで `notified.trigger` を呼ばない。
+
+中身は vueuse の3つで組んである（`replace-handrolled-with-libraries`）。
+
+| 手 | 何に使っているか |
+| --- | --- |
+| `useWebSocket` | 接続と再接続（`autoReconnect: { delay: 2_000 }`）。生の `WebSocket` と自前のタイマーは持たない |
+| `createEventHook` | `onNotification` の配信。ハンドラの `Set` も `onScopeDispose` での解除も持たない（scope の破棄に任せる） |
+| `createSharedComposable` | 接続をアプリ全体で1本に保つ。モジュールスコープの `shared` 変数は無い |
 
 #### 接続は1本だけ
 
-モジュールスコープの `shared` に握って使い回す（シングルトン）。上層と下層のどちらにいても通知を受けるため、画面ごとに接続を張らない。
+`createSharedComposable` は**参照カウント式**で、購読している scope が全て消えると state ごと捨て、次の呼び出しで作り直す。
 
-```ts
-let shared: BoardSocket | null = null;
-export function useBoardSocket(): BoardSocket {
-  if (shared !== null) return shared;
-  ...
-}
-```
+**`app.vue` 直下の `NotificationToaster` が常駐して購読を持ち続けること**が、その「全て消える」を起こさない前提。あれを外すとレイアウト切替の瞬間に購読が0になり、接続が切れる。`app.vue` と `NotificationToaster.vue` の両方にその旨のコメントがある。
+
+`createGlobalState` は採っていない。**モジュールスコープに state を置くため、SSR でリクエストを跨いで共有されてしまう**（`openspec/changes/replace-handrolled-with-libraries/design.md` 決定1）。
 
 #### SSR では接続しない
 
-`import.meta.client` を見てブラウザに渡ってから張る。
+URL を `computed` で組み、`typeof window === 'undefined'` なら空文字を返す。`useWebSocket` は空の URL では繋がない。
 
 #### 繋ぐ先
 
 **stroke-board のサーバー（`server/routes/ws.ts`）だけ。本家 WebSocket には繋がない**（`specs/upstream-connection`）。ブラウザから本家へ直接触らせないという境界による。
 
-`onNotification` のハンドラは `onScopeDispose` で自動的に解除される。
+**参照元**（8）— `components/shared/NotificationToaster.vue`（`onNotification`）、`layouts/portal.vue`、`layouts/workspace.vue`、`pages/index.vue`、`pages/projects/index.vue`、`pages/projects/[projectId]/approvals/[approvalId].vue`、`pages/projects/[projectId]/specs/[specName]/[document].vue`、`pages/projects/[projectId]/steering/[name].vue`
 
-**参照元**（5）— `layouts/portal.vue`、`layouts/workspace.vue`、`pages/index.vue`、`pages/projects/index.vue`、`components/shared/NotificationToaster.vue`
+※ 下層3ページは `upstreamConnected` だけを取る。`app.vue` と `DocumentEditor.vue` は呼ばずにコメントで触れているだけ。
 
 ### useRelativeTime.ts
 
-一覧の「最終更新」列に出す相対時刻。18行。**4つの中で最小。**
+一覧の「最終更新」列に出す相対時刻。47行。**4つの中で最小。**
 
 ```ts
 export function formatRelativeTime(iso: string, now = Date.now()): string
@@ -115,6 +118,20 @@ export function formatRelativeTime(iso: string, now = Date.now()): string
 `now` を引数で受けるためテストで時刻を固定できる。
 
 `use` で始まるが Vue のリアクティブな状態を持たない純関数。ファイル名の慣習に合わせてある。
+
+#### 中身は vueuse の `formatTimeAgo`
+
+刻みと日付の差の計算は自前で持たない（`replace-handrolled-with-libraries`）。ただし**既定のままだと出力が変わる**ため、3つを明示している。
+
+| 指定 | 既定 | ここでの指定 | 理由 |
+| --- | --- | --- | --- |
+| `units` | minute の上限 46 分・hour の上限 20 時間。週・月・年まで刻む | 60 分 / 24 時間で切り、`day` を最大単位にする | 46 分で「1時間前」、20 時間で「1日前」になるのを避ける。週・月・年は出さない |
+| `rounding` | `'round'` | `'floor'` | 現行が切り捨てだった。`1分59秒` は「1分前」 |
+| `messages` | 未来は「〜後」 | `future: () => 'たった今'`、`invalid: '—'` | 現行は負の経過時間を「たった今」に畳んでいた |
+
+`showSecond` は既定（false）のまま。1分未満は「たった今」に畳まれるので、`second` の単位定義は刻みの下限を置くためだけにある。
+
+**テスト**（`useRelativeTime.test.ts`、64行）— 上の3点を出力で固定する。既定に戻ると落ちるケース（46分・20時間・`1分59秒`）を明示的に置いてある。
 
 **参照元**（5）— 上層2ページ（`index.vue`、`projects/index.vue`）と下層3ページ（`specs/index.vue`、`steering/index.vue`、`tasks/index.vue`）
 
@@ -215,7 +232,7 @@ export function isSteeringName(value: string): value is SteeringName
 
 | composable | 参照元 | 判定 |
 | --- | --- | --- |
-| `useBoardSocket` | 上層2 + 両レイアウト + Toaster | 階層をまたぐ → `shared/` |
+| `useBoardSocket` | 上層2 + 下層3 + 両レイアウト + Toaster | 階層をまたぐ → `shared/` |
 | `useRelativeTime` | 上層2 + 下層3 | 階層をまたぐ → `shared/` |
 | `useProjectApi` | 下層9ページのみ | 下層専用 → `workspace/` |
 | `useSteeringDocuments` | 下層 steering 2ページのみ | 下層専用 → `workspace/` |
@@ -258,34 +275,39 @@ Toaster / 通知一覧                   本家 REST
 
 | ファイル | 何をするか | 何に触るか | 誰が使うか |
 |---|---|---|---|
-| `useQuestionChannel.ts` | W1 を購読し、今の1問を持つ | WebSocket | 画面1、`useProposalReview` |
-| `useProposalChannel.ts` | W2 を購読し、proposal と名前候補を持つ | WebSocket | `useProposalReview` |
-| `useWaitingRetry.ts` | 送信後の待機と失敗の判定 | HTTP（`GET /api/strokes/<id>` をポーリング） | 画面1、`useProposalReview` |
+| `useSessionChannel.ts` | セッションの WS チャンネルを1つ購読し、最後の1件を持つ | WebSocket（`useWebSocket`） | 画面1、`useAgentQuestion`（W1）、`useProposalReview`（W2） |
+| `useWaitingRetry.ts` | 送信後の待機と失敗の判定 | HTTP（`GET /api/strokes/<id>` を `useIntervalFn` でポーリング） | 画面1、`useAgentQuestion`、`useProposalReview` |
 | `useAnnotations.ts` | 差し戻しコメントを積み、4層のペイロードに組む | なし（純粋な状態と変換） | `useProposalReview`、`CommentModal` |
-| `useAgentQuestion.ts` | 問いの往復（W1 購読・回答送信・AI 起動要求・待機）を1つにまとめる | `useQuestionChannel`・`useWaitingRetry` + HTTP | `useProposalReview`（※2026-08-24 追記。棚卸しから漏れていた） |
+| `useAgentQuestion.ts` | 問いの往復（W1 購読・回答送信・AI 起動要求・待機）を1つにまとめる | `useSessionChannel`・`useWaitingRetry` + HTTP | `useProposalReview`（※2026-08-24 追記。棚卸しから漏れていた） |
 | `useProposalReview.ts` | 画面2の状態と往復の全部 | 上の各本 + HTTP | 画面2、`Modals.vue` |
 
 ## 個別
 
-### `useQuestionChannel.ts`（24行）
+### `useSessionChannel.ts`（31行）
 
 ```
-useQuestionChannel(sessionId) → { question }
+useSessionChannel<T>(sessionId, channel) → Ref<T | null>
 ```
 
-`ws://<host>/api/<id>/ws/question` に `useWebSocket`（vueuse）で繋ぎ、届いた1件で上書きする。**今の1問しか持たない。** 接続時にもサーバー側から現在分が1件届く。
+`ws://<host>/api/strokes/<id>/ws/<channel>` に `useWebSocket`（vueuse、`autoReconnect: true`）で繋ぎ、届いた1件で上書きする。**最後の1件しか持たない。** 接続時にもサーバー側から現在分が1件届く。
 
-URL を自前で組み立てている（`window.location` から scheme と host を取る）。
+URL は `computed` で組み、`typeof window === 'undefined'` なら空文字を返す（`useWebSocket` は空の URL では繋がない）。
 
-### `useProposalChannel.ts`（24行）
+W1 と W2 の**唯一の違いは購読先のパスと届く型**だったので、それを引数に出して1本にした（`replace-handrolled-with-libraries` design 決定2）。
 
-```
-useProposalChannel(sessionId) → { message }
-```
+**ラッパは置かない。呼び出し側が直接呼ぶ。**
 
-`useQuestionChannel` と**構造が完全に同じ**。違うのはパス（`/ws/proposal`）と型（`ProposalMessage`）だけ。URL の組み立てロジックも重複している。
+| 呼ぶ側 | 呼び出し | 契約 |
+|---|---|---|
+| `pages/strokes/[sessionId]/index.vue` | `useSessionChannel<Question>(sessionId, 'question')` | W1 |
+| `useAgentQuestion.ts` | `useSessionChannel<Question>(sessionId, 'question')` | W1 |
+| `useProposalReview.ts` | `useSessionChannel<ProposalMessage>(sessionId, 'proposal')` | W2 |
 
-### `useWaitingRetry.ts`（48行）
+かつては `useQuestionChannel` / `useProposalChannel` という8行のラッパ2本を挟んでいた。中身は**返り値に名前を付け直すだけ**で、購読先と型は `'question'` / `<Question>` という**ただの引数**だったため、判定の本体（`docs/specs/plan/composables-library-replacement.md` の「2本 → 1本」）に合わせて消した。W1 / W2 という契約の名前は、このファイルの冒頭コメントと呼び出し行のコメントで保つ。
+
+呼び出し3箇所とも `useSessionChannel` を**明示 import していない**（ストローク側は auto-import）。
+
+### `useWaitingRetry.ts`（49行）
 
 ```
 useWaitingRetry(sessionId) → { waiting, failed, startWaiting, stopWaiting }
@@ -293,7 +315,9 @@ useWaitingRetry(sessionId) → { waiting, failed, startWaiting, stopWaiting }
 
 待機中だけ3秒おきに `GET /api/strokes/<id>` を読み、`invocation` が `failed` / `idle` になったら止まる。**通常は W1 / W2 の配信が先に届くので、これは保険。**
 
-SSR では `setInterval` を張らない（Nuxt が例外にする、と実測のコメントあり）。
+timer は vueuse の `useIntervalFn(fn, 3000, { immediate: false })` に委ねている。`resume()` は張り直しのたびに前の timer を捨てるので手で clear する必要がなく、scope が壊れたときの停止も内蔵している。
+
+**SSR ガードは残っている。** `startWaiting()` の中で `import.meta.server` なら `resume()` せずに返す。`useIntervalFn` は client 限定のガードを持たず、SSR で `setInterval` を張ると Nuxt が例外にするため（実測: reload 直後の SSR で `invocation: running` を踏んで判明、とコメントにある）。
 
 回復（再送）はしない。呼び出し側の役割。
 
@@ -318,7 +342,11 @@ useAnnotations() → { comments, addSelection, addGeneral, update, remove, clear
 useAgentQuestion(sessionId) → { question, waiting, failed, error, answered, send }
 ```
 
-W1 の購読（`useQuestionChannel`）・回答の送信（U7）・AI の起動要求（U13）・待機（`useWaitingRetry`）を1つに束ねる。状態は全て返り値として出し、外から渡す口は持たない。面（`AgentQuestionModal`）はこれに依存せず props と emit だけで繋がる。使い方は `docs/specs/reference/stroke-modules.md`。
+W1 の購読（`useSessionChannel`）・回答の送信（U7）・AI の起動要求（U13）・待機（`useWaitingRetry`）を1つに束ねる。状態は全て返り値として出し、外から渡す口は持たない。面（`AgentQuestion`）はこれに依存せず props と emit だけで繋がる。使い方は `docs/specs/reference/stroke-modules.md`。
+
+`replace-handrolled-with-libraries` での変更はコメント1語のみ（面の名前が `AgentQuestionModal` → `AgentQuestion` に変わったことへの追随）。中身は触っていない。
+
+**送信先の `base` が `/api/${sessionId}` になっている**（`useProposalReview` と画面1は `/api/strokes/${sessionId}`）。これは別 change `fix-agent-question-api-path` の対象で、ここでは現状の記録として残す。
 
 ### `useProposalReview.ts`（412行）
 
@@ -328,7 +356,7 @@ useProposalReview(sessionId, { phase, strokes }) → 39 個のプロパティ
 
 （※2026-08-24 実測。旧記述は 410行・46 プロパティ）
 
-**突出して大きい。** 他の5本を束ね（`useQuestionChannel` は `useAgentQuestion` 越し）、画面2の状態と往復を丸ごと持つ。返すものは自分でコメントを付けて6群に区切ってある。
+**突出して大きい。** 他の4本を束ね（W1 の `useSessionChannel` は `useAgentQuestion` 越し、W2 は自分で直接呼ぶ）、画面2の状態と往復を丸ごと持つ。返すものは自分でコメントを付けて6群に区切ってある。
 
 ```
 本文と局面   phase / strokes / proposal / projectName /
@@ -353,7 +381,8 @@ useProposalReview(sessionId, { phase, strokes }) → 39 個のプロパティ
 
 ## 気づいたこと
 
-- **`useQuestionChannel` と `useProposalChannel` が構造的に同じ。** WS の URL 組み立ても重複
-- **`useProposalReview` が 412 行で、他の5本の合計（406行）より大きい。** 状態・モーダル・HTTP エラー解体・送信の決着追跡が1箇所に集まっている（※2026-08-24 実測で更新）
+- ~~**`useQuestionChannel` と `useProposalChannel` が構造的に同じ。** WS の URL 組み立ても重複~~ → **解消済み**（`replace-handrolled-with-libraries`）。2本を消して `useSessionChannel` 1本に畳み、呼び出し側が購読先と型を渡す。URL の組み立ては `useSessionChannel` の1箇所だけ
+- **`useProposalReview` が 412 行で、他の6本の合計（406行）より大きい。** 状態・モーダル・HTTP エラー解体・送信の決着追跡が1箇所に集まっている（※チャンネルの集約で内訳は変わったが、合計 406行 は変わっていない）
 - **色の定義が composable にある。** `useAnnotations.ts` の `highlightColors` を `CommentModal.vue` が直接 import している
-- **画面1側には composable が無い。** `app/pages/strokes/[sessionId]/index.vue` は `useQuestionChannel` と `useWaitingRetry` を直接呼び、送信も自前で書いている。画面2だけが `useProposalReview` にまとまっている
+- **画面1側には composable が無い。** `app/pages/strokes/[sessionId]/index.vue` は `useSessionChannel` と `useWaitingRetry` を直接呼び、送信（`answer()` の中の U7 → U13 の2連発）も自前で書いている。画面2だけが `useProposalReview`（と `useAgentQuestion`）にまとまっている。`replace-handrolled-with-libraries` はここを変えていない
+- **`useAgentQuestion` だけ API の base が `/api/<id>` で、他は `/api/strokes/<id>`。** 別 change `fix-agent-question-api-path` の対象

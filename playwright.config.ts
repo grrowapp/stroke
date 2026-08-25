@@ -12,8 +12,17 @@ import { defineConfig } from '@playwright/test';
  * ずれていないことは `yarn test:live` が本物に対して確かめる。
  */
 
-export const STUB_PORT = 5199;
-export const APP_PORT = 3199;
+/*
+ * ポートはワークツリーごとに変える。`stroke-board` は base2 / base3 / base4 の複数の
+ * ワークツリーを並行して使っており、同じ値だと**別のワークツリーの e2e が起動した瞬間に
+ * こちらの web サーバが落ちる**（実測: 2026-08-25、`[WebServer] Killed` が2回）。
+ * playwright は `reuseExistingServer: false` で走るので、同時実行の検出も排他もしない。
+ *
+ * 百の位でワークツリーを分け、下2桁は 00 で揃える。
+ * base2 = 3200/5200（宣言済み） / **base3 = 3300/5300（ここ）** / base4 = 3400/5400。
+ */
+export const STUB_PORT = 5300;
+export const APP_PORT = 3300;
 
 /** 走査対象と registry をここに作る */
 export const E2E_ROOT = join(process.cwd(), '.e2e-tmp');

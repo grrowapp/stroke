@@ -5,6 +5,8 @@
  * （structure.md の「画面から本家へ直接触らない」）。
  */
 
+import type { Annotation } from './stroke';
+
 /** プロジェクトが本家に繋がっているか */
 export type ProjectConnection = 'active' | 'disconnected';
 
@@ -152,6 +154,8 @@ export interface SpecPhaseDto {
 
 export interface SpecSummaryDto {
   name: string;
+  /** 本家が name から起こす表示名。一覧の上段に出る（下段が name） */
+  displayName?: string;
   description?: string;
   createdAt: string;
   lastModified: string;
@@ -199,4 +203,40 @@ export interface ApprovalDto {
 
 export interface DocumentContentDto {
   content: string;
+}
+
+/**
+ * 承認への応答。本家が受ける3つをそのまま持つ。
+ *
+ * `needs-revision` だけが注釈コメントを運ぶ。`approve` / `reject` は `response` しか
+ * 持たない（本家 `multi-server.ts` の `POST /approvals/:id/:action`）。
+ */
+export type ApprovalActionName = 'approve' | 'reject' | 'needs-revision';
+
+/**
+ * `annotations` に JSON 化して載せる記録。
+ *
+ * 本家の `ApprovalsPage.tsx` が組む形と同じ（`decision` / `comments` / `summary` /
+ * `timestamp`）。ストローク側の `SendBackRecord` と形は同じで `decision` だけが違う。
+ */
+export interface ApprovalRevisionRecord {
+  decision: 'needs-revision';
+  comments: Annotation[];
+  summary: string;
+  timestamp: string;
+}
+
+/**
+ * `POST /api/projects/:projectId/approvals/:id/needs-revision` に送るもの。
+ *
+ * 3つとも本家の `approval_<id>.json` の別々のフィールドとして保存される。1本の
+ * テキストに畳まないのは、箇所と指摘の対応（`comments`）が畳むと失われるため。
+ */
+export interface ApprovalRevisionPayload {
+  /** 人間可読の要約。本家では `response` に入る */
+  response: string;
+  /** `ApprovalRevisionRecord` を JSON 化したもの */
+  annotations: string;
+  /** 構造化配列そのもの */
+  comments: Annotation[];
 }
