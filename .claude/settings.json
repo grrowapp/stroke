@@ -24,8 +24,8 @@
       "Read(/prompt/**)",
       "Edit(//opt/projects/**)",
       "Edit(./.claude/**)",
-      "Edit(.mcp.json)",
-      "Edit(/openspec/changes/**/.openspec.yaml)"
+      "Edit(/openspec/changes/**/.openspec.yaml)",
+      "Edit(.mcp.json)"
     ]
   },
   "statusLine": {
