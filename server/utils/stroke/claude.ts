@@ -23,13 +23,6 @@ const CLAUDE_TIMEOUT_SIGNAL = 'SIGKILL' as const
  */
 const CLAUDE_SESSION_MISSING_MESSAGE = 'No conversation found with session ID'
 
-/**
- * 子プロセスへ接続先を渡す環境変数の名前。
- * **これはこちらが読む設定ではなく、渡す名前である。** セッション API スキルがこの名前で
- * 接続先を読むので、変えるならスキル側と揃える。
- */
-const CLAUDE_BASE_URL_ENV_NAME = 'STROKE_BASEURL'
-
 /** 呼び出しモード。セッションの最初だけ `--session-id`、以降は `--resume`。 */
 export type ClaudeMode = 'new' | 'resume'
 
@@ -114,7 +107,7 @@ export async function runClaude(options: ClaudeRunOptions): Promise<ClaudeRunRes
     const child = spawn(launch.command, args, {
       cwd: options.cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, [CLAUDE_BASE_URL_ENV_NAME]: launch.apiBaseUrl },
+      env: { ...process.env, 'STROKE_BASEURL': launch.apiBaseUrl },
     })
 
     let stdout = ''

@@ -9,7 +9,7 @@ arguments:
   - question
   - options
 allowed-tools:
-  - Bash(jq *)
+  - Bash(jq -n *)
   - Bash(curl -X POST *)
   - Bash(printenv *)
 ---
@@ -20,6 +20,7 @@ jq -n \
   --arg d '$detail' \
   --arg q '$question' \
   --argjson o '$options' \
-  '{header: $h, detail: $d, question: $q, options: $o}' \
+  "{header: $h, detail: $d, question: $q, options: $o}" \
 | curl -X POST "$(printenv STROKE_BASEURL)/api/strokes/${CLAUDE_SESSION_ID}/question" -H 'Content-Type: application/json' --data-binary @-
+
 ```

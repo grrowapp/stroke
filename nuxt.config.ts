@@ -160,7 +160,8 @@ export default defineNuxtConfig({
         '--model', 'sonnet',
         '--add-dir', import.meta.dirname,
         '--add-dir', `${import.meta.dirname}/assets`,
-        '--allowedTools', 'Skill Bash Read Write Edit',
+        '--allowedTools', 'Skill Bash(openspec *) Bash(curl -X POST *) Bash(jq -n *) Bash(printenv *) Read Edit',
+        '--disallowedTools', 'Bash(cd *)',
       ],
 
       // エージェント向け endpoint の base URL。spawn 時に環境変数 STROKE_BASEURL として
@@ -174,7 +175,7 @@ export default defineNuxtConfig({
       // AI へ渡す定型。指示の本文はコードに持たない（specs/agent/invocation）。従う手順は
       // スキル自身が持つ。初回はスキル起動＋最低限の固定指示、継続は続きを促すだけ
       // （入力は prompt に載せず、エージェントが取得スキルで読む）
-      firstPrompt: '/openspec-ff-change draft-proposal\n\nスキルの指示に従って作業を実施する。',
+      firstPrompt: '/openspec-ff-change \n\n取得スキルで内容を確認しスキルに従って作業しろ',
       continuePrompt: '続きを進めろ。状況は取得スキルで確認してから判断しろ。',
 
       // 承認で昇格した直後に steering 文書を作らせる定型（ADR 0011）。cwd は昇格先の
