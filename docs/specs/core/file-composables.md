@@ -31,7 +31,9 @@
 
 平置き後も**明示 import を維持する**（auto-import は使わない。`nuxt.config` の `autoImport: false` 前提）。
 
-移動の実施は `docs/specs/plan/structure-migration.md`。
+移動の実施は `docs/specs/plan/structure-migration.md`。同資料の冒頭が「いずれも**別 change で寄せる**」と定めており、`replace-handrolled-with-libraries` では行わない。
+
+`shared/useRelativeTime.ts` は `useXxx` を1つも export していない（中身は純関数 `formatRelativeTime` のみ）。規範の「関心単位の `useXxx` を平置き」に当てはまらないが、**規範のツリーに純関数の置き場が無い**ため、置き場の新設を含めて平置きと同じ change で決める。
 
 ---
 
