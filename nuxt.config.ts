@@ -87,9 +87,9 @@ export default defineNuxtConfig({
   typescript: { typeCheck: false, strict: true },
 
   // 起動の待ち受け。3000 はこのマシンで別のプロセスが使っているのでずらしてある。
-  // 3001 はストロークの `claude.apiBaseUrl` と揃える値。
+  // 3399 はストロークの `claude.apiBaseUrl` と揃える値（変えるなら両方揃えて変える）。
   // 別マシンのブラウザから開くため、localhost ではなく全インタフェースで待つ
-  devServer: { host: '0.0.0.0', port: 3001 },
+  devServer: { host: '0.0.0.0', port: 3399 },
 
   // ===========================================================================
   // 実行時に決まる設定
@@ -166,7 +166,7 @@ export default defineNuxtConfig({
 
       // エージェント向け endpoint の base URL。spawn 時に環境変数 STROKE_BASEURL として
       // 渡し、セッション API スキルがそこから接続先を解決する（prompt には載せない）
-      apiBaseUrl: 'http://127.0.0.1:3001',
+      apiBaseUrl: 'http://127.0.0.1:3399',
 
       // セッションの openspec/config.yaml に書くワークフロースキーマ名。実体は
       // user レベル（~/.local/share/openspec/schemas/）に配置されたものが解決される

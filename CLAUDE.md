@@ -18,6 +18,11 @@ Single-context — one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/ag
 
 Use fresh agents, not `fork`, when the goal is to keep context out. See `docs/agents/subagents.md`.
 
+## Dev サーバー
+
+- ポートは **3399 固定**（`nuxt.config.ts` の `devServer.port`）。ストロークの `claude.apiBaseUrl` と揃えてあり、変えるときは必ず両方を揃えて変える（値の正は `docs/specs/core/settings-reference.md`）
+- 3000 はこのマシンで別のプロセスが使用中。使わない
+
 ## Docs
 
 `docs/specs/` は**定義としての specs** の置き場（要素で区分）。機能的 specs（Requirement + Scenario）は `openspec/specs/` にある。

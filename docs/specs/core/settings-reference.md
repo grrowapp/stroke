@@ -32,7 +32,7 @@ const { projectShareRoot, claude } = config.runtimeConfig
 | キー | 既定値 |
 |---|---|
 | `projectShareRoot` | `/opt/projects` |
-| `claude.apiBaseUrl` | `http://127.0.0.1:3001` |
+| `claude.apiBaseUrl` | `http://127.0.0.1:3399` |
 | `claude.workflowSchema` | `flontier-strokeflow` |
 | `claude.firstPrompt` | `/openspec-ff-change draft-proposal` ＋ 固定指示 |
 | `claude.continuePrompt` | 続きを促す1文 |
