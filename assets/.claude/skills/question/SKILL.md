@@ -15,12 +15,5 @@ allowed-tools:
 ---
 
 ```!
-jq -n \
-  --arg h '$header' \
-  --arg d '$detail' \
-  --arg q '$question' \
-  --argjson o '$options' \
-  "{header: $h, detail: $d, question: $q, options: $o}" \
-| curl -X POST "$(printenv STROKE_BASEURL)/api/strokes/${CLAUDE_SESSION_ID}/question" -H 'Content-Type: application/json' --data-binary @-
-
+jq -n '{header: $ARGS.positional[0], detail: $ARGS.positional[1], question: $ARGS.positional[2], options: ($ARGS.positional[3]|fromjson)}' --args '$header' '$detail' '$question' '$options' | curl -X POST "$(printenv STROKE_BASEURL)/api/strokes/${CLAUDE_SESSION_ID}/question" -H 'Content-Type: application/json' --data-binary @-
 ```
