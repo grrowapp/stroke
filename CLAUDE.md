@@ -26,9 +26,11 @@ Use fresh agents, not `fork`, when the goal is to keep context out. See `docs/ag
 
 ## Worktree 運用
 
-- 合流点は `/opt/projects/stroke-board` の **main**。成果は各 worktree のブランチから main へマージする
-- 各 worktree は main を**取り込めるタイミングで自主的に** `git merge main` で追随する。親から worktree へ配ることはしない（作業途中の土台を動かさないため）
+- 合流点は各 worktree の**もとになった親ブランチ**。main を直接の合流点にしない
+- 成果のマージ先・追随の取り込み元・ユーザー指示で扱う対象は、いずれもこの親ブランチ
+- 各 worktree は親ブランチを**取り込めるタイミングで自主的に** merge して追随する。親から worktree へ配ることはしない（作業途中の土台を動かさないため）
 - 取り込みを先延ばしするほどコンフリクトが育つ。**小さく頻繁に**取り込むこと
+- **main へのマージ**は、ユーザー指示を受けてから確認→承認を一回踏んで行う（この手順は将来スキル化する想定）
 
 ## Docs
 
