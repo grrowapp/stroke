@@ -160,7 +160,7 @@ export default defineNuxtConfig({
         '--model', 'sonnet',
         '--add-dir', import.meta.dirname,
         '--add-dir', `${import.meta.dirname}/assets`,
-        '--allowedTools', 'Skill Bash(openspec *) Bash(curl -X POST *) Bash(jq -n *) Bash(printenv *) Read Edit',
+        '--allowedTools', 'Skill Bash(openspec *) Bash(curl -X POST *) Bash(jq -n *) Bash(printenv *) Read Edit Write',
         '--disallowedTools', 'Bash(cd *)',
       ],
 
