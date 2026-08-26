@@ -24,6 +24,12 @@ Use fresh agents, not `fork`, when the goal is to keep context out. See `docs/ag
 - 3000 はこのマシンで別のプロセスが使用中。使わない
 - E2E の PORT_SLOT（`playwright.config.ts`）で slot 3 は欠番。APP_PORT が 3399 と被るため（base3 は slot 6 = 5699/3699）
 
+## Worktree 運用
+
+- 合流点は `/opt/projects/stroke-board` の **main**。成果は各 worktree のブランチから main へマージする
+- 各 worktree は main を**取り込めるタイミングで自主的に** `git merge main` で追随する。親から worktree へ配ることはしない（作業途中の土台を動かさないため）
+- 取り込みを先延ばしするほどコンフリクトが育つ。**小さく頻繁に**取り込むこと
+
 ## Docs
 
 `docs/specs/` は**定義としての specs** の置き場（要素で区分）。機能的 specs（Requirement + Scenario）は `openspec/specs/` にある。
