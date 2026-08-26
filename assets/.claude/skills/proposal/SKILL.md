@@ -12,9 +12,5 @@ allowed-tools:
 ---
 
 ```!
-jq -n \
-  --rawfile p '$filepath' \
-  --arg n '$projectname' \
-  '{proposal: $p} + (if $n == "" then {} else {projectName: $n} end)' \
-| curl -X POST "$(printenv STROKE_BASEURL)/api/strokes/${CLAUDE_SESSION_ID}/proposal" -H 'Content-Type: application/json' --data-binary @-
+jq -n -R '{proposal: ([inputs] | join("\n"))} + (if $ARGS.positional[0] == "" then {} else {projectName: $ARGS.positional[0]} end)' --args '$projectname' < '$filepath' | curl -X POST "$(printenv STROKE_BASEURL)/api/strokes/${CLAUDE_SESSION_ID}/proposal" -H 'Content-Type: application/json' --data-binary @-
 ```
