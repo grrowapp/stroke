@@ -22,6 +22,7 @@ Use fresh agents, not `fork`, when the goal is to keep context out. See `docs/ag
 
 - ポートは **3399 固定**（`nuxt.config.ts` の `devServer.port`）。ストロークの `claude.apiBaseUrl` と揃えてあり、変えるときは必ず両方を揃えて変える（値の正は `docs/specs/core/settings-reference.md`）
 - 3000 はこのマシンで別のプロセスが使用中。使わない
+- E2E の PORT_SLOT（`playwright.config.ts`）で slot 3 は欠番。APP_PORT が 3399 と被るため（base3 は slot 6 = 5699/3699）
 
 ## Docs
 

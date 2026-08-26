@@ -26,15 +26,16 @@ import { defineConfig } from '@playwright/test';
 const PORT_SLOT: Record<string, number> = {
   base: 1,
   base2: 2,
-  base3: 3,
+  // 3 は欠番。slot 3 の APP_PORT が dev サーバーの固定ポート 3399 と被るため（CLAUDE.md の Dev サーバー）
   base4: 4,
   mvp: 5,
+  base3: 6,
 };
 
 /** 表に無い作業ツリーはまとめて 9 番。並列で使うなら表に足すこと。 */
 const slot = PORT_SLOT[basename(process.cwd())] ?? 9;
 
-/** base=5199/3199、base2=5299/3299、base3=5399/3399 … */
+/** base=5199/3199、base2=5299/3299、base3=5699/3699 … */
 export const STUB_PORT = 5099 + slot * 100;
 export const APP_PORT = 3099 + slot * 100;
 
