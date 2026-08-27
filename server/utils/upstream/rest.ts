@@ -22,11 +22,13 @@ import {
   approvalRequestSchema,
   documentContentSchema,
   projectInfoSchema,
+  projectListEntrySchema,
   specDataSchema,
   specDocumentsSchema,
   taskProgressSchema,
   type ApprovalRequest,
   type ProjectInfo,
+  type ProjectListEntry,
   type SpecData,
   type SpecDocumentName,
   type SpecDocuments,
@@ -52,7 +54,13 @@ export function isSteeringDocument(value: string): value is SteeringDocument {
 
 export type UpstreamFailure =
   | { kind: 'not-configured' }
-  | { kind: 'not-found'; path: string }
+  /**
+   * `detail` は本家が返したエラー本文（`{ error: string }` の `error`）。取れなかった
+   * ときだけ省く——`toHttpError` の固定文言に頼らず本家の実応答を伝えたい呼び出し側
+   * （MCP ツール。`server/utils/mcp/upstream-failure.ts`）のためのもので、既存の
+   * 呼び出し側（`toHttpError` 経由）はこれを読まないので挙動は変わらない。
+   */
+  | { kind: 'not-found'; path: string; detail?: string }
   | { kind: 'unreachable'; path: string; reason: string }
   | { kind: 'malformed'; path: string; reason: string };
 
@@ -64,6 +72,14 @@ export class UpstreamRestClient {
   /** `GET /api/projects/:projectId/info` */
   getProjectInfo(projectId: string): Promise<UpstreamResult<ProjectInfo>> {
     return this.read(`/api/projects/${enc(projectId)}/info`, projectInfoSchema);
+  }
+
+  /**
+   * `GET /api/projects/list` — 起動中のプロジェクト一覧。MCP ツールが projectPath から
+   * projectId を引き当てるのに使う（provide-operations-via-mcp design.md）。
+   */
+  listProjects(): Promise<UpstreamResult<ProjectListEntry[]>> {
+    return this.read('/api/projects/list', projectListEntrySchema.array());
   }
 
   /** `GET /api/projects/:projectId/specs` */
@@ -147,7 +163,7 @@ export class UpstreamRestClient {
       });
     } catch (error) {
       if (statusOf(error) === 404) {
-        return { ok: false, failure: { kind: 'not-found', path } };
+        return { ok: false, failure: { kind: 'not-found', path, detail: detailOf(error) } };
       }
       return { ok: false, failure: { kind: 'unreachable', path, reason: toReason(error) } };
     }
@@ -209,7 +225,7 @@ export class UpstreamRestClient {
       });
     } catch (error) {
       if (statusOf(error) === 404) {
-        return { ok: false, failure: { kind: 'not-found', path } };
+        return { ok: false, failure: { kind: 'not-found', path, detail: detailOf(error) } };
       }
       return { ok: false, failure: { kind: 'unreachable', path, reason: toReason(error) } };
     }
@@ -233,7 +249,7 @@ export class UpstreamRestClient {
       raw = await ofetch(path, { baseURL: this.baseUrl, retry: 0 });
     } catch (error) {
       if (statusOf(error) === 404) {
-        return { ok: false, failure: { kind: 'not-found', path } };
+        return { ok: false, failure: { kind: 'not-found', path, detail: detailOf(error) } };
       }
       return {
         ok: false,
@@ -266,4 +282,13 @@ function statusOf(error: unknown): number | undefined {
 
 function toReason(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/** 本家が返したエラー本文（`{ error: string }` の `error`）。取れなければ undefined。 */
+function detailOf(error: unknown): string | undefined {
+  if (typeof error !== 'object' || error === null) return undefined;
+  const data = (error as { data?: unknown }).data;
+  if (typeof data !== 'object' || data === null) return undefined;
+  const message = (data as { error?: unknown }).error;
+  return typeof message === 'string' ? message : undefined;
 }

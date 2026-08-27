@@ -4,6 +4,8 @@ import { readStrokeConfig } from './config'
 import { initSessionOpenspec } from './openspec'
 import { readState, writeState } from './session-store'
 import { submissionCount } from './submission-signal'
+import { MCP_SERVER_NAME, withMcpToolsAllowed } from '../mcp/allowed-tools'
+import { issueConnectionToken, registerConnection, removeConnection } from '../mcp/connection-table'
 
 /**
  * 起動の材料を設定から組み立てる端。
@@ -82,6 +84,7 @@ function conversationWriter(sessionId: string) {
  * @param kind       ストロークの往復か、承認後の steering か
  * @param retries    これまでに起こし直した回数
  * @param runId      steering の会話 id。まだ無ければ undefined
+ * @param token      この起動の接続表 token（provide-operations-via-mcp design.md「接続の担保」）
  */
 export function buildRun(options: {
   sessionId: string
@@ -89,8 +92,9 @@ export function buildRun(options: {
   kind: RunKind
   retries: number
   runId?: string
+  token: string
 }): AiRun {
-  const { sessionId, cwd, kind, retries, runId } = options
+  const { sessionId, cwd, kind, retries, runId, token } = options
   const { claude, openspec } = readStrokeConfig()
 
   // 空 = 無効。無効を undefined へ写すのは設定を引いた端のここで行う
@@ -103,7 +107,15 @@ export function buildRun(options: {
         command: claude.command,
         // 本家 spec-workflow の MCP を与えて起こす（ADR 0011）。設定にも持たず、
         // ファイルも作らず、cwd から組み立てて args に足す（design.md D7）。
-        args: [...claude.args, '--mcp-config', mcpConfigFor(cwd)],
+        // 自前 MCP サーバー（provide-operations-via-mcp）も同じ --mcp-config に並べる
+        // （既存フラグ・本家 MCP の並びは変えない）。
+        // MCP ツールは --allowedTools に載っていないと呼べないため、同じく呼び出し
+        // ごとにここで足す（tasks 4.5）。
+        args: [
+          ...withMcpToolsAllowed(claude.args),
+          '--mcp-config',
+          mcpConfigFor(cwd, token, claude.apiBaseUrl),
+        ],
         apiBaseUrl: claude.apiBaseUrl,
       },
       cwd,
@@ -126,7 +138,13 @@ export function buildRun(options: {
   return {
     launch: {
       command: claude.command,
-      args: claude.args,
+      // 自前 MCP サーバー（provide-operations-via-mcp）を足す。既存フラグの並びは変えない。
+      // MCP ツールは --allowedTools に載っていないと呼べないため、同じくここで足す（tasks 4.5）。
+      args: [
+        ...withMcpToolsAllowed(claude.args),
+        '--mcp-config',
+        mcpToolConfigFor(token, claude.apiBaseUrl),
+      ],
       apiBaseUrl: claude.apiBaseUrl,
     },
     cwd,
@@ -156,12 +174,37 @@ export function buildRun(options: {
 }
 
 /**
- * 本家 `spec-workflow-mcp` を起こす `--mcp-config` の中身。
+ * 自前 MCP サーバー（provide-operations-via-mcp）を起こす `--mcp-config` の1エントリ。
+ *
+ * url は `runtimeConfig.claude.apiBaseUrl` から組み立てる（design.md「MCP の url は
+ * 既存設定から組み立てる」。新しい設定は増やさない）。token はこの起動専用の一時値
+ * （接続表 `server/utils/mcp/connection-table.ts`）。
+ */
+function mcpToolServerEntry(token: string, apiBaseUrl: string): Record<string, unknown> {
+  return {
+    type: 'http',
+    url: `${apiBaseUrl}/mcp`,
+    headers: { 'x-stroke-token': token },
+  }
+}
+
+/** flontier 工程の `--mcp-config`。自前 MCP サーバーのみを持つ。 */
+function mcpToolConfigFor(token: string, apiBaseUrl: string): string {
+  return JSON.stringify({
+    mcpServers: {
+      [MCP_SERVER_NAME]: mcpToolServerEntry(token, apiBaseUrl),
+    },
+  })
+}
+
+/**
+ * steering 工程の `--mcp-config`。本家 `spec-workflow-mcp` と自前 MCP サーバーを並べる
+ * （既存フラグ・本家 MCP の並びは変えない）。
  *
  * `--mcp-config` は JSON 文字列を直接受け取れる（実機確認済み・design.md D7）。
  * 生成先のプロジェクトをそのままワークスペースとして渡す。
  */
-function mcpConfigFor(cwd: string): string {
+function mcpConfigFor(cwd: string, token: string, apiBaseUrl: string): string {
   return JSON.stringify({
     mcpServers: {
       specworkflow: {
@@ -169,11 +212,26 @@ function mcpConfigFor(cwd: string): string {
         command: 'npx',
         args: ['-y', '@pimzino/spec-workflow-mcp@latest', cwd],
       },
+      [MCP_SERVER_NAME]: mcpToolServerEntry(token, apiBaseUrl),
     },
   })
 }
 
-/** 材料を組み立てて起こす。結果は待たない。 */
+/**
+ * 材料を組み立てて起こす。結果は待たない。
+ *
+ * spawn 直前に接続表 token を発行・登録し（provide-operations-via-mcp design.md「接続の
+ * 担保」）、実行終了時（正常・異常とも）に削除する。**`buildRun` が同期的に throw する
+ * 経路も含める。**`invokeAi` の引数として評価される `buildRun(...)` が例外を投げると
+ * `invokeAi` 自体が呼ばれず `.finally` がどの promise にもアタッチされないため、
+ * その経路は別途 catch して削除する（santa-method レビュー指摘）。
+ *
+ * **この関数自身は同期的に throw しない。** `kick` は `async` 宣言ではない通常関数のため、
+ * catch 節で素の `throw` をすると呼び出し式の評価中に同期的に例外が飛び、呼び出し元
+ * （`invoke-agent.get.ts`）の `.catch()/.finally()` が一切アタッチされないまま素通りする
+ * （busy ガード解除・エラーログがどちらも実行されなくなる。santa-method レビュー指摘）。
+ * 常に `Promise` を返す契約を保つため `Promise.reject` で包む。
+ */
 export function kick(options: {
   sessionId: string
   cwd: string
@@ -181,5 +239,19 @@ export function kick(options: {
   retries: number
   runId?: string
 }): Promise<void> {
-  return invokeAi(options.sessionId, buildRun(options))
+  const token = issueConnectionToken()
+  registerConnection(
+    token,
+    options.kind === 'steering' ? { projectPath: options.cwd } : { sessionId: options.sessionId },
+  )
+
+  let run: AiRun
+  try {
+    run = buildRun({ ...options, token })
+  } catch (error) {
+    removeConnection(token)
+    return Promise.reject(error)
+  }
+
+  return invokeAi(options.sessionId, run).finally(() => removeConnection(token))
 }

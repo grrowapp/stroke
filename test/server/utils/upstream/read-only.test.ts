@@ -129,6 +129,7 @@ describe('接点層の書き込みは決めた3つだけである', () => {
       'getSteeringDocument',
       'getTaskProgress',
       'listPendingApprovals',
+      'listProjects',
       'listSpecs',
       'respondToApproval',
       'saveSpecDocument',

@@ -1,0 +1,94 @@
+[
+  {
+    "proposal": false,
+    "question": {
+      "header": "利用者識別",
+      "detail": "家族で共有して使うペットの餌やり・散歩記録アプリ。複数の家族が同じペットに対して記録する想定だが、誰がいつ記録したかを区別するかは未確定。",
+      "question": "記録に登録者名は必要か？",
+      "options": [
+        {
+          "label": "個人を区別する",
+          "description": "各家族が自分の名前を選んで記録し、誰がやったか分かる",
+          "recommended": true
+        },
+        {
+          "label": "区別しない",
+          "description": "誰が記録したかは残さず、全員共通の記録として扱う"
+        }
+      ]
+    },
+    "answer": {
+      "kind": "option",
+      "value": "個人を区別する"
+    }
+  },
+  {
+    "proposal": false,
+    "question": {
+      "header": "認証方式",
+      "detail": "記録者を個人単位で区別することが決定した。家族内で使うアプリのため、パスワード付きアカウント登録が必要か、名前を選ぶだけの簡易な方式で足りるかが未確定。",
+      "question": "本人確認の方法は？",
+      "options": [
+        {
+          "label": "名前選択のみ",
+          "description": "パスワード無しで自分の名前を選ぶだけで記録できる",
+          "recommended": true
+        },
+        {
+          "label": "アカウントログイン",
+          "description": "メールやパスワードでログインしてから記録する"
+        }
+      ]
+    },
+    "answer": {
+      "kind": "option",
+      "value": "名前選択のみ"
+    }
+  },
+  {
+    "proposal": false,
+    "question": {
+      "header": "記録項目",
+      "detail": "本人確認は名前選択のみで足りることが決定した。餌やり・散歩の記録内容について、簡単なチェックだけで済ませるか、時刻や量などの詳細情報も記録するかが未確定。",
+      "question": "記録する情報の粒度は？",
+      "options": [
+        {
+          "label": "詳細記録",
+          "description": "時刻・量・時間などを入力し、履歴として詳しく残す",
+          "recommended": true
+        },
+        {
+          "label": "簡易チェック",
+          "description": "「やった」を記録するだけで済ませる"
+        }
+      ]
+    },
+    "answer": {
+      "kind": "option",
+      "value": "詳細記録"
+    }
+  },
+  {
+    "proposal": false,
+    "question": {
+      "header": "対象ペット数",
+      "detail": "詳細記録（時刻・量など）を行うことが決定した。家族内で複数のペットを飼っているケースに対応するか、1匹のみを前提とするかが未確定。",
+      "question": "複数ペットに対応するか？",
+      "options": [
+        {
+          "label": "複数対応",
+          "description": "ペットごとに記録を分けて管理できる",
+          "recommended": true
+        },
+        {
+          "label": "1匹のみ",
+          "description": "ペットは1匹だけを前提にシンプルに作る"
+        }
+      ]
+    },
+    "answer": {
+      "kind": "option",
+      "value": "複数対応"
+    }
+  }
+]

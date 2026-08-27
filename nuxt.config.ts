@@ -20,8 +20,11 @@ export default defineNuxtConfig({
   // 「これも外に出せるのでは」と再検討しないこと。
   // ===========================================================================
 
-  // ビルド時: モジュールの解決とプラグインの生成がビルドで行われる
-  modules: ['@nuxt/ui', '@nuxtjs/mdc'],
+  // ビルド時: モジュールの解決とプラグインの生成がビルドで行われる。
+  // @nuxtjs/mcp-toolkit: stroke-board 自身が MCP サーバーになる（route は既定 `/mcp`、
+  // ツール定義の置き場 `dir` も既定 `server/mcp`）。0.x のため package.json でバージョンを
+  // 固定してある（provide-operations-via-mcp design.md）
+  modules: ['@nuxt/ui', '@nuxtjs/mdc', '@nuxtjs/mcp-toolkit'],
 
   // ビルド時: markdown の parse 設定はビルドで畳み込まれる。
   mdc: {
@@ -239,26 +242,26 @@ export default defineNuxtConfig({
       // （~/.claude/CLAUDE.md）をエンドユーザーのセッションへ持ち込まないためである。
       // project を外すとスキルが一切ロードされない（ADR 0001）。
       //
-      // AI に許すツールは Skill Bash Read Write Edit。取得・提出は endpoint への HTTP 発行
-      // （Bash で curl）で行い、proposal.md / stroke.md は AI 自身が書いてパスで渡す。
+      // 取得・提出の操作は stroke-board の MCP ツールが担う（provide-operations-via-mcp）。
+      // その分の `--allowedTools`（`mcp__stroke-board`）は呼び出しごとに決まるのでここには
+      // 入れず、`server/utils/mcp/allowed-tools.ts` が値へ足す。
       //
-      // **`Skill` を外してはならない。** セッション API スキルの curl は
-      // `${CLAUDE_SESSION_ID}` でセッション id を解決するが、この変数が値を持つのは
-      // **スキルの `!` フェンスの中だけ**である（実測 2026-08-25: Bash ツールから
-      // `printenv` すると空、フェンスからは `--session-id` の値が取れる）。
-      // `Skill` が無いと claude はスキルを起動できず、Bash で curl を真似ようとして
-      // 空の id を掴み、提出に至らないままタイムアウトする。
+      // **`Skill` を外してはならない。** 手順の案内（/openspec-ff-change・
+      // /write-steering-v2）はスキルが担っており、`Skill` が無いと起動できない。
       //
       // `-p` / `--output-format json`、`--session-id` / `--resume` とセッション id、
-      // `--mcp-config`、`--` 以降の prompt は呼び出しごとに決まるのでここには入れず、
-      // 呼び出し側が args の後ろに足す
+      // `--mcp-config`、MCP ツール分の `--allowedTools`、`--` 以降の prompt は
+      // 呼び出しごとに決まるのでここには入れず、呼び出し側が args の後ろに足す
       command: 'claude',
       args: [
         '--setting-sources', SETTING_SOURCES_REQUIRED,
         '--model', 'sonnet',
         '--add-dir', import.meta.dirname,
         '--add-dir', `${import.meta.dirname}/assets`,
-        '--allowedTools', 'Skill Bash(openspec *) Bash(curl -X POST *) Bash(jq -n *) Bash(printenv *) Read Edit Write',
+        // curl / jq / printenv は落とした（取得・提出を MCP ツール以外で真似る余地を
+        // 残さない・ユーザー指示 2026-08-27）。`Write` は develop 側の追加で、proposal を
+        // `docs/proposal.md` に書くのに要るので残す
+        '--allowedTools', 'Skill Bash(openspec *) Read Edit Write',
         '--disallowedTools', 'Bash(cd *)',
       ],
 
@@ -272,9 +275,18 @@ export default defineNuxtConfig({
 
       // AI へ渡す定型。指示の本文はコードに持たない（specs/agent/invocation）。従う手順は
       // スキル自身が持つ。初回はスキル起動＋最低限の固定指示、継続は続きを促すだけ
-      // （入力は prompt に載せず、エージェントが取得スキルで読む）
-      firstPrompt: '/openspec-ff-change \n\n取得スキルで内容を確認しスキルに従って作業しろ',
-      continuePrompt: '続きを進めろ。状況は取得スキルで確認してから判断しろ。',
+      // （入力は prompt に載せず、エージェントが取得ツールで読む）
+      //
+      // 取得・提出の操作は stroke-board の MCP ツールが担い、手順の案内はスキルが担う
+      // （provide-operations-via-mcp tasks 4.7 の役割分担）。案内スキルの起動
+      // （/openspec-ff-change）はそのまま残す
+      // `/openspec-ff-change` は実体が無く（`.claude/skills/` にも assets にも openspec の
+      // スキーマにも存在しない）、prompt の先頭に置くと `Unknown command` で初回起動が
+      // 何もせず終わる（実測 2026-08-27: assistant のターンがゼロで
+      // 「プロセスは成功したが提出が届かない」になり、巡回の再起動が毎回拾っていた）。
+      // 案内スキルを用意し直す話は本 change の範囲外なので、起動だけを外す
+      firstPrompt: 'stroke-board の MCP ツールで内容を確認し、作業しろ',
+      continuePrompt: '続きを進めろ。状況は stroke-board の MCP ツールで確認してから判断しろ。',
 
       // 承認で昇格した直後に steering 文書を作らせる定型（ADR 0011）。cwd は昇格先の
       // プロジェクトで、--mcp-config は呼び出し側がそこから組み立てて足す。

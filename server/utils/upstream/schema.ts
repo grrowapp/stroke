@@ -106,6 +106,18 @@ export const approvalRequestSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
+/**
+ * `GET /api/projects/list` の各要素。
+ *
+ * `instances` の中身は使わない（アクティブ判定は `registry.ts` が別に持つ）ので検証しない。
+ */
+export const projectListEntrySchema = z.object({
+  projectId: z.string(),
+  projectName: z.string(),
+  projectPath: z.string(),
+  instances: z.array(z.unknown()),
+});
+
 /** `GET /api/projects/:projectId/info` */
 export const projectInfoSchema = z.object({
   projectId: z.string(),
@@ -225,6 +237,7 @@ export type ParsedTask = z.infer<typeof parsedTaskSchema>;
 export type TaskSummary = z.infer<typeof taskSummarySchema>;
 export type SpecData = z.infer<typeof specDataSchema>;
 export type ApprovalRequest = z.infer<typeof approvalRequestSchema>;
+export type ProjectListEntry = z.infer<typeof projectListEntrySchema>;
 export type ProjectInfo = z.infer<typeof projectInfoSchema>;
 export type SpecDocuments = z.infer<typeof specDocumentsSchema>;
 export type TaskProgress = z.infer<typeof taskProgressSchema>;

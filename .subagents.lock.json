@@ -1,0 +1,70 @@
+{
+  "version": 2,
+  "skill": {
+    "links": {
+      "api-design": {
+        "name": "api-design",
+        "source": null
+      },
+      "code-review": {
+        "name": "code-review",
+        "source": "mattpocock/skills"
+      },
+      "codebase-design": {
+        "name": "codebase-design",
+        "source": "mattpocock/skills"
+      },
+      "coding-standards": {
+        "name": "coding-standards",
+        "source": null
+      },
+      "contract-first": {
+        "name": "contract-first",
+        "source": null
+      },
+      "domain-modeling": {
+        "name": "domain-modeling",
+        "source": "mattpocock/skills"
+      },
+      "grilling": {
+        "name": "grilling",
+        "source": "mattpocock/skills"
+      },
+      "mcp-server-patterns": {
+        "name": "mcp-server-patterns",
+        "source": null
+      },
+      "nuxt4-patterns": {
+        "name": "nuxt4-patterns",
+        "source": null
+      },
+      "prototype": {
+        "name": "prototype",
+        "source": "mattpocock/skills"
+      },
+      "santa-method": {
+        "name": "santa-method",
+        "source": null
+      },
+      "setup-matt-pocock-skills": {
+        "name": "setup-matt-pocock-skills",
+        "source": "mattpocock/skills"
+      },
+      "triage": {
+        "name": "triage",
+        "source": "mattpocock/skills"
+      },
+      "vite-patterns": {
+        "name": "vite-patterns",
+        "source": null
+      },
+      "vue-patterns": {
+        "name": "vue-patterns",
+        "source": null
+      }
+    }
+  },
+  "subagent": {
+    "links": {}
+  }
+}
