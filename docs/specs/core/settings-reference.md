@@ -38,6 +38,7 @@ const { projectShareRoot, claude } = config.runtimeConfig
 | `claude.continuePrompt` | 続きを促す1文 |
 | `claude.steeringPrompt` | `/write-steering-v2` ＋ 固定指示 |
 | `claude.maxRetries` | `2` |
+| `claude.debugLogDir` | （空 = 無効） |
 | `openspec.bin` | `openspec` |
 | `openspec.initArgs` | `init --tools none` |
 | `wsPathPattern` | `/api/strokes/([^/]+)/ws/{channel}(?:$\|[/?#])` |
@@ -83,6 +84,14 @@ const { projectShareRoot, claude } = config.runtimeConfig
 1回の呼び出しで起こすのは1回だけで、起こし直しは巡回が担う。したがって起動の総回数は「上限 + 1」、総待ち時間は「(上限 + 1) × タイムアウト」で決まる。`0` にすると起こし直さない（1回だけ試す）。
 
 タイムアウトは10分（設定ではない。`server/utils/stroke/claude.ts`）なので、既定の `2` では最大30分で `error` に達する。
+
+### `claude.debugLogDir`
+
+呼び出しの生出力（`--output-format json` の stdout 全文）を書き残すディレクトリ（`openspec/specs/debug/logging`）。空なら書かない（**既定 = 無効**）。
+
+- ファイルは呼び出しごとに1つ、`<YYYYMMDD-HHmmss-SSS>-<セッション uuid>.json`。上書きしない
+- 調査用の複製であり、書き出しの失敗は呼び出しの成否・セッションの状態・画面の挙動に影響しない（サーバーログへ警告1行のみ）
+- ローテーションは無い。調査が終わったら空へ戻し、残ったファイルは手で消す
 
 ### `claude` の起動定義
 

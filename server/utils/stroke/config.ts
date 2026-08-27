@@ -34,6 +34,8 @@ const schema = z.object({
     steeringPrompt: z.string().trim().min(1),
     /** 失敗を起こし直す回数の上限。到達したら起動せず `error`（終端）にする */
     maxRetries: z.number().int().min(0),
+    /** 呼び出しの生出力を書き残すディレクトリ。空なら書かない（既定・openspec/specs/debug/logging） */
+    debugLogDir: z.string().trim(),
   }),
   openspec: z.object({
     /** セッションの openspec ルートを初期化する CLI */

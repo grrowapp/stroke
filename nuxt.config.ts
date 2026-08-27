@@ -285,6 +285,10 @@ export default defineNuxtConfig({
       // 失敗した実行を起こし直す回数の上限。上限に達したら起動せず invocation を
       // error（終端）にする。総待ち時間は「(回数 + 1) × タイムアウト」で決まる
       maxRetries: 2,
+
+      // 呼び出しの生出力（--output-format json の stdout 全文）を書き残すディレクトリ。
+      // 空なら書かない（既定 = 無効）。調査用の複製で、呼び出しの成否には影響しない
+      debugLogDir: '',
     },
 
     // --- ストローク: セッションの openspec ルートを初期化する CLI とその引数

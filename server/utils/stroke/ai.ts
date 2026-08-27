@@ -14,6 +14,8 @@ export interface AiRun {
   launch: ClaudeLaunch
   /** `claude -p` の cwd。AI が書く生成物はここへ落ちる */
   cwd: string
+  /** 呼び出しの生出力を書き残すディレクトリ。呼び出し側が設定から引き、無効なら省く */
+  debugLogDir?: string
   /** 定型の**候補**。どちらを使うかは invokeAi が初回/継続の判定で決める */
   prompts: { first: string, continue: string }
   /** 失敗を起こし直す回数の上限。到達していたら起動しない */
@@ -70,7 +72,7 @@ export interface AiRun {
  */
 export async function invokeAi(sessionId: string, run: AiRun): Promise<void> {
   const {
-    launch, cwd, prompts, maxRetries, retries,
+    launch, cwd, debugLogDir, prompts, maxRetries, retries,
     conversationId, hasConversation, setInvocation, remember, prepare, didWork,
   } = run
 
@@ -105,7 +107,7 @@ export async function invokeAi(sessionId: string, run: AiRun): Promise<void> {
   // **1回の呼び出しで起こすのは1回だけである。** 起こし直しは巡回（`failed` を拾って
   // U13 を叩く）が担い、回数は `state.json` が持つ。ここで内側にもループを持つと、
   // 巡回の回数と掛け算になって総起動回数が上限の意味から外れる。
-  const result = await runClaude({ sessionId: conversationId, launch, cwd, prompt, mode })
+  const result = await runClaude({ sessionId: conversationId, launch, cwd, prompt, mode, debugLogDir })
 
   if (result.ok) {
     // 会話 id は作業の成否に関わらず覚える。次のキックはこの続きから始める。

@@ -1,4 +1,8 @@
 import { spawn } from 'node:child_process'
+import { mkdir, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { LOG_PREFIX } from './log'
+import { isSafeSegment } from './session-core'
 
 /**
  * 子プロセスを打ち切るまでの待ち時間。超えたらリトライ経路へ流す。
@@ -62,6 +66,13 @@ export interface ClaudeRunOptions {
   /** prompt。`--` の後ろに位置引数として渡す */
   prompt: string
   mode: ClaudeMode
+  /**
+   * 呼び出しの生出力（stdout 全文）を書き残すディレクトリ。省けば書かない。
+   *
+   * 調査用の複製であり、書き出しの成否は呼び出しの結果に反映しない
+   * （openspec/specs/debug/logging）。値は呼び出し側が設定から引いて渡す。
+   */
+  debugLogDir?: string
 }
 
 export type ClaudeRunResult =
@@ -137,6 +148,20 @@ export async function runClaude(options: ClaudeRunOptions): Promise<ClaudeRunRes
     })
 
     child.on('close', (code: number | null) => {
+      // 生出力の複製は成否の判定より先に、判定と独立に残す。失敗した呼び出しの
+      // 出力こそ調査に要る（openspec/specs/debug/logging「失敗した呼び出しの出力も残る」）
+      if (options.debugLogDir !== undefined) {
+        // ファイル名に使う id は**出どころを問わず** isSafeSegment で通す。呼び出し側の
+        // 値も、steering の継続では前回応答の session_id（`state.json` の runId）が
+        // 未検証のまま流入するため、優先側だけ素通しにしない。保存先の外へ出られる形を
+        // 通さない（識別子をパスに使う既存の線引きと同じ）
+        const rawId = sessionId ?? readEnvelope(stdout)?.sessionId
+        writeDebugLog(
+          options.debugLogDir,
+          rawId != null && isSafeSegment(rawId) ? rawId : 'unknown',
+          stdout,
+        )
+      }
       if (timedOut) {
         finish({ ok: false, sessionMissing: false, detail: `タイムアウト (${CLAUDE_TIMEOUT_MS}ms)` })
         return
@@ -155,6 +180,33 @@ export async function runClaude(options: ClaudeRunOptions): Promise<ClaudeRunRes
     })
 
   })
+}
+
+/**
+ * 呼び出しの生出力を `<dir>/<YYYYMMDD-HHmmss-SSS>-<セッション uuid>.json` へ書き残す。
+ *
+ * 調査用の複製である。呼び出しの完了処理から切り離し（await しない）、mkdir・write の
+ * どちらの失敗も結果へ反映しない。無音だと「設定したのにログが無い」調査が詰むので、
+ * 警告だけ1行出す（openspec/specs/debug/logging・design.md）。
+ */
+function writeDebugLog(dir: string, sessionId: string, stdout: string): void {
+  const file = join(dir, `${debugLogStamp(new Date())}-${sessionId}.json`)
+  void mkdir(dir, { recursive: true })
+    // `wx` = 既存ファイルなら書かず失敗させる。上書き禁止（spec の MUST NOT）を
+    // 時刻の衝突しにくさでなく機構で保証し、衝突は下の警告経路へ流す
+    .then(() => writeFile(file, stdout, { flag: 'wx' }))
+    .catch((error: unknown) => {
+      const detail = error instanceof Error ? error.message : String(error)
+      console.warn(`${LOG_PREFIX} デバッグログを書けない: ${file}（${detail}）`)
+    })
+}
+
+/** 名前順ソート＝時系列になる時刻表記。ミリ秒まで入れて同秒の衝突を避ける。 */
+function debugLogStamp(now: Date): string {
+  const pad = (value: number, width = 2): string => String(value).padStart(width, '0')
+  const date = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`
+  const time = `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`
+  return `${date}-${time}-${pad(now.getMilliseconds(), 3)}`
 }
 
 /**

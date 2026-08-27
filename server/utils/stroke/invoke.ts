@@ -93,6 +93,10 @@ export function buildRun(options: {
   const { sessionId, cwd, kind, retries, runId } = options
   const { claude, openspec } = readStrokeConfig()
 
+  // 空 = 無効。無効を undefined へ写すのは設定を引いた端のここで行う
+  // （openspec/specs/debug/logging「出力先の設定があるときだけ書かれる」）
+  const debugLogDir = claude.debugLogDir === '' ? undefined : claude.debugLogDir
+
   if (kind === 'steering') {
     return {
       launch: {
@@ -103,6 +107,7 @@ export function buildRun(options: {
         apiBaseUrl: claude.apiBaseUrl,
       },
       cwd,
+      debugLogDir,
       // 初回も継続も同じ定型。ユーザー入力は無く、続きを促すのも同じ1本で足りる
       prompts: { first: claude.steeringPrompt, continue: claude.steeringPrompt },
       maxRetries: claude.maxRetries,
@@ -125,6 +130,7 @@ export function buildRun(options: {
       apiBaseUrl: claude.apiBaseUrl,
     },
     cwd,
+    debugLogDir,
     prompts: { first: claude.firstPrompt, continue: claude.continuePrompt },
     maxRetries: claude.maxRetries,
     retries,
