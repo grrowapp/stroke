@@ -54,7 +54,7 @@ claude プロセスが stroke-board と本家へアクションする操作系�
 
 ### Modified Capabilities
 
-- `agent/invocation`: 呼び出しの起動定義に MCP サーバーの提供が加わる（セッション工程・steering 工程の `--mcp-config` への追加と、サーバーへ渡す env の組み立て）。
+なし。`--mcp-config` の追加は `agent/invocation` の既存 Requirement「呼び出し側は、引いた起動フラグをそのまま渡すか、その実行に要るフラグを足して渡す SHALL」の範囲内の利用であり、Requirement 自体の変更を伴わない（実装時に確認。santa-method レビュー指摘）。
 
 ## Impact
 

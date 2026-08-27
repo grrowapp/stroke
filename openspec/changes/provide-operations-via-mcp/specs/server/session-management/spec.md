@@ -13,14 +13,14 @@ claude の起動と MCP 接続を結びつけるセッション管理の契約�
 #### Scenario: 2つのセッションが同時に動いても混ざらない
 
 - **GIVEN** stroke-board が起動済みである
-- **WHEN** `POST /api/strokes` で内容の異なる概要を2件投稿してセッションを2つ作り、それぞれ `GET /api/strokes/:id/invoke-agent` で AI を起動し、双方のストロークが進むのを待つ
-- **THEN** `GET /api/strokes/:id/strokes` で読んだ各セッションの記録が、自分の概要に対応する内容であり、他方のセッションの内容を含まない（検証側が突き合わせる）
+- **WHEN** `POST /api/strokes` で、一方には概要以外の文脈に出現しない識別子 A、もう一方には識別子 B を本文に含む概要をそれぞれ投稿してセッションを2つ作り、それぞれ `GET /api/strokes/:id/invoke-agent` で AI を起動し、双方のストロークが進むのを待つ
+- **THEN** `GET /api/strokes/:id/strokes` で読んだ各セッションの記録（`question` の `header` / `detail` / `question` / `options` 全文）に、自分に対応する識別子（A または B）が少なくとも1回現れ、かつ他方の識別子は1回も現れない
 
 #### Scenario: flontier と steering が同時に動いても混ざらない
 
 - **GIVEN** stroke-board と本家の dashboard が起動済みで、把握完了に達し proposal が提出されたセッションが存在する
-- **WHEN** `POST /api/strokes/:id/approve` でそのセッションを承認して steering 工程を開始し、並行して `POST /api/strokes` と `GET /api/strokes/:id/invoke-agent` で別セッションの flontier 工程を起動し、双方が進むのを待つ
-- **THEN** `GET /api/strokes/:id/strokes` で読んだ flontier セッションの記録は自分の概要に対応する内容であり、本家から取得した steering 文書は承認で生成されたプロジェクトのものである（検証側が突き合わせる）
+- **WHEN** `POST /api/strokes/:id/approve` でそのセッションを承認して steering 工程を開始し、並行して `POST /api/strokes`（概要以外の文脈に出現しない識別子 C を含む概要）と `GET /api/strokes/:id/invoke-agent` で別セッションの flontier 工程を起動し、双方が進むのを待つ
+- **THEN** `GET /api/strokes/:id/strokes` で読んだ flontier セッションの記録に識別子 C が現れ、承認したセッションのプロジェクト名（`GET /api/strokes` の応答が持つ昇格後の名前）以外の識別子は現れない。かつ `GET /api/projects/:projectId/steering/:name`（`projectId` は承認で生成されたプロジェクトのもの）が 200 を返す
 
 ### Requirement: 有効な token の無い呼び出しを拒否する
 
