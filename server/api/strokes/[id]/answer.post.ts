@@ -40,6 +40,5 @@ export default defineEventHandler(async (event) => {
     await appendAnswerStroke(sessionId, pending, answer)
   }
 
-  setResponseStatus(event, 200)
-  return null
+  return new Response(null, { status: 204 })
 })

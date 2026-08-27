@@ -86,6 +86,5 @@ export default defineEventHandler(async (event) => {
     }
   })
 
-  setResponseStatus(event, 200)
-  return null
+  return new Response(null, { status: 204 })
 })

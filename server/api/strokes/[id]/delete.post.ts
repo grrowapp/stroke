@@ -16,7 +16,7 @@ import { forgetSubmissions } from '../../../utils/stroke/submission-signal'
  * 持つ——CLI（`yarn session delete`）も同じ core を通るので、endpoint 側にだけ置くと
  * 片方が素通しになる。
  */
-export default defineEventHandler(async (event): Promise<null> => {
+export default defineEventHandler(async (event): Promise<Response> => {
   const sessionId = await requireSessionId(event)
 
   if (isRunning(sessionId)) {
@@ -30,5 +30,5 @@ export default defineEventHandler(async (event): Promise<null> => {
   }
   // 消えたセッションの提出の記録も落とす（id が使い回されたときに前の分を数えない）。
   forgetSubmissions(sessionId)
-  return null
+  return new Response(null, { status: 204 })
 })

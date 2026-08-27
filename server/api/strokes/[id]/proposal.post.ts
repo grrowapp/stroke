@@ -52,6 +52,5 @@ export default defineEventHandler(async (event) => {
   // 完了の合図ではなく「作業が行われた」ことの記録。invokeAi が起動の前後で比べる。
   notifySubmission(sessionId)
 
-  setResponseStatus(event, 200)
-  return null
+  return new Response(null, { status: 204 })
 })

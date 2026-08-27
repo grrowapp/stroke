@@ -166,7 +166,7 @@ invokeAi だけである（`openspec/specs/api/stroke/submission`）。
 - input: クエリ `cwd`（省略可。実行する場所）と `reset`（省略可。ユーザーの再実行）。
   **endpoint は cwd を自分で導出しない**——キックする側（画面・巡回・承認処理）が path を
   渡す。省略時はセッションディレクトリ。`reset` があればリトライ回数を 0 に戻してから起こす。
-- output: 本文なし
+- output: `{}`（200）。読み取り（GET）のため 204 を使わない
 - 受理で即完結する。`running` 化・起動・完了検知・タイムアウト・上限判定は非同期の
   invokeAi が担い、応答はそれを待たない。
 - **完了は invokeAi が子プロセスの output stream で検知する。** 提出（A5・A7）は完了の
@@ -210,7 +210,7 @@ invokeAi だけである（`openspec/specs/api/stroke/submission`）。
 ### A8 `POST /api/strokes/:id/submission`
 
 - input: `{ invocation: 'running' | 'idle' | 'failed' | 'error', retries?: number }`
-- output: 本文なし
+- output: 本文なし（204）
 - 実行の記録を指定の値に変えるだけの口。**`invocation` の唯一の書き込み口**であり、
   叩くのは invokeAi だけとする。claude（エージェント）と画面は叩かない
   （`openspec/specs/api/stroke/submission`）。A5・A7 も `invocation` に触れない。
