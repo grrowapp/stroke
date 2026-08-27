@@ -1,0 +1,4 @@
+schema: custom
+created: 2026-08-21
+retire_capabilities: true
+note: "プロジェクトを起こす側と見張る側で繋がっていない入口と出口を繋ぐ（作成ボタン→概要画面など）"

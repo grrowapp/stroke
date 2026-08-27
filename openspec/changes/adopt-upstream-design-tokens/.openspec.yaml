@@ -1,4 +1,4 @@
-schema: custom
+schema: specs-with-grill
 created: 2026-08-21
 skip_specs: true
 note: "統合で見た目が割れないよう、ストローク側の画面を本家再現の design token（CSS 変数・ダークテーマ）に揃える"

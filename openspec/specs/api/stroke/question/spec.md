@@ -1,0 +1,33 @@
+# api/stroke/question Specification
+
+## Purpose
+エージェントが問いを提出する endpoint（A5 `POST /api/strokes/:id/question`）を規定する。ストロークの問いも差し戻しへの問い返しも同じ口で受け、スキーマ検証と拒否までを担う。path は従来どおり変えない。
+
+## Requirements
+
+### Requirement: A5 POST /api/strokes/:id/question — 問いの提出を受ける
+
+システムは `POST /api/strokes/:id/question` を公開する SHALL。ストロークの問いも差し戻しへの問い返しも同じ口で受け、エージェントに区別を求めない。提出される問いは次の構造に従う。
+
+- `header`（12字以内）— 話題タグ
+- `detail`（300字以内）— 問いに関する詳細な説明
+- `question`（20字以内）— 問い本文
+- `options`（1件以上5件以内）— 選択肢。各要素は `label`（見出し、1〜5語）と `description`（50字以内。それを選ぶと何がどうなるかの説明）を持つ
+- `recommended` — 推奨の印。`true` の選択肢は多くとも1つ
+
+スキーマを満たさない提出は受理してはならない（MUST NOT）。`label` の「1〜5語」は形式の規定として文言で伝えるものとし、語数による機械的な検証は行わない。存在しないセッション id への提出は受理しない SHALL。
+
+#### Scenario: 問いを提出する
+
+- **WHEN** エージェントが構造を満たす問いを `POST /api/strokes/:id/question` へ提出する
+- **THEN** システムはそれを受け取り、ユーザーに問いとして表示する
+
+#### Scenario: スキーマを満たさない問いを提出する
+
+- **WHEN** 提出が構造を満たさない（規定の長さ・件数の超過を含む）
+- **THEN** システムは提出を受理せず、スキーマを満たさないことをエージェントへ返す
+
+#### Scenario: 存在しないセッション id で提出する
+
+- **WHEN** 存在しないセッション id に問いが提出される
+- **THEN** システムは受理せず、エラーを返す

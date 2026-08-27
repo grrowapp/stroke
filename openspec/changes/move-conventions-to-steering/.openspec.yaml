@@ -1,4 +1,4 @@
-schema: custom
+schema: specs-with-grill
 created: 2026-08-24
 note: |
   コーディング規約（auto-import 不使用・明示 import、テスト4種の役割、画面は判断しない）を docs から steering へ移す。

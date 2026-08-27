@@ -1,4 +1,4 @@
-schema: custom
+schema: specs-with-grill
 created: 2026-08-24
 note: |
   app/components/ を ui/（機能に属さない共通部品）＋機能単位へ再編する。

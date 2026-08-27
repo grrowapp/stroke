@@ -1,4 +1,4 @@
-schema: custom
+schema: specs-with-grill
 created: 2026-08-24
 note: |
   app/pages/strokes/** のルーティングを app/pages/projects/create/ 配下へ移す。

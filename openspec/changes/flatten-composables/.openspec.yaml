@@ -1,4 +1,4 @@
-schema: custom
+schema: specs-with-grill
 created: 2026-08-24
 note: |
   app/composables/ を関心単位の useXxx 平置きへ統一する（shared / workspace の境界ディレクトリを廃止）。

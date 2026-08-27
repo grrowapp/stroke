@@ -51,6 +51,10 @@ Use fresh agents, not `fork`, when the goal is to keep context out. See `docs/ag
 
 - `api-contract.md` — サーバ API の契約。画面・エージェントとサーバの境界
 
+### `docs/feature/`
+
+- `overview.md` — feature のワークフロー定義（`__` 命名・器・工程・締め。2レーンのうち feature レーンの正）
+
 ### `docs/specs/architecture/`
 
 - `session-workflow.md` — セッションのワークフロー定義（store・スキル・配線・実測で確定した制約）

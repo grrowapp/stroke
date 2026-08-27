@@ -1,4 +1,4 @@
-schema: custom
+schema: specs-with-grill
 created: 2026-08-24
 note: |
   app/assets/css/stroke.css（セッション画面だけに効くスタイル）を、design token の統合とあわせて畳む。

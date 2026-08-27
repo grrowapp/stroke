@@ -2,7 +2,7 @@
 
 仕様書管理（change `spec-document-management`）はプロジェクト配下 `docs/` の**既存**文書の一覧・閲覧・編集・削除を扱う。新しい文書を起こす口はそこに含めていない。文書を増やせなければドキュメントとしての仕様書は育たないので、作成の口を用意する。
 
-**前提**: 本 change は `spec-document-management`（capability `spec-documents` の新設）の完了を前提とする。
+**前提**: 本 change は `spec-document-management`（capability `spec-documents` の新設）の完了を前提とする。あわせて `define-feature-workflow`（feature / 仕様書の2レーンを定める仕様定義）の確定も前提とし、specs / design の作成は確定した仕様定義への**完全準拠**で進める。
 
 ## What Changes
 

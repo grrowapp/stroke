@@ -1,4 +1,4 @@
-schema: custom
+schema: specs-with-grill
 created: 2026-08-24
 note: |
   server/utils/ を関心単位4区分へ再編する。upstream / control / stroke という出自・境界での分けを解消。

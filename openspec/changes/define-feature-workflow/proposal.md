@@ -1,0 +1,43 @@
+## Why
+
+stroke-board は文書を **feature**（実装のタスクに繋がる文書の組）と**仕様書**（システムをドキュメントとして記述し続けるもの）の2分類で扱う。課題は階層有無の差異だった。openspec の specs は `specs/<階層>/spec.md` と階層を持てるが、本家 `.spec-workflow/specs/` は**フラット必須**で、入れ子は一覧に出ず親 spec を汚す（実測 2026-08-26、`docs/specs/reference/upstream-observations.md`）。
+
+解決の核は **`__`（2重アンダーバー）区切りで階層をフラット名にエンコードし、両者を同期する**こと。本家の枠組みは良いが openspec と比べて管理する概念層が荒いため、器は本家・概念層は openspec と役割を分ける方向がある（「spec-workflow-mcp の皮を被った openspec 実装」のイメージ。ただし中身の正をどちらに置くかは未決）。
+
+本 change の目的は、この定義を**ドキュメントとして作成する**ことである。feature の定義がどこにも無いまま依存 change（`create-feature` / `create-spec-document`）が進むと解釈がぶれる。定義の文書を作り、依存 change が完全準拠できる基盤にする。
+
+## What Changes
+
+feature の定義を文書化する。feature とは「実装のタスクに繋がる文書の組であり、本家の器に置かれ、openspec の `openspec/specs/` 配下の spec と1対1に対応するもの」である。文書化する仕様は次の4面。
+
+- **名前（`feature/naming`）**: 命名の規約と変換ルール。spec 名は openspec 側のパス（`openspec/specs/` からの相対）のセグメントを `__` で連結したフラット名。セグメントはアンダースコアを含まない kebab-case とし、`__` が常に区切りとしてのみ現れることで変換は可逆になる。名前とパスは1対1に対応し、同名の feature は存在しない。
+- **器と対応物（`feature/structure`）**: feature は `.spec-workflow/specs/<spec名>/` 直下の proposal.md / requirements.md / design.md / tasks.md で構成される（本家が読むのは requirements / design / tasks の3文書のみ。proposal.md は有っても害なし）。入れ子ディレクトリは持たない（実測で害が確認済み）。feature には必ず対応する change が `openspec/changes/` に存在し、その change には起票時の概要のみを持つ ticket が `openspec/tickets/<change名>.md` に存在する（起票の後に書き足さない）。
+- **工程（`feature/workflow/overview`）**: 工程の全体像。工程は openspec のローカル schema による外部定義で決まり、コード変更なしで反映される。tasks の全完了の後に締めがあり、それが最後である。schema の中身の詳細（artifact 定義・template）は本 change では決めず、実装時の設計とする。
+- **締め（`feature/workflow/sync`）**: feature 固有の sync 工程は定義しない。締めは本家の archive を起点とし（このとき requirements.md を change へ移す＝戻す接合）、以降は openspec 標準の sync → archive をそのまま使う。openspec 側は常に階層パスが正で、spec 名から配置先を計算することはない。
+
+本 change の仕様は**規約と構造の定義**であり、実行時の挙動（作成・削除・上書き等の操作がどう振る舞うか）は定義しない。操作の挙動は、操作の口を実装する依存 change 側の仕様が定める。
+
+あわせて、**概念の対応**を定義に記録する。本家の requirements と openspec の spec はほぼ同じ意図のものであり、requirements 側はスコープが粗め。イメージとして最も近いのは「openspec の spec が名前を変えたもの」。形式の強制（openspec 形式で書かなければならない等）はしない——中身の正の置き場は未決である。
+
+**仕様書レーンは本 change の scope 外**（仮決めの記載のみ）。openspec 的には `skip_specs: true` 相当の変形ワークフローで、proposal → spec（形が少し違う）→ design と進み tasks は無く、最後に `docs/specs/` へ同期する——というのが現時点の仮決め。器は先に用意してある（change `define-spec-document-workflow`、空の capability `spec-document/workflow/overview`）。
+
+## Capabilities
+
+### New Capabilities
+
+- `feature/naming`: 命名の規約と変換ルール。`__` による openspec 側のパスとの相互変換（可逆）、セグメントの規約（アンダースコアを含まない kebab-case）、名前とパスの1対1対応（同名は存在しない）。
+- `feature/structure`: feature を構成する構造。本家側のフラットな器（4文書・入れ子なし）と、openspec 側に必ず存在する対応物（change・ticket）。
+- `feature/workflow/overview`: 工程の全体像。外部定義（ローカル schema）・コード変更なしの反映・tasks 完了の後の締めが最後であること。
+- `feature/workflow/sync`: 締めの定義。本家の archive を起点とする戻す接合と、openspec 標準の sync → archive への接続。
+
+### Modified Capabilities
+
+なし。
+
+## Impact
+
+- **依存される change**: `create-feature` と `create-spec-document` は、本 change で確定した定義への完全準拠で specs / design を進める（両 proposal に明記済み）。操作（作成・削除等）の挙動の仕様は依存 change 側で定める。
+- **openspec store**: `openspec/schemas/` に feature 用 schema が増える（実体の作成は実装時の設計）。`openspec/specs/` が feature 完了時の sync で育ち始める。
+- **docs/**: apply の成果物として、確定した定義を `docs/feature/overview.md`（feature の定義の置き場）に落とす。`__` 規則のような覆しにくい決定は `docs/adr/` にも残す。
+- **本家との境界**: 本家 `.spec-workflow/specs/` への書き込みの口は依存 change 側が扱う。本 change が定めるのは定義であり、入れ子 spec の害（実測済み）を `__` ルールで回避する。本家の器の中身をどの形式で書くかはユーザー判断であり（ADR 0005 の趣旨）、決めた時にその判断を記録する。
+- **未決の分岐**: 中身の正の置き場（openspec 形式を正とするか）、工程の間の change の成果物と本家の器の中身の同期のさせ方、締め（戻す接合と openspec 側の sync → archive）の実行の担い手。いずれも全体の設計に依存するため本 change では決めず、実装時の設計へ送る。

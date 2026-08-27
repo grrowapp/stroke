@@ -4,12 +4,14 @@ feature（本家 spec-workflow の requirements / design / tasks の組）は本
 
 内容を詰める工程には、統合済みの stroke フロー（概要 → ストローク → proposal → 承認）を導入する想定がある。ただし**本 change の範囲は feature の作成まで**とし、stroke フローによる内容の充填は後続の change で扱う。
 
+**前提**: 本 change は `define-feature-workflow`（feature ワークフローの仕様定義）の確定を前提とする。specs / design の作成は、確定した仕様定義への**完全準拠**で進める。
+
 ## What Changes
 
 - ポータルの画面から**新しい feature を作成**できるようにする。
 - 作成はサーバ API 経由で行う。API が本家の `.spec-workflow/specs/<feature-name>/` 配下にファイルを作る。画面が直接ファイルを書くことはしない。
 - 本家の領域（`.spec-workflow/` 配下）への**書き込み**を初めて行う。本家データの扱いはユーザー判断とする ADR 0005 の趣旨に対し、この change 自体がそのユーザー判断である。
-- feature 名の付け方と既存 feature との衝突の扱いを定める。
+- feature 名の付け方と既存 feature との衝突の扱いを定める。feature 名は `define-feature-workflow` の `__` 命名規則（openspec 側のパスのエンコード）に従う。
 
 ## Capabilities
 
