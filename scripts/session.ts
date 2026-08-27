@@ -34,7 +34,7 @@ async function main(): Promise<void> {
       // AI の呼び出しはここでは起きないので invocation は idle で書く（design.md 決定3）
       const sessionId = await createSessionCore(root, arg, 'idle')
       // 返答は転送予定先（画面1）の URL。開けばセッションが進む
-      console.log(`${config.claude.apiBaseUrl}/s/${sessionId}`)
+      console.log(`${config.claude.apiBaseUrl}/strokes/${sessionId}`)
       return
     }
     case 'delete': {
