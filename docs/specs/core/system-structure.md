@@ -6,7 +6,7 @@ stroke-board の構造の定義。**統合後のあるべき配置**を規範と
 - components の全数と規範への対応は `docs/specs/core/file-components.md`、composables は `docs/specs/core/file-composables.md`、server/utils は `docs/specs/core/server-structure.md`
 - データ取得・SSR の設計は `docs/specs/architecture/data-fetching.md`
 - 現状との差分（移行課題）は `docs/specs/plan/structure-migration.md`
-- コーディング規約（命名・import の書き方・テストの置き方と通す門番）は steering（`.spec-workflow/steering/` の `structure.md` / `tech.md`）が持つ。この資料は規約を持たず、参照だけを置く
+- コーディング規約（命名・import の書き方・テストの置き場・通す門番・書き方の原則）は steering（`.spec-workflow/steering/` の `structure.md` / `tech.md`）が持つ。この資料は規約を持たず、参照だけを置く
 
 ---
 
@@ -91,6 +91,6 @@ base2/
 | `docs/specs/core/file-components.md` / `file-composables.md` / `server-structure.md` | 部品・composable・utils の全数と規範への対応 |
 | `docs/specs/architecture/data-fetching.md` | データ取得・SSR の設計 |
 | `docs/specs/plan/structure-migration.md` | 現状との差分（移行課題） |
-| `.spec-workflow/steering/structure.md` / `tech.md` | コーディング規約（命名・import・テストの置き方と通す門番） |
+| `.spec-workflow/steering/structure.md` / `tech.md` | コーディング規約（命名・import・テストの置き場・通す門番・書き方の原則） |
 | `docs/adr/0002` / `0005`〜`0008` | 統合・本家の扱いの決定 |
 | `docs/agents/` | エージェント向けの運用 |
