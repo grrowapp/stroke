@@ -56,10 +56,7 @@ artifact を書く前に読むもの。`openspec/config.yaml` の `context` に�
 
 ## ブランチの切りどころ
 
-**planning の段階ではブランチを切らない。** `proposal` / `specs` / `design` / `tasks` は master 上で作る。
+**planning の段階ではブランチを切らない。** `proposal` / `specs` / `design` / `tasks` は develop上で作る。
 
 理由は、artifact を分離すると辿れなくなるからである。change は「今どこに何の課題があるか」を示す記録で、`openspec list` で一覧できることに価値がある。ブランチに分けると、そのブランチに切り替えない限り change が見えず、複数の change を並べて読むこともできない。planning の段階では隔離すべき成果物がまだ無い。
 
-**ブランチを切るのは apply（実装）に入るとき。** そこで初めてコードに触れ、壊れうる状態が生まれる。ブランチ名は change-id をそのまま使う。
-
-実装が終わって archive するところまでをそのブランチで行い、master へマージする。
