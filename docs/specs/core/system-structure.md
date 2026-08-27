@@ -39,7 +39,7 @@ base2/
 │   └── utils/                  関心単位で切る（§3 に一覧）
 ├── shared/                     画面とサーバーが共有する型（ドメイン別ファイル）
 ├── docs/                       specs（定義）/ adr / agents
-├── test/                       単体テスト。ソースの構造をそのまま写す（app/ server/ …）
+├── test/                       単体テスト（app/ server/ …）
 ├── e2e/                        Playwright
 ├── openspec/                   機能的 specs と change
 └── scripts/
