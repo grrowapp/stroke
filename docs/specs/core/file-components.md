@@ -72,7 +72,7 @@
 | `workspace/RecordList.vue` | 209 | `items: RecordItem[]` / `testid` / `labels` | — |
 | `workspace/WorkspacePanel.vue` | 28 | `title` / `subtitle` / `testid` + `actions` slot | — |
 
-単体テストはソースと同居させない。この2本を検証するテストは `test/app/components/workspace/`（`markdown-roundtrip.test.ts` / `markdown-sanitize.test.ts`）にある。
+この2本を検証するテストは `test/app/components/workspace/`（`markdown-roundtrip.test.ts` / `markdown-sanitize.test.ts`）にある。
 
 ### 参照元
 
