@@ -13,6 +13,7 @@
       "Edit(/openspec/**)",
       "Edit(/docs/adr/**)",
       "Read(/.claude/**)",
+      "Edit(//opt/projects/stroke-board/openspec/**)",
       "Bash(npx -y mdts --port 8522 *)",
       "mcp__specworkflow",
       "Agent",
@@ -22,9 +23,9 @@
       "Bash(sed *)",
       "Bash(awk *)",
       "Read(/prompt/**)",
-      "Edit(//opt/projects/**)",
       "Edit(./.claude/**)",
-      "Edit(/openspec/changes/**/.openspec.yaml)",
+      "Edit(//opt/projects/stroke-board/openspec/**/.openspec.yaml)",
+      "Edit(//opt/projects/**/.spec-workflow/**)",
       "Edit(.mcp.json)"
     ]
   },
