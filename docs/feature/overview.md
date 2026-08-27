@@ -21,33 +21,28 @@ stroke でエージェントが schema の instruction に従い proposal.md を
   ▼
 stroke-board が spec.md を feature として .spec-workflow に配置する
   │ feature の名前は capability のパスを `__` 規約でエンコード
+  │ proposal.md も一緒に置く（capability が複数なら全 feature に同じものを置く）
   ▼
 .spec-workflow/specs/<spec名>/            ← 器（capability と1対1）
-  ├ proposal.md       （change の proposal に対応。本家は読まないが有っても害なし）
-  ├ requirements.md   （change の spec に対応）
+  ├ proposal.md       （change の proposal。集合定義の拠り所）
+  ├ requirements.md   （change の spec に対応。delta 形式を満たす）
   ├ design.md         （change の design に対応）
   └ tasks.md          （change の tasks に対応）
   │ エージェントが内容の充填 〜 実装を進める（工程は schema の外部定義で決まる）
   │ tasks 全完了 ＝ その feature（capability）の作業完了
   ▼
 本家の archive（spec-workflow が元々持つ機能）
-  │ requirements.md の中身を change 内の spec.md（delta）へ戻す（戻す接合。実行の担い手は未決）
+  │ requirements.md の中身を change 内の delta として置く（戻す接合）
   │ → openspec/changes/<change名>/specs/<階層パス>/spec.md
   ▼
 openspec 標準の sync → archive
-  │ 対象 capability すべての戻す接合が揃ってから実行する（実行の担い手は未決）。
+  │ 対象 capability すべての戻す接合が揃ってから実行する。
   │ sync が delta を同じパスへ反映し、archive が change を片づける
   ▼
 openspec/specs/<階層パス>/spec.md          ← 確定した仕様の置き場
   │
-  │ 本家で archive から戻された（unarchive）
-  │ ＝ その capability にフォーカスした修正の開始
-  ▼
-stroke-board が update-<feature名> の change を新品で起こす
-  │ 対象の capability は、復元された器の spec 名に置換ルールを適用して特定する（1つ）。
-  │ 器は本家が丸ごと復元する。
-  │ 締めの戻す接合では、全文と確定済み spec の差分から MODIFIED の delta を作る
-  └─▶（「内容の充填 〜 実装」へ戻る）
+  │ 本家で archive から戻された（unarchive）＝修正の開始
+  └─▶ [archive からの戻しへの対応](#archive-からの戻しへの対応update-change) が起票に接続する
 ```
 
 ## 入口
@@ -78,15 +73,15 @@ stroke が始まる口は複数ある。代表は2つで、網羅と挙動の定
 | feature | capability（openspec の spec） | **1 : 1**（永続） | 名前。spec 名 ↔ パスの置換ルール |
 | change | capability（= feature） | **1 : N** | change の proposal が capability を確定し、エージェントが proposal を元に書いた spec.md（capability ごとに1つ）を stroke-board が feature として spec-workflow に配置する。対応の正は proposal の Capabilities 節 |
 | ticket | change | **1 : 1** | ファイル名 = change 名（`openspec/tickets/<change名>.md`）。起票時に作られ、起票の概要のみを持ち、以後追記しない |
-| 器の1周回（作成 〜 archive） | change 1つ | 1 : 1 | archive から戻す＝同じ器・別の change（update change） |
 
-- 「この capability を対象とする進行中の change はどれか」は **change の proposal の Capabilities 節から引く**
-- 対応は **proposal で capability が確定した時点で成立する**。それまでは対応が無い状態でよい。update change は起票の瞬間から対象が1つ確定している（復元された器の spec 名に置換ルールを適用して特定する）
+- 「この capability を対象とする進行中の change はどれか」は、**修正の回は change 名で引ける**（`update-<feature名>` が対象を表す）。**最初の回の引き方は未決**（[後続で決めること](#後続で決めること)。ticket への後書きは禁止で、change ディレクトリの中に作業中の成果物は無い）
+- 対応は **proposal で capability が確定した時点で成立する**。それまでは対応が無い状態でよい。update change も同じで、proposal が再作成されるまで対応は成立しない（change 名の `update-<feature名>` は対象を示唆するだけ）
 
 ## 器
 
 - feature は `.spec-workflow/specs/<spec名>/` 直下の proposal.md / requirements.md / design.md / tasks.md で構成される
-- 本家が spec として扱うのは requirements / design / tasks の3文書のみ。proposal.md は本家からは見えないが、置いてあっても害はない。stroke-board では feature の文書の種類として追加する予定
+- 本家が spec として扱うのは requirements / design / tasks の3文書のみ。proposal.md は本家からは見えないが、置いてあっても害はない
+- stroke-board は配置時に change の proposal.md を feature へ置く。**capability が複数のときは、分解された feature 全てに同じ proposal.md を置き**、これを集合定義（この change が対象とする capability の全量）の拠り所とする
 - `.spec-workflow/specs/` 配下に入れ子ディレクトリを持たない。入れ子は本家の一覧に現れず、本家のファイル監視が親 spec に存在しない文書の更新イベントを飛ばす（実測 2026-08-26、[upstream-observations](../specs/reference/upstream-observations.md)）。階層は入れ子ではなく `__` エンコードのフラット名で表す
 
 ## 工程
@@ -100,13 +95,13 @@ stroke が始まる口は複数ある。代表は2つで、網羅と挙動の定
 
 feature 固有の sync 工程は**定義しない**。締めは既存の2つの機能の接合である。
 
-- 起点は**本家の archive**（spec-workflow が元々持つ機能）
-- **戻す接合**: archive のとき、requirements.md の中身を対応する change 内の **delta** `openspec/changes/<change名>/specs/<階層パス>/spec.md` へ戻す（proposal の後に作られた spec.md を更新する）。階層パスは spec 名に置換ルールを適用して得る（`api__session` → `specs/api/session/spec.md`）
+- 起点は **archive**（spec-workflow が元々持つ機能。実行の主体は規定しない）
+- **戻す接合**: archive のとき、対応する change 内の **delta** `openspec/changes/<change名>/specs/<階層パス>/spec.md` へ、requirements.md の中身を戻す（proposal の後に作られた spec.md を更新する）。階層パスは spec 名に置換ルールを適用して得る（`api__session` → `specs/api/session/spec.md`）
 - **sync**: openspec 標準の sync が change 内の delta を**同じパス**の `openspec/specs/<階層パス>/spec.md` へ反映する。spec 名から配置先を計算する機能は openspec に無く、配置先は delta のパスだけで決まる
 - **archive**: openspec 標準の archive が change を片づけ、工程が終わる（openspec の `archive` コマンドは sync と片づけの両方を行う）
-- change の対象 capability が複数のときは、**すべての対象の戻す接合が揃ってから** sync → archive を実行する（change は1つなので、締めも1回）
-- 戻す接合は **delta 形式への変換を含む**。置かれる delta は openspec の delta 形式（`## ADDED Requirements` 等 + Requirement / Scenario）であり、sync がそのまま読める状態にする
-- 修正の回（次節の update change）では、器の requirements.md は**全文**で編集される（本家に delta の概念が無い）。戻す接合はこの全文と確定済みの `openspec/specs/<階層パス>/spec.md` の差分から **MODIFIED の delta** を作ることになる。この差分の作り方は[後続で決めること](#後続で決めること)
+- change の対象 capability が複数のときは、**すべての対象の戻す接合が揃ってから** sync → archive を実行する。揃ったかどうかは、stroke-board が **archive 操作の度に、capability に対する delta の充足チェック**を行って判定する
+- proposal 上に capability が複数定義されていた場合、spec-workflow への配置時に、**分解された feature 全てに同じ proposal.md を配置**する。これが集合定義（この change が対象とする capability の全量）の拠り所になる
+- 戻す接合は **delta 形式への変換をしない**。requirements.md は delta 形式（`## ADDED Requirements` 等 + Requirement / Scenario）を満たしており、sync がそのまま読める
 - 結果として `openspec/specs/` に入る spec.md は openspec の機能的 spec の形式（Requirement + Scenario）に適合する
 
 ### 本家操作との混在への対応（archive からの戻し）
@@ -115,50 +110,59 @@ feature 固有の sync 工程は**定義しない**。締めは既存の2つの�
 
 概念として、spec の変更は change を立てて delta を作るのが正しい流れである。本家には delta の概念が無いので、**archive から戻す＝修正・やり直しの開始＝change を立てることと同義**である。feature は1つ（本家側に changes / specs のような状態区分は無く、同じ器がそのまま作業場になる）。
 
-そこで stroke-board は、archive からの戻しを感知したら**内容変更の change（`update-<feature名>` のような名前）を新品で起こす**。
+#### 突き合わせ（状態の判定）
 
-**spec-update からの流れ**:
+軸は**本家が返す specs の一覧**である。WS `spec-update` は `{specs, archivedSpecs}`（アクティブな器と archive 済みの器の全件一覧）を運ぶ（[upstream-observations](../specs/reference/upstream-observations.md)）。画面ロード時も同じ一覧を本家から取得する（ADR-0012 の流儀）。stroke-board は一覧を受け取るたびに、判定を全量やり直す。
+
+受け取った一覧の spec 名ごとに、openspec 側の2点を見る（spec 名からの逆変換はしない。[ADR-0005](../adr/0005-do-not-derive-from-upstream-data.md)）。
+
+- **確定した仕様があるか** — `openspec/specs/<パス>/spec.md` がある（パス ↔ spec 名は置換ルール）
+- **update change があるか** — `openspec/changes/update-<spec名>/`（`archive/` 除く）がある（名前が対象を表す）
+
+各 spec 名を判定表に当てる。
+
+| 確定した仕様 | update change | 状態と対応 |
+|---|---|---|
+| ある | ない | **archive からの戻し** → update change を起こす（次項） |
+| ある | ある | 修正の回が進行中。正常 |
+| ない | どちらでも | 最初の回の作業中、または出自不明。両者の区別に要る「最初の回の change ↔ capability の対応の引き方」は未決（[後続で決めること](#後続で決めること)）→ 表示してユーザー判断 |
+
+逆に、update change があるのに対象の spec 名が `specs` に居ないときは、`archivedSpecs` に居れば締めの途中（正常）、どこにも居なければ**本家の器が消えた** → 表示してユーザー判断。
+
+判定は毎回、受け取った一覧とその場の状態だけで完結し、スナップショットや差分の追跡は持たない（サーバ再起動に強く、ロード時・受信時で同じ判定になる）。自演ガードとして、stroke-board 自身が締めを実行している間の `spec-update` では起票しない。
+
+#### archive からの戻しへの対応（update change）
+
+判定が「archive からの戻し」のとき、stroke-board は修正の回を始める。
 
 ```
-本家で unarchive（archive から戻す）
-  ▼
-stroke-board が感知する
-  │ WS spec-update の受信、または画面ロード時の突き合わせ（ADR-0012 の流儀）
-  ▼
-stroke-board が update-<feature名> の change を新品で起こす（ticket も同時に作る）
-  │ 対象の capability は、復元された器の spec 名に置換ルールを適用して特定する
-  ▼
-（全体像の stroke → proposal 以降に合流）
+stroke-board が update-<feature名> の change と ticket を新品で起こす
+  │ feature 名は復元された器の spec 名から取る。発火時の自動の挙動はここまで
 ```
 
-- 起こす change は完全な新品。過去の change や確定済み spec からの引き写しはしない（器の復元は本家が全部やる）
-- 確定済みの `openspec/specs/<階層パス>/spec.md` は正のまま残る
-- 自演ガード: stroke-board 自身が締めを実行している間の `spec-update` では起票しない
+自動の流れはここで切れる。以降は**ユーザーの操作**（入口「feature の画面から stroke を開始する」）で始まる。
 
-**突き合わせ**（ロード時・受信時に全量をやり直す）: feature ごとに、次の3箇所を見比べる。
+```
+ユーザーが feature の画面から stroke を開始する
+  ▼
+エージェントが stroke で proposal を作り直す
+  │ capability は proposal が再作成されるまで確定しない
+  │ （Capabilities 節に対象が入って初めて対応が成立する。[対応の定義](#対応の定義)）
+  ▼
+以降は全体像の「spec.md を書く」から締めまでと同じ
+```
 
-1. 本家に器があるか — `.spec-workflow/specs/` にアクティブな spec があるか
-2. 作業中の change があるか — **proposal の Capabilities 節**にそのパスを含む change が、`openspec/changes/`（`archive/` 除く）に居るか（[対応の定義](#対応の定義)。delta の存在では引かない）
-3. 確定した仕様があるか — `openspec/specs/<パス>/spec.md` があるか
+確定済みの `openspec/specs/<階層パス>/spec.md` は、update change が締まるまで正のまま残る。
 
-例: feature `api__session` なら、パスは `api/session`。見るのは `.spec-workflow/specs/api__session/` の有無、`api/session` を Capabilities に持つ進行中 change の有無（`openspec/changes/` の proposal を見る）、`openspec/specs/api/session/spec.md` の有無の3点である。
+#### 表示
 
-この判定は毎回その場の状態だけで完結する。過去のスナップショットの保存や差分の追跡は持たない（サーバ再起動に強く、ロード時・受信時で同じ判定になる）。
-
-| 本家の器 | 作業中の change | 確定した仕様 | 状態と対応 |
-|---|---|---|---|
-| ある | ある | どちらでも | 進行中。正常 |
-| ある | ない | ある | archive からの戻し → **update change を起こす** |
-| ある | ない | ない | 出自不明 → 表示してユーザー判断 |
-| ない | ある | どちらでも | 本家の器が消えた → 表示してユーザー判断 |
-
-**表示**: 自動で回復できないもの（出自不明・器の消失）は Feature 一覧の該当行にバッジを付け、詳細で上の表のどれに当たるかを示す。
+自動で回復できないもの（出自不明・器の消失）は Feature 一覧の該当行にバッジを付け、詳細で判定表のどれに当たるかを示す。
 
 ## changes との関係
 
-openspec では作業は change（`openspec/changes/<id>/`）として追跡される。change は proposal・specs（delta）・design・tasks を持ち、完了すると **sync**（delta を main specs へ反映）で `openspec/specs/` に確定した仕様が入り、その後 **archive** で change が片づけられる（openspec の `archive` コマンドは specs の更新と change の片づけの両方を行う）。順序は sync → archive である。
+openspec では作業は change（`openspec/changes/<change名>/`）として追跡される。change は proposal・specs（delta）・design・tasks を持ち、完了すると **sync**（delta を main specs へ反映）で `openspec/specs/` に確定した仕様が入り、その後 **archive** で change が片づけられる（openspec の `archive` コマンドは specs の更新と change の片づけの両方を行う）。順序は sync → archive である。
 
-進行中の feature には、**それを対象とする進行中の change が必ず `openspec/changes/` に存在する**（確定事項）。change と feature は 1 : N であり、対応は proposal の Capabilities 節で引く（[対応の定義](#対応の定義)）。
+進行中の feature には、**それを対象とする進行中の change が必ず `openspec/changes/` に存在する**（確定事項）。change と feature は 1 : N であり、対応の引き方は[対応の定義](#対応の定義)に従う。
 
 - feature の proposal / requirements / design / tasks は、change の成果物（proposal / spec / design / tasks）に対応する
 - feature の tasks 全完了の後、本家の archive を起点に requirements.md が change 内の delta（`specs/<階層パス>/spec.md`）へ戻る（戻す接合）。change の対象すべての戻す接合が揃ったら、openspec 標準の sync → archive で締まる
@@ -171,9 +175,9 @@ openspec では作業は change（`openspec/changes/<id>/`）として追跡さ�
 
 | 本家の器 | openspec の概念 | 備考 |
 |---|---|---|
-| `.spec-workflow/specs/<spec名>/` | capability の器 | 進行中の回は、その capability を対象とする change に対応。中身の同期のさせ方は未決 |
-| `proposal.md` | change の proposal | 本家は読まない。stroke-board が feature の文書の種類として扱う予定 |
-| `requirements.md` | spec（Requirement + Scenario） | 概念がほぼ同じ。「openspec の spec が名前を変えたもの」が最も近いイメージ。requirements 側はスコープが粗め。形式まで縛るかは未決 |
+| `.spec-workflow/specs/<spec名>/` | change に相当する作業単位 | capability と1対1（[命名](#命名)） |
+| `proposal.md` | change の proposal | 本家は読まない。配置時に全 feature へ同じものが置かれ、集合定義の拠り所になる |
+| `requirements.md` | spec（Requirement + Scenario） | delta 形式を満たす。spec.md との同期のさせ方は未決（[後続で決めること](#後続で決めること)） |
 | `design.md` | change の design | |
 | `tasks.md` | change の tasks | |
 | tasks 全完了 → 本家の archive | sync → archive | 本家 archive で requirements が change へ戻り、sync で `openspec/specs/` が育ち、archive で change が片づく |
@@ -183,10 +187,9 @@ openspec では作業は change（`openspec/changes/<id>/`）として追跡さ�
 
 いずれも全体の設計（実装時の設計・後続の change）で決める。決まるまで、依存 change 側でも決めずに実装時の設計へ送る。
 
-- **delta の起こし方（差分観点）**: 修正の回で、器の全文と確定済み spec の差分から MODIFIED の delta を作る仕組み。現時点のイメージは「stroke-board の feature 画面上に stroke を起こす機能を実装し、その工程が動いて delta を起こす」（仮）
-- 中身の正の最終形（概念の対応に留めるか、形式まで縛るか）
 - 工程の間の、change の成果物と本家の器の中身の同期のさせ方
 - 締め（戻す接合と openspec 側の sync → archive）の実行の担い手
 - update change の起票の詳細（命名の確定・自演ガードの実装）
+- 最初の回（確定した仕様がまだ無い作業中の feature）の change ↔ capability の対応の引き方（ticket への後書きは禁止・change ディレクトリの中に作業中の成果物は無い、という制約の下で決める。出自不明の器との区別に要る）
 
 feature への操作（作成・削除等）の挙動は本書では定めない。操作の口を実装する依存 change（`create-feature` ほか）側の仕様が定める。

@@ -26,3 +26,4 @@
 - **change 間の依存**: `spec-document-management` の完了が先。仕様書管理画面と `docs/` の API がそこで生まれる。
 - 画面: 仕様書管理画面に作成の UI を追加。
 - サーバ: `docs/` 配下への作成 API を `server/` に追加。
+- **`define-feature-workflow` の確定による影響**（2026-08-27 承認。正は `docs/feature/overview.md`）: feature レーンの定義が確定し、準拠の参照先が定まった。ticket（`openspec/tickets/<change名>.md`。起票時に作られ、概要のみ・以後追記しない）等の確定は feature レーン側の定義であり、仕様書レーンは仮決めのまま。本 change の範囲・内容への変更はない。

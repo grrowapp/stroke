@@ -11,4 +11,4 @@
 
 ## 3. 承認
 
-- [ ] 3.1 `docs/feature/overview.md` のユーザー承認を得る
+- [x] 3.1 `docs/feature/overview.md` のユーザー承認を得る
