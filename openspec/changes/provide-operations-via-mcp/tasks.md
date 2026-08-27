@@ -1,34 +1,45 @@
 # provide-operations-via-mcp Tasks
 
-## 1. 土台
+## 1. モジュール導入
 
-- [ ] 1.1 `@modelcontextprotocol/sdk` と `zod` を依存に追加する
-- [ ] 1.2 `tools/mcp/` を作り、接続コンテキスト（stroke base URL / 本家 base URL / セッション id / プロジェクトパス）を env から読む口を実装する（design D3）
-- [ ] 1.3 transport 非依存のハンドラ層の型（引数 + 接続コンテキスト → 結果）を定義する（design D2）
+- [ ] 1.1 `@nuxtjs/mcp-toolkit` を依存に追加し、lockfile でバージョンを固定する
+- [ ] 1.2 `nuxt.config.ts` の modules に追加する（route は既定 `/mcp`、`dir` は既定のまま）
+- [ ] 1.3 Nuxt DevTools の MCP Inspector で `/mcp` が開けることを確認する
 
-## 2. ツールハンドラ（endpoint 代行）
+## 2. セッション管理（接続表と token）
 
-- [ ] 2.1 `overview`: `GET /api/strokes/:id/overview` への代行を実装する（specs `mcp/tools/overview`）
-- [ ] 2.2 `strokes`: `GET /api/strokes/:id/strokes` への代行を実装する（specs `mcp/tools/strokes`）
-- [ ] 2.3 `send-back`: `GET /api/strokes/:id/send-back` への代行を実装する。404 も素通しする（specs `mcp/tools/send-back`）
-- [ ] 2.4 `submit`: 種別（question / proposal / steering-document）で代行先を振り分ける提出の一本口を実装する（specs `mcp/tools/submit`）
-- [ ] 2.5 `steering`: 文書名引数の取得と文書状況の取得を実装する。projectId は `GET /api/projects/list` からプロジェクトパスで引き当てる（specs `mcp/tools/steering`、design D3）
-- [ ] 2.6 エラー素通し（`{status, body}`）とネットワーク不達時のツールエラーを共通化する（design D5）
+- [ ] 2.1 接続表の util を `server/utils/` に追加する（`register` / `resolveConnection` / `remove`。メモリのみ・永続化しない。specs `server/session-management`、design の接続表エントリ: token / sessionId / projectPath）
+- [ ] 2.2 `resolveConnection` は `x-stroke-token` ヘッダを照合し、欠落・不一致は 401 を throw する（既定値で補わない。ADR-0013）
+- [ ] 2.3 接続表 util の単体テスト: 登録→照合→削除の一巡、欠落・不一致の拒否
+- [ ] 2.4 ここまでの実装を santa-method でレビューし（独立2レビュアー）、両者合格まで修正する
 
-## 3. stdio エントリ
+## 3. ツール定義（server/mcp/tools/）
 
-- [ ] 3.1 `tools/mcp/index.ts` に SDK の stdio Server を実装し、ハンドラ層を登録する（サーバー名 `stroke`、design D4）
-- [ ] 3.2 単体で起動してツール列挙と各ツールの往復を確認する（specs `mcp/server`）
+- [ ] 3.1 `get-overview.ts`: A1 への代行。結果は `status: 200` + `overview` / 404 は `not_found`（specs `mcp/tools/overview`）
+- [ ] 3.2 `get-strokes.ts`: U3 への代行。結果は `status: 200` + 時系列の記録一覧 / 404 は `not_found`（specs `mcp/tools/strokes`）
+- [ ] 3.3 `get-send-back.ts`: A4 への代行。404 の errorCode は `no_send_back` / `session_not_found` で区別（specs `mcp/tools/send-back`）
+- [ ] 3.4 `send-question.ts`: A5 への代行。構造化引数、成功 204、400 は `validation_error`、404 は `session_not_found`、409 は `phase_conflict`（specs `mcp/tools/question`）
+- [ ] 3.5 `submit-document.ts`: 種別（flontier / steering）で A7 / 本家 PUT へ振り分け。失敗は種別によらずエラー形式、本家不達は `unreachable`（specs `mcp/tools/submit`）
+- [ ] 3.6 `get-steering.ts`: 本家 GET への代行。結果に `exists`（本家 info の文書状況から）を含める。文書無しは 200 + `exists: false` + 空の文章、規定外名は 400 `validation_error`、不達は 502 `unreachable`（specs `mcp/tools/steering`）
+- [ ] 3.7 projectId の解決: ツール実行時に本家 `GET /api/projects/list` からプロジェクトパスで引き当てる（design）
+- [ ] 3.8 ツールハンドラの単体テスト: `$fetch` をモックし、結果整形（status / errorCode / error）を各パターンで検証
+- [ ] 3.9 ツール6本の実装を santa-method でレビューし（独立2レビュアー）、両者合格まで修正する
 
-## 4. spawn 配線
+## 4. spawn への配線（invoke.ts）
 
-- [ ] 4.1 `server/utils/stroke/invoke.ts`: セッション工程の呼び出しに操作系 MCP サーバーの `--mcp-config` を足す（specs `agent/invocation`）
-- [ ] 4.2 同 steering 工程の `mcpConfigFor` に、本家 MCP と並べて操作系サーバーを足す
-- [ ] 4.3 接続情報が prompt に載っていないことを確認する（specs `agent/invocation` の Scenario）
+- [ ] 4.1 spawn 直前に一時 token（推測困難な乱数）を発行し、接続表へ登録する
+- [ ] 4.2 mcp-config に `{ "type": "http", "url": "<apiBaseUrl>/mcp", "headers": { "x-stroke-token": <token> } }` を追加する（url は `runtimeConfig.claude.apiBaseUrl` から。既存フラグ・steering の本家 MCP の並びは変えない）
+- [ ] 4.3 invokeAi の実行終了時（正常・異常とも）に接続表のエントリを削除する
+- [ ] 4.4 配線の実装を santa-method でレビューし（独立2レビュアー）、両者合格まで修正する
 
-## 5. テストと検証
+## 5. 検証
 
-- [ ] 5.1 ハンドラ層の単体テスト（代行先 URL・素通し・振り分け）を追加する
-- [ ] 5.2 セッション工程の実機確認: 起動した claude からツール一覧が見え、`overview` の取得と `submit`（question）の提出が通る
-- [ ] 5.3 steering 工程の実機確認: `steering` の取得と `submit`（steering-document）の書き込みが通る
-- [ ] 5.4 既存スキル経路が無変更で動くこと（併存）を確認する
+- [ ] 5.1 MCP Inspector で6ツールの列挙と、結果スキーマ（status / errorCode / error）の定義を確認する（specs `mcp/server`）
+- [ ] 5.2 token 無し・未発行 token の MCP 設定で外部から `claude -p` を起動し、ツール呼び出しが認可エラーで失敗する報告を確認する（specs `server/session-management`）
+- [ ] 5.3 セッション2つを並走させ、`GET /api/strokes/:id/strokes` の記録が混ざらないことを確認する（specs `server/session-management`）
+- [ ] 5.4 既存経路の無変更確認: 現行スキルでのストローク・steering 工程が従来どおり動く（ロールバックは mcp-config の追加分を外すだけ）
+
+## 6. レビューと承認
+
+- [ ] 6.1 全体を santa-method でレビューし（独立2レビュアー・共有コンテキストなし）、両者合格まで修正する
+- [ ] 6.2 検証（5章）の結果を添えて approvals（dashboard）で承認を依頼し、approved を確認する。承認までは change の完了・archive に進まない

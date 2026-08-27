@@ -44,9 +44,9 @@ graph TD
 | `get-overview.ts` | 概要の取得 | A1 `GET /api/strokes/:id/overview` |
 | `get-strokes.ts` | ストローク記録の取得 | U3 `GET /api/strokes/:id/strokes` |
 | `get-send-back.ts` | 差し戻しの取得 | A4 `GET /api/strokes/:id/send-back` |
-| `submit-question.ts` | 問いの提出（構造化引数） | A5 `POST /api/strokes/:id/question` |
+| `send-question.ts` | 問いの提出（構造化引数） | A5 `POST /api/strokes/:id/question` |
 | `submit-document.ts` | 文書の提出（種別 flontier / steering） | A7 `POST /api/strokes/:id/proposal` / 本家 `PUT /api/projects/:projectId/steering/:name` |
-| `get-steering.ts` | steering 文書の取得 | 本家 `GET /api/projects/:projectId/steering/:name` |
+| `get-steering.ts` | steering 文書の取得（有無 `exists` を結果で告知。値は本家の文書状況から） | 本家 `GET /api/projects/:projectId/steering/:name` / 本家 `GET /api/projects/:projectId/info` |
 
 ツールファイルの形（ハンドラが `(args, event: H3Event)` を受けることはモジュールのソースで検証済み: `nitro-mcp-toolkit/src/runtime/tool.ts`）:
 
@@ -79,22 +79,21 @@ export default defineMcpTool({
 | 項目 | 内容 |
 |---|---|
 | token | 照合キー。`x-stroke-token` ヘッダと突き合わせる |
-| kind | 工程種別（flontier / steering） |
-| sessionId | flontier 工程のみ。セッション id |
-| projectPath | steering 工程のみ。プロジェクトパス |
-| claudeSessionId | claude の session-id（`--session-id` / `--resume` の値） |
+| sessionId | 対象のセッション id |
+| projectPath | 対象のプロジェクトパス |
 
 登録は spawn の直前、削除は invokeAi の実行終了時（正常・異常とも）。Nitro プロセス内のメモリのみに保持し永続化しないため、stroke-board 再起動で全エントリが失効し、再起動をまたいで有効な資格情報を作らない。
 
 ### 結果の形
 
-各ツールの結果は次のいずれか1つで、いずれも1階層とする。
+各ツールの結果は1階層のフラットな形に統一し、種類の列挙（成功/エラー/不達の排他形）にはしない。項目は次のとおり。
 
-| 形 | 項目 | 意味 |
+| 項目 | いつ持つか | 意味 |
 |---|---|---|
-| 成功 | そのツールの結果スキーマの項目 | 例: `get-overview` は `{ overview: string }` |
-| エラー | `status` / `error` | endpoint が返した HTTP ステータスコードとエラー本文。書き換え・省略・追加をしない |
-| 不達 | `unreachable: true` | 本家 dashboard に到達できなかった場合のみ。`status` / `error` は持たない |
+| `status` | 常に | 呼び出しの結果を表す HTTP ステータスコード（endpoint の応答の値を保持する） |
+| `errorCode` | 失敗時のみ | 機械可読の失敗種別。endpoint のエラーは応答から導出し、本家 dashboard に到達できない場合は `unreachable` |
+| `error` | 失敗時のみ | endpoint が返したエラー本文。書き換え・省略・追加をしない |
+| 結果スキーマの項目 | 成功時のみ | 例: `get-overview` は `overview: string` |
 
 ## Decisions
 
@@ -114,13 +113,13 @@ MCP は Nuxt アプリの route `/mcp`（Streamable HTTP）で提供し、別プ
 
 invoke.ts が起動した claude だけが接続できる担保と「どの claude か」の特定を、1つの token で行う。セッション id の直渡しは不採用——特定できるのは flontier 工程だけで steering 工程の文脈はプロジェクトパスとなりヘッダの意味が工程で変わるうえ、id は画面 URL（`/strokes/<uuid>`）に現れる値で担保にならない。永続 token（設定値）も不採用——全 claude で共有になり、漏れても失効できない。
 
-### Decision: 接続表はメモリ上の層とし、新 capability で契約を定める
+### Decision: 接続表はメモリ上の層とし、capability `server/session-management` で契約を定める
 
-接続の担保はツール個別でなく全ツール共通の関心なので、独立した層にし、契約を新 capability `specs/mcp/connection` に定める（design 承認後に spec を追加する）。ファイル・DB への永続化は不採用——失効管理が必要になり、漏洩面も増える。
+接続の担保はツール個別でなく全ツール共通の関心なので、独立した層にし、契約を capability `server/session-management` に定める（spec は承認済み）。ファイル・DB への永続化は不採用——失効管理が必要になり、漏洩面も増える。
 
-### Decision: 結果は3種のフラットな形に固定する
+### Decision: 結果は status と errorCode のフラットな形に統一する
 
-「相手が拒否した」（内容を直して出し直せる）と「相手に届かない」（出し直しても無駄、環境の問題）は claude の次の行動が違うため、エラーと不達を区別する。stroke-board 向け操作に不達を定めないのは、stroke-board 自身が spawn 元で、停止中にツールが実行される状況が成立しないため（specs `mcp/server`）。MCP サーバー側の事前検証・独自分岐は入れない（ADR-0013）。入れ子の構造化エラーは不採用。
+すべての結果は1階層で、常に `status`（HTTP ステータスコード）を持つ。失敗はさらに `errorCode`（機械可読の失敗種別）と `error`（endpoint が返したエラー本文。書き換え・省略・追加をしない）を持ち、成功はツールの結果スキーマの項目を持つ。種類の列挙（成功/エラー/不達の排他3形）にはしない（レビュー指示 2026-08-27）。「相手が拒否した」（内容を直して出し直せる）と「相手に届かない」（出し直しても無駄、環境の問題）の区別は `errorCode` で表し、後者は `unreachable` とする。`unreachable` を定めるのは本家 dashboard 向け操作だけ——stroke-board 自身が spawn 元で、停止中にツールが実行される状況が成立しないため（specs `mcp/server`）。MCP サーバー側の事前検証・独自分岐は入れない（ADR-0013）。入れ子の構造化エラーは不採用。
 
 ### Decision: MCP の url は既存設定から組み立てる
 
@@ -128,14 +127,14 @@ url の base は nuxt.config の既存値 `runtimeConfig.claude.apiBaseUrl`（�
 
 ### Decision: ツール名は動詞+対象で内容がわかる名前にする
 
-`get-overview` / `get-strokes` / `get-send-back` / `submit-question` / `submit-document` / `get-steering` の6本（ファイル名=ツール名）。スキル名は引き継がない。問いと文書を分けるのは引数の形が別物のため（構造化引数 vs 本文の文章）。capability 名の流用（`overview` 等）は内容が読めず不採用。
+`get-overview` / `get-strokes` / `get-send-back` / `send-question` / `submit-document` / `get-steering` の6本（ファイル名=ツール名）。スキル名は引き継がない。問いと文書を分けるのは引数の形が別物のため（構造化引数 vs 本文の文章）。capability 名の流用（`overview` 等）は内容が読めず不採用。
 
 ## Risks / Trade-offs
 
 - [モジュールが 0.x で破壊的変更があり得る] → lockfile でバージョンを固定し、更新は change として扱う
 - [同じ `/mcp` に複数の claude が接続する] → 接続表の token 照合で接続文脈を分離する。ヘッダ欠落・表に無い token は拒否し、既定値で補わない（ADR-0013）
 - [`/mcp` が route として外部からも見える] → token 照合により、invoke.ts が起動した claude 以外の呼び出しは拒否される（Decision: 一時 token）
-- [本家 dashboard 停止中は steering 系ツールが失敗する] → 不達を `{ unreachable: true }` として返し（Decision: 結果3形）、MCP サーバー側で握りつぶさない
+- [本家 dashboard 停止中は steering 系ツールが失敗する] → `errorCode: unreachable` の失敗として返し（Decision: 結果の形）、MCP サーバー側で握りつぶさない
 - [ツールとスキルの併存で入口が2本になる] → 本 change の範囲では2本のまま。一本化は `switch-workflow-to-mcp-tools` が行う
 
 ## Migration Plan

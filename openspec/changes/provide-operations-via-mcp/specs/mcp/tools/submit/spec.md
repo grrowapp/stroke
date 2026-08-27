@@ -2,7 +2,7 @@
 
 ## Purpose
 
-文書の提出の一本口となるツールの契約を定める。どこへの提出かは引数の種別で決まる。
+文書の提出の一本口となるツール（`submit-document`）の契約を定める。どこへの提出かは引数の種別で決まる。
 
 ## ADDED Requirements
 
@@ -10,52 +10,22 @@
 
 ツールの引数は、提出の種別（flontier / steering）と文書の文章とする SHALL。種別が steering の場合は文書名（product / tech / structure）を併せて取る SHALL。
 
-ツールは、種別が flontier の場合は文章を自セッションの proposal として提出し、種別が steering の場合は指定された文書名の steering 文書として書き込む SHALL。提出先の振り分けは引数だけで決まる SHALL。引数に現れない内部状態を見て振り分けや可否を変えてはならない（MUST NOT）（docs/adr/0013 の原則に整合する）。ツール側で文章の検証を行って提出を止めてはならない（MUST NOT）——検証の正は提出先にある。
+提出先の振り分けは引数だけで決まる SHALL。引数に現れない内部状態を見て振り分けや可否を変えてはならない（MUST NOT）（docs/adr/0013 の原則に整合する）。ツール側で文章の検証を行って提出を止めてはならない（MUST NOT）——検証の正は提出先にある。結果は `mcp/server` の形式（status / errorCode）に従う SHALL。失敗は種別によらずすべてこのエラー形式で返り、本家 dashboard に到達できない場合の errorCode は `unreachable` とする SHALL。
 
-結果は次のいずれか1つを返す SHALL。
-
-- **受理**: 提出が受け付けられたこと
-- **エラー**: ステータスとエラー内容
-- **不達**: 提出先に到達できなかったこと
-
-#### Scenario: proposal を提出する
+#### Scenario: proposal の提出が画面に反映される
 
 - **GIVEN** 対象のセッションで stroke が把握完了した
-- **WHEN** 種別に flontier を指定し、proposal の文章を渡してツールを実行し、受理を受領する
-- **THEN** そのセッションの proposal 確認画面に、提出した文章が表示されていることが確認できる
+- **WHEN** claude が種別 flontier で proposal の文章を提出する
+- **THEN** proposal 確認画面（`/strokes/<セッション id>/proposal`）に提出された文章が表示される（検証側がブラウザで開いて確かめる）
 
-#### Scenario: product の steering 文書を提出する
+#### Scenario: steering 文書の提出が本家に反映される
 
-- **GIVEN** 対象のプロジェクトが存在する
-- **WHEN** 種別に steering、文書名に product を指定し、文章を渡してツールを実行し、受理を受領する
-- **THEN** steering の取得ツールで product を読み取ると、提出した文章が返る
+- **GIVEN** 本家の dashboard が起動済みで、対象のプロジェクトの steering 工程が開始されている
+- **WHEN** claude が種別 steering・文書名 product で文章を提出する
+- **THEN** 本家 `GET /api/projects/:projectId/steering/product` の応答が、提出された文章と一致する（検証側が突き合わせる）
 
-#### Scenario: tech の steering 文書を提出する
+#### Scenario: 本家が停止中の提出はエラーになる
 
-- **GIVEN** 対象のプロジェクトが存在する
-- **WHEN** 種別に steering、文書名に tech を指定し、文章を渡してツールを実行し、受理を受領する
-- **THEN** steering の取得ツールで tech を読み取ると、提出した文章が返る
-
-#### Scenario: structure の steering 文書を提出する
-
-- **GIVEN** 対象のプロジェクトが存在する
-- **WHEN** 種別に steering、文書名に structure を指定し、文章を渡してツールを実行し、受理を受領する
-- **THEN** steering の取得ツールで structure を読み取ると、提出した文章が返る
-
-#### Scenario: 提出先の検証に通らない
-
-- **GIVEN** 対象のセッションで stroke が把握完了した
-- **WHEN** 種別に flontier を指定し、提出先の検証に通らない文章で提出する
-- **THEN** エラーが返り、ステータスとエラー内容を持つ
-
-#### Scenario: 検証エラーの後に出し直す
-
-- **GIVEN** 対象のセッションで stroke が把握完了し、直前の提出が検証エラーで受理されていない
-- **WHEN** 内容を直した文章を同じツールで提出し、受理を受領する
-- **THEN** そのセッションの proposal 確認画面に、提出した文章が表示されていることが確認できる
-
-#### Scenario: 本家の dashboard が停止している
-
-- **GIVEN** 対象のプロジェクトが存在し、本家の dashboard が停止している
-- **WHEN** 種別に steering を指定して提出する
-- **THEN** 不達が返る
+- **GIVEN** 対象のプロジェクトの steering 工程が開始された後、本家の dashboard が停止している
+- **WHEN** claude が種別 steering で文章を提出する
+- **THEN** 結果はエラーで、status と `errorCode: unreachable` を持つ
