@@ -5,7 +5,7 @@
 状態の正はサーバのファイル（`state.json` / `strokes.json`）にある。WS はバッファを持たず、
 繋がっている接続へその場で流すだけ。図と実装が食い違ったら実装が正しい。
 
-矢印に付けた番号（U1・U7・U9・U13・A5・A7・W1・W2）は `docs/specs/api/api-contract.md` の一覧と同じもの。
+矢印に付けた番号（U1・U7・U9・U13・A5・A7・W1・W2）は `docs/specs/api/contract.md` の一覧と同じもの。
 入れ物の形と検証の規定は `docs/specs/core/schema.md` を参照。
 
 ## 並び
@@ -157,6 +157,6 @@ W1 が流すのは問いだけで、**問いの取り下げは流れない**。A
 
 ## 関連
 
-- `docs/specs/api/api-contract.md` — endpoint の一覧と契約
+- `docs/specs/api/contract.md` — endpoint の一覧と契約
 - `docs/specs/core/schema.md` — 入れ物の形と検証の規定
 - `docs/specs/reference/stroke-modules.md` — 画面側の使い方

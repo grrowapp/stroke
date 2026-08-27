@@ -2,7 +2,7 @@
 
 stroke-board の構造の定義。**統合後のあるべき配置**を規範として定める。
 
-- 用語は `CONTEXT.md`、決定の理由は `docs/adr/`、api の契約は `docs/specs/api/api-contract.md`
+- 用語は `CONTEXT.md`、決定の理由は `docs/adr/`、api の契約は `docs/specs/api/contract.md`
 - components の全数と規範への対応は `docs/specs/core/file-components.md`、composables は `docs/specs/core/file-composables.md`、server/utils は `docs/specs/core/server-structure.md`
 - データ取得・SSR の設計は `docs/specs/architecture/data-fetching.md`
 - 現状との差分（移行課題）は `docs/specs/plan/structure-migration.md`
@@ -33,7 +33,7 @@ base2/
 │   │   └── approval/           承認
 │   └── composables/            関心単位の useXxx を平置き。境界のディレクトリを作らない
 ├── server/                     Nitro
-│   ├── api/                    契約どおり（strokes は api-contract.md、projects は本家仲介）
+│   ├── api/                    契約どおり（strokes は contract.md、projects は本家仲介）
 │   ├── plugins/                起動時処理
 │   ├── routes/                 WebSocket（ws.ts と api/strokes/:id/ws/** = 契約 W1・W2）
 │   └── utils/                  関心単位で切る（§3 に一覧）
@@ -61,7 +61,7 @@ base2/
 
 ## 3. サーバー — `server/`
 
-**api は契約が正。** セッション系（`/api/strokes/**`、WS を含む）は `docs/specs/api/api-contract.md` の番号どおり。プロジェクト系（`/api/projects/**`）は本家の読み取り10本と書き込み3本（承認応答・仕様書保存・ステアリング保存）で、`read-only.test.ts` が範囲を機械的に固定している。
+**api は契約が正。** セッション系（`/api/strokes/**`、WS を含む）は `docs/specs/api/contract.md` の番号どおり。プロジェクト系（`/api/projects/**`）は本家の読み取り10本と書き込み3本（承認応答・仕様書保存・ステアリング保存）で、`read-only.test.ts` が範囲を機械的に固定している。
 
 **utils は関心単位で切る。** 区分は4つ — **本家接続 / 監視・通知 / セッション / 設定・起動**。全数の対応は `server-structure.md`。
 
@@ -85,7 +85,7 @@ base2/
 
 | 資料 | 持つもの |
 | --- | --- |
-| `docs/specs/api/api-contract.md` | api の契約 |
+| `docs/specs/api/contract.md` | api の契約 |
 | `docs/specs/core/schema.md` | 入れ物の形と検証 |
 | `docs/specs/core/settings-reference.md` | 設定の正 |
 | `docs/specs/core/file-components.md` / `file-composables.md` / `server-structure.md` | 部品・composable・utils の全数と規範への対応 |

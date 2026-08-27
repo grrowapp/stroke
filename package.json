@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "nuxt dev",
     "build": "nuxt build",
+    "clean": "rm -rf .output .nuxt node_modules/.vite node_modules/.cache .e2e-tmp test-results",
     "preview": "nuxt preview",
     "start": "nuxt dev",
     "postinstall": "nuxt prepare",
@@ -16,6 +17,7 @@
     "spec": "openspec validate --all",
     "check": "yarn typecheck && yarn spec",
     "session": "tsx --env-file-if-exists=.env scripts/session.ts",
+    "check:ws-disconnect": "tsx scripts/ws-disconnect-check.ts",
     "test": "vitest run",
     "test:live": "vitest run --config vitest.live.config.ts",
     "test:e2e": "playwright test"

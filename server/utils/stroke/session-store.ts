@@ -1,5 +1,5 @@
-import { readFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { mkdir, readFile } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
 import { z } from 'zod'
 import type { Answer, Invocation, Question, SendBackPayload, Stroke } from '#shared/stroke'
 import { conflict } from './conflict'
@@ -251,22 +251,57 @@ async function writeStrokes(sessionId: string, strokes: Stroke[]): Promise<void>
   await writeAtomic(sessionId, SESSION_FILES.strokes, `${JSON.stringify(strokes, null, 2)}\n`)
 }
 
+/** セッションから見た proposal の位置。`docs/proposal.md` を書くのはここ1箇所だけ。 */
+const PROPOSAL_PATH = join(PROJECT_DOCS_DIR, PROJECT_PROPOSAL_FILE)
+
 /**
- * 最新の proposal 本文。
+ * proposal の本体を扱う1つの口。**読みと書きを分けない。**
  *
- * 書き手は claude で、セッションの時点から `docs/proposal.md` に置く
- * （openspec/specs/project/generation）。承認はこのファイルを動かさないため、昇格後は
- * `<name>/docs/proposal.md` としてそのまま読める。**サーバーは書かない。**
- * 書かれていなければ undefined を返し、承認は 409 で止まる。
+ * 分けると、置き場所の規定が読み手と書き手に散る。この不具合はまさにそれで起きた——
+ * 読み手（画面2 の接続時配信・承認）だけが `docs/proposal.md` を前提にし、書き手が
+ * 誰も居ないまま残った（openspec/changes/write-proposal-to-docs）。
+ *
+ * proposal はセッションの時点から `docs/proposal.md` に在り、昇格はディレクトリごとの
+ * 改名なのでこのファイルを動かさない。昇格後は `<name>/docs/proposal.md` としてそのまま
+ * 読める（openspec/specs/project/generation）。
  */
-export async function readProposal(sessionId: string): Promise<string | undefined> {
-  try {
-    return await readFile(
-      sessionFile(shareRoot(), sessionId, join(PROJECT_DOCS_DIR, PROJECT_PROPOSAL_FILE)),
-      'utf8',
-    )
-  } catch {
-    return undefined
+export function sessionProposal(sessionId: string) {
+  const path = (): string => sessionFile(shareRoot(), sessionId, PROPOSAL_PATH)
+
+  return {
+    /** 最新の proposal 本文。まだ無ければ undefined を返し、承認は 409 で止まる。 */
+    async read(): Promise<string | undefined> {
+      try {
+        return await readFile(path(), 'utf8')
+      } catch {
+        return undefined
+      }
+    },
+
+    /**
+     * 受理した proposal を残す。呼び出し側はこれが成功してから受理を成立させる
+     * （openspec/specs/api/stroke/proposal「残せなければ受理しない」）。
+     *
+     * 出し直しは上書きで、残るのは常に最後に受理した1件だけ。往復の記録は
+     * `strokes.json` が持つので、proposal の過去版を読む相手は居ない。
+     *
+     * `docs/` は在るとは限らない（セッションの作成時には作られない）ので、ここで用意する。
+     */
+    async write(proposal: string): Promise<void> {
+      try {
+        await mkdir(dirname(path()), { recursive: true })
+      } catch (error) {
+        throw sessionErrorToHttp(
+          new SessionCoreError(
+            'io',
+            `proposal の置き場を作れなかった: ${error instanceof Error ? error.message : String(error)}`,
+          ),
+        )
+      }
+
+      // 書きかけを読ませない。失敗は HTTP へ写り、呼び出し側の受理が成立しない
+      await writeAtomic(sessionId, PROPOSAL_PATH, proposal)
+    },
   }
 }
 

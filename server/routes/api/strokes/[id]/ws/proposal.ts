@@ -1,5 +1,5 @@
 import type { ProposalMessage } from '#shared/stroke'
-import { readProposal, readState, sessionExists } from '../../../../../utils/stroke/session-store'
+import { readState, sessionExists, sessionProposal } from '../../../../../utils/stroke/session-store'
 import { proposalChannel, sessionIdFromUrl } from '../../../../../utils/stroke/ws-channels'
 
 /**
@@ -19,7 +19,7 @@ export default defineWebSocketHandler({
     // 接続時配信: 現在の proposal があればそれを1件流す（design.md 決定6）。
     const state = await readState(sessionId)
     if (state.phase === 'stroking') return
-    const proposal = await readProposal(sessionId)
+    const proposal = await sessionProposal(sessionId).read()
     if (proposal === undefined) return
     const message: ProposalMessage = { proposal, projectName: state.projectName ?? null }
     peer.send(JSON.stringify(message))

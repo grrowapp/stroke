@@ -1,6 +1,6 @@
 # データ取得と SSR
 
-画面のデータ取得の設計。Nuxt 4 の SSR 安全なパターンに従う。配置の規範は `docs/specs/core/system-structure.md`、api の契約は `docs/specs/api/api-contract.md`。
+画面のデータ取得の設計。Nuxt 4 の SSR 安全なパターンに従う。配置の規範は `docs/specs/core/system-structure.md`、api の契約は `docs/specs/api/contract.md`。
 
 ## 規定
 
