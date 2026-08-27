@@ -20,11 +20,35 @@
 - **WHEN** 画面が `POST /api/sessions/:id/answer` へ `Answer`（`{ kind: 'free', value: '<回答の本文>' }`）を送る
 - **THEN** 画面へステータス 204 が返り、応答に本文は無い
 
+#### Scenario: 画面が差し戻しを送る
+
+- **GIVEN** phase が `proposed` のセッションが在る
+- **WHEN** 画面が `POST /api/sessions/:id/send-back` へ 1 件以上の指摘を持つ `SendBackPayload` を送る
+- **THEN** 画面へステータス 204 が返り、応答に本文は無い
+
+#### Scenario: 画面が承認を送る
+
+- **GIVEN** phase が `proposed` のセッションが在り、`docs/proposal.md` が在り、昇格先の名前が使える
+- **WHEN** 画面が `POST /api/sessions/:id/approve` へ `{ projectName: '<名前>' }` を送る
+- **THEN** 画面へステータス 204 が返り、応答に本文は無い
+
 #### Scenario: エージェントが問いを送る
 
 - **GIVEN** phase が `stroking` のセッションが在る
 - **WHEN** エージェントが `POST /api/strokes/:id/question` へ `Question`（`header` / `detail` / `question` / `options[]`）を送る
 - **THEN** エージェントへステータス 204 が返り、応答に本文は無い
+
+#### Scenario: エージェントが proposal を送る
+
+- **GIVEN** phase が `stroking` のセッションが在り、`docs/proposal.md` へ書き込める
+- **WHEN** エージェントが `POST /api/strokes/:id/proposal` へ `{ proposal: '<本文>' }` を送る
+- **THEN** エージェントへステータス 204 が返り、応答に本文は無い
+
+#### Scenario: invokeAi が実行の記録を送る
+
+- **GIVEN** 対象の id を持つセッションが保存されている
+- **WHEN** invokeAi が `POST /api/strokes/:id/submission` へ `{ invocation: 'running' }` を送る
+- **THEN** invokeAi へステータス 204 が返り、応答に本文は無い
 
 ### Requirement: 読み取りの応答に 204 を使わない
 

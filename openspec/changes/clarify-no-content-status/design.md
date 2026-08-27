@@ -27,6 +27,7 @@ if (event.handled) {
 | 戻り値 | h3 の処理 | 応答 |
 | --- | --- | --- |
 | `null` | `sendNoContent(event)`（`:2100`） | **204** |
+| web 標準 `Response` | `sendWebResponse(event, val)`（`:2103-2104` → `:942`） | **Response の status がそのまま** |
 | オブジェクト | `send(event, JSON.stringify(val), MIMES.json)`（`:2129`） | **200** |
 | 文字列 | `send(event, val, MIMES.html)`（`:2126`） | 200（Content-Type が html） |
 
@@ -54,6 +55,7 @@ code を渡した場合は `!code` が偽になり、渡した値がそのまま
 **Goals:**
 
 - 返す応答コードがコードから読めること。書いた数字が実際に効くこと
+- 本文の無い応答で裸の `null` を返さないこと。h3 の推測に頼らず、status を自分で持った応答を返すこと
 - 応答の規約に spec 上の持ち主を与えること
 - 読み取り（GET）が 204 を返さないこと
 
@@ -62,27 +64,22 @@ code を渡した場合は `!code` が偽になり、渡した値がそのまま
 - 受理で完結する操作の応答コードを変えること。204 のままである
 - `docs/specs/api/contract.md` の 204 の記述を変えること。現状が正
 - **endpoint の path とメソッドを変えること。** この change は応答コードだけを扱う
-- **削除（U11）を扱うこと。** `api/contract` が規定する操作に含めないため、`delete.post.ts` にも触らない
+- **削除（U11）を spec の規定対象に加えること。** `api/contract` の対象操作には含めない。`delete.post.ts` はコードの置き換え（裸の `return null` の除去）だけを行い、応答は変えない
 - 409 busy を画面がどう扱うか。それは `fix-busy-response-handling` の範囲
 
 ## 規約の置き場所
 
-`docs/specs/api/contract.md` は横断規約を 2 箇所に持っている。
+正常な応答コードの規約は `docs/specs/api/contract.md` の `## 全体設計:23` にある。
 
-| 箇所 | 内容 |
-| --- | --- |
-| `## 全体設計:23` | POST は受理だけを返す（本文なし・204）。例外は U1 だけ |
-| `## 約束:233-243` | 404 / 409（`busy`・`name-conflict`・`phase`）/ 502 は無い |
+> POST は受理だけを返す（本文なし・204）。例外は U1（`sessionId` を返す）だけ。
 
-`openspec/specs/api/` 側は endpoint 単位の構成しか持たず、この横断規約に対応する capability が無い。実際、`openspec/specs/` に応答コードの記述は 1 件も存在しない。規約は資料と実装だけが持っており、片方が動いたときに食い違う。今回の食い違いはその現れである。
+`openspec/specs/api/` 側は endpoint 単位の構成しか持たず、この規約に対応する capability が無い。実際、`openspec/specs/` に応答コードの記述は 1 件も存在しない。規約は資料と実装だけが持っており、片方が動いたときに食い違う。今回の食い違いはその現れである。
 
-`api/contract` はこの穴を埋める。個別 endpoint の spec は自分の入出力だけを持ち、共通部分はここを参照する。
+`api/contract` はこの穴を埋める。扱うのは正常に成立した要求への応答コードだけとし、エラーの応答は含めない。個別 endpoint の spec は自分の入出力だけを持ち、共通部分はここを参照する。
 
 ## Decisions
 
-### Decision: 返す応答コードを数字で渡す
-
-`setResponseStatus(event, 200)` と `return null` の組み合わせをやめ、`return sendNoContent(event, 204)` に置き換える。
+### Decision: 末尾を `return new Response(null, { status: 204 })` の 1 行に置き換える
 
 ```ts
 // 変更前
@@ -90,26 +87,45 @@ setResponseStatus(event, 200)
 return null
 
 // 変更後
-return sendNoContent(event, 204)
+return new Response(null, { status: 204 })
 ```
 
-理由は 3 つ。
+事故の根本は、裸の `null` を返して応答コードを h3 の推測——`null` を 204 に変換し、その際 200 を「未設定」とみなして捨てる——に委ねていたことにある。推測に頼る書き方自体を無くす。
 
-- **数字が効く。** `sendNoContent` は渡された code をそのまま使う（`:744` の `!code` が偽になる）。204 と書けば 204 が返り、捨てられる値がコードから消える
-- **返したい応答が名前で読める。** `sendNoContent` は「本文を返さない」を意味する。`return null` は「本文が無いから h3 が 204 にしてくれる」という間接的な表現で、h3 の規定を知らないと読めない
-- **戻り値の型が応答コードを決める構造をやめられる。** 現状は `null` を返すかどうかで応答が変わる。数字を直接渡せば、その対応関係を読み手が知らなくてよい
+web 標準（fetch handler 方式）の形である。Service Worker・Cloudflare Workers・`Deno.serve`・Next.js の route handler と同じく、status も本文も自分で持った `Response` を 1 つの式で返す。h3 の推測は入らず、status の設定と応答の返却が set と return に分かれない。
 
-`return sendNoContent(...)` が成立する根拠は Context のとおり。`sendNoContent` は `undefined` を返すが、その前に `res.end()` を済ませて `event.handled` を立てるため、app レイヤーは正常終了する。
+h3 は戻り値が web `Response` のとき `sendWebResponse` で送出する（`:2103-2104` → `:942`）。status は `Response` から反映され（`:950-955`）、本文が無ければ `res.end()` で応答を完了させる（`:962-964`）。h3 1.x の土台は Node 応答だが、この受け口は h3 自身が公開する正規の経路であり、web 標準ベースの h3 v2 にもそのまま通じる形である。
 
-**却下した案: `setResponseStatus(event, 200)` の行だけを消す** — `return null` が残るので応答は 204 のままになり、誤読の元も消える。しかし応答コードを決めているのが `return null` である構造は変わらず、コードのどこにも 204 が現れない。何が返るかを知るには h3 の規定を知る必要がある
+h3 1.15.11 で 8 通りを実測した。
 
-**却下した案: `setResponseStatus(event, 204)` + `return null`** — 数字は効く（`204 !== 200` なので引き継がれる）が、`sendNoContent` を呼ぶのは相変わらず `return null` である。加えて、そのハンドラが後日 `null` 以外を返すようになると、残った 204 を h3 が引き継ぎ、`nullBodyResponses`（`:2477`）が 204 を本文なしと扱うため**本文が黙って捨てられる**。`sendNoContent` を直接呼ぶ形なら、本文を返すよう変えるときにこの行ごと書き換えることになるので、取り残しが起きない
+| 書き方 | 応答 | Content-Type |
+| --- | --- | --- |
+| `setResponseStatus(event, 204)` のみ | **404** | — |
+| `setResponseStatus(event, 204)` + `return sendNoContent(event)` | **204** | 付かない |
+| `setResponseStatus(event, 204)` + `event.node.res.end()` | 204 | 付かない |
+| `setResponseStatus(event, 204)` + `return null` | 204 | 付かない |
+| `setResponseStatus(event, 200)` + `return null`（現状） | 204 | 付かない |
+| `sendNoContent(event, 204)` | 204 | 付かない |
+| `return new Response(null, { status: 204 })` | 204 | 付かない |
+| `setResponseStatus(event, 204)` + `return ''` | 204 | `text/html` |
+
+**却下した案: `setResponseStatus(event, 204)` + `return null`（当初の採用案）** — 書いた 204 は効く（`:744` で引き継がれる）が、`null` という本文でない裸の値を返し、h3 の推測に依存する骨格が残る。事故を起こした書き方そのものが温存される
+
+**却下した案: `sendNoContent(event, 204)`** — h3 1.x の語彙としては自然な 1 文で動くが、h3 1.x 固有の関数に意図を預ける形になる。web 標準の handler 方式（status を持った応答を 1 つの式で返す）を正とし、フレームワーク固有の書き方をこれ以上増やさない
+
+**却下した案: `setResponseStatus(event, 204)` + `return sendNoContent(event)`** — 動くが、status の設定と応答の完了が 2 文に分かれる
+
+**却下した案: `event.node.res.end()` で完了させる** — 動くが、h3 を通さず Node の生 API を直接呼ぶことになる
+
+**却下した案: `return ''` で完了させる** — 動くが `text/html` が付く。本文が無いのに型を名乗る
+
+**却下した案: `setResponseStatus(event, 200)` の行だけを消す** — `return null` が残るので応答は 204 のままになる。しかしコードのどこにも 204 が現れず、裸の `null` と推測依存もそのまま残る
 
 **却下した案: `200` を残して注記を足す** — 差分は最小だが、実際にレビューを誤らせた `200` の行がそのまま残る。コメントで誤りを覆う形になり、コメントを読み飛ばせば同じ誤解に戻る
 
-### Decision: `delete.post.ts` は触らない
+### Decision: `delete.post.ts` も同じ形に置き換える
 
-`delete.post.ts:33` も `return null` で 204 を返しており、コードから 204 が読めない点は他と同じである。しかし U11 は `api/contract` が規定する操作に含めないため、spec の裏付けが無い変更になる。この change では触らない。
+`delete.post.ts:33` も裸の `return null` で 204 を返しており、コードから 204 が読めない点は他と同じである。U11 は `api/contract` の規定対象に含めないが、置き換えても応答は 204 のまま変わらず spec に影響しない。裸の `return null` を無くす動機はこのファイルにも同じく当てはまるため、対象に含める。
 
 ### Decision: `invoke-agent`（U13）は 200 を返す
 
@@ -132,10 +148,11 @@ return sendNoContent(event, 204)
 
 - **`invoke-agent` の応答が 204 から 200 に変わる（BREAKING）** → 呼び出し元 7 箇所がすべて戻り値を使っていないことを確認済み（proposal.md）。実測と画面操作でも確かめる
 - **`invoke-agent` の本文が空のオブジェクトになる** → 返す情報が無いため。将来この endpoint が何かを返すなら、そのときは本文の設計が要る
-- **`sendNoContent` を直接呼ぶ形は h3 の内部関数に依存する** → `sendNoContent` は h3 の公開 API（`:2498` の export に含まれる）であり、内部実装ではない。ただし h3 の major 更新時には確認が要る
-- **受理系 6 本は応答が変わらないため、変更が効いたかを応答コードだけでは確かめられない** → 変更前後で 204 のままであることが合格条件になる。加えて、コード上に 204 が現れることを grep で確認する
-- **`delete.post.ts` だけが `return null` のまま残る** → U11 が `api/contract` の対象外であるため。8 ファイル中 1 本だけ書き方が揃わない状態になる。U11 の扱いが決まった時点で別途揃える
-- **ソースを読んで確定させただけで、変更後の実測はしていない** → 実装後に実測するタスクを tasks.md に置く
+- **受理系 6 本と delete は応答が変わらないため、変更が効いたかを応答コードだけでは確かめられない** → 変更前後で 204 のままであることが合格条件になる。加えて、コード上に 204 が現れ、`return null` が残っていないことを grep で確認する
+- **`delete.post.ts` の変更に spec の裏付けが無い** → U11 は `api/contract` の規定対象外のまま置き換える。応答がワイヤ上で一切変わらないことが担保であり、変更前後の実測（1. と 4.）で確かめる
+- **将来どれかが本文を返すよう変わるとき、書き換えを誤ると本文が黙って捨てられる** → `nullBodyResponses`（`:2477`）が 204 を本文なしと扱うため。ただし status と本文が `Response` の 1 つの式に集まっているので、この式ごと書き換えれば済み、status の消し忘れが構造上起きにくい
+- **ソースを読んで確定させただけで、変更後の実測はしていない** → 実装後に実測するタスクを tasks.md に置く。実測結果（2026-08-27、別ポート 3499 で base2 の dev サーバーを起動して実施。3399 は別 worktree が使用中のため触れていない）: A5・U7・A7・U9・A8・U11 は変更前後とも 204 で一致。`invoke-agent`（U13）は変更前 204 → 変更後 200 を確認し、応答完了前に実際の AI プロセスが起動することも確認した（`kick()` が `claude` を spawn。ユーザー承認の上で実行し、終了後にプロセスと一時セッションを片付けた）
+- **`approve`（U10）は実測していない** → project 昇格（ディレクトリ改名）と実際の AI 起動を伴う実操作のため、ユーザー判断でソース検証のみに留めた。他 6 本と同じ `return new Response(null, { status: 204 })` の形であり、h3 の送出経路（`sendWebResponse`、`:2103-2104` → `:942`）は他 6 本の実測で確認済みなので、コードの同一性から 204 のままであると判断する
 
 ## Migration Plan
 
