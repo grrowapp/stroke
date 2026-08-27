@@ -5,15 +5,15 @@ import { assertNameAvailable, promoteSessionToProject } from '../../../utils/str
 import { approveBody, parseBody } from '../../../utils/stroke/request-schemas'
 import { invokePath } from '../../../utils/stroke/invoke'
 import { requireSessionId } from '../../../utils/stroke/session-param'
-import { readProposal, readState, writeState } from '../../../utils/stroke/session-store'
+import { readState, sessionProposal, writeState } from '../../../utils/stroke/session-store'
 import { forgetSubmissions } from '../../../utils/stroke/submission-signal'
 
 /**
  * U10: 承認してプロジェクトへ昇格させる。承認は昇格の唯一の引き金。
  *
  * 昇格はセッションディレクトリの改名だけである（openspec/specs/project/generation）。
- * proposal は claude がセッションの時点から `docs/proposal.md` に書いており、改名は
- * それを動かさない。サーバーは proposal を書かない。
+ * proposal はセッションの時点から `docs/proposal.md` に在り（受理の時点で A7 が残す）、
+ * 改名はそれを動かさない。**承認は proposal を書かず、既にあるものに触れない。**
  *
  * **`approved` かつ未改名の宙吊りを作らない。** 順序は「衝突確認 → phase 書き換え →
  * 改名」で、改名が失敗したら phase を `proposed` へ書き戻す（design.md D3）。
@@ -36,9 +36,10 @@ export default defineEventHandler(async (event) => {
     throw conflict('phase', '承認できるのは proposal が出ているときだけ。')
   }
 
-  // proposal が書かれていなければ昇格しない。claude が `docs/proposal.md` を書いて
-  // いない場合はここで止まり、セッションは `proposed` のまま残る。
-  if ((await readProposal(sessionId)) === undefined) {
+  // proposal が残っていなければ昇格しない。A7 は残せたときだけ受理を成立させるので、
+  // `proposed` に進んだセッションでは通常ここを通る。通らないのは外から消された場合で、
+  // そのときはセッションを `proposed` のまま残す。
+  if ((await sessionProposal(sessionId).read()) === undefined) {
     throw conflict('phase', '承認する proposal が見つからない。')
   }
 

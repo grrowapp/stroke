@@ -4,17 +4,24 @@ import { isKebabCase } from '../../../utils/stroke/project'
 import { parseBody, proposalSubmitBody } from '../../../utils/stroke/request-schemas'
 import { requireSessionId } from '../../../utils/stroke/session-param'
 import { notifySubmission } from '../../../utils/stroke/submission-signal'
-import { markProposalStrokeIfFirst, readState, writeState } from '../../../utils/stroke/session-store'
+import {
+  markProposalStrokeIfFirst,
+  readState,
+  sessionProposal,
+  writeState,
+} from '../../../utils/stroke/session-store'
 import { proposalChannel } from '../../../utils/stroke/ws-channels'
 
 /**
  * A7: proposal の全文を提出する。初提出なら strokes へマーカー行を追記し、受理した瞬間に
  * W2 へ配信する。
  *
- * **ファイルは書かない。** proposal を書くのは claude で、セッションの時点から
- * `docs/proposal.md` に置く（openspec/specs/project/generation）。ここは本文を検証して
- * 受理・配信し、phase を進めるだけである。書かずに提出だけされた場合は、承認時に
- * 「proposal が見つからない」として既存の 409 経路で現れる。
+ * **受理した本文はここで残す。** 配信（`publish`）はメモリ上の接続にしか届かないので、
+ * 残さないと「提出の瞬間に繋いでいた画面にしか出ない」ことになる。繋ぎ直した画面にも
+ * 承認にも同じ proposal が要る（openspec/specs/api/stroke/proposal）。
+ *
+ * 順序は **残す → phase を進める → 配信する**。残せなければそこで失敗を返し、phase も
+ * 配信も行わない。逆順にすると、配信だけ届いて残っていない状態が作れてしまう。
  */
 export default defineEventHandler(async (event) => {
   const sessionId = await requireSessionId(event)
@@ -24,6 +31,9 @@ export default defineEventHandler(async (event) => {
   if (state.phase === 'approved') {
     throw conflict('phase', '承認済みのセッションには提出できない。')
   }
+
+  // 受理を成立させる前に残す。ここが失敗したら phase も配信も行わない
+  await sessionProposal(sessionId).write(proposal)
 
   await markProposalStrokeIfFirst(sessionId)
 
