@@ -11,4 +11,4 @@
 
 ## 3. commit
 
-- [ ] 3.1 この change の成果物を commit する
+- [x] 3.1 この change の成果物を commit する
