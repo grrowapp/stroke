@@ -52,7 +52,7 @@
 | A1 | `GET /api/strokes/:id/overview` | 概要を取得する |
 | A4 | `GET /api/strokes/:id/send-back` | 差し戻しの指摘一式を取得する |
 | A5 | `POST /api/strokes/:id/question` | 今の1問を提出する（ストロークの問い・問い返しの区別なし） |
-| A7 | `POST /api/strokes/:id/proposal` | proposal を提出する（ファイルは書かない） |
+| A7 | `POST /api/strokes/:id/proposal` | proposal を提出する（受理した本文を残す） |
 | A8 | `POST /api/strokes/:id/submission` | 実行の記録（`invocation`）を変える。**叩くのは invokeAi だけ** |
 
 ### WS 配信 — 2本（サーバ → 画面のみ。画面からは何も送らない）
@@ -124,8 +124,9 @@ invokeAi だけである（`openspec/specs/api/stroke/submission`）。
 - output: 本文なし（204）
 - 承認は**セッションディレクトリを `<projectName>` へ改名するだけ**である。新しい
   ディレクトリを作らず、ファイルも動かさない（`openspec/specs/project/generation`）。
-- 前提: `docs/proposal.md` が在ること。**サーバーは proposal を書かない**ので、claude が
-  書いていなければ 409（proposal が見つからない）で止まる。
+- 前提: `docs/proposal.md` が在ること。書くのは A7 で、残せたときだけ受理を成立させるので、
+  `proposed` まで進んだセッションでは通常在る。外から消された場合は 409（proposal が
+  見つからない）で止まる。**承認は proposal を書かず、既にあるものに触れない。**
 - 順序は「衝突確認 → phase 書き換え → 改名」で、改名が失敗したら phase を `proposed` へ
   書き戻す。`approved` かつ未改名の宙吊りは作らない。
 - 改名の成功直後に steering の claude を起こす（cwd＝生成先。完了は待たない・ADR 0011）。
@@ -198,10 +199,13 @@ invokeAi だけである（`openspec/specs/api/stroke/submission`）。
 
 - input: `{ proposal: string, projectName?: string }`（`projectName` は kebab-case のときだけ候補採用）
 - output: 本文なし（204）
-- **ファイルは書かない。** proposal を書くのは claude で、セッションの時点から
-  `docs/proposal.md` に置く。ここは本文を検証して受理・W2 配信し、phase を進めるだけ
-  （`openspec/specs/project/generation`）。
-- エラー: 400 本文が空 / 404 / 409 phase（`approved` は拒否）
+- **受理した本文を残す。** セッションの `docs/proposal.md` へ書き、以後に繋ぎ直した画面
+  （W2 の接続時配信）でも承認（U10）でも同じ proposal が得られる。出し直しは上書きで、
+  残るのは最後に受理した1件だけ（`openspec/specs/api/stroke/proposal`）。
+- **残せなければ受理しない。** 書けなかったときは失敗を返し、phase も進めず W2 へも
+  配信しない。受理したのに残っていない状態を作らない。
+- 順序は「残す → phase を進める → W2 配信」。
+- エラー: 400 本文が空 / 404 / 409 phase（`approved` は拒否）/ 500 残せなかった
 
 ### A8 `POST /api/strokes/:id/submission`
 

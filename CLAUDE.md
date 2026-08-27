@@ -49,7 +49,7 @@ Use fresh agents, not `fork`, when the goal is to keep context out. See `docs/ag
 
 ### `docs/specs/api/`
 
-- `api-contract.md` — サーバ API の契約。画面・エージェントとサーバの境界
+- `contract.md` — サーバ API の契約。画面・エージェントとサーバの境界
 
 ### `docs/specs/architecture/`
 

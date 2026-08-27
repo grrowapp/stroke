@@ -112,6 +112,6 @@ const { result, waiting, failed, send } = useAgentRun(sessionId, definition)
 ## 関連
 
 - `docs/specs/reference/stroke-modules.md` — この案が広げる対象
-- `docs/specs/api/api-contract.md` — 今の U/W/A の境界
+- `docs/specs/api/contract.md` — 今の U/W/A の境界
 - `openspec/specs/workflow-definition` — 定義ファイルでワークフローを外に出す既存の規定
 - `openspec/specs/ai-invocation` — 起動設定を外に出す既存の規定

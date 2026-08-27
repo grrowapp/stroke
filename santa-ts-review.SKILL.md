@@ -57,7 +57,7 @@ allowed-tools: Read, Grep, Glob, Bash, Agent, Skill
 加えてリポジトリ固有の正を読ませる。
 
 - `CONTEXT.md` — ドメイン用語。指摘は必ずこの語彙で書かせる
-- `docs/specs/api/api-contract.md` — サーバ API の契約
+- `docs/specs/api/contract.md` — サーバ API の契約
 - `docs/specs/core/system-structure.md` — 配置の規範
 - `openspec/specs/<capability>/spec.md` — 対象が触れる capability の要件
 
