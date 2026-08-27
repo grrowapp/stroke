@@ -18,7 +18,7 @@ import { forgetSubmissions } from '../../../utils/stroke/submission-signal'
  *
  * 実行中の呼び出しを持つ間は busy と同じ 409 で受理しない。
  */
-export default defineEventHandler(async (event): Promise<null> => {
+export default defineEventHandler(async (event): Promise<Response> => {
   const sessionId = await requireSessionId(event)
   const root = readStrokeConfig().projectShareRoot
 
@@ -46,7 +46,7 @@ export default defineEventHandler(async (event): Promise<null> => {
 
   // 消えたセッションの提出の記録も落とす（id が使い回されたときに前の分を数えない）
   forgetSubmissions(sessionId)
-  return null
+  return new Response(null, { status: 204 })
 })
 
 function toHttp(error: unknown) {
