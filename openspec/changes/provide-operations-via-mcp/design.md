@@ -11,13 +11,13 @@
 
 **Goals:**
 
-- 現行操作の代行ツール一式を MCP として提供し、両工程の spawn に配線する
+- 現行操作の代行ツール一式を MCP として提供し、両工程の spawn に配線する（`--mcp-config` と MCP ツール分の `--allowedTools` の両方。claude が実際に呼べる状態までを「提供」とする）
 - ツール定義をモジュールの規約に載せ、後続 change（実処理化）がハンドラの差し替えだけで済む形にする
 - 接続を起動時発行の一時 token で担保し、invoke.ts が起動した claude だけがツールを使える状態にする
 
 **Non-Goals:**
 
-- ワークフロースキーマ・allowedTools・スキルの切り替え（`switch-workflow-to-mcp-tools`）
+- ワークフロースキーマ側の instruction の作り直し・スキル相当の手順書の整備（`switch-workflow-to-mcp-tools`）。MCP ツール分の allowedTools の追加・curl / jq の削除・prompt 3件の向き先変更は、提供したツールで往復が成立するために要るので本 change に含む
 - ツールの実処理化・transport の変更（`implement-mcp-operations`）
 - `docs/` の変更（`document-mcp-operations`）
 
@@ -135,10 +135,12 @@ url の base は nuxt.config の既存値 `runtimeConfig.claude.apiBaseUrl`（�
 - [同じ `/mcp` に複数の claude が接続する] → 接続表の token 照合で接続文脈を分離する。ヘッダ欠落・表に無い token は拒否し、既定値で補わない（ADR-0013）
 - [`/mcp` が route として外部からも見える] → token 照合により、invoke.ts が起動した claude 以外の呼び出しは拒否される（Decision: 一時 token）
 - [本家 dashboard 停止中は steering 系ツールが失敗する] → `errorCode: unreachable` の失敗として返し（Decision: 結果の形）、MCP サーバー側で握りつぶさない
-- [ツールとスキルの併存で入口が2本になる] → 本 change の範囲では2本のまま。一本化は `switch-workflow-to-mcp-tools` が行う
+- [操作系のフォールバック先が存在しない] → 操作系のスキルが無く curl / jq も落ちている現状では、取得・提出の入口は MCP ツールだけで、ツールが動かなければ往復は止まる。受け入れ条件を「取得・提出が MCP ツール経由で行われ、往復が成立すること」に置き、実機で確認する（tasks 5.1）。案内・instruction は引き続き Skill が担う
 
 ## Migration Plan
 
 1. モジュールを導入し（`nuxt.config.ts` の modules に追加、route は既定 `/mcp`）、`server/mcp/tools/` にツールを置いて Nuxt DevTools の MCP Inspector で列挙を確認する
 2. 接続表の層と token 照合を入れ、invoke.ts の両工程の `--mcp-config` に `{ "type": "http", ... }` のサーバー定義を足す（既存フラグ・本家 MCP の並びは変えない）
-3. 既存スキル経路は無変更のため、ロールバックは `--mcp-config` の追加分を外すだけ（モジュールが残っても既存経路に影響しない）
+3. 同じ場所で MCP ツール分の `--allowedTools` をコード内で組み立てて足す（複数指定がマージされるか上書きされるかは実機で確定する）。あわせて `nuxt.config.ts` の既存 allowedTools から `Bash(curl -X POST *)` / `Bash(jq -n *)` を落とし、取得・提出を MCP ツール以外で真似できる余地を消す
+4. `nuxt.config.ts` の prompt 3件の向き先を MCP ツールへ改める（スキルは削除済みで指し先が無い）
+5. スキルが無くフォールバック先が存在しないため、ロールバックしても旧経路には戻らない。`--mcp-config` / `--allowedTools` / prompt の変更を外すと往復そのものが止まる。この change は戻す前提を持たない
