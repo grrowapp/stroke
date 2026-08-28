@@ -72,7 +72,7 @@ export default defineMcpTool({
 2. 接続表に「token → 接続文脈」を登録する
 3. mcp-config `{ "type": "http", "url": "<apiBaseUrl>/mcp", "headers": { "x-stroke-token": <token> } }` を組み立てて claude を起動する
 4. ツール呼び出しごとに、ヘッダの token を接続表と突き合わせて接続文脈を解決する
-5. token の欠落・表に無い token は 401 で拒否し、既定値で補わない（ADR-0013）
+5. token の欠落・表に無い token は 401 で拒否し、既定値で補わない（ADR-0014）
 
 接続表のエントリと持ち方:
 
@@ -107,7 +107,7 @@ MCP は Nuxt アプリの route `/mcp`（Streamable HTTP）で提供し、別プ
 
 ### Decision: ハンドラは既存 endpoint への HTTP 発行のみで代行する
 
-対応する既存 endpoint へ `$fetch` を発行し、その応答だけから結果を作る。セッションディレクトリ・プロジェクトディレクトリのファイルは読み書きしない。検証・状態遷移の正は endpoint 側にあり（ADR-0013）、MCP 層に第2の実装を作らない。同一プロセスでも endpoint を経由するのは busy ガード・前提チェックを通すため（invoke.ts の U13 経由と同じ判断）。
+対応する既存 endpoint へ `$fetch` を発行し、その応答だけから結果を作る。セッションディレクトリ・プロジェクトディレクトリのファイルは読み書きしない。検証・状態遷移の正は endpoint 側にあり（ADR-0014）、MCP 層に第2の実装を作らない。同一プロセスでも endpoint を経由するのは busy ガード・前提チェックを通すため（invoke.ts の U13 経由と同じ判断）。
 
 ### Decision: 接続は起動時発行の一時 token で担保する
 
@@ -119,7 +119,7 @@ invoke.ts が起動した claude だけが接続できる担保と「どの clau
 
 ### Decision: 結果は status と errorCode のフラットな形に統一する
 
-すべての結果は1階層で、常に `status`（HTTP ステータスコード）を持つ。失敗はさらに `errorCode`（機械可読の失敗種別）と `error`（endpoint が返したエラー本文。書き換え・省略・追加をしない）を持ち、成功はツールの結果スキーマの項目を持つ。種類の列挙（成功/エラー/不達の排他3形）にはしない（レビュー指示 2026-08-27）。「相手が拒否した」（内容を直して出し直せる）と「相手に届かない」（出し直しても無駄、環境の問題）の区別は `errorCode` で表し、後者は `unreachable` とする。`unreachable` を定めるのは本家 dashboard 向け操作だけ——stroke-board 自身が spawn 元で、停止中にツールが実行される状況が成立しないため（specs `mcp/server`）。MCP サーバー側の事前検証・独自分岐は入れない（ADR-0013）。入れ子の構造化エラーは不採用。
+すべての結果は1階層で、常に `status`（HTTP ステータスコード）を持つ。失敗はさらに `errorCode`（機械可読の失敗種別）と `error`（endpoint が返したエラー本文。書き換え・省略・追加をしない）を持ち、成功はツールの結果スキーマの項目を持つ。種類の列挙（成功/エラー/不達の排他3形）にはしない（レビュー指示 2026-08-27）。「相手が拒否した」（内容を直して出し直せる）と「相手に届かない」（出し直しても無駄、環境の問題）の区別は `errorCode` で表し、後者は `unreachable` とする。`unreachable` を定めるのは本家 dashboard 向け操作だけ——stroke-board 自身が spawn 元で、停止中にツールが実行される状況が成立しないため（specs `mcp/server`）。MCP サーバー側の事前検証・独自分岐は入れない（ADR-0014）。入れ子の構造化エラーは不採用。
 
 ### Decision: MCP の url は既存設定から組み立てる
 
@@ -132,7 +132,7 @@ url の base は nuxt.config の既存値 `runtimeConfig.claude.apiBaseUrl`（�
 ## Risks / Trade-offs
 
 - [モジュールが 0.x で破壊的変更があり得る] → lockfile でバージョンを固定し、更新は change として扱う
-- [同じ `/mcp` に複数の claude が接続する] → 接続表の token 照合で接続文脈を分離する。ヘッダ欠落・表に無い token は拒否し、既定値で補わない（ADR-0013）
+- [同じ `/mcp` に複数の claude が接続する] → 接続表の token 照合で接続文脈を分離する。ヘッダ欠落・表に無い token は拒否し、既定値で補わない（ADR-0014）
 - [`/mcp` が route として外部からも見える] → token 照合により、invoke.ts が起動した claude 以外の呼び出しは拒否される（Decision: 一時 token）
 - [本家 dashboard 停止中は steering 系ツールが失敗する] → `errorCode: unreachable` の失敗として返し（Decision: 結果の形）、MCP サーバー側で握りつぶさない
 - [操作系のフォールバック先が存在しない] → 操作系のスキルが無く curl / jq も落ちている現状では、取得・提出の入口は MCP ツールだけで、ツールが動かなければ往復は止まる。受け入れ条件を「取得・提出が MCP ツール経由で行われ、往復が成立すること」に置き、実機で確認する（tasks 5.1）。案内・instruction は引き続き Skill が担う

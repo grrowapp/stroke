@@ -9,7 +9,7 @@
 ## 2. セッション管理（接続表と token）
 
 - [x] 2.1 接続表の util を `server/utils/` に追加する（`register` / `resolveConnection` / `remove`。メモリのみ・永続化しない。specs `server/session-management`、design の接続表エントリ: token / sessionId / projectPath）
-- [x] 2.2 `resolveConnection` は `x-stroke-token` ヘッダを照合し、欠落・不一致は 401 を throw する（既定値で補わない。ADR-0013）
+- [x] 2.2 `resolveConnection` は `x-stroke-token` ヘッダを照合し、欠落・不一致は 401 を throw する（既定値で補わない。ADR-0014）
 - [x] 2.3 接続表 util の単体テスト: 登録→照合→削除の一巡、欠落・不一致の拒否
 - [x] 2.4 ここまでの実装を santa-method でレビューし（独立2レビュアー）、両者合格まで修正する
 
@@ -28,7 +28,7 @@
   - **手順の置き場を決める必要がある。** ワークフロースキーマ（`flontier-strokeflow`）の instruction は現在 `/get-overview` `/get-strokes` `/get-send-back` というスラッシュコマンド形式で、指す実体が既に無い（`assets/.claude/skills/` は空）。エージェントは名前の一致で偶然 MCP ツールを使えているだけ
   - 役割分担では「案内・instruction は Skill」だが、その Skill が存在しない。このツールが手順を返すのか、Skill を用意し直すのかは未決
 - [x] 3.10 **結果を `structuredContent` として返す**（`server/utils/mcp/define-tool.ts` の `defineStrokeTool`）。これが無いと `outputSchema` を宣言した6ツールは1つも動かない。モジュールの `normalizeToolResult` は CallToolResult でない素のオブジェクトを `content` だけに包み `structuredContent` を付けないため、MCP SDK が `Output validation error: ... no structured content was provided` で全呼び出しを弾く（5.1 の実行で判明・実測 2026-08-27）。包み忘れが1箇所でもあるとそのツールだけ静かに壊れるので、19箇所の `return` ではなく定義の入口1箇所で包む
-- [x] 3.12 **入力の上限・許容値を契約の説明として書く**（`.describe()`）。`send-question` の `inputSchema` は長さ・件数の上限を一切表現しておらず、エージェントは上限を知る手立てが無いまま A5 の「問いの構造として読み取れない。」だけを受け取り、形を探り続けていた（5.2 の実測 2026-08-27: `send-question` 13回中8回が 400 `validation_error`。内容のある問いが弾かれ、通ったのは「テスト」のような短い問いだけ）。`.max()` で弾く形にはしない——検証の正は代行先に置いたままにする（ADR-0013）。`send-question`（header 12 / detail 300 / question 20 / options 1〜5・description 50）・`submit-document`（name は product / tech / structure、document は本文そのもの）・`get-steering`（同）に適用。
+- [x] 3.12 **入力の上限・許容値を契約の説明として書く**（`.describe()`）。`send-question` の `inputSchema` は長さ・件数の上限を一切表現しておらず、エージェントは上限を知る手立てが無いまま A5 の「問いの構造として読み取れない。」だけを受け取り、形を探り続けていた（5.2 の実測 2026-08-27: `send-question` 13回中8回が 400 `validation_error`。内容のある問いが弾かれ、通ったのは「テスト」のような短い問いだけ）。`.max()` で弾く形にはしない——検証の正は代行先に置いたままにする（ADR-0014）。`send-question`（header 12 / detail 300 / question 20 / options 1〜5・description 50）・`submit-document`（name は product / tech / structure、document は本文そのもの）・`get-steering`（同）に適用。
 
 **ただしこれは緩和であって、根本の修正ではない。** 上限を伝えても、実際に超えたときに A5 が「問いの構造として読み取れない。」としか返さないため、送り手はどこを削ればよいか分からない。根本は A5 が違反箇所を返していないことで、そちらは別途修正した（`define-request-validation-messages`）。修正後は 400 が 5件 → 1件に減り、その 1件も理由が届いて次で通った
 - [x] 3.11 3.8 の単体テストを、結果のエンベロープも検証する形に直す。`tool.handler()` の返り値を直接見ていたため、3.10 の不具合を1件も検出できていなかった。→ 全36ケースを `structuredResult`（`test/server/mcp/tools/support.ts`）経由にし、加えて `test/server/utils/mcp/define-tool.test.ts` でモジュールの**実物の** `normalizeToolResult` を通す（包めば `structuredContent` が残り、包まなければ落ちることを固定）
