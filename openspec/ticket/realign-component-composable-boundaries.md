@@ -1,7 +1,8 @@
 ---
-status: needs-triage
 tags:
   - enhancement
+status: Todo
+order: 2.0
 ---
 
 # realign-component-composable-boundaries
@@ -10,7 +11,7 @@ component のリファクタ。仕様書 `file-components`（spec-workflow、202
 
 **順序の前提**: `separate-composable-responsibilities`（composables の責務分離）である程度整理が進んでから着手する。その時点で component と composables の**両方をまたいで切り方を再度整理**する（片側だけで切らない）。
 
-関連: `reorganize-components`（置き場の再編）・`flatten-composables`（置き場の平置き）とは別軸。page component / MarkdownComponent の定義は承認済み仕様書 `file-components` が持つ。
+page component / MarkdownComponent の定義は承認済み仕様書 `file-components` が持つ。
 
 ---
 
@@ -31,5 +32,3 @@ component のリファクタ。仕様書 `file-components`（spec-workflow、202
 3. その時点でコンポーネントと composable の境界を通しで見直す
 
 **条件付き承認の条件であることに注意。** この change は承認済み仕様書の条件として起票されたもので、実施しない判断を取るなら仕様書側の扱いを併せて決める必要がある。
-
-**関連する順序の論点:** `reorganize-components`（置き場の再編）を先にやると、境界の切り直しで再び動かすことになる可能性がある。どちらを先にするかはユーザーの判断。

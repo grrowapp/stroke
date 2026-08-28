@@ -1,7 +1,8 @@
 ---
-status: ready-for-agent
 tags:
-  - enhancement
+  - document
+status: Doing
+order: 0.0
 ---
 
 # move-conventions-to-steering

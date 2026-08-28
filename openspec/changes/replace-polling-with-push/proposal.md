@@ -1,5 +1,24 @@
 # proposal — replace-polling-with-push
 
+> **要改訂（2026-08-27）— W3 を4本目の endpoint にしない。**
+>
+> change [`show-pending-project-in-list`](../show-pending-project-in-list/) が WS 配信の規約を
+> capability `ws/delivery` として立て、そこに **「新しい種類の出来事のために配信の口を増やさない。
+> 既にある接続にメッセージの種別を足す」** を置いた。口を分けてよいのは**運ぶ相手が違うとき**だけで
+> ある。
+>
+> 本 change の W3（`/api/strokes/:id/ws/failure`）は、W1 / W2 と**同じ相手**——1つのセッションを見て
+> いる画面——へ届くものなので、この規約に正面から反する。**新しい endpoint ではなく、W1 か W2 の
+> メッセージ種別として足す形へ書き換えること。**
+>
+> 影響するのは「サーバ」節の `server/routes/api/strokes/[id]/ws/failure.ts` の新設と、
+> `ws-channels.ts` への registry 追加、`wsPathPattern` のチャンネル名追加である。`markInvocationFailed`
+> からの publish・`useWaitingRetry` のポーリング撤去・`ai-invocation` の spec 改定という**本題は
+> そのまま**成立する。
+>
+> なお `ws-channels.ts` の束ねの実装は既に `server/utils/ws/registry.ts` の1本に統合済みである
+> （あちらの tasks 1.x）。着手前に取り込むこと。
+
 ## Why
 
 ストローク側の待機は、成功と失敗で届き方が揃っていない。
