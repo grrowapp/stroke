@@ -47,6 +47,16 @@ async function waitForFiles(dir: string, count: number): Promise<string[]> {
   return (await readdir(dir).catch(() => [])).sort()
 }
 
+/** 追記も呼び出しの完了と切り離されているので、指定の回数ぶん揃うまで待つ。 */
+async function waitForContent(file: string, entries: number): Promise<string> {
+  for (let i = 0; i < 50; i++) {
+    const text = await readFile(file, 'utf8').catch(() => '')
+    if (text.split('\n').filter(line => line.startsWith('# ')).length >= entries) return text
+    await new Promise(resolve => setTimeout(resolve, 20))
+  }
+  return await readFile(file, 'utf8').catch(() => '')
+}
+
 const cleanups: string[] = []
 
 async function tempDir(): Promise<string> {
@@ -78,7 +88,7 @@ describe('runClaude のデバッグログ', () => {
     expect(await readdir(dir)).toEqual([])
   })
 
-  it('出力先を渡せば呼び出しごとに1ファイル残り、上書きされない', async () => {
+  it('セッションごとに1ファイルへ追記され、前の呼び出しが失われない', async () => {
     const dir = await tempDir()
     const logDir = join(dir, 'logs')
     const options = {
@@ -92,15 +102,23 @@ describe('runClaude のデバッグログ', () => {
 
     expect((await runClaude(options)).ok).toBe(true)
     const first = await waitForFiles(logDir, 1)
-    expect(first).toHaveLength(1)
-    expect(first[0]).toMatch(new RegExp(`^\\d{8}-\\d{6}-\\d{3}-${SESSION_ID}\\.json$`))
-    expect(await readFile(join(logDir, first[0]!), 'utf8')).toBe(ENVELOPE)
+    // ファイル名からセッションを特定できる
+    expect(first).toEqual([`${SESSION_ID}.json`])
+
+    const after1 = await waitForContent(join(logDir, first[0]!), 1)
+    expect(after1).toContain(ENVELOPE)
 
     expect((await runClaude({ ...options, mode: 'resume' })).ok).toBe(true)
-    const second = await waitForFiles(logDir, 2)
-    expect(second).toHaveLength(2)
-    expect(second).toContain(first[0])
-    expect(await readFile(join(logDir, first[0]!), 'utf8')).toBe(ENVELOPE)
+
+    // **ファイルは増えない。** 調べる単位はセッションなので、往復のたびに開く先が
+    // 増えると1本を追えなくなる
+    const after2 = await waitForContent(join(logDir, first[0]!), 2)
+    expect(await readdir(logDir)).toEqual([`${SESSION_ID}.json`])
+
+    // 1回目の記録が残ったまま、2回目が後ろに続く
+    expect(after2.split(ENVELOPE)).toHaveLength(3)
+    // 呼び出しの区切りが読み取れる
+    expect(after2.split('\n').filter(line => line.startsWith('# '))).toHaveLength(2)
   })
 
   it('失敗した呼び出し（非ゼロ終了）でも出力が残る', async () => {
@@ -118,8 +136,50 @@ describe('runClaude のデバッグログ', () => {
 
     expect(result.ok).toBe(false)
     const names = await waitForFiles(logDir, 1)
-    expect(names).toHaveLength(1)
-    expect(await readFile(join(logDir, names[0]!), 'utf8')).toBe('broken output')
+    expect(names).toEqual([`${SESSION_ID}.json`])
+    expect(await waitForContent(join(logDir, names[0]!), 1)).toContain('broken output')
+  })
+
+  it('出力先を渡したときだけ stream-json で起こす', async () => {
+    const dir = await tempDir()
+    const logDir = join(dir, 'logs')
+    // 子プロセスに届いた引数をそのまま吐かせ、最後にエンベロープを出して成功で終える。
+    // `--` の後ろが位置引数として届くので、`process.argv` に runClaude が足したフラグが並ぶ
+    const echoArgs = launchThat(
+      `process.stdout.write(JSON.stringify(process.argv.slice(1)) + "\\n" + ${JSON.stringify(ENVELOPE)})`,
+    )
+
+    await runClaude({
+      sessionId: SESSION_ID, launch: echoArgs, cwd: dir, prompt: 'PROMPT', mode: 'new',
+      debugLogDir: logDir,
+    })
+
+    const names = await waitForFiles(logDir, 1)
+    const written = await readFile(join(logDir, names[0]!), 'utf8')
+    // ツールの呼び出しと結果はストリームにしか出ない。`json` のままだと、失敗した
+    // ツール呼び出しがどのログにも残らない（実測 2026-08-27）
+    expect(written).toContain('stream-json')
+    // `--print` と併用する `stream-json` の要件（`claude --help`）
+    expect(written).toContain('--verbose')
+  })
+
+  it('出力先を渡さなければ stream-json にしない', async () => {
+    const dir = await tempDir()
+    const seen = join(dir, 'argv.json')
+    const echoArgs = launchThat(
+      `require("fs").writeFileSync(${JSON.stringify(seen)}, JSON.stringify(process.argv.slice(1)));`
+      + `process.stdout.write(${JSON.stringify(ENVELOPE)})`,
+    )
+
+    const result = await runClaude({
+      sessionId: SESSION_ID, launch: echoArgs, cwd: dir, prompt: 'PROMPT', mode: 'new',
+    })
+
+    expect(result.ok).toBe(true)
+    const argv = await readFile(seen, 'utf8')
+    expect(argv).toContain('json')
+    expect(argv).not.toContain('stream-json')
+    expect(argv).not.toContain('--verbose')
   })
 
   it('出力先へ書けなくても呼び出しは成功のまま、警告が1行出る', async () => {
