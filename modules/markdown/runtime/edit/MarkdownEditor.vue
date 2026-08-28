@@ -2,7 +2,7 @@
 /**
  * 文書を直して保存する。仕様書とステアリングの本文がこれを使う。
  *
- * 承認対象の本文は読むだけなので、承認画面はこれを使わず `DocumentView` を使う。
+ * 承認対象の本文は読むだけなので、承認画面はこれを使わず `MarkdownView` を使う。
  * 読み取り専用のものにモードを足すと「編集できるが編集させない」状態を持つことになり、
  * 間違って有効になる余地が残る。編集できないものは編集の口を持たない、という形を
  * コンポーネントの境界で表している（specs/document-editing）。
@@ -10,12 +10,16 @@
  * 扱うのは markdown のテキストそのもの。読み込みと保存のあいだで変換を挟まないので、
  * 開いて保存しただけで内容が変わることが構造的に起こらない（design.md の決定）。
  * WYSIWYG を採らなかった理由は `markdown-roundtrip.test.ts` に残してある。
+ *
+ * **保存そのものはここの責務ではない。** `save` を受け取って呼ぶだけで、保存先も
+ * 保存の可否も呼ぶ側が決める（`openspec/specs/markdown/module`）。中身が無いときに
+ * 何を出すかも同じで、`#empty` を素通しして呼ぶ側へ渡す。
  */
 import { useEventListener, useMounted, useTimeoutFn } from '@vueuse/core';
 import { computed, ref, watch } from '#imports';
 import { onBeforeRouteLeave } from 'vue-router';
 
-import DocumentView from '~/components/workspace/DocumentView.vue';
+import MarkdownView from '../render/MarkdownView.vue';
 
 const props = defineProps<{
   /** 保存されている内容。null は未作成 */
@@ -252,7 +256,9 @@ onBeforeRouteLeave(() => {
       書いたものがどう出るかをその場で確かめられる。
     -->
     <div :class="framed === true ? 'sb-panel' : ''" data-testid="document-body">
-      <DocumentView v-if="mode === 'edit' && preview" :content="draft" />
+      <MarkdownView v-if="mode === 'edit' && preview" :value="draft">
+        <template #empty><slot name="empty" /></template>
+      </MarkdownView>
       <textarea
         v-else-if="mode === 'edit'"
         v-model="draft"
@@ -260,7 +266,9 @@ onBeforeRouteLeave(() => {
         spellcheck="false"
         data-testid="document-input"
       />
-      <DocumentView v-else :content="content" />
+      <MarkdownView v-else :value="content">
+        <template #empty><slot name="empty" /></template>
+      </MarkdownView>
     </div>
   </div>
 </template>

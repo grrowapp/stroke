@@ -20,8 +20,8 @@
 import { computed, definePageMeta, useRoute } from '#imports';
 
 import ApprovalAnnotator from '~/components/review/ApprovalAnnotator.vue';
-import DocumentEditor from '~/components/workspace/DocumentEditor.vue';
-import DocumentView from '~/components/workspace/DocumentView.vue';
+import MarkdownEditor from '#markdown/edit/MarkdownEditor.vue';
+import MarkdownView from '#markdown/render/MarkdownView.vue';
 import EmptyState from '~/components/workspace/EmptyState.vue';
 import WorkspacePanel from '~/components/workspace/WorkspacePanel.vue';
 import { useBoardSocket } from '~/composables/useBoardSocket';
@@ -114,7 +114,7 @@ const CATEGORY: Record<string, string> = { spec: '仕様', steering: 'ステア�
           `bg-panel border rounded-lg` の中に置くため（`ApprovalsAnnotator.tsx` の
           左列）。仕様書・ステアリングの画面はパネル1枚なので立てない。
         -->
-        <DocumentEditor
+        <MarkdownEditor
           v-if="target !== null"
           :content="document?.content"
           :save="save"
@@ -122,12 +122,15 @@ const CATEGORY: Record<string, string> = { spec: '仕様', steering: 'ステア�
           framed
           testid="approval-document"
         />
-        <!-- 直せない文書は読むだけ。枠は `DocumentEditor` が持つものと同じ -->
+        <!-- 直せない文書は読むだけ。枠は `MarkdownEditor` が持つものと同じ -->
         <div v-else class="sb-panel">
-          <DocumentView
-            :content="document?.content"
-            missing="対象の文書を取得できませんでした。"
-          />
+          <MarkdownView :value="document?.content">
+            <template #empty>
+              <EmptyState testid="document-missing" title="中身がありません">
+                対象の文書を取得できませんでした。
+              </EmptyState>
+            </template>
+          </MarkdownView>
         </div>
       </template>
     </ApprovalAnnotator>

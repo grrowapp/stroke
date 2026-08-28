@@ -20,37 +20,12 @@ export default defineNuxtConfig({
   // 「これも外に出せるのでは」と再検討しないこと。
   // ===========================================================================
 
-  // ビルド時: モジュールの解決とプラグインの生成がビルドで行われる
-  modules: ['@nuxt/ui', '@nuxtjs/mdc'],
-
-  // ビルド時: markdown の parse 設定はビルドで畳み込まれる。
-  mdc: {
-    // 既定では h2〜h4 に自動でアンカーリンクが付き、本家の文書表示と別物になるので切る
-    // （docs/specs/plan/components-library-replacement.md）
-    headings: { anchorLinks: false },
-
-    // **生 HTML は描かない。** MDC の既定サニタイズは属性しか落とさず、`<img>` や
-    // `<script>` はタグとして残る。`rehype-raw` を切ると生 HTML が要素にならず、
-    // 文書側の HTML が描かれる経路そのものが無くなる。
-    // stroke-board は本家のファイルを読んで出すだけで、文書の中身を信用して実行する
-    // 立場にない。
-    rehypePlugins: { 'rehype-raw': false },
-
-    // Prose コンポーネントを使わず素のタグで描く。
-    // `@nuxtjs/mdc` を入れると @nuxt/ui が自前の Prose 一式（ProseTable / ProseTh …）を
-    // 自動登録し（`hasNuxtModule` 判定なので `ui.prose: false` では止まらない）、
-    // Tailwind クラスを直付けする。クラスは `.sb-markdown` の指定に勝つため、
-    // 本家写しの見た目（docs/specs/core）が丸ごと効かなくなる。
-    //
-    // そのうえで `pre` だけ自前の受け口に差し替える。本家は mermaid のフェンスを図（SVG）に
-    // しているが、shiki は生ソースのコードブロックにしてしまう。`MarkdownPre` が
-    // `language` を見て mermaid だけ図へ回し、それ以外の `pre` は属性ごと素通しする。
-    // 値は `resolveComponent()` で引かれるので、対象は `app/components/global/` に置く
-    // （そこに置いたものだけが `app.component()` で登録される）。
-    //
-    // `prose` は上のとおり切ったままにする。Prose を戻すと `.sb-markdown` が効かなくなる。
-    components: { prose: false, map: { pre: 'MarkdownPre' } },
-  },
+  // ビルド時: モジュールの解決とプラグインの生成がビルドで行われる。
+  //
+  // markdown は `modules/markdown/` が自分で `@nuxtjs/mdc` を入れるのでここに書かない。
+  // parse 設定もそちらに在る（`openspec/specs/markdown/module`）。**戻さないこと。**
+  // `modules/` は Nuxt が自動で読む置き場なので、この配列に列挙する必要もない
+  modules: ['@nuxt/ui'],
 
   // ビルド時: アイコンはバンドルに畳み込まれる。
   // `mode: 'svg'` は CSS mask ではなく inline SVG で描く指定。パスが DOM に出るので、

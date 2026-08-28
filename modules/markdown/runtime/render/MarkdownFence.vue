@@ -8,18 +8,18 @@
  * （`CodeBlock`）へ回す。
  *
  * props を宣言せず `$attrs` で受けているのは、宣言すると属性として出なくなり、
- * 受け側（`CodeBlock`）に shiki のクラスやハイライトの指定が届かなくなるため。
+ * 受け側（`MarkdownCode`）に shiki のクラスやハイライトの指定が届かなくなるため。
  *
- * **`components/global/` に置いてあるのは名前で引かれるから。** MDC は map の値を
- * `resolveComponent(名前)` で引く（`MDCRenderer.vue`）。Nuxt が `app.component()` で
- * 登録するのは `components/global/` の分だけで、ほかは template の解決にしか使われない。
- * `components/workspace/` に置くと名前が解けず `<WorkspaceMarkdownPre>` という未知の
- * 要素がそのまま出る（実測）。振り分けた先はここから import するので置き場を問わない。
+ * **名前で引かれるので global に登録する。** MDC は map の値を `resolveComponent(名前)` で
+ * 引く（`MDCRenderer.vue`）。名前が解けないと `<MarkdownPre>` という未知の要素がそのまま
+ * 出る（実測）。以前は `app/components/global/` に置くことでこれを満たしていたが、
+ * モジュールの `addComponent({ global: true })` が同じ登録を行うため、置き場の制約は無い。
+ * 振り分けた先はここから相対で import する。
  */
 import { computed, useAttrs } from 'vue';
 
-import CodeBlock from '~/components/workspace/CodeBlock.vue';
-import MermaidDiagram from '~/components/workspace/MermaidDiagram.vue';
+import MarkdownCode from './MarkdownCode.vue';
+import MarkdownDiagram from './MarkdownDiagram.vue';
 
 defineOptions({ inheritAttrs: false });
 
@@ -32,6 +32,6 @@ const mermaid = computed<string | null>(() =>
 </script>
 
 <template>
-  <MermaidDiagram v-if="mermaid !== null" :code="mermaid" />
-  <CodeBlock v-else v-bind="$attrs"><slot /></CodeBlock>
+  <MarkdownDiagram v-if="mermaid !== null" :code="mermaid" />
+  <MarkdownCode v-else v-bind="$attrs"><slot /></MarkdownCode>
 </template>
