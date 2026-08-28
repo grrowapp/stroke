@@ -48,5 +48,8 @@ workflow/openspec/changes/
 # E2E の作業領域
 .e2e-tmp/
 
+# `yarn check:stroke` が書き出すセッションの経過（HTML）
+.stroke-check/
+
 # openspec の store 登録マーカー。マシンローカルな台帳メタデータで、リポジトリの成果物ではない
 .openspec-store/
