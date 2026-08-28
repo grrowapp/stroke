@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787644333924_vrfbcl5el",
+  "approvalId": "approval_1787644333866_txf1431j1",
+  "approvalTitle": "specs: ai-invocation — 廃止（→ agent/invocation へ全要件移行）",
+  "version": 1,
+  "timestamp": "2026-08-25T07:52:13.924Z",
+  "trigger": "initial",
+  "status": "pending",
+  "content": "# specs/ai-invocation — delta\n\n## REMOVED Requirements\n\n### Requirement: AI は実際のスキルとして走る\n\n**Reason**: capability の畳み込み（承認済み requirements 2026-08-25）。\n**Migration**: `agent/invocation` の同名要件が引き継ぐ。\n\n### Requirement: 起動設定は再ビルドなしで変更できる\n\n**Reason**: capability の畳み込み。呼び出し側がフラグを足せる形に広がる。\n**Migration**: `agent/invocation` の同名要件が引き継ぐ。\n\n### Requirement: 同一セッションの往復は会話として継続する\n\n**Reason**: capability の畳み込み。\n**Migration**: `agent/invocation` の同名要件が引き継ぐ。\n\n### Requirement: 失敗はサーバ側でリトライし、ユーザーに見せない\n\n**Reason**: capability の畳み込み。\n**Migration**: `agent/invocation` の同名要件が引き継ぐ。\n\n### Requirement: リトライで入力を再送しない\n\n**Reason**: capability の畳み込み。\n**Migration**: `agent/invocation` の同名要件が引き継ぐ。\n\n### Requirement: リトライしても進めない場合だけエラーを表示する\n\n**Reason**: リトライの扱いが「`failed` の記録→巡回の再キック→上限到達で `error` 終端→ユーザーに引き渡す」へ変わった。\n**Migration**: `agent/invocation` の「リトライ上限に達したら error に変える」と `portal/batch` が引き継ぐ。\n\n### Requirement: 起動後タイムアウト時間内に提出が無ければ失敗として扱う\n\n**Reason**: 完了の判定が「endpoint への提出」から「invokeAi による output stream の検知」に変わった。\n**Migration**: `agent/invocation` の「完了は output stream で検知して idle に変える」「タイムアウトで failed に変える」が引き継ぐ。\n\n### Requirement: 初回か継続かはセッション一覧との符合から導く\n\n**Reason**: capability の畳み込み。定型の候補を呼び出し側から受け取る形に変わる。\n**Migration**: `agent/invocation` の同名要件が引き継ぐ。\n\n### Requirement: 定型は設定値として外に出す\n\n**Reason**: capability の畳み込み。定型を引くのが呼び出し側になる。\n**Migration**: `agent/invocation` の同名要件が引き継ぐ。\n",
+  "fileStats": {
+    "size": 2331,
+    "lines": 49,
+    "lastModified": "2026-08-25T07:49:26.975Z"
+  },
+  "comments": []
+}

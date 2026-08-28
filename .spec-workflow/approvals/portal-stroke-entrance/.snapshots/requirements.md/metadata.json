@@ -1,0 +1,62 @@
+{
+  "filePath": ".spec-workflow/specs/portal-stroke-entrance/requirements.md",
+  "currentVersion": 7,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-24T22:13:46.353Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787609626314_7ux74stcr",
+      "approvalTitle": "入口の接合の対応方法（作成ボタン→ストローク概要入力）"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2026-08-24T22:36:30.208Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787610782715_wd8brypwp",
+      "approvalTitle": "入口の接合の対応方法（画面イメージ修正: モーダルは全面・一覧は隠れる）"
+    },
+    {
+      "version": 3,
+      "filename": "snapshot-003.json",
+      "timestamp": "2026-08-24T22:42:48.267Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787611320305_q6h2o40ua",
+      "approvalTitle": "入口の接合の対応方法（触るコード見直し: ページ流用の全面モーダル・URL は進む）"
+    },
+    {
+      "version": 4,
+      "filename": "snapshot-004.json",
+      "timestamp": "2026-08-24T22:51:02.382Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787611445537_z6uxxmzwx",
+      "approvalTitle": "入口の接合の対応方法（画面とファイルの対応表を追加）"
+    },
+    {
+      "version": 5,
+      "filename": "snapshot-005.json",
+      "timestamp": "2026-08-24T23:02:33.860Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787612491541_0bi29igef",
+      "approvalTitle": "入口の接合の対応方法（実装の要点を2点に簡素化）"
+    },
+    {
+      "version": 6,
+      "filename": "snapshot-006.json",
+      "timestamp": "2026-08-24T23:07:25.033Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787612638848_pel7qokg3",
+      "approvalTitle": "入口の接合の対応方法（実装の想定を図で見える化・ファイル対応付き）"
+    },
+    {
+      "version": 7,
+      "filename": "snapshot-007.json",
+      "timestamp": "2026-08-25T02:43:41.667Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787612942684_e38v7yiua",
+      "approvalTitle": "入口の接合の対応方法（実装の想定を表形式に）"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787644315141_bql4lu1er",
+  "approvalId": "approval_1787644315045_xgtntnkxk",
+  "approvalTitle": "specs: stroke-session — 廃止（→ stroke/frontier へ全要件移行）",
+  "version": 1,
+  "timestamp": "2026-08-25T07:51:55.141Z",
+  "trigger": "initial",
+  "status": "pending",
+  "content": "# specs/stroke-session — delta\n\n## REMOVED Requirements\n\n### Requirement: 概要からセッションを開始する\n\n**Reason**: capability の畳み込み（承認済み requirements 2026-08-25）。\n**Migration**: `stroke/frontier` の同名要件が引き継ぐ。\n\n### Requirement: ローカルファイルから概要を読み込む\n\n**Reason**: capability の畳み込み。\n**Migration**: `stroke/frontier` の同名要件が引き継ぐ。\n\n### Requirement: ストロークの往復を進める\n\n**Reason**: capability の畳み込み。\n**Migration**: `stroke/frontier` の同名要件が引き継ぐ。\n\n### Requirement: 把握完了の判定は grilling の終了条件に従う\n\n**Reason**: capability の畳み込み。\n**Migration**: `stroke/frontier` の同名要件が引き継ぐ。\n\n### Requirement: セッションの状態を保持する\n\n**Reason**: capability の畳み込み。\n**Migration**: `stroke/frontier` の同名要件が引き継ぐ。\n\n### Requirement: proposal が起きた後の画面1 は画面2 へ送る\n\n**Reason**: capability の畳み込み。承認済みセッションは昇格で id ごと消えるため、対象は `proposed` のみに変わる。\n**Migration**: `stroke/frontier` の同名要件が引き継ぐ。\n\n### Requirement: 問いは選択式で提示する\n\n**Reason**: capability の畳み込み。\n**Migration**: `stroke/frontier` の同名要件が引き継ぐ。\n\n### Requirement: 画面に出た内容が提示の全てである\n\n**Reason**: capability の畳み込み。\n**Migration**: `stroke/frontier` の同名要件が引き継ぐ。\n\n### Requirement: 回答は選択または自由入力で送る\n\n**Reason**: capability の畳み込み。\n**Migration**: `stroke/frontier` の同名要件が引き継ぐ。\n\n### Requirement: 主表示は最新の問いだけにする\n\n**Reason**: capability の畳み込み。\n**Migration**: `stroke/frontier` の同名要件が引き継ぐ。\n\n### Requirement: 履歴はパンくずとして辿れる\n\n**Reason**: capability の畳み込み。\n**Migration**: `stroke/frontier` の同名要件が引き継ぐ。\n\n### Requirement: 画面2でも同じパンくずで履歴を辿れる\n\n**Reason**: capability の畳み込み。\n**Migration**: `stroke/frontier` の同名要件が引き継ぐ。\n",
+  "fileStats": {
+    "size": 2297,
+    "lines": 64,
+    "lastModified": "2026-08-25T07:49:26.871Z"
+  },
+  "comments": []
+}

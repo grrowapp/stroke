@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787788966640_yj2yzdqgo",
+  "approvalId": "approval_1787788966542_t37h34igc",
+  "approvalTitle": "specs 1/7: mcp/server — サーバー本体の契約（stdio・endpoint 代行・接続情報解決・素通し）",
+  "version": 1,
+  "timestamp": "2026-08-27T00:02:46.640Z",
+  "trigger": "initial",
+  "status": "pending",
+  "content": "# mcp/server Delta\n\n## Purpose\n\nclaude プロセスへ操作系ツールを提供する MCP サーバー本体の挙動を定める。transport・接続情報の解決・endpoint 代行の原則という、全ツールに共通する契約を持つ。\n\n## ADDED Requirements\n\n### Requirement: サーバーは stdio transport で提供される\n\nMCP サーバーは stdio transport の別プロセスとして起動し、呼び出し側が組み立てる MCP 設定から登録される SHALL。\n\n#### Scenario: 起動した claude からツールが見える\n\n- **WHEN** MCP 設定にこのサーバーを含めて claude プロセスが起動する\n- **THEN** claude プロセスから操作系ツールの一覧が取得できる\n\n### Requirement: 全ツールは endpoint への代行である\n\n各ツールの実行は、対応する既存 endpoint への HTTP 発行のみで行う SHALL。サーバーはセッションディレクトリ・プロジェクトディレクトリのファイルを読み書きしてはならない（MUST NOT）。\n\n#### Scenario: ツールの実行が endpoint に届く\n\n- **WHEN** いずれかのツールが実行される\n- **THEN** 対応する endpoint へ HTTP が発行され、その応答だけからツールの結果が作られる\n\n#### Scenario: ファイルには触れない\n\n- **WHEN** いずれかのツールが実行される\n- **THEN** セッション・プロジェクトのファイルへの読み書きは発生しない\n\n### Requirement: 接続情報はサーバーが解決する\n\n接続先（stroke-board・本家それぞれの base URL）とセッション id は、起動時に呼び出し側から渡された値でサーバーが解決する SHALL。本家向け操作に要る projectId は、本家の endpoint への問い合わせで解決する SHALL。ツールの引数に接続情報を要求してはならない（MUST NOT）。\n\n#### Scenario: 引数なしで自セッションに届く\n\n- **WHEN** セッション向けの取得ツールが引数なしで実行される\n- **THEN** そのセッションの endpoint に対して取得が行われる\n\n#### Scenario: projectId を引数に取らない\n\n- **WHEN** 本家向けのツールが実行される\n- **THEN** projectId はサーバーが解決し、呼び出し側は渡していない\n\n### Requirement: エラーは素通しで返す\n\nendpoint がエラーを返した場合、ツールはそのステータスと本文をそのまま結果として返す SHALL。サーバー側で判定・変換・独自の状態分岐を加えてはならない（MUST NOT）（docs/adr/0013 の原則に整合する）。\n\n#### Scenario: 検証エラーが読める\n\n- **WHEN** 代行先の endpoint が 400 を返す\n- **THEN** ツールの結果からそのエラー内容がそのまま読める\n",
+  "fileStats": {
+    "size": 2827,
+    "lines": 54,
+    "lastModified": "2026-08-26T23:58:51.516Z"
+  },
+  "comments": []
+}

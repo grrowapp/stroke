@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787782999068_3nlvfk96p",
+  "approvalId": "approval_1787782587178_4jdhxcwjn",
+  "approvalTitle": "spec: feature/naming の承認（やり直し: 規約・変換ルール・1対1のみ。挙動なし）",
+  "version": 4,
+  "timestamp": "2026-08-26T22:23:19.068Z",
+  "trigger": "revision_requested",
+  "status": "pending",
+  "content": "## Purpose\n\nopenspec の capability パス（階層あり）と本家 spec-workflow の spec 名（フラット必須）を対応付ける命名の規約と変換ルール。作成（`create-feature`）と sync はこの1つの規約に従う。\n\n## ADDED Requirements\n\n### Requirement: spec 名は capability パスの `__` 連結である\n\nfeature の spec 名は、対応する capability パスのセグメントを `__`（2重アンダーバー）で連結したフラット名である SHALL。パスから名前へ（エンコード）、名前からパスへ（デコード）の両方向の変換が定まる SHALL。\n\n#### Scenario: エンコード\n\n- **WHEN** capability パス `api/session` をエンコードする\n- **THEN** spec 名は `api__session` になる\n\n#### Scenario: デコード\n\n- **WHEN** spec 名 `api__session` をデコードする\n- **THEN** capability パスは `api/session` になる\n\n#### Scenario: 単一セグメント\n\n- **WHEN** 階層を持たない capability パス `portal` をエンコードする\n- **THEN** spec 名は `portal` のままである\n\n### Requirement: セグメントはアンダースコアを含まない kebab-case である\n\ncapability パスの各セグメントは kebab-case（英小文字・数字・ハイフン）である SHALL。セグメントはアンダースコアを含んではならない MUST NOT。これにより名前の中の `__` は常に区切りとしてのみ現れ、変換は可逆になる。\n\n#### Scenario: 規約に適合しないセグメント\n\n- **WHEN** セグメント `api_v2` を規約に照らす\n- **THEN** アンダースコアを含むため適合しない\n\n#### Scenario: 変換の可逆性\n\n- **WHEN** 規約に適合する capability パスをエンコードし、その結果をデコードする\n- **THEN** 元の capability パスに一致する\n\n### Requirement: 名前と capability パスは1対1に対応する\n\nspec 名と capability パスは1対1に対応する SHALL。同名の feature は存在しない。\n\n#### Scenario: 異なるパスは異なる名前になる\n\n- **WHEN** 異なる2つの capability パス（例: `api/session` と `api/billing`）をエンコードする\n- **THEN** 異なる spec 名（`api__session` と `api__billing`）になる\n\n#### Scenario: 名前から対応先が一意に定まる\n\n- **WHEN** spec 名 `api__session` の対応先を求める\n- **THEN** capability パス `api/session` ただ1つに定まる\n",
+  "fileStats": {
+    "size": 2465,
+    "lines": 53,
+    "lastModified": "2026-08-26T22:16:01.104Z"
+  },
+  "comments": []
+}

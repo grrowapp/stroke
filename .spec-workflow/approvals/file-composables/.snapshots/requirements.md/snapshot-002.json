@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787609718505_4wyn21ro7",
+  "approvalId": "approval_1787609564697_oi1er9pk0",
+  "approvalTitle": "composables 一覧",
+  "version": 2,
+  "timestamp": "2026-08-24T22:15:18.505Z",
+  "trigger": "revision_requested",
+  "status": "pending",
+  "content": "# composables 一覧\n\n| composable | 説明 |\n| --- | --- |\n| `useBoardSocket.ts` | stroke-board サーバの WebSocket から通知を受ける（全画面で1接続を共有） |\n| `useRelativeTime.ts` | ISO 時刻を相対時刻の文字列にする純関数 |\n| `useProjectApi.ts` | 本家の情報の取得・保存 API 呼び出し11関数を集約する |\n| `useSteeringDocuments.ts` | ステアリング3文書（product / tech / structure）の有無を組み立てる |\n| `useQuestionChannel.ts` | W1 を購読し、今の1問を持つ |\n| `useProposalChannel.ts` | W2 を購読し、proposal と名前候補を持つ |\n| `useWaitingRetry.ts` | 送信後の待機と失敗を `GET /api/strokes/<id>` のポーリングで判定する |\n| `useAnnotations.ts` | 差し戻しコメントを積み、AI へ渡す4層のペイロードに組む |\n| `useAgentQuestion.ts` | 問いの往復（W1 購読・回答送信・AI 起動要求・待機）を1つに束ねる |\n| `useProposalReview.ts` | 画面2（proposal レビュー）の状態と往復の全部を持つ |\n",
+  "fileStats": {
+    "size": 1072,
+    "lines": 15,
+    "lastModified": "2026-08-24T22:12:37.969Z"
+  },
+  "comments": []
+}

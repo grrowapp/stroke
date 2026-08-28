@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787778755791_vw50a3rtc",
+  "approvalId": "approval_1787778755741_l5xupdnly",
+  "approvalTitle": "spec: feature/naming（`__` 命名規則）の承認",
+  "version": 1,
+  "timestamp": "2026-08-26T21:12:35.791Z",
+  "trigger": "initial",
+  "status": "pending",
+  "content": "## Purpose\n\nopenspec の capability パス（階層あり）と本家 spec-workflow の spec 名（フラット必須）を `__` で相互に対応付ける命名規約。階層有無の差異をこの規約が吸収し、作成（`create-feature`）と sync の両方がこの1つの規約に従う。\n\n## ADDED Requirements\n\n### Requirement: capability パスと spec 名は `__` で相互変換できる\n\nopenspec の capability パス（`/` 区切り）と本家の spec 名は、`/` と `__` の置換で相互変換される SHALL。変換は可逆でなければならない MUST。\n\n#### Scenario: パスから spec 名へのエンコード\n\n- **WHEN** capability パス `api/session` を本家の spec 名にエンコードする\n- **THEN** spec 名は `api__session` になる\n\n#### Scenario: spec 名からパスへのデコード\n\n- **WHEN** 本家の spec 名 `api__session` を capability パスにデコードする\n- **THEN** パスは `api/session` になる\n\n#### Scenario: 階層を持たない名前はそのまま\n\n- **WHEN** `__` を含まない spec 名 `portal` をデコードする\n- **THEN** パスは `portal` のまま（単一セグメント）である\n\n### Requirement: セグメント名に `__` を含めてはならない\n\ncapability パスの各セグメント名は `__` を含んではならない MUST NOT。含めると変換の可逆性が壊れる。違反する名前の受け付けは拒否される SHALL。\n\n#### Scenario: 違反する名前の拒否\n\n- **WHEN** セグメント名に `__` を含む名前（例: `api__v2/session`）で feature を作ろうとする\n- **THEN** 作成は拒否され、`__` を含むセグメント名が使えないことが分かるエラーが返る\n\n### Requirement: エンコード結果が既存と重複する作成は拒否される\n\nエンコードした spec 名が本家に既存の spec 名と一致する場合、作成は拒否される SHALL。\n\n#### Scenario: 既存名との衝突\n\n- **WHEN** 本家に spec `api__session` が既にある状態で、capability パス `api/session` から feature を作ろうとする\n- **THEN** 作成は重複として拒否される\n",
+  "fileStats": {
+    "size": 2166,
+    "lines": 43,
+    "lastModified": "2026-08-26T21:02:27.096Z"
+  },
+  "comments": []
+}

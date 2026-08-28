@@ -1,0 +1,267 @@
+{
+  "id": "approval_1787637765793_u95nfdem9",
+  "title": "connect-portal-and-strokes — capability の変更を1行1変更の箇条書き化・timeout の主体を U13 実装と明示",
+  "filePath": ".spec-workflow/specs/connect-portal-and-strokes/requirements.md",
+  "type": "document",
+  "status": "needs-revision",
+  "createdAt": "2026-08-25T06:02:45.793Z",
+  "category": "spec",
+  "categoryName": "connect-portal-and-strokes",
+  "response": "Feedback Summary (18 comments):\n\nSpecific Text Comments:\n1. \"実行の記録は `state.json` の `invocation`（`running` / `id...\": これ変更じゃない\n2. \"・**起動の基本は U13 のキック**。ストロークも steering もこの経路で始まる（承認の...\": これ今既にそうなってない？\n3. \"・サーバーは何の作業かを判定しない。キックは初回/継続の符合判定（U12 の一覧との符合。ファイルを...\": u13のキックが既に実装済みならこれも恐らく実装済み。というか、変更じゃない\n4. \"U13（起動口）の実装がタイムアウトを見張り、A8 が届かないまま時間切れになったら `invoca...\": U13の実装って？APIがプロセス起動してそのまま残るはNG\ninvocationを変更する操作の指定がないNG\n5. \"・拾ったものに U13 をキックする\": どうキックするかがない。1点だけ懸念あり\n6. \"（本文なし。指示された作業の完了を告げ、受理で `invocation` を `running` か...\": 意味不明。作業の完了は告げない。invocationを操作するapiなだけ。idleとfalseを同砂漠化定義必要\n7. \"`api/stroke` |\": ちがう\n8. \"`api/stroke`\": NG\n9. \" `api/stroke` \": NG\n10. \" `api/stroke` \": NG\n11. \" `api/stroke`\": NG\n12. \"初回か継続かの符合 | U12 `GET /api/sessions` の一覧との符合 \": NG\n13. \"| 画面が見る実行状態 | U2 `GET /api/sessions/:id` の応答の `inv...\": ？\n14. \"\n\": faildを入れろ\n15. \"| `running` → `failed` | 時間切れ。A8 が届かないままタイムアウトしたらサ...\": サーバーじゃない。invokeAIのはず\n16. \"ただのボタン。押すとストロークが全画面で開く |\": オーバーレイ上にmodal\n17. \"| 可否判定（サーバー・共有の型） | 登録と作成の両方を返す | 登録だけ。作成の理由コードは削除...\": 登録も要らない\n18. \" 置き場が2件 | 置き場1件に統一＋ steering の定型を1件追加 |\": 意味不明。置き場？\n",
+  "annotations": "{\n  \"decision\": \"needs-revision\",\n  \"comments\": [\n    {\n      \"type\": \"selection\",\n      \"comment\": \"これ変更じゃない\",\n      \"timestamp\": \"2026-08-25T06:04:33.262Z\",\n      \"selectedText\": \"実行の記録は `state.json` の `invocation`（`running` / `idle` / `failed` のまま）\",\n      \"highlightColor\": {\n        \"bg\": \"rgba(255, 235, 59, 0.3)\",\n        \"border\": \"#FFEB3B\",\n        \"name\": \"#ffeb3b\"\n      },\n      \"id\": \"comment_1787637873262_f68h1e9rr\",\n      \"startOffset\": 1679,\n      \"endOffset\": 1748\n    },\n    {\n      \"type\": \"selection\",\n      \"comment\": \"これ今既にそうなってない？\",\n      \"timestamp\": \"2026-08-25T06:04:46.631Z\",\n      \"selectedText\": \"・**起動の基本は U13 のキック**。ストロークも steering もこの経路で始まる（承認の成功そのものでは起動しない\",\n      \"highlightColor\": {\n        \"bg\": \"rgba(255, 235, 59, 0.3)\",\n        \"border\": \"#FFEB3B\",\n        \"name\": \"#ffeb3b\"\n      },\n      \"id\": \"comment_1787637886631_r57785ci4\",\n      \"startOffset\": 1609,\n      \"endOffset\": 1672\n    },\n    {\n      \"type\": \"selection\",\n      \"comment\": \"u13のキックが既に実装済みならこれも恐らく実装済み。というか、変更じゃない\",\n      \"timestamp\": \"2026-08-25T06:05:24.819Z\",\n      \"selectedText\": \"・サーバーは何の作業かを判定しない。キックは初回/継続の符合判定（U12 の一覧との符合。ファイルを直接見ない）だけで会話を開始・再開す\",\n      \"highlightColor\": {\n        \"bg\": \"rgba(255, 235, 59, 0.3)\",\n        \"border\": \"#FFEB3B\",\n        \"name\": \"#ffeb3b\"\n      },\n      \"id\": \"comment_1787637924819_ezyye74d8\",\n      \"startOffset\": 1753,\n      \"endOffset\": 1821\n    },\n    {\n      \"type\": \"selection\",\n      \"comment\": \"U13の実装って？APIがプロセス起動してそのまま残るはNG\\ninvocationを変更する操作の指定がないNG\",\n      \"timestamp\": \"2026-08-25T06:06:44.726Z\",\n      \"selectedText\": \"U13（起動口）の実装がタイムアウトを見張り、A8 が届かないまま時間切れになったら `invocation` を `failed` に変える** \",\n      \"highlightColor\": {\n        \"bg\": \"rgba(255, 235, 59, 0.3)\",\n        \"border\": \"#FFEB3B\",\n        \"name\": \"#ffeb3b\"\n      },\n      \"id\": \"comment_1787638004726_s5k2vxwyk\",\n      \"startOffset\": 1888,\n      \"endOffset\": 1962\n    },\n    {\n      \"type\": \"selection\",\n      \"comment\": \"どうキックするかがない。1点だけ懸念あり\",\n      \"timestamp\": \"2026-08-25T06:07:50.998Z\",\n      \"selectedText\": \"・拾ったものに U13 をキックする\",\n      \"highlightColor\": {\n        \"bg\": \"rgba(255, 235, 59, 0.3)\",\n        \"border\": \"#FFEB3B\",\n        \"name\": \"#ffeb3b\"\n      },\n      \"id\": \"comment_1787638070998_wrg213bze\",\n      \"startOffset\": 2083,\n      \"endOffset\": 2101\n    },\n    {\n      \"type\": \"selection\",\n      \"comment\": \"意味不明。作業の完了は告げない。invocationを操作するapiなだけ。idleとfalseを同砂漠化定義必要\",\n      \"timestamp\": \"2026-08-25T06:09:27.225Z\",\n      \"selectedText\": \"（本文なし。指示された作業の完了を告げ、受理で `invocation` を `running` から `idle` に変える）\",\n      \"highlightColor\": {\n        \"bg\": \"rgba(255, 235, 59, 0.3)\",\n        \"border\": \"#FFEB3B\",\n        \"name\": \"#ffeb3b\"\n      },\n      \"id\": \"comment_1787638167225_qr2qd8l1i\",\n      \"startOffset\": 2555,\n      \"endOffset\": 2619\n    },\n    {\n      \"type\": \"selection\",\n      \"comment\": \"ちがう\",\n      \"timestamp\": \"2026-08-25T06:10:34.769Z\",\n      \"selectedText\": \"`api/stroke` |\",\n      \"highlightColor\": {\n        \"bg\": \"rgba(255, 235, 59, 0.3)\",\n        \"border\": \"#FFEB3B\",\n        \"name\": \"#ffeb3b\"\n      },\n      \"id\": \"comment_1787638234769_tvkjd7je2\",\n      \"startOffset\": 3068,\n      \"endOffset\": 3082\n    },\n    {\n      \"type\": \"selection\",\n      \"comment\": \"NG\",\n      \"timestamp\": \"2026-08-25T06:11:10.514Z\",\n      \"selectedText\": \"`api/stroke`\",\n      \"highlightColor\": {\n        \"bg\": \"rgba(255, 235, 59, 0.3)\",\n        \"border\": \"#FFEB3B\",\n        \"name\": \"#ffeb3b\"\n      },\n      \"id\": \"comment_1787638270514_fyzcqufji\",\n      \"startOffset\": 3157,\n      \"endOffset\": 3169\n    },\n    {\n      \"type\": \"selection\",\n      \"comment\": \"NG\",\n      \"timestamp\": \"2026-08-25T06:11:15.960Z\",\n      \"selectedText\": \" `api/stroke` \",\n      \"highlightColor\": {\n        \"bg\": \"rgba(255, 235, 59, 0.3)\",\n        \"border\": \"#FFEB3B\",\n        \"name\": \"#ffeb3b\"\n      },\n      \"id\": \"comment_1787638275960_gwde5vtlo\",\n      \"startOffset\": 3251,\n      \"endOffset\": 3265\n    },\n    {\n      \"type\": \"selection\",\n      \"comment\": \"NG\",\n      \"timestamp\": \"2026-08-25T06:12:17.971Z\",\n      \"selectedText\": \" `api/stroke` \",\n      \"highlightColor\": {\n        \"bg\": \"rgba(255, 235, 59, 0.3)\",\n        \"border\": \"#FFEB3B\",\n        \"name\": \"#ffeb3b\"\n      },\n      \"id\": \"comment_1787638337971_muygjt2mp\",\n      \"startOffset\": 3776,\n      \"endOffset\": 3790\n    },\n    {\n      \"type\": \"selection\",\n      \"comment\": \"NG\",\n      \"timestamp\": \"2026-08-25T06:12:23.194Z\",\n      \"selectedText\": \" `api/stroke`\",\n      \"highlightColor\": {\n        \"bg\": \"rgba(255, 235, 59, 0.3)\",\n        \"border\": \"#FFEB3B\",\n        \"name\": \"#ffeb3b\"\n      },\n      \"id\": \"comment_1787638343194_q38adaibl\",\n      \"startOffset\": 3687,\n      \"endOffset\": 3700\n    },\n    {\n      \"type\": \"selection\",\n      \"comment\": \"NG\",\n      \"timestamp\": \"2026-08-25T06:15:19.583Z\",\n      \"selectedText\": \"初回か継続かの符合 | U12 `GET /api/sessions` の一覧との符合 \",\n      \"highlightColor\": {\n        \"bg\": \"rgba(255, 235, 59, 0.3)\",\n        \"border\": \"#FFEB3B\",\n        \"name\": \"#ffeb3b\"\n      },\n      \"id\": \"comment_1787638519583_65qhf7p1y\",\n      \"startOffset\": 5345,\n      \"endOffset\": 5389\n    },\n    {\n      \"type\": \"selection\",\n      \"comment\": \"？\",\n      \"timestamp\": \"2026-08-25T06:16:15.581Z\",\n      \"selectedText\": \"| 画面が見る実行状態 | U2 `GET /api/sessions/:id` の応答の `invocation` |\",\n      \"highlightColor\": {\n        \"bg\": \"rgba(255, 235, 59, 0.3)\",\n        \"border\": \"#FFEB3B\",\n        \"name\": \"#ffeb3b\"\n      },\n      \"id\": \"comment_1787638575581_wu8s5ff8e\",\n      \"startOffset\": 5462,\n      \"endOffset\": 5522\n    },\n    {\n      \"type\": \"selection\",\n      \"comment\": \"faildを入れろ\",\n      \"timestamp\": \"2026-08-25T06:16:25.930Z\",\n      \"selectedText\": \"\\n\",\n      \"highlightColor\": {\n        \"bg\": \"rgba(255, 235, 59, 0.3)\",\n        \"border\": \"#FFEB3B\",\n        \"name\": \"#ffeb3b\"\n      },\n      \"id\": \"comment_1787638585930_9kdswqpbd\",\n      \"startOffset\": 5523,\n      \"endOffset\": 5524\n    },\n    {\n      \"type\": \"selection\",\n      \"comment\": \"サーバーじゃない。invokeAIのはず\",\n      \"timestamp\": \"2026-08-25T06:17:46.677Z\",\n      \"selectedText\": \"| `running` → `failed` | 時間切れ。A8 が届かないままタイムアウトしたらサーバーが `failed` に変える |\",\n      \"highlightColor\": {\n        \"bg\": \"rgba(255, 235, 59, 0.3)\",\n        \"border\": \"#FFEB3B\",\n        \"name\": \"#ffeb3b\"\n      },\n      \"id\": \"comment_1787638666677_73m8mkqj5\",\n      \"startOffset\": 5942,\n      \"endOffset\": 6012\n    },\n    {\n      \"type\": \"selection\",\n      \"comment\": \"オーバーレイ上にmodal\",\n      \"timestamp\": \"2026-08-25T06:19:16.622Z\",\n      \"selectedText\": \"ただのボタン。押すとストロークが全画面で開く |\",\n      \"highlightColor\": {\n        \"bg\": \"rgba(255, 235, 59, 0.3)\",\n        \"border\": \"#FFEB3B\",\n        \"name\": \"#ffeb3b\"\n      },\n      \"id\": \"comment_1787638756622_c8211oe79\",\n      \"startOffset\": 6565,\n      \"endOffset\": 6589\n    },\n    {\n      \"type\": \"selection\",\n      \"comment\": \"登録も要らない\",\n      \"timestamp\": \"2026-08-25T06:19:41.477Z\",\n      \"selectedText\": \"| 可否判定（サーバー・共有の型） | 登録と作成の両方を返す | 登録だけ。作成の理由コードは削除 |\",\n      \"highlightColor\": {\n        \"bg\": \"rgba(255, 235, 59, 0.3)\",\n        \"border\": \"#FFEB3B\",\n        \"name\": \"#ffeb3b\"\n      },\n      \"id\": \"comment_1787638781477_3wdmrkny6\",\n      \"startOffset\": 6590,\n      \"endOffset\": 6642\n    },\n    {\n      \"type\": \"selection\",\n      \"comment\": \"意味不明。置き場？\",\n      \"timestamp\": \"2026-08-25T06:21:48.241Z\",\n      \"selectedText\": \" 置き場が2件 | 置き場1件に統一＋ steering の定型を1件追加 |\",\n      \"highlightColor\": {\n        \"bg\": \"rgba(255, 235, 59, 0.3)\",\n        \"border\": \"#FFEB3B\",\n        \"name\": \"#ffeb3b\"\n      },\n      \"id\": \"comment_1787638908241_s7cw7n16a\",\n      \"startOffset\": 7063,\n      \"endOffset\": 7102\n    }\n  ],\n  \"summary\": \"Feedback Summary (18 comments):\\n\\nSpecific Text Comments:\\n1. \\\"実行の記録は `state.json` の `invocation`（`running` / `id...\\\": これ変更じゃない\\n2. \\\"・**起動の基本は U13 のキック**。ストロークも steering もこの経路で始まる（承認の...\\\": これ今既にそうなってない？\\n3. \\\"・サーバーは何の作業かを判定しない。キックは初回/継続の符合判定（U12 の一覧との符合。ファイルを...\\\": u13のキックが既に実装済みならこれも恐らく実装済み。というか、変更じゃない\\n4. \\\"U13（起動口）の実装がタイムアウトを見張り、A8 が届かないまま時間切れになったら `invoca...\\\": U13の実装って？APIがプロセス起動してそのまま残るはNG\\ninvocationを変更する操作の指定がないNG\\n5. \\\"・拾ったものに U13 をキックする\\\": どうキックするかがない。1点だけ懸念あり\\n6. \\\"（本文なし。指示された作業の完了を告げ、受理で `invocation` を `running` か...\\\": 意味不明。作業の完了は告げない。invocationを操作するapiなだけ。idleとfalseを同砂漠化定義必要\\n7. \\\"`api/stroke` |\\\": ちがう\\n8. \\\"`api/stroke`\\\": NG\\n9. \\\" `api/stroke` \\\": NG\\n10. \\\" `api/stroke` \\\": NG\\n11. \\\" `api/stroke`\\\": NG\\n12. \\\"初回か継続かの符合 | U12 `GET /api/sessions` の一覧との符合 \\\": NG\\n13. \\\"| 画面が見る実行状態 | U2 `GET /api/sessions/:id` の応答の `inv...\\\": ？\\n14. \\\"\\n\\\": faildを入れろ\\n15. \\\"| `running` → `failed` | 時間切れ。A8 が届かないままタイムアウトしたらサ...\\\": サーバーじゃない。invokeAIのはず\\n16. \\\"ただのボタン。押すとストロークが全画面で開く |\\\": オーバーレイ上にmodal\\n17. \\\"| 可否判定（サーバー・共有の型） | 登録と作成の両方を返す | 登録だけ。作成の理由コードは削除...\\\": 登録も要らない\\n18. \\\" 置き場が2件 | 置き場1件に統一＋ steering の定型を1件追加 |\\\": 意味不明。置き場？\\n\",\n  \"timestamp\": \"2026-08-25T06:21:53.864Z\"\n}",
+  "respondedAt": "2026-08-25T06:21:53.899Z",
+  "comments": [
+    {
+      "type": "selection",
+      "comment": "これ変更じゃない",
+      "timestamp": "2026-08-25T06:04:33.262Z",
+      "selectedText": "実行の記録は `state.json` の `invocation`（`running` / `idle` / `failed` のまま）",
+      "highlightColor": {
+        "bg": "rgba(255, 235, 59, 0.3)",
+        "border": "#FFEB3B",
+        "name": "#ffeb3b"
+      },
+      "id": "comment_1787637873262_f68h1e9rr",
+      "startOffset": 1679,
+      "endOffset": 1748
+    },
+    {
+      "type": "selection",
+      "comment": "これ今既にそうなってない？",
+      "timestamp": "2026-08-25T06:04:46.631Z",
+      "selectedText": "・**起動の基本は U13 のキック**。ストロークも steering もこの経路で始まる（承認の成功そのものでは起動しない",
+      "highlightColor": {
+        "bg": "rgba(255, 235, 59, 0.3)",
+        "border": "#FFEB3B",
+        "name": "#ffeb3b"
+      },
+      "id": "comment_1787637886631_r57785ci4",
+      "startOffset": 1609,
+      "endOffset": 1672
+    },
+    {
+      "type": "selection",
+      "comment": "u13のキックが既に実装済みならこれも恐らく実装済み。というか、変更じゃない",
+      "timestamp": "2026-08-25T06:05:24.819Z",
+      "selectedText": "・サーバーは何の作業かを判定しない。キックは初回/継続の符合判定（U12 の一覧との符合。ファイルを直接見ない）だけで会話を開始・再開す",
+      "highlightColor": {
+        "bg": "rgba(255, 235, 59, 0.3)",
+        "border": "#FFEB3B",
+        "name": "#ffeb3b"
+      },
+      "id": "comment_1787637924819_ezyye74d8",
+      "startOffset": 1753,
+      "endOffset": 1821
+    },
+    {
+      "type": "selection",
+      "comment": "U13の実装って？APIがプロセス起動してそのまま残るはNG\ninvocationを変更する操作の指定がないNG",
+      "timestamp": "2026-08-25T06:06:44.726Z",
+      "selectedText": "U13（起動口）の実装がタイムアウトを見張り、A8 が届かないまま時間切れになったら `invocation` を `failed` に変える** ",
+      "highlightColor": {
+        "bg": "rgba(255, 235, 59, 0.3)",
+        "border": "#FFEB3B",
+        "name": "#ffeb3b"
+      },
+      "id": "comment_1787638004726_s5k2vxwyk",
+      "startOffset": 1888,
+      "endOffset": 1962
+    },
+    {
+      "type": "selection",
+      "comment": "どうキックするかがない。1点だけ懸念あり",
+      "timestamp": "2026-08-25T06:07:50.998Z",
+      "selectedText": "・拾ったものに U13 をキックする",
+      "highlightColor": {
+        "bg": "rgba(255, 235, 59, 0.3)",
+        "border": "#FFEB3B",
+        "name": "#ffeb3b"
+      },
+      "id": "comment_1787638070998_wrg213bze",
+      "startOffset": 2083,
+      "endOffset": 2101
+    },
+    {
+      "type": "selection",
+      "comment": "意味不明。作業の完了は告げない。invocationを操作するapiなだけ。idleとfalseを同砂漠化定義必要",
+      "timestamp": "2026-08-25T06:09:27.225Z",
+      "selectedText": "（本文なし。指示された作業の完了を告げ、受理で `invocation` を `running` から `idle` に変える）",
+      "highlightColor": {
+        "bg": "rgba(255, 235, 59, 0.3)",
+        "border": "#FFEB3B",
+        "name": "#ffeb3b"
+      },
+      "id": "comment_1787638167225_qr2qd8l1i",
+      "startOffset": 2555,
+      "endOffset": 2619
+    },
+    {
+      "type": "selection",
+      "comment": "ちがう",
+      "timestamp": "2026-08-25T06:10:34.769Z",
+      "selectedText": "`api/stroke` |",
+      "highlightColor": {
+        "bg": "rgba(255, 235, 59, 0.3)",
+        "border": "#FFEB3B",
+        "name": "#ffeb3b"
+      },
+      "id": "comment_1787638234769_tvkjd7je2",
+      "startOffset": 3068,
+      "endOffset": 3082
+    },
+    {
+      "type": "selection",
+      "comment": "NG",
+      "timestamp": "2026-08-25T06:11:10.514Z",
+      "selectedText": "`api/stroke`",
+      "highlightColor": {
+        "bg": "rgba(255, 235, 59, 0.3)",
+        "border": "#FFEB3B",
+        "name": "#ffeb3b"
+      },
+      "id": "comment_1787638270514_fyzcqufji",
+      "startOffset": 3157,
+      "endOffset": 3169
+    },
+    {
+      "type": "selection",
+      "comment": "NG",
+      "timestamp": "2026-08-25T06:11:15.960Z",
+      "selectedText": " `api/stroke` ",
+      "highlightColor": {
+        "bg": "rgba(255, 235, 59, 0.3)",
+        "border": "#FFEB3B",
+        "name": "#ffeb3b"
+      },
+      "id": "comment_1787638275960_gwde5vtlo",
+      "startOffset": 3251,
+      "endOffset": 3265
+    },
+    {
+      "type": "selection",
+      "comment": "NG",
+      "timestamp": "2026-08-25T06:12:17.971Z",
+      "selectedText": " `api/stroke` ",
+      "highlightColor": {
+        "bg": "rgba(255, 235, 59, 0.3)",
+        "border": "#FFEB3B",
+        "name": "#ffeb3b"
+      },
+      "id": "comment_1787638337971_muygjt2mp",
+      "startOffset": 3776,
+      "endOffset": 3790
+    },
+    {
+      "type": "selection",
+      "comment": "NG",
+      "timestamp": "2026-08-25T06:12:23.194Z",
+      "selectedText": " `api/stroke`",
+      "highlightColor": {
+        "bg": "rgba(255, 235, 59, 0.3)",
+        "border": "#FFEB3B",
+        "name": "#ffeb3b"
+      },
+      "id": "comment_1787638343194_q38adaibl",
+      "startOffset": 3687,
+      "endOffset": 3700
+    },
+    {
+      "type": "selection",
+      "comment": "NG",
+      "timestamp": "2026-08-25T06:15:19.583Z",
+      "selectedText": "初回か継続かの符合 | U12 `GET /api/sessions` の一覧との符合 ",
+      "highlightColor": {
+        "bg": "rgba(255, 235, 59, 0.3)",
+        "border": "#FFEB3B",
+        "name": "#ffeb3b"
+      },
+      "id": "comment_1787638519583_65qhf7p1y",
+      "startOffset": 5345,
+      "endOffset": 5389
+    },
+    {
+      "type": "selection",
+      "comment": "？",
+      "timestamp": "2026-08-25T06:16:15.581Z",
+      "selectedText": "| 画面が見る実行状態 | U2 `GET /api/sessions/:id` の応答の `invocation` |",
+      "highlightColor": {
+        "bg": "rgba(255, 235, 59, 0.3)",
+        "border": "#FFEB3B",
+        "name": "#ffeb3b"
+      },
+      "id": "comment_1787638575581_wu8s5ff8e",
+      "startOffset": 5462,
+      "endOffset": 5522
+    },
+    {
+      "type": "selection",
+      "comment": "faildを入れろ",
+      "timestamp": "2026-08-25T06:16:25.930Z",
+      "selectedText": "\n",
+      "highlightColor": {
+        "bg": "rgba(255, 235, 59, 0.3)",
+        "border": "#FFEB3B",
+        "name": "#ffeb3b"
+      },
+      "id": "comment_1787638585930_9kdswqpbd",
+      "startOffset": 5523,
+      "endOffset": 5524
+    },
+    {
+      "type": "selection",
+      "comment": "サーバーじゃない。invokeAIのはず",
+      "timestamp": "2026-08-25T06:17:46.677Z",
+      "selectedText": "| `running` → `failed` | 時間切れ。A8 が届かないままタイムアウトしたらサーバーが `failed` に変える |",
+      "highlightColor": {
+        "bg": "rgba(255, 235, 59, 0.3)",
+        "border": "#FFEB3B",
+        "name": "#ffeb3b"
+      },
+      "id": "comment_1787638666677_73m8mkqj5",
+      "startOffset": 5942,
+      "endOffset": 6012
+    },
+    {
+      "type": "selection",
+      "comment": "オーバーレイ上にmodal",
+      "timestamp": "2026-08-25T06:19:16.622Z",
+      "selectedText": "ただのボタン。押すとストロークが全画面で開く |",
+      "highlightColor": {
+        "bg": "rgba(255, 235, 59, 0.3)",
+        "border": "#FFEB3B",
+        "name": "#ffeb3b"
+      },
+      "id": "comment_1787638756622_c8211oe79",
+      "startOffset": 6565,
+      "endOffset": 6589
+    },
+    {
+      "type": "selection",
+      "comment": "登録も要らない",
+      "timestamp": "2026-08-25T06:19:41.477Z",
+      "selectedText": "| 可否判定（サーバー・共有の型） | 登録と作成の両方を返す | 登録だけ。作成の理由コードは削除 |",
+      "highlightColor": {
+        "bg": "rgba(255, 235, 59, 0.3)",
+        "border": "#FFEB3B",
+        "name": "#ffeb3b"
+      },
+      "id": "comment_1787638781477_3wdmrkny6",
+      "startOffset": 6590,
+      "endOffset": 6642
+    },
+    {
+      "type": "selection",
+      "comment": "意味不明。置き場？",
+      "timestamp": "2026-08-25T06:21:48.241Z",
+      "selectedText": " 置き場が2件 | 置き場1件に統一＋ steering の定型を1件追加 |",
+      "highlightColor": {
+        "bg": "rgba(255, 235, 59, 0.3)",
+        "border": "#FFEB3B",
+        "name": "#ffeb3b"
+      },
+      "id": "comment_1787638908241_s7cw7n16a",
+      "startOffset": 7063,
+      "endOffset": 7102
+    }
+  ]
+}

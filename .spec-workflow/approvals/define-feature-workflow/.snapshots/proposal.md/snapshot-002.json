@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787774220608_h0uvt98oo",
+  "approvalId": "approval_1787773305174_62hojluuh",
+  "approvalTitle": "proposal: define-feature-workflow（feature ワークフローの仕様定義）の承認",
+  "version": 2,
+  "timestamp": "2026-08-26T19:57:00.608Z",
+  "trigger": "revision_requested",
+  "status": "pending",
+  "content": "## Why\n\nstroke-board は文書を **feature**（実装のタスクに繋がるもの。本家 spec-workflow の requirements / design / tasks の組）と**仕様書**（システムをドキュメントとして記述し続けるもの）の2分類で扱う方向で動いている。ここで課題になっていたのが階層有無の差異である。openspec の specs は `specs/<階層>/spec.md` と階層を持てるが、本家 `.spec-workflow/specs/` は**フラット必須**で、入れ子は一覧に出ず親 spec を汚す（実測 2026-08-26、`docs/specs/reference/upstream-observations.md`）。\n\n解決策が見えた。**`__`（2重アンダーバー）区切りで階層をフラット名にエンコードして両者を同期する**。さらに中身の正を openspec 側に置く——requirements.md とは openspec の spec.md（Requirement + Scenario）を名前だけ変えた器であり、全体として「spec-workflow-mcp の皮を被った openspec 実装」とする。本家の枠組みは良いが、openspec と比べて管理する概念層が荒い。器は本家、概念層は openspec と役割を分ける。\n\nこの仕様定義を1つの change として固め、依存する change（`create-feature` / `create-spec-document`）が完全準拠で進められる基盤にする。\n\n## What Changes\n\nfeature レーンのワークフロー定義を確立する。\n\n- **`__` 命名規則**: openspec の capability パス（例 `api/session`）と本家 spec 名（例 `api__session`）を `__` で相互変換する。可逆性のため、パスのセグメント名に `__` を含めてはならない。\n- **中身の正は openspec 形式**: 本家 `specs/<name>/requirements.md` の中身は openspec の spec.md 形式で書く。design.md / tasks.md も openspec の change 成果物に対応させる。\n- **feature 用 workflow schema の新設**: `openspec/schemas/` にローカル schema を追加する（artifact の名前・順序・生成ファイルは schema で自由に定義できることを検証済み。実例 `flontier-steering`）。\n- **載せ替え規約**: openspec 側の工程成果物を本家 `.spec-workflow/specs/<__名>/` へ配置する取り決め。change 内を openspec 標準（`specs/**` の delta 形式）のまま持ち載せ替え時に改名するか、schema が直接 requirements.md を生成するかの分岐は design で決める。前者は openspec の archive → sync 機構をそのまま使え、後者は specs への配置を自前実装する必要が出る。\n- **完了時 sync**: feature の tasks が完了したら、openspec で言う archive → sync に相当する工程で `openspec/specs/<階層>/spec.md` へ配置する（`__` をデコード）。発火のタイミング（tasks 完了時か archive 操作時か）と担い手（エージェントのスキルかポータルのサーバか）は design で決める。\n\n**仕様書レーンは本 change の scope 外**（仮決めの記載のみ）。openspec 的には `skip_specs: true` 相当の変形ワークフローで、proposal → spec（形が少し違う）→ design と進み tasks は無く、最後に `docs/specs/` へ同期する——というのが現時点の仮決め。実現は一番遠い機能であり、後続 change で扱う。\n\n## Capabilities\n\n### New Capabilities\n\n- `feature-workflow`: feature の一生の振る舞い定義。`__` 命名規則・openspec 形式を正とする中身の規約・工程成果物の本家への載せ替え・tasks 完了後の `openspec/specs/` への配置を定める。\n\n### Modified Capabilities\n\nなし。\n\n## Impact\n\n- **依存される change**: `create-feature` と `create-spec-document` は、本 change で確定した仕様定義への完全準拠で specs / design を進める（両 proposal に明記済み）。\n- **openspec store**: `openspec/schemas/` に feature 用 schema が増える。`openspec/specs/` が feature 完了時の sync で育ち始める。\n- **本家との境界**: 本家 `.spec-workflow/specs/` への書き込みの口は `create-feature` 側が扱う。本 change が定めるのは規約と sync であり、入れ子 spec の害（実測済み）を `__` ルールで回避する。本家の器の中身を openspec 形式で書くという決定はユーザー判断であり（ADR 0005 の趣旨）、本 change がその判断の記録を兼ねる。\n- **未決の分岐**: 載せ替えの持ち方（A: openspec 標準のまま持ち改名して載せ替え / B: schema が直接 requirements.md を生成）と、sync の発火・担い手は design で決める。\n",
+  "fileStats": {
+    "size": 4659,
+    "lines": 37,
+    "lastModified": "2026-08-26T19:36:19.254Z"
+  },
+  "comments": []
+}

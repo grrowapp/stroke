@@ -1,0 +1,35 @@
+{
+  "id": "approval_1787637518918_gqbn6gcqv",
+  "title": "connect-portal-and-strokes — 判定と API の対応を endpoint 番号で明示した版（U12/U13/U2/A8）",
+  "filePath": ".spec-workflow/specs/connect-portal-and-strokes/requirements.md",
+  "type": "document",
+  "status": "needs-revision",
+  "createdAt": "2026-08-25T05:58:38.918Z",
+  "category": "spec",
+  "categoryName": "connect-portal-and-strokes",
+  "response": "Feedback Summary (2 comments):\n\nGeneral Comments:\n1. capabilityを変更点が何かをわかるように箇条書きにする。1行1変更\n\nSpecific Text Comments:\n1. \"起動口はタイムアウトを見張り、**A8 が届かないまま時間切れになったら `invocation` ...\": api\n",
+  "annotations": "{\n  \"decision\": \"needs-revision\",\n  \"comments\": [\n    {\n      \"type\": \"general\",\n      \"comment\": \"capabilityを変更点が何かをわかるように箇条書きにする。1行1変更\",\n      \"timestamp\": \"2026-08-25T06:00:34.596Z\",\n      \"id\": \"comment_1787637634596_knva6b4mj\"\n    },\n    {\n      \"type\": \"selection\",\n      \"comment\": \"api\",\n      \"timestamp\": \"2026-08-25T06:00:44.186Z\",\n      \"selectedText\": \"起動口はタイムアウトを見張り、**A8 が届かないまま時間切れになったら `invocation` を `failed` に変える*\",\n      \"highlightColor\": {\n        \"bg\": \"rgba(255, 235, 59, 0.3)\",\n        \"border\": \"#FFEB3B\",\n        \"name\": \"#ffeb3b\"\n      },\n      \"id\": \"comment_1787637644186_qwmokjvmv\",\n      \"startOffset\": 1785,\n      \"endOffset\": 1851\n    }\n  ],\n  \"summary\": \"Feedback Summary (2 comments):\\n\\nGeneral Comments:\\n1. capabilityを変更点が何かをわかるように箇条書きにする。1行1変更\\n\\nSpecific Text Comments:\\n1. \\\"起動口はタイムアウトを見張り、**A8 が届かないまま時間切れになったら `invocation` ...\\\": api\\n\",\n  \"timestamp\": \"2026-08-25T06:00:47.862Z\"\n}",
+  "respondedAt": "2026-08-25T06:00:47.896Z",
+  "comments": [
+    {
+      "type": "general",
+      "comment": "capabilityを変更点が何かをわかるように箇条書きにする。1行1変更",
+      "timestamp": "2026-08-25T06:00:34.596Z",
+      "id": "comment_1787637634596_knva6b4mj"
+    },
+    {
+      "type": "selection",
+      "comment": "api",
+      "timestamp": "2026-08-25T06:00:44.186Z",
+      "selectedText": "起動口はタイムアウトを見張り、**A8 が届かないまま時間切れになったら `invocation` を `failed` に変える*",
+      "highlightColor": {
+        "bg": "rgba(255, 235, 59, 0.3)",
+        "border": "#FFEB3B",
+        "name": "#ffeb3b"
+      },
+      "id": "comment_1787637644186_qwmokjvmv",
+      "startOffset": 1785,
+      "endOffset": 1851
+    }
+  ]
+}

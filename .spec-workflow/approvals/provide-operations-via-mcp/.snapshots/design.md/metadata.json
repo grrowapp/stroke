@@ -1,0 +1,94 @@
+{
+  "filePath": "openspec/changes/provide-operations-via-mcp/design.md",
+  "currentVersion": 11,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-27T00:03:17.542Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787788997456_rzsw2br5x",
+      "approvalTitle": "design: tools/mcp 配置・transport 非依存ハンドラ・接続情報は mcp-config の env・素通し規約"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2026-08-27T02:46:23.657Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787788997456_rzsw2br5x",
+      "approvalTitle": "design: tools/mcp 配置・transport 非依存ハンドラ・接続情報は mcp-config の env・素通し規約"
+    },
+    {
+      "version": 3,
+      "filename": "snapshot-003.json",
+      "timestamp": "2026-08-27T03:44:02.892Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787801501293_13huc7hh7",
+      "approvalTitle": "design(改訂3): @nuxtjs/mcp-toolkit 採用 — stroke-board 自身が /mcp(Streamable HTTP)で MCP を提供。別プロセス・stdio・バンドル廃止。ツールは server/mcp/tools/ に defineMcpTool、セッション文脈は mcp-config の headers(ハンドラの H3Event 受け取りはソース検証済み)"
+    },
+    {
+      "version": 4,
+      "filename": "snapshot-004.json",
+      "timestamp": "2026-08-27T04:10:33.634Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787802948031_rmiy400g4",
+      "approvalTitle": "design(改訂6): mcp-config の url は nuxt.config の既存値 runtimeConfig.claude.apiBaseUrl から組み立てる（<apiBaseUrl>/mcp）。本家は既存 upstreamBaseUrl。配置は規定どおり server/mcp/tools/"
+    },
+    {
+      "version": 5,
+      "filename": "snapshot-005.json",
+      "timestamp": "2026-08-27T04:56:37.824Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787806153830_g86pbiffr",
+      "approvalTitle": "design(改訂13): Decisions の各見出しを「Decision: <内容>」形式に修正（決定1〜8 の番号書式を廃止）。他は改訂12 と同じ"
+    },
+    {
+      "version": 6,
+      "filename": "snapshot-006.json",
+      "timestamp": "2026-08-27T06:05:24.955Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787810610016_vuo6hwdn1",
+      "approvalTitle": "design(改訂14): 改訂13 の残指摘を反映 — 結果は「種類の3形」をやめ status(常時)+errorCode/error(失敗時)+結果項目(成功時)のフラット形に統一(不達は errorCode: unreachable)。capability 参照を承認済みの server/session-management に修正"
+    },
+    {
+      "version": 7,
+      "filename": "snapshot-007.json",
+      "timestamp": "2026-08-27T06:08:23.170Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787810777607_uhtfhzu6w",
+      "approvalTitle": "design(改訂15): 接続表エントリから kind(工程種別)を削除し、sessionId / projectPath の「〜工程のみ」条件を外して「対象のセッション id / プロジェクトパス」に簡素化"
+    },
+    {
+      "version": 8,
+      "filename": "snapshot-008.json",
+      "timestamp": "2026-08-27T06:13:46.854Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787810929184_flhfsxu7l",
+      "approvalTitle": "design(改訂16): 接続表エントリから claudeSessionId を削除（残る項目は token / sessionId / projectPath のみ）"
+    },
+    {
+      "version": 9,
+      "filename": "snapshot-009.json",
+      "timestamp": "2026-08-27T06:16:15.358Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787811256106_q5vusf39n",
+      "approvalTitle": "design(改訂17): ツール名 submit-question を send-question に改名（submit は登録用、question は送信のため）。ツール表・Decision の両方を更新"
+    },
+    {
+      "version": 10,
+      "filename": "snapshot-010.json",
+      "timestamp": "2026-08-27T07:11:06.532Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787814359004_tv02617z5",
+      "approvalTitle": "design(改訂18): ツール表の get-steering に文書状況の取得(文書名省略時)と代行先 GET /api/projects/:projectId/info を追記(spec 改訂5 への追随)"
+    },
+    {
+      "version": 11,
+      "filename": "snapshot-011.json",
+      "timestamp": "2026-08-27T07:16:03.882Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787814704915_44h4rg04p",
+      "approvalTitle": "design(改訂19): 合意外だった「文書名省略の文書状況モード」を撤回 — get-steering は文書の取得のみで、有無 exists を結果で告知(値は本家 info の文書状況から)。spec 側の省略モード Requirement も削除済み"
+    }
+  ]
+}

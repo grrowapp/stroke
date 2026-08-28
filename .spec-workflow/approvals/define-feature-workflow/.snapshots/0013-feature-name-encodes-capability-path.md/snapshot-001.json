@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787784502552_hoe0zptfi",
+  "approvalId": "approval_1787784502448_y0n0gcyzz",
+  "approvalTitle": "成果物: ADR-0013（`__` 命名規則の決定）の承認",
+  "version": 1,
+  "timestamp": "2026-08-26T22:48:22.552Z",
+  "trigger": "initial",
+  "status": "pending",
+  "content": "# ADR-0013: feature の名前は openspec 側のパスを `__` でエンコードしたものである\n\n- **状態**: 採用\n- **日付**: 2026-08-26\n\n## 決定\n\nfeature の spec 名（本家 `.spec-workflow/specs/` 直下のディレクトリ名）は、openspec 側の対応するパス（`openspec/specs/` からの相対）のセグメントを `__`（2重アンダーバー）で連結したフラット名とする。\n\n- `openspec/specs/api/session/` ↔ `.spec-workflow/specs/api__session/`\n- パスの各セグメントはアンダースコアを含まない kebab-case（英小文字・数字・ハイフン）とする。これにより `__` は常に区切りとしてのみ現れ、変換は可逆になる\n- パスと spec 名は1対1に対応する。同名の feature は存在しない\n- `.spec-workflow/specs/` 配下に入れ子ディレクトリを作らない\n\n## 背景\n\nopenspec の specs は階層を持てるが、本家 spec-workflow の specs はフラット必須である。稼働中の 2.2.7 に実際に入れ子を置いて確かめた結果（2026-08-26、[upstream-observations](../specs/reference/upstream-observations.md)）:\n\n- 入れ子は書き込め、URL 直叩きで読めるが、一覧に現れない（`getAllSpecs` が1階層しか読まない）\n- 本家のファイル監視はパス位置決め打ちのため、入れ子の文書更新が**親 spec の存在しない文書の更新イベント**として飛ぶ。見えないだけでなく隣に害が出る\n\nこの差異を吸収するため、階層をフラット名にエンコードして両者を同期する。\n\n## 影響\n\n- feature の名前が一度使われ始めると、規則の変更には既存名の変換が要る。覆すのは難しい\n- 命名の定義の正は `docs/specs/architecture/feature-workflow.md`。機能的 specs は change `define-feature-workflow` の sync で `openspec/specs/feature/` 配下に入る\n- 依存 change（`create-feature` ほか）はこの規則への完全準拠で進める\n",
+  "fileStats": {
+    "size": 2029,
+    "lines": 29,
+    "lastModified": "2026-08-26T22:47:31.375Z"
+  },
+  "comments": []
+}

@@ -1,0 +1,62 @@
+{
+  "filePath": "openspec/changes/define-feature-workflow/proposal.md",
+  "currentVersion": 7,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-26T19:41:45.300Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787773305174_62hojluuh",
+      "approvalTitle": "proposal: define-feature-workflow（feature ワークフローの仕様定義）の承認"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2026-08-26T19:57:00.608Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787773305174_62hojluuh",
+      "approvalTitle": "proposal: define-feature-workflow（feature ワークフローの仕様定義）の承認"
+    },
+    {
+      "version": 3,
+      "filename": "snapshot-003.json",
+      "timestamp": "2026-08-26T20:40:48.735Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787774688819_3qfsg9p7n",
+      "approvalTitle": "proposal: define-feature-workflow の承認（改訂2: capability を4つに分解）"
+    },
+    {
+      "version": 4,
+      "filename": "snapshot-004.json",
+      "timestamp": "2026-08-26T20:53:40.374Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787776936135_7e5z1wst7",
+      "approvalTitle": "proposal: define-feature-workflow の承認（改訂3: capability パス指定反映・schema 詳細は実装時設計・仕様書レーンの器を用意）"
+    },
+    {
+      "version": 5,
+      "filename": "snapshot-005.json",
+      "timestamp": "2026-08-26T20:56:57.582Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787777684361_e5c2rnqyo",
+      "approvalTitle": "proposal: define-feature-workflow の承認（改訂4: structure/sync を書き直し・載せ替え表現を撤去）"
+    },
+    {
+      "version": 6,
+      "filename": "snapshot-006.json",
+      "timestamp": "2026-08-26T22:15:14.605Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787782403986_59mi08d5f",
+      "approvalTitle": "proposal: define-feature-workflow のやり直し2（目的=定義の文書化。仕様は規約と構造に限定し、操作の挙動を除外）"
+    },
+    {
+      "version": 7,
+      "filename": "snapshot-007.json",
+      "timestamp": "2026-08-26T22:38:22.665Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787783636626_42zw7y0it",
+      "approvalTitle": "proposal: 表記統一の再承認（「capability パス」を実パス表記へ）"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787792088411_wfmt533fq",
+  "approvalId": "approval_1787791758568_g1naxub28",
+  "approvalTitle": "specs 4/7(改訂4): mcp/tools/send-back — 承認済みパターンで再構成（指摘一式 or エラー。無しは A4 に合わせエラーで表現）",
+  "version": 7,
+  "timestamp": "2026-08-27T00:54:48.411Z",
+  "trigger": "revision_requested",
+  "status": "pending",
+  "content": "# mcp/tools/send-back Delta\n\n## Purpose\n\n差し戻し（ユーザーが proposal を承認せず修正を求めて返した指摘一式）を取得するツールの契約を定める。\n\n## ADDED Requirements\n\n### Requirement: 差し戻しを引数なしで取得する\n\nツールは引数を取らない SHALL。結果は次のいずれか1つを返す SHALL。\n\n- **指摘一式**: 保存済みの差し戻しの指摘一式\n- **エラー**: ステータスとエラー内容\n\n#### Scenario: 指摘を読む\n\n- **GIVEN** 差し戻しが保存されたセッションが存在する\n- **WHEN** このツールを実行する\n- **THEN** 指摘一式が返る\n\n#### Scenario: 差し戻しが無い\n\n- **GIVEN** 差し戻しの無いセッションが存在する\n- **WHEN** このツールを実行する\n- **THEN** エラーが返り、ステータスとエラー内容から差し戻しが無いことが読める\n",
+  "fileStats": {
+    "size": 916,
+    "lines": 27,
+    "lastModified": "2026-08-27T00:47:44.523Z"
+  },
+  "comments": []
+}

@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787788997542_zxiioretw",
+  "approvalId": "approval_1787788997456_rzsw2br5x",
+  "approvalTitle": "design: tools/mcp 配置・transport 非依存ハンドラ・接続情報は mcp-config の env・素通し規約",
+  "version": 1,
+  "timestamp": "2026-08-27T00:03:17.542Z",
+  "trigger": "initial",
+  "status": "pending",
+  "content": "# provide-operations-via-mcp Design\n\n## Context\n\n- claude の起動は invokeAi の1系統で、呼び出し側がフラグを足す構造になっている（`openspec/specs/agent/invocation`）。steering 工程は既に `--mcp-config` へ本家 MCP を JSON 文字列で直渡ししている（`server/utils/stroke/invoke.ts` の `mcpConfigFor`、ADR-0011）\n- セッション API（`/api/strokes/:id/*`）と本家 dashboard REST（`/api/projects/*`）は稼働済みで、契約は `openspec/specs/api/**` と本家 2.2.7（ADR-0008）に固定されている\n- 動機と範囲は proposal.md を参照。specs は `specs/mcp/**` と `specs/agent/invocation` にある\n\n## Goals / Non-Goals\n\n**Goals:**\n\n- 現行操作の代行ツール一式を stdio MCP サーバーとして提供し、両工程の spawn に配線する\n- ツールハンドラを transport 非依存に保ち、後続 change（実処理化・Nitro HTTP 化）が載せ替えだけで済む形にする\n\n**Non-Goals:**\n\n- ワークフロースキーマ・allowedTools・スキルの切り替え（`switch-workflow-to-mcp-tools`）\n- ツールの実処理化・transport の変更（`implement-mcp-operations`）\n- `docs/` の変更（`document-mcp-operations`）\n\n## Decisions\n\n- **D1: 置き場は `tools/mcp/`、実行は tsx** — `server/` は Nitro のビルド対象なので外に置く。別プロセスの stdio エントリは `tools/mcp/index.ts` とし、`npx tsx` で直接実行する（事前ビルド不要でスピード優先）。代替: `server/` 配下に置く案は Nitro のビルドと責務が混ざるため不採用\n- **D2: ハンドラは「引数 + 接続コンテキスト → HTTP 発行 → 結果」の純関数** — 接続コンテキスト（stroke base URL / 本家 base URL / セッション id / プロジェクトパス）を引数で受け、SDK・transport に依存しない層に置く。stdio エントリは `@modelcontextprotocol/sdk` の Server でこれを包むだけ。将来の Nitro HTTP 化はエントリの差し替えで済む\n- **D3: 接続情報は `--mcp-config` の env で渡す** — 呼び出し側（invoke.ts）が steering の `mcpConfigFor` と同型で JSON を組み立て、env に `STROKE_BASEURL`・セッション id（セッション工程）・本家 base URL・プロジェクトパス（steering 工程）を埋める。設定値としては持たない（本家 MCP の扱いに倣う。ADR-0011）。projectId はサーバーが本家 `GET /api/projects/list` の応答からプロジェクトパスで引き当てる\n- **D4: ツール名はスキル名を引き継がない** — サーバー名 `stroke`、ツール名は capability に揃えて `overview` / `strokes` / `send-back` / `submit` / `steering-read` とする。提出は `submit` の1本で、`type`（question / proposal / steering-document）と種別ごとの本文引数を受ける\n- **D5: エラーは `{status, body}` の素通し** — endpoint の応答をステータスごと文字列化してツール結果に載せる。ネットワーク不達のみツールエラーとして返す。サーバー側の事前検証・変換は入れない（specs `mcp/server` / ADR-0013）\n- **D6: 依存は `@modelcontextprotocol/sdk` + `zod`** — 引数スキーマは zod で宣言し SDK に渡す。HTTP は組み込みの fetch を使い、追加の HTTP クライアントは入れない\n\n## Risks / Trade-offs\n\n- [stdio サーバーの起動失敗で claude がツール無しのまま走る] → サーバーは依存最小の薄いプロキシに保ち、起動失敗は invokeAi の既存のタイムアウト・リトライ系（`failed` → 巡回）に載せる\n- [本家 dashboard 停止中は steering 系ツールが失敗する] → 素通しの原則どおりエラーをそのまま返し、サーバー側で隠さない（現行 curl スキルと同じ挙動）\n- [ツールとスキルの併存期間に入口が2本になる] → 本 change では既存の入口を変えない決定の帰結として受容する。一本化は `switch-workflow-to-mcp-tools` が行う\n\n## Migration Plan\n\n1. `tools/mcp/` を追加し、単体で stdio 起動・ツール列挙を確認する\n2. invoke.ts の両工程に `--mcp-config` を足す（既存フラグ・本家 MCP の並びは変えない）\n3. 既存スキル経路は無変更のため、ロールバックは `--mcp-config` の追加分を外すだけ\n\n## Open Questions\n\n- 実行形態を tsx 直実行のままにするか、配布時に事前ビルドへ寄せるか（挙動・契約に影響しないため実装後の運用で判断できる）\n",
+  "fileStats": {
+    "size": 4648,
+    "lines": 46,
+    "lastModified": "2026-08-27T00:00:43.318Z"
+  },
+  "comments": []
+}

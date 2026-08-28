@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787791565479_gykt60ppu",
+  "approvalId": "approval_1787791073799_jzyj0ftvr",
+  "approvalTitle": "【先行1本】specs 2/7(改訂8): mcp/tools/overview — 不達シナリオを削除（stroke-board 停止中はツールが実行され得ないため）。結果は概要本文かエラー（ステータス・内容）の2択",
+  "version": 5,
+  "timestamp": "2026-08-27T00:46:05.479Z",
+  "trigger": "approved",
+  "status": "pending",
+  "content": "# mcp/tools/overview Delta\n\n## Purpose\n\nセッションの概要（ユーザーが最初に投げた、作りたいシステムの説明）を取得するツールの契約を定める。\n\n## ADDED Requirements\n\n### Requirement: 概要を引数なしで取得する\n\nツールは引数を取らない SHALL。結果は次のいずれか1つを返す SHALL。\n\n- **概要**: 概要の本文\n- **エラー**: ステータスとエラー内容\n\n#### Scenario: 概要を読む\n\n- **GIVEN** 概要を受理したセッションが存在する\n- **WHEN** このツールを実行する\n- **THEN** そのセッションの概要の本文が返る\n\n#### Scenario: セッションが存在しない\n\n- **GIVEN** 対象のセッションが削除されている\n- **WHEN** このツールを実行する\n- **THEN** エラーが返り、ステータスとエラー内容を持つ\n",
+  "fileStats": {
+    "size": 869,
+    "lines": 27,
+    "lastModified": "2026-08-27T00:37:45.900Z"
+  },
+  "comments": []
+}

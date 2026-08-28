@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/document-directory-structure/tasks.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-24T18:57:26.664Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787597846652_ncpal8k6z",
+      "approvalTitle": "document-directory-structure: tasks（マージ・張り替え・steering 連動・commit）"
+    }
+  ]
+}

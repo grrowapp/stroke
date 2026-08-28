@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787644324426_mozicqo6d",
+  "approvalId": "approval_1787644324326_a1xb14yi7",
+  "approvalTitle": "specs: proposal-review — 廃止（→ stroke/frontier へ全要件移行）",
+  "version": 1,
+  "timestamp": "2026-08-25T07:52:04.426Z",
+  "trigger": "initial",
+  "status": "pending",
+  "content": "# specs/proposal-review — delta\n\n## REMOVED Requirements\n\n### Requirement: proposal を Markdown プレビューで示す\n\n**Reason**: capability の畳み込み（承認済み requirements 2026-08-25）。\n**Migration**: `stroke/frontier` の同名要件が引き継ぐ。\n\n### Requirement: proposal の見せ方を切り替えられる\n\n**Reason**: capability の畳み込み。\n**Migration**: `stroke/frontier` の同名要件が引き継ぐ。\n\n### Requirement: 指摘は proposal の本文に紐づけて積める\n\n**Reason**: capability の畳み込み。\n**Migration**: `stroke/frontier` の同名要件が引き継ぐ。\n\n### Requirement: 積んだ指摘を見直し、直し、取り消せる\n\n**Reason**: capability の畳み込み。\n**Migration**: `stroke/frontier` の同名要件が引き継ぐ。\n\n### Requirement: 差し戻すと proposal が出し直される\n\n**Reason**: capability の畳み込み。\n**Migration**: `stroke/frontier` の同名要件が引き継ぐ。\n\n### Requirement: 差し戻しの応答待ちは修正中と分かる待ち受け画面で示す\n\n**Reason**: capability の畳み込み。\n**Migration**: `stroke/frontier` の同名要件が引き継ぐ。\n\n### Requirement: 差し戻しに対して AI が問い返せる\n\n**Reason**: capability の畳み込み。\n**Migration**: `stroke/frontier` の同名要件が引き継ぐ。\n\n### Requirement: 問い返しは1問1答を繰り返す\n\n**Reason**: capability の畳み込み。\n**Migration**: `stroke/frontier` の同名要件が引き継ぐ。\n\n### Requirement: プロジェクト名を提案し、ユーザーが確定する\n\n**Reason**: capability の畳み込み。生成の失敗は昇格の失敗として `project/generation` が扱う。\n**Migration**: `stroke/frontier` の同名要件が引き継ぐ。\n\n### Requirement: 承認はプロジェクト生成の唯一の引き金\n\n**Reason**: capability の畳み込み。プロジェクトの作り方が rename 昇格に変わる。\n**Migration**: `stroke/frontier` の「承認はプロジェクト昇格の唯一の引き金」が引き継ぐ。\n\n### Requirement: 承認後は承認と差し戻しを提供しない\n\n**Reason**: 承認がセッションディレクトリの改名による昇格になり、承認後のセッションは同じ id では存在しなくなった。「phase が `approved` のセッションで画面2を開く」という状態が起こらない。\n**Migration**: `stroke/frontier` の「承認の成功で画面2を離れてプロジェクト一覧へ戻る」が引き継ぐ。\n",
+  "fileStats": {
+    "size": 2565,
+    "lines": 59,
+    "lastModified": "2026-08-25T07:49:27.083Z"
+  },
+  "comments": []
+}

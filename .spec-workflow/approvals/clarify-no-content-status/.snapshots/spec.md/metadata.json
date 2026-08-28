@@ -1,0 +1,62 @@
+{
+  "filePath": "openspec/changes/clarify-no-content-status/specs/api/contract/spec.md",
+  "currentVersion": 7,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-27T06:12:25.454Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787811145391_hd9mgau42",
+      "approvalTitle": "clarify-no-content-status — spec api/contract（応答の共通規約）"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2026-08-27T06:14:53.533Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787811145391_hd9mgau42",
+      "approvalTitle": "clarify-no-content-status — spec api/contract（応答の共通規約）"
+    },
+    {
+      "version": 3,
+      "filename": "snapshot-003.json",
+      "timestamp": "2026-08-27T07:54:58.926Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787817228035_lbervve1e",
+      "approvalTitle": "clarify-no-content-status — spec api/contract（応答の共通規約）"
+    },
+    {
+      "version": 4,
+      "filename": "snapshot-004.json",
+      "timestamp": "2026-08-27T07:56:45.164Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787817350309_y35p58ke4",
+      "approvalTitle": "clarify-no-content-status — spec api/contract（U11 は本文を送らない点を明記）"
+    },
+    {
+      "version": 5,
+      "filename": "snapshot-005.json",
+      "timestamp": "2026-08-27T08:01:00.343Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787817480110_5253ann73",
+      "approvalTitle": "clarify-no-content-status — spec api/contract（対象を操作の列挙に変更。誰が呼ぶかを書かない）"
+    },
+    {
+      "version": 6,
+      "filename": "snapshot-006.json",
+      "timestamp": "2026-08-27T08:03:15.015Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787817760054_mavq982m4",
+      "approvalTitle": "clarify-no-content-status — spec api/contract（THEN に宛先を明示 / 画面からの削除シナリオを削除）"
+    },
+    {
+      "version": 7,
+      "filename": "snapshot-007.json",
+      "timestamp": "2026-08-27T08:34:39.949Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787818794986_msunn28m9",
+      "approvalTitle": "clarify-no-content-status — spec api/contract（対象 6 操作すべてにシナリオを対応）"
+    }
+  ]
+}

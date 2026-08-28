@@ -1,0 +1,70 @@
+{
+  "filePath": ".spec-workflow/specs/core-structure/requirements.md",
+  "currentVersion": 8,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-24T19:06:29.396Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787598389377_h972bih6j",
+      "approvalTitle": "最終 structure 本体（docs/specs/core/structure.md のマージ結果）"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2026-08-24T19:20:05.740Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787599078913_e46u0vp0o",
+      "approvalTitle": "最終 structure 本体 — 統合された一つのアプリとして再構成（起こす→見張るの1つの流れ）"
+    },
+    {
+      "version": 3,
+      "filename": "snapshot-003.json",
+      "timestamp": "2026-08-24T19:41:11.718Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787599750844_kef27rdoc",
+      "approvalTitle": "最終 structure — 統合規範版（軸は参照範囲・層とリソース・ドメイン。出自分けを廃し移行課題を明記）"
+    },
+    {
+      "version": 4,
+      "filename": "snapshot-004.json",
+      "timestamp": "2026-08-24T19:59:58.105Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787601216459_ugkzyjlct",
+      "approvalTitle": "最終 structure — components 18本・composables 10本の全数マッピングで区切りを実証（ui/＋機能5つ、関心10、整理課題つき）"
+    },
+    {
+      "version": 5,
+      "filename": "snapshot-005.json",
+      "timestamp": "2026-08-24T20:04:49.478Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787601764940_ebwkgexuc",
+      "approvalTitle": "最終 structure — 骨のみに整理（詳細は file-components / file-composables / architecture / plan へ配布、utils 31本を関心区分で一覧化）"
+    },
+    {
+      "version": 6,
+      "filename": "snapshot-006.json",
+      "timestamp": "2026-08-24T20:06:30.999Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787601930929_y81nksn85",
+      "approvalTitle": "最終 structure — utils の区分を4つに集約（本家接続 / 監視・通知 / セッション / 設定・起動）"
+    },
+    {
+      "version": 7,
+      "filename": "snapshot-007.json",
+      "timestamp": "2026-08-24T20:11:00.174Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787602155553_2yx06pbi1",
+      "approvalTitle": "最終 structure — utils 全数表を file-server-utils.md へ切り出し（本文は4区分名のみ）"
+    },
+    {
+      "version": 8,
+      "filename": "snapshot-008.json",
+      "timestamp": "2026-08-24T20:12:59.407Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787602296208_krsccqwub",
+      "approvalTitle": "最終 structure — utils の切り出し先を server-structure.md に改名"
+    }
+  ]
+}

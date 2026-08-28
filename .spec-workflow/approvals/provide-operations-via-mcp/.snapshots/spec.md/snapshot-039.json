@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787814123264_g399vidxj",
+  "approvalId": "approval_1787814105733_3wzdespd1",
+  "approvalTitle": "specs mcp/tools/overview(改訂4): errorCode / error の意味を定義 — errorCode は status から導出する機械可読の失敗種別(404 は not_found)、error は endpoint が返したエラー本文。シナリオにも具体値を明記",
+  "version": 39,
+  "timestamp": "2026-08-27T07:02:03.264Z",
+  "trigger": "approved",
+  "status": "pending",
+  "content": "# mcp/tools/overview Delta\n\n## Purpose\n\nセッションの概要（ユーザーが最初に投げた、作りたいシステムの説明）を取得するツール（`get-overview`）の契約を定める。\n\n## ADDED Requirements\n\n### Requirement: 概要を引数なしで取得する\n\nツールは引数を取らない SHALL。成功の結果は `status` と `overview`（そのセッションの概要の本文）を持つ SHALL。失敗の結果は `status`（HTTP ステータスコード）・`errorCode`（status から導出する機械可読の失敗種別。404 は `not_found`）・`error`（endpoint が返したエラー本文）を持つ SHALL（`mcp/server` の形式）。\n\n#### Scenario: 概要を読む\n\n- **GIVEN** 概要を受理したセッションが存在する\n- **WHEN** このツールを実行する\n- **THEN** 結果に `status: 200` と、そのセッションの概要の本文（`overview`）が入っている\n\n#### Scenario: セッションが存在しない\n\n- **GIVEN** 対象のセッションが削除されている\n- **WHEN** このツールを実行する\n- **THEN** 結果はエラーで、`status: 404`・`errorCode: not_found` と、endpoint が返したエラー本文（`error`）を持つ\n",
+  "fileStats": {
+    "size": 1236,
+    "lines": 24,
+    "lastModified": "2026-08-27T07:01:19.619Z"
+  },
+  "comments": []
+}

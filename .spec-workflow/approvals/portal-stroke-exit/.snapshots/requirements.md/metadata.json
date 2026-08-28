@@ -1,0 +1,94 @@
+{
+  "filePath": ".spec-workflow/specs/portal-stroke-exit/requirements.md",
+  "currentVersion": 11,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-25T00:12:47.361Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787616767326_ayl8s4f59",
+      "approvalTitle": "出口の接合 設計資料（docs/specs/plan/portal-stroke-exit.md 本体の写し）"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2026-08-25T00:41:44.311Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787618365959_9qr0eguj1",
+      "approvalTitle": "出口の接合 設計資料 改訂3（新設ファイル無し・mcp-config は JSON 文字列をただの引数として渡す）"
+    },
+    {
+      "version": 3,
+      "filename": "snapshot-003.json",
+      "timestamp": "2026-08-25T01:39:50.743Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787618907382_ijbk7k1ck",
+      "approvalTitle": "出口の接合 設計資料 改訂5（成否判定を成果物の存在に変更。プロセス終了は試行終了の合図のみ）"
+    },
+    {
+      "version": 4,
+      "filename": "snapshot-004.json",
+      "timestamp": "2026-08-25T01:41:38.080Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787622036693_zs7li0fsm",
+      "approvalTitle": "出口の接合 設計資料 改訂6（実行記録・timeout で false・提出告知 API・巡回リトライ。設定の追加先を明示）"
+    },
+    {
+      "version": 5,
+      "filename": "snapshot-005.json",
+      "timestamp": "2026-08-25T01:47:14.926Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787622370914_nt58ohtrg",
+      "approvalTitle": "出口の接合 設計資料 改訂7（完了とリトライを承認からの時系列で記述。補完箇所5点を削除）"
+    },
+    {
+      "version": 6,
+      "filename": "snapshot-006.json",
+      "timestamp": "2026-08-25T01:57:27.752Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787622836050_wj5xv2ghk",
+      "approvalTitle": "出口の接合 設計資料 改訂8（完了とリトライの開始点を「claude 起動と session-id 登録」に）"
+    },
+    {
+      "version": 7,
+      "filename": "snapshot-007.json",
+      "timestamp": "2026-08-25T02:21:24.434Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787623084610_mr4oj6qm4",
+      "approvalTitle": "出口の接合 設計資料 改訂9（図の順序を修正: 巡回は失敗の後）"
+    },
+    {
+      "version": 8,
+      "filename": "snapshot-008.json",
+      "timestamp": "2026-08-25T02:24:13.637Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787624543023_ufbx00n35",
+      "approvalTitle": "出口の接合 設計資料 改訂10（mcp-config は設定に持たず生成先パスから導出。設定追加は steering 用 prompt のみ）"
+    },
+    {
+      "version": 9,
+      "filename": "snapshot-009.json",
+      "timestamp": "2026-08-25T02:34:40.423Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787625137774_xr4o3hto3",
+      "approvalTitle": "出口の接合 設計資料 改訂11（承認＝セッションディレクトリの rename 昇格。置き場を同一 root に統一・proposal.md は docs/ へ）"
+    },
+    {
+      "version": 10,
+      "filename": "snapshot-010.json",
+      "timestamp": "2026-08-25T02:38:09.849Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787625342347_ruzzwdwiw",
+      "approvalTitle": "出口の接合 設計資料 改訂12（proposal.md はセッション時点から docs/ 配下に保存。承認は rename のみ）"
+    },
+    {
+      "version": 11,
+      "filename": "snapshot-011.json",
+      "timestamp": "2026-08-25T02:41:56.639Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787625542270_fsxb9p5nh",
+      "approvalTitle": "出口の接合 設計資料 改訂13（proposal.md は claude が docs/ 配下に直接書く。サーバーのコードは作らない）"
+    }
+  ]
+}

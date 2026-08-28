@@ -1,0 +1,78 @@
+{
+  "filePath": "openspec/changes/provide-operations-via-mcp/proposal.md",
+  "currentVersion": 9,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-26T22:55:17.728Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787784917384_j2yngrkvs",
+      "approvalTitle": "proposal: 操作系一式を MCP ツール経由で提供する change の proposal 承認"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2026-08-26T23:04:55.206Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787785172661_c3s8ljcuu",
+      "approvalTitle": "proposal(改訂2): 操作系一式を MCP ツール経由で提供する — 代行対象を endpoint 表記で列挙"
+    },
+    {
+      "version": 3,
+      "filename": "snapshot-003.json",
+      "timestamp": "2026-08-26T23:25:25.708Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787786116807_5zpa9oami",
+      "approvalTitle": "proposal(改訂6): 操作系一式を MCP ツール経由で提供する — stroke の工程が見る範囲（セッション5 + steering 3）に絞る"
+    },
+    {
+      "version": 4,
+      "filename": "snapshot-004.json",
+      "timestamp": "2026-08-26T23:35:54.926Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787787212228_b63rzt39e",
+      "approvalTitle": "proposal(改訂8): mcp/docs を capability から除外（docs は Impact の成果物扱い）。新規3 + 変更1 の構成"
+    },
+    {
+      "version": 5,
+      "filename": "snapshot-005.json",
+      "timestamp": "2026-08-26T23:43:59.944Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787787385789_xuni4wiyj",
+      "approvalTitle": "proposal(改訂9): mcp/tools/* を機能単位に分解（overview / strokes / send-back / question / proposal / project-info / steering-read / steering-write）"
+    },
+    {
+      "version": 6,
+      "filename": "snapshot-006.json",
+      "timestamp": "2026-08-26T23:46:57.894Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787787875909_yq6yasqip",
+      "approvalTitle": "proposal(改訂10): 提出系を mcp/tools/submit に一本化（question / proposal / steering 書き込みを種別引数で振り分け）"
+    },
+    {
+      "version": 7,
+      "filename": "snapshot-007.json",
+      "timestamp": "2026-08-26T23:50:25.100Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787788052953_4eleubdey",
+      "approvalTitle": "proposal(改訂11): project-info ツールを廃止し projectId はサーバー内部解決へ、文書状況は steering-read に一元化"
+    },
+    {
+      "version": 8,
+      "filename": "snapshot-008.json",
+      "timestamp": "2026-08-26T23:57:33.774Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787788548334_kawfzucgl",
+      "approvalTitle": "proposal(改訂12・再掲): docs は本 change で触らない。後続3 change（切替・実処理化・ドキュメント作成）を立てて proposal 起こし済み"
+    },
+    {
+      "version": 9,
+      "filename": "snapshot-009.json",
+      "timestamp": "2026-08-27T05:10:13.729Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787806688922_l3h7zaze2",
+      "approvalTitle": "proposal(改訂2): capability server/session-management を追加（一時 token の発行・対応表への登録・照合・失効）。あわせて確定済み決定に追随: stdio/env の記述を mcp-toolkit(/mcp・HTTP)/token headers に修正、新規依存を @nuxtjs/mcp-toolkit に変更"
+    }
+  ]
+}

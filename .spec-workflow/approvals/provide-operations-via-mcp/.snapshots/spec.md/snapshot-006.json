@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787791954649_hotkvyozw",
+  "approvalId": "approval_1787791755781_471nao5x9",
+  "approvalTitle": "specs 3/7(改訂4): mcp/tools/strokes — 承認済み overview のパターンで再構成（一覧 or エラーの2択・不達なし）",
+  "version": 6,
+  "timestamp": "2026-08-27T00:52:34.649Z",
+  "trigger": "revision_requested",
+  "status": "pending",
+  "content": "# mcp/tools/strokes Delta\n\n## Purpose\n\n済んだストロークの記録（末尾が直前の回答）を取得するツールの契約を定める。\n\n## ADDED Requirements\n\n### Requirement: ストローク記録を引数なしで取得する\n\nツールは引数を取らない SHALL。結果は次のいずれか1つを返す SHALL。\n\n- **記録の一覧**: ストローク記録の一覧。並びは末尾が直前の回答\n- **エラー**: ステータスとエラー内容\n\n#### Scenario: 記録を読む\n\n- **GIVEN** ストロークを重ねたセッションが存在する\n- **WHEN** このツールを実行する\n- **THEN** ストローク記録の一覧が返り、末尾が直前の回答である\n\n#### Scenario: セッションが存在しない\n\n- **GIVEN** 対象のセッションが削除されている\n- **WHEN** このツールを実行する\n- **THEN** エラーが返り、ステータスとエラー内容を持つ\n",
+  "fileStats": {
+    "size": 940,
+    "lines": 27,
+    "lastModified": "2026-08-27T00:47:40.971Z"
+  },
+  "comments": []
+}

@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787814136622_saaatn2q5",
+  "approvalId": "approval_1787814108566_nh1zu1svt",
+  "approvalTitle": "specs mcp/tools/strokes(改訂4): errorCode / error の意味を定義(404 = not_found、error は endpoint のエラー本文)。シナリオに具体値を明記",
+  "version": 40,
+  "timestamp": "2026-08-27T07:02:16.622Z",
+  "trigger": "approved",
+  "status": "pending",
+  "content": "# mcp/tools/strokes Delta\n\n## Purpose\n\n済んだストロークの記録（末尾が直前の回答）を取得するツール（`get-strokes`）の契約を定める。\n\n## ADDED Requirements\n\n### Requirement: ストローク記録を引数なしで取得する\n\nツールは引数を取らない SHALL。成功の結果は `status` とストローク記録の一覧（時系列順に並び、最後の要素が最新の記録）を持つ SHALL。失敗の結果は `status`（HTTP ステータスコード）・`errorCode`（status から導出する機械可読の失敗種別。404 は `not_found`）・`error`（endpoint が返したエラー本文）を持つ SHALL（`mcp/server` の形式）。\n\n#### Scenario: 記録を読む\n\n- **GIVEN** ストロークを重ねたセッションが存在する\n- **WHEN** このツールを実行する\n- **THEN** 結果に `status: 200` と記録の一覧が入り、一覧は時系列順で最後の要素が最新の記録である\n\n#### Scenario: セッションが存在しない\n\n- **GIVEN** 対象のセッションが削除されている\n- **WHEN** このツールを実行する\n- **THEN** 結果はエラーで、`status: 404`・`errorCode: not_found` と、endpoint が返したエラー本文（`error`）を持つ\n",
+  "fileStats": {
+    "size": 1273,
+    "lines": 24,
+    "lastModified": "2026-08-27T07:01:19.623Z"
+  },
+  "comments": []
+}

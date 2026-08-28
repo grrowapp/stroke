@@ -1,0 +1,78 @@
+{
+  "filePath": "openspec/changes/define-feature-workflow/specs/feature/naming/spec.md",
+  "currentVersion": 9,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-26T21:12:35.791Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787778755741_l5xupdnly",
+      "approvalTitle": "spec: feature/naming（`__` 命名規則）の承認"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2026-08-26T22:20:41.759Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787782599168_dg302i3vs",
+      "approvalTitle": "spec: feature/workflow/sync の承認（やり直し: sync の定義＝配置先と形式のみ）"
+    },
+    {
+      "version": 3,
+      "filename": "snapshot-003.json",
+      "timestamp": "2026-08-26T22:21:36.380Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787782590971_zyo0nb5za",
+      "approvalTitle": "spec: feature/structure の承認（やり直し: 器の構造のみ。1対1は naming へ移動）"
+    },
+    {
+      "version": 4,
+      "filename": "snapshot-004.json",
+      "timestamp": "2026-08-26T22:23:19.068Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787782587178_4jdhxcwjn",
+      "approvalTitle": "spec: feature/naming の承認（やり直し: 規約・変換ルール・1対1のみ。挙動なし）"
+    },
+    {
+      "version": 5,
+      "filename": "snapshot-005.json",
+      "timestamp": "2026-08-26T22:24:02.946Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787782595239_zbdp1i098",
+      "approvalTitle": "spec: feature/workflow/overview の承認（やり直し: 工程の定義のみ。実行時のガード記述を撤去）"
+    },
+    {
+      "version": 6,
+      "filename": "snapshot-006.json",
+      "timestamp": "2026-08-26T22:24:39.792Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787783040289_ffuana7s8",
+      "approvalTitle": "spec: feature/naming の承認（改訂: 用語定義を追加・指摘シナリオを削除）"
+    },
+    {
+      "version": 7,
+      "filename": "snapshot-007.json",
+      "timestamp": "2026-08-26T22:31:22.844Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787783320245_nzla9w69n",
+      "approvalTitle": "spec: feature/naming の承認（改訂: 「capability パス」を廃し実パス表記のみに）"
+    },
+    {
+      "version": 8,
+      "filename": "snapshot-008.json",
+      "timestamp": "2026-08-26T22:38:21.613Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787783640005_sfrbcu9x9",
+      "approvalTitle": "spec: feature/workflow/sync の表記統一の再承認"
+    },
+    {
+      "version": 9,
+      "filename": "snapshot-009.json",
+      "timestamp": "2026-08-26T22:38:22.223Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787783638678_novuwsrhd",
+      "approvalTitle": "spec: feature/structure の表記統一の再承認"
+    }
+  ]
+}

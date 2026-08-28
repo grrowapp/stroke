@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/project-generation-removal/requirements.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-25T07:52:09.303Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787644329195_5curnfwj6",
+      "approvalTitle": "specs: project-generation（旧）— 廃止（→ project/generation へ移行）"
+    }
+  ]
+}

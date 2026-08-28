@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/agent-invocation/requirements.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-25T07:51:21.052Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787644281018_bnjj1oan1",
+      "approvalTitle": "specs: agent/invocation — 引数化・invocation 4値・完了検知・上限（新設・畳み込み）"
+    }
+  ]
+}

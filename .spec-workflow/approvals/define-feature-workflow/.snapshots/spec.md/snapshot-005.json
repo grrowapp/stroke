@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787783042946_voecob9uw",
+  "approvalId": "approval_1787782595239_zbdp1i098",
+  "approvalTitle": "spec: feature/workflow/overview の承認（やり直し: 工程の定義のみ。実行時のガード記述を撤去）",
+  "version": 5,
+  "timestamp": "2026-08-26T22:24:02.946Z",
+  "trigger": "approved",
+  "status": "pending",
+  "content": "## Purpose\n\nfeature（実装のタスクに繋がる文書の組）の工程の全体像を定める。個々の工程の成果物の詳細（schema の中身・template）は定めず、実装時の設計に委ねる。\n\n## ADDED Requirements\n\n### Requirement: feature の工程は外部定義される\n\nfeature の工程は openspec のローカル schema による外部定義で決まる SHALL。工程の定義の変更は、アプリのコード変更・再ビルドなしに反映される SHALL。\n\n#### Scenario: 工程の定義変更がコード変更なしで反映される\n\n- **WHEN** 運用者が feature 用 schema の定義を変更し、その後に新しい feature の工程が始まる\n- **THEN** 変更後の定義で工程が進み、アプリのコード変更・再ビルドは行われていない\n\n### Requirement: 工程の最終段は sync である\n\nfeature の工程の定義において、最終段は sync（`feature/workflow/sync`）である SHALL。sync は tasks の完了の後に位置づけられる SHALL。\n\n#### Scenario: 工程の並び\n\n- **WHEN** feature の工程の定義を参照する\n- **THEN** sync が最終段にあり、tasks の完了の後に位置づけられている\n",
+  "fileStats": {
+    "size": 1226,
+    "lines": 24,
+    "lastModified": "2026-08-26T22:16:14.708Z"
+  },
+  "comments": []
+}

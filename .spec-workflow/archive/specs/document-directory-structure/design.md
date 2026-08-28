@@ -1,0 +1,56 @@
+# document-directory-structure — Design
+
+## Context
+
+`docs/specs/core/` に構造の資料が2本ある。`structure.md` はストローク側の規則（統合時に席を奪い合わないための名前空間規約）、`structure-design.md` はポータル側の層（接点・制御・画面の積み方と部品の配置）で、どちらも統合前の「自分の側」だけを書いている。リポジトリ全体のディレクトリ構造は steering の structure（`/opt/projects/stroke-board/.spec-workflow/steering/structure.md`、dashboard 管理）だけが持ち、しかもポータル単体時代のツリーのままである。
+
+## Goals / Non-Goals
+
+**Goals:**
+
+- 2本のマージと微調整で最終の structure を1本作り、構造の定義を一元化する
+- 統合後の実態から抽出したディレクトリ構造を docs 側（最終 structure）に持たせる
+- steering の structure を最終 structure と連動させる
+
+**Non-Goals:**
+
+- 構造そのものの変更（ディレクトリの切り直し・移動はしない。書くのは今の実態）
+- `file-component.md` / `file-components.md` / `file-composables.md` の取捨・統合
+- 導線（答え合わせの規定）の定義
+
+## Decisions
+
+### 1. 最終ファイルは `docs/specs/core/structure.md`、`structure-design.md` は廃止
+
+「最終の structure」を `structure.md` の名前で残し、`structure-design.md` はマージで吸収して削除する（`git rm`）。
+
+**Alternatives considered:**
+- 第3の新ファイルに両方を吸収: 参照の張り替えが2本ぶんに増え、名前も増えるため却下
+
+### 2. マージの中身 — 3部構成、微調整は整形と重複除去まで
+
+最終 structure は次を持つ。
+
+1. **ディレクトリ構造** — 統合後の実態から抽出したリポジトリ全体のツリー（ディレクトリのみ）
+2. **ストローク側の規則** — 現 `structure.md` の内容（領域名 `stroke`・区分・URL・置き場）
+3. **ポータル側の層** — 現 `structure-design.md` の内容（層の積み方・依存の向き・層をまたぐ流れ）
+
+微調整の範囲は、マージに伴う整形・見出しの統合・重複の除去に限る。内容の新設計や記述の追加はしない（ディレクトリ構造の抽出を除く）。
+
+### 3. `architecture-docs` spec の名指しを変更する
+
+spec は「構造の資料は `structure-design.md` の1ファイル」と規定している。名指しを最終の `structure.md` に変え、**1ファイル規定は維持**する。マージはこの規定の狙い（構造の説明を1か所に）に沿う方向の変更である。
+
+### 4. steering の連動 — Directory Organization を最終 structure と一致させる
+
+steering の structure のうち、ポータル単体時代のままのディレクトリツリー（Directory Organization）を、最終 structure が持つ統合後のツリーと一致させる。ファイル配置の表からは `structure-design.md` の行が消える。アクセスは dashboard API（GET/PUT）経由でファイルを直接触らず、承認は dashboard で取る（`restructure-docs-specs` の Decision 5 と同じ）。
+
+### 5. 参照の張り替えは現役のみ
+
+`openspec/changes/archive/` に加え、完了済みの `openspec/changes/restructure-docs-specs/` も**記録として触らない**。張り替えるのは architecture-docs spec・CLAUDE.md 索引・`docs/specs/` 内の相互参照4本。
+
+## Risks / Trade-offs
+
+- **マージによる文脈の消失**: 2本はそれぞれ「自分の側」の前提で書かれている。機械的に連結すると主語が曖昧になるため、見出しでストローク側/ポータル側を明示して残す
+- **spec の SHALL 名指し変更**: 規定の狙いは変えないが、spec の文言変更であることに変わりはない。proposal の Modified Capabilities に明示し、承認の場で判断を仰ぐ
+- **steering 承認の往復**: 前 change で3往復した。今回は「ディレクトリ構造とファイル配置を分ける・表形式」の指摘を最初から織り込む

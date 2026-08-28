@@ -1,0 +1,43 @@
+{
+  "id": "approval_1787628134971_ait7g8zry",
+  "title": "connect-portal-and-strokes — 入口と出口を繋ぐ実装計画",
+  "filePath": ".spec-workflow/specs/connect-portal-and-strokes/requirements.md",
+  "type": "document",
+  "status": "needs-revision",
+  "createdAt": "2026-08-25T03:22:14.971Z",
+  "category": "spec",
+  "categoryName": "connect-portal-and-strokes",
+  "response": "Feedback Summary (2 comments):\n\nSpecific Text Comments:\n1. \"| steering-stage（新設） | 承認の成功が起点。生成先で別の claude を走らせ...\": stroke/frontierにcapabilityを変える。\n\nstrokeのうちのfrontierフェーズの意図\n2. \"| proposal-review | 承認の成功で画面を閉じて一覧へ戻る。承認したセッションは i...\": stroke/frontier\n",
+  "annotations": "{\n  \"decision\": \"needs-revision\",\n  \"comments\": [\n    {\n      \"type\": \"selection\",\n      \"comment\": \"stroke/frontierにcapabilityを変える。\\n\\nstrokeのうちのfrontierフェーズの意図\",\n      \"timestamp\": \"2026-08-25T03:25:16.557Z\",\n      \"selectedText\": \"| steering-stage（新設） | 承認の成功が起点。生成先で別の claude を走らせる。進捗も失敗もユーザーに見せない。実行を記録し、提出の告知で消し、失敗は巡回が拾い直す |\",\n      \"highlightColor\": {\n        \"bg\": \"rgba(255, 235, 59, 0.3)\",\n        \"border\": \"#FFEB3B\",\n        \"name\": \"#ffeb3b\"\n      },\n      \"id\": \"comment_1787628316557_id2f8qcyg\",\n      \"startOffset\": 955,\n      \"endOffset\": 1051\n    },\n    {\n      \"type\": \"selection\",\n      \"comment\": \"stroke/frontier\",\n      \"timestamp\": \"2026-08-25T03:26:45.733Z\",\n      \"selectedText\": \"| proposal-review | 承認の成功で画面を閉じて一覧へ戻る。承認したセッションは id ごと消えるので開けない |\",\n      \"highlightColor\": {\n        \"bg\": \"rgba(255, 235, 59, 0.3)\",\n        \"border\": \"#FFEB3B\",\n        \"name\": \"#ffeb3b\"\n      },\n      \"id\": \"comment_1787628405733_1de4iy4cn\",\n      \"startOffset\": 1341,\n      \"endOffset\": 1406\n    }\n  ],\n  \"summary\": \"Feedback Summary (2 comments):\\n\\nSpecific Text Comments:\\n1. \\\"| steering-stage（新設） | 承認の成功が起点。生成先で別の claude を走らせ...\\\": stroke/frontierにcapabilityを変える。\\n\\nstrokeのうちのfrontierフェーズの意図\\n2. \\\"| proposal-review | 承認の成功で画面を閉じて一覧へ戻る。承認したセッションは i...\\\": stroke/frontier\\n\",\n  \"timestamp\": \"2026-08-25T03:26:55.497Z\"\n}",
+  "respondedAt": "2026-08-25T03:26:55.510Z",
+  "comments": [
+    {
+      "type": "selection",
+      "comment": "stroke/frontierにcapabilityを変える。\n\nstrokeのうちのfrontierフェーズの意図",
+      "timestamp": "2026-08-25T03:25:16.557Z",
+      "selectedText": "| steering-stage（新設） | 承認の成功が起点。生成先で別の claude を走らせる。進捗も失敗もユーザーに見せない。実行を記録し、提出の告知で消し、失敗は巡回が拾い直す |",
+      "highlightColor": {
+        "bg": "rgba(255, 235, 59, 0.3)",
+        "border": "#FFEB3B",
+        "name": "#ffeb3b"
+      },
+      "id": "comment_1787628316557_id2f8qcyg",
+      "startOffset": 955,
+      "endOffset": 1051
+    },
+    {
+      "type": "selection",
+      "comment": "stroke/frontier",
+      "timestamp": "2026-08-25T03:26:45.733Z",
+      "selectedText": "| proposal-review | 承認の成功で画面を閉じて一覧へ戻る。承認したセッションは id ごと消えるので開けない |",
+      "highlightColor": {
+        "bg": "rgba(255, 235, 59, 0.3)",
+        "border": "#FFEB3B",
+        "name": "#ffeb3b"
+      },
+      "id": "comment_1787628405733_1de4iy4cn",
+      "startOffset": 1341,
+      "endOffset": 1406
+    }
+  ]
+}

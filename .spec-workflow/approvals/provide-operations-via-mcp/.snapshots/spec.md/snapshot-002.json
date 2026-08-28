@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787789324344_w7bpq7sua",
+  "approvalId": "approval_1787788970281_fzuesc4ik",
+  "approvalTitle": "specs 2/7: mcp/tools/overview — 概要取得ツールの契約",
+  "version": 2,
+  "timestamp": "2026-08-27T00:08:44.344Z",
+  "trigger": "revision_requested",
+  "status": "pending",
+  "content": "# mcp/tools/overview Delta\n\n## Purpose\n\nセッションの概要（ユーザーが最初に投げた、作りたいシステムの説明）を取得するツールの契約を定める。\n\n## ADDED Requirements\n\n### Requirement: 概要を引数なしで取得する\n\nツールは引数を取らず、自セッションの `GET /api/strokes/:id/overview` へ代行し、その応答をそのまま返す SHALL。\n\n#### Scenario: 概要を読む\n\n- **WHEN** claude プロセスがこのツールを実行する\n- **THEN** そのセッションの概要が endpoint の応答のまま返る\n\n#### Scenario: エラーは素通しされる\n\n- **WHEN** endpoint がエラーを返す\n- **THEN** ツールの結果からそのエラー内容がそのまま読める\n",
+  "fileStats": {
+    "size": 759,
+    "lines": 22,
+    "lastModified": "2026-08-26T23:58:55.064Z"
+  },
+  "comments": []
+}

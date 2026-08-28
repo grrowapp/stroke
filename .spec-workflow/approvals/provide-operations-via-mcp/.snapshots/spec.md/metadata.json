@@ -1,0 +1,406 @@
+{
+  "filePath": "openspec/changes/provide-operations-via-mcp/specs/mcp/server/spec.md",
+  "currentVersion": 50,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-27T00:02:46.640Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787788966542_t37h34igc",
+      "approvalTitle": "specs 1/7: mcp/server — サーバー本体の契約（stdio・endpoint 代行・接続情報解決・素通し）"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2026-08-27T00:08:44.344Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787788970281_fzuesc4ik",
+      "approvalTitle": "specs 2/7: mcp/tools/overview — 概要取得ツールの契約"
+    },
+    {
+      "version": 3,
+      "filename": "snapshot-003.json",
+      "timestamp": "2026-08-27T00:13:28.710Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787789452753_51f3k19em",
+      "approvalTitle": "specs 2/7(改訂): mcp/tools/overview — エラー処理シナリオを追加（endpoint エラー・不達）"
+    },
+    {
+      "version": 4,
+      "filename": "snapshot-004.json",
+      "timestamp": "2026-08-27T00:36:48.435Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787790746307_3ixz3mpxv",
+      "approvalTitle": "【先行1本】specs 2/7(改訂7): mcp/tools/overview — 「〜の形」表現を廃し、結果の内容（概要の本文／種別・ステータス・エラー内容）で記述"
+    },
+    {
+      "version": 5,
+      "filename": "snapshot-005.json",
+      "timestamp": "2026-08-27T00:46:05.479Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787791073799_jzyj0ftvr",
+      "approvalTitle": "【先行1本】specs 2/7(改訂8): mcp/tools/overview — 不達シナリオを削除（stroke-board 停止中はツールが実行され得ないため）。結果は概要本文かエラー（ステータス・内容）の2択"
+    },
+    {
+      "version": 6,
+      "filename": "snapshot-006.json",
+      "timestamp": "2026-08-27T00:52:34.649Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787791755781_471nao5x9",
+      "approvalTitle": "specs 3/7(改訂4): mcp/tools/strokes — 承認済み overview のパターンで再構成（一覧 or エラーの2択・不達なし）"
+    },
+    {
+      "version": 7,
+      "filename": "snapshot-007.json",
+      "timestamp": "2026-08-27T00:54:48.411Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787791758568_g1naxub28",
+      "approvalTitle": "specs 4/7(改訂4): mcp/tools/send-back — 承認済みパターンで再構成（指摘一式 or エラー。無しは A4 に合わせエラーで表現）"
+    },
+    {
+      "version": 8,
+      "filename": "snapshot-008.json",
+      "timestamp": "2026-08-27T00:58:00.372Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787792036071_ic7j48ii3",
+      "approvalTitle": "specs 3/7(改訂5): mcp/tools/strokes — 並びの表現を「時系列順・最後の要素が最新の記録」に明確化"
+    },
+    {
+      "version": 9,
+      "filename": "snapshot-009.json",
+      "timestamp": "2026-08-27T01:01:06.933Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787792157148_adoyjxsco",
+      "approvalTitle": "specs 4/7(改訂5): mcp/tools/send-back — 「差し戻し無し」の GIVEN を肯定形の状態（ストローク中・proposal 未提出）に修正"
+    },
+    {
+      "version": 10,
+      "filename": "snapshot-010.json",
+      "timestamp": "2026-08-27T01:02:22.641Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787792264122_j9onfid6w",
+      "approvalTitle": "specs 5a: mcp/tools/question（新設） — 問いは構造化引数（header/detail/question/options）の専用ツールに分離"
+    },
+    {
+      "version": 11,
+      "filename": "snapshot-011.json",
+      "timestamp": "2026-08-27T01:05:09.079Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787792265588_8ml2e0hjo",
+      "approvalTitle": "specs 5b(改訂4): mcp/tools/submit — 文書の提出（proposal / steering 文書）に限定"
+    },
+    {
+      "version": 12,
+      "filename": "snapshot-012.json",
+      "timestamp": "2026-08-27T01:15:49.899Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787792520739_7bi3hfk9u",
+      "approvalTitle": "specs 4/7(改訂6): mcp/tools/send-back — 「差し戻し無し」の GIVEN を「把握完了に達したセッションが存在する」に修正"
+    },
+    {
+      "version": 13,
+      "filename": "snapshot-013.json",
+      "timestamp": "2026-08-27T01:38:52.934Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787792320481_lph1c5int",
+      "approvalTitle": "specs 6/7(改訂5): mcp/tools/steering — product / tech / structure の種別ごとに取得シナリオを分割"
+    },
+    {
+      "version": 14,
+      "filename": "snapshot-014.json",
+      "timestamp": "2026-08-27T01:44:26.184Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787792823329_c4jqzeco9",
+      "approvalTitle": "specs 5b(改訂5): mcp/tools/submit — 4指摘対応（question 言及削除・不達の理由明記・「プロジェクトが存在する」に簡素化・proposal にプロジェクト名の提案を追加）"
+    },
+    {
+      "version": 15,
+      "filename": "snapshot-015.json",
+      "timestamp": "2026-08-27T01:45:57.001Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787793449103_uq3h8lefs",
+      "approvalTitle": "specs 4/7(改訂7): mcp/tools/send-back — GIVEN を指定文言に修正（差し戻しが発生した／セッションが存在しない）"
+    },
+    {
+      "version": 16,
+      "filename": "snapshot-016.json",
+      "timestamp": "2026-08-27T01:47:20.064Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787794620992_nb149nrq6",
+      "approvalTitle": "specs 5a(改訂3): mcp/tools/question — 検証は提出先の仕事として、検証エラーは汎用1シナリオに集約"
+    },
+    {
+      "version": 17,
+      "filename": "snapshot-017.json",
+      "timestamp": "2026-08-27T01:48:13.387Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787794823050_lzgivj6hm",
+      "approvalTitle": "specs 6/7(改訂6): mcp/tools/steering — 文書状況の別口を廃止。読める=文章+ステータス／無い=ステータスのみで告知"
+    },
+    {
+      "version": 18,
+      "filename": "snapshot-018.json",
+      "timestamp": "2026-08-27T01:52:39.073Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787795132946_n0x8s4u4p",
+      "approvalTitle": "specs 5b(改訂6): mcp/tools/submit — 種別を flontier / steering に。書き込みは受理の受領後、読み取りで反映を確認する形式に"
+    },
+    {
+      "version": 19,
+      "filename": "snapshot-019.json",
+      "timestamp": "2026-08-27T01:58:30.154Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787795290255_wtt1nc58a",
+      "approvalTitle": "specs 5a(改訂4): mcp/tools/question — エラーのシナリオと出し直しのシナリオを分離"
+    },
+    {
+      "version": 20,
+      "filename": "snapshot-020.json",
+      "timestamp": "2026-08-27T02:49:27.979Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787796137673_nvyd73ymq",
+      "approvalTitle": "specs 1/7(改訂2): mcp/server — 全シナリオを指定形式（stroke-board 起動済み→MCP 設定指定で claude 起動→ツール実行指示→確認）に再構成"
+    },
+    {
+      "version": 21,
+      "filename": "snapshot-021.json",
+      "timestamp": "2026-08-27T02:57:51.012Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787797138406_u2l16ei8y",
+      "approvalTitle": "specs 5b(改訂7): mcp/tools/submit — 「読み取りで」を proposal 確認画面での表示に具体化。他ファイルへの波及なし（proposal を読み返すツール/endpoint は現状無く、画面が唯一の観測点のため）"
+    },
+    {
+      "version": 22,
+      "filename": "snapshot-022.json",
+      "timestamp": "2026-08-27T03:01:10.671Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787796185065_b4hct3lp2",
+      "approvalTitle": "specs 7/7(改訂2): agent/invocation — 抽象表現を排し「起動の --mcp-config にサーバーが含まれ env に接続情報が入る」の観測形式に書き直し"
+    },
+    {
+      "version": 23,
+      "filename": "snapshot-023.json",
+      "timestamp": "2026-08-27T05:15:35.613Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787807674896_mdci7667i",
+      "approvalTitle": "specs server/session-management(改訂3): 手段の細部を削って簡素化 — 正常系「工程で AI を起動し実行と報告を指示→報告で確認」、拒否・失効系「token 無し/無効値で /mcp へツール呼び出し→HTTP 401」"
+    },
+    {
+      "version": 24,
+      "filename": "snapshot-024.json",
+      "timestamp": "2026-08-27T05:18:48.262Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787807771846_lgfzw3xz8",
+      "approvalTitle": "specs server/session-management(改訂4): 第1 Requirement の本文を短文3つ+接続文脈の箇条書きに分割（内容は同じ）"
+    },
+    {
+      "version": 25,
+      "filename": "snapshot-025.json",
+      "timestamp": "2026-08-27T05:20:36.275Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787807979515_f5sha6r1d",
+      "approvalTitle": "specs server/session-management(改訂5): Requirement を観測可能な振る舞いに書き直し — 「呼び出しは起動元の対象に届く」「有効な token の無い呼び出しは 401」「終了・再起動で失効」。発行・対応表・ヘッダ名などの機構は design 側へ"
+    },
+    {
+      "version": 26,
+      "filename": "snapshot-026.json",
+      "timestamp": "2026-08-27T05:23:48.499Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787808080908_rpg1mxsl3",
+      "approvalTitle": "specs server/session-management(改訂6): R1 を「呼び出しは起動単位で識別され、文脈が混ざらない」に変更。シナリオは同時実行の分離2本（セッション2つ / flontier と steering の併走）。「対象に届く」系は mcp/server 側と重複のため削除"
+    },
+    {
+      "version": 27,
+      "filename": "snapshot-027.json",
+      "timestamp": "2026-08-27T05:28:28.055Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787808284200_qgfq0o4fn",
+      "approvalTitle": "specs server/session-management(改訂7): 起動方法を「AI 起動の口（invoke-agent）」と明示し、分離シナリオの THEN を「事前に取得して控えた値と報告の突き合わせ」に変更（全シナリオ見直し済み）"
+    },
+    {
+      "version": 28,
+      "filename": "snapshot-028.json",
+      "timestamp": "2026-08-27T05:29:58.376Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787808566072_qn1g7jwfy",
+      "approvalTitle": "specs server/session-management(改訂8): 分離シナリオを「検証側が spawn の MCP 設定から token を採取し /mcp を直接呼び、保存済みの取得値と突き合わせる」形に変更（claude に判定させない・指示の注入を前提にしない）"
+    },
+    {
+      "version": 29,
+      "filename": "snapshot-029.json",
+      "timestamp": "2026-08-27T05:34:16.430Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787808706672_u1i9fpemx",
+      "approvalTitle": "specs server/session-management(改訂9): 起動を実操作に修正 — flontier は「画面から概要を投稿（投稿の流れで AI 起動）」、steering は「proposal の承認で工程開始」。「AI 起動の口」表現は全廃"
+    },
+    {
+      "version": 30,
+      "filename": "snapshot-030.json",
+      "timestamp": "2026-08-27T05:39:51.159Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787808917068_wdm5xb2m9",
+      "approvalTitle": "specs server/session-management(改訂10): シナリオの操作を endpoint 表記に — 起動は POST /api/strokes + GET /api/strokes/:id/invoke-agent、steering 開始は POST /api/strokes/:id/approve"
+    },
+    {
+      "version": 31,
+      "filename": "snapshot-031.json",
+      "timestamp": "2026-08-27T06:00:14.916Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787809551560_yptl1ydzr",
+      "approvalTitle": "specs server/session-management(改訂11): 検証側の token 採取・操作をシナリオから全廃（token 処理は invoke-agent 内部）。分離はセッション記録(GET /api/strokes/:id/strokes)の突き合わせで観測。失効は R2 本文に統合し、R3 を削除"
+    },
+    {
+      "version": 32,
+      "filename": "snapshot-032.json",
+      "timestamp": "2026-08-27T06:02:19.707Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787810448937_soe2g288m",
+      "approvalTitle": "specs server/session-management(改訂12): 拒否シナリオを「外部から claude -p を起動しツール実行と呼び出し状況の報告を指示 → 報告で認可エラーの失敗を観測」に変更（/mcp への生 HTTP 送信は廃止）"
+    },
+    {
+      "version": 33,
+      "filename": "snapshot-033.json",
+      "timestamp": "2026-08-27T06:19:21.146Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787811481479_jfejeumts",
+      "approvalTitle": "specs mcp/server(改訂4): 承認済み design に全面追随 — stroke-board 自身の route /mcp(Streamable HTTP)・6ツール明示・結果は status/errorCode のフラット形・接続情報を引数に要求しない。観測は MCP Inspector(一覧・スキーマ定義)。stdio・旧エラー3種の記述は削除"
+    },
+    {
+      "version": 34,
+      "filename": "snapshot-034.json",
+      "timestamp": "2026-08-27T06:21:04.351Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787811589416_3kx12osa8",
+      "approvalTitle": "specs mcp/server(改訂5): 「接続情報を引数に要求しない」Requirement を削除（各ツールの引数契約は mcp/tools/** が個別に定めており重複、projectId 解決の機構は design 側）。残りは改訂4 と同じ"
+    },
+    {
+      "version": 35,
+      "filename": "snapshot-035.json",
+      "timestamp": "2026-08-27T06:31:52.957Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787811752774_6xxinoor1",
+      "approvalTitle": "specs mcp/tools/submit(改訂8): 結果を status/errorCode 形式へ統一（「受理/エラー/不達」の3種列挙を廃止、失敗は種別によらず全部エラー形式・本家不達は errorCode: unreachable）。画面確認は「/strokes/<id>/proposal をブラウザで開く」と方法を明示。文書名別の重複3シナリオと観測不能な検証エラー・出し直しシナリオは削除"
+    },
+    {
+      "version": 36,
+      "filename": "snapshot-036.json",
+      "timestamp": "2026-08-27T06:48:31.308Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787812398871_41l9m1pak",
+      "approvalTitle": "specs mcp/tools/strokes(改訂): get-strokes — 結果を status/errorCode 形式に統一。観測は Inspector のスキーマ定義"
+    },
+    {
+      "version": 37,
+      "filename": "snapshot-037.json",
+      "timestamp": "2026-08-27T06:55:35.025Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787813429101_jjwlhtx4l",
+      "approvalTitle": "specs mcp/tools/overview(改訂2): 結果の具体（成功は status + overview 本文 / 失敗は status + errorCode + error）と、成功・セッション無しのパターン2シナリオを明記"
+    },
+    {
+      "version": 38,
+      "filename": "snapshot-038.json",
+      "timestamp": "2026-08-27T07:00:26.060Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787813875516_aczhrgt13",
+      "approvalTitle": "specs mcp/tools/overview(改訂3): status の具体値を明記 — 成功 200、セッション無し 404"
+    },
+    {
+      "version": 39,
+      "filename": "snapshot-039.json",
+      "timestamp": "2026-08-27T07:02:03.264Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787814105733_3wzdespd1",
+      "approvalTitle": "specs mcp/tools/overview(改訂4): errorCode / error の意味を定義 — errorCode は status から導出する機械可読の失敗種別(404 は not_found)、error は endpoint が返したエラー本文。シナリオにも具体値を明記"
+    },
+    {
+      "version": 40,
+      "filename": "snapshot-040.json",
+      "timestamp": "2026-08-27T07:02:16.622Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787814108566_nh1zu1svt",
+      "approvalTitle": "specs mcp/tools/strokes(改訂4): errorCode / error の意味を定義(404 = not_found、error は endpoint のエラー本文)。シナリオに具体値を明記"
+    },
+    {
+      "version": 41,
+      "filename": "snapshot-041.json",
+      "timestamp": "2026-08-27T07:02:53.585Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787814110681_b6neydxz5",
+      "approvalTitle": "specs mcp/tools/send-back(改訂4): errorCode / error の意味を定義(404 = not_found、error は endpoint のエラー本文)。シナリオに具体値を明記"
+    },
+    {
+      "version": 42,
+      "filename": "snapshot-042.json",
+      "timestamp": "2026-08-27T07:04:13.429Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787814112806_khej6f1zr",
+      "approvalTitle": "specs mcp/tools/question(改訂4): errorCode / error の意味を定義(400 = bad_request、error は送信先のエラー本文)。シナリオに具体値を明記"
+    },
+    {
+      "version": 43,
+      "filename": "snapshot-043.json",
+      "timestamp": "2026-08-27T07:04:59.343Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787814114700_bqnf3zj31",
+      "approvalTitle": "specs mcp/tools/steering(改訂4): errorCode / error の意味を定義(400 = bad_request、不達 = unreachable、error は本家のエラー本文)。シナリオに具体値を明記"
+    },
+    {
+      "version": 44,
+      "filename": "snapshot-044.json",
+      "timestamp": "2026-08-27T07:07:58.522Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787814220088_c94dim31w",
+      "approvalTitle": "specs mcp/tools/send-back(改訂5): エラー本文の具体を明記 — 差し戻し無しは「差し戻しはまだ無い。」、セッション無しは「そのセッションは無い。」(いずれも実装で確認済み)"
+    },
+    {
+      "version": 45,
+      "filename": "snapshot-045.json",
+      "timestamp": "2026-08-27T07:09:13.973Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787814357182_m9gh7z7ji",
+      "approvalTitle": "specs mcp/tools/steering(改訂5): 文書状況の取得を追加 — 文書名省略で各文書の有無を返す(本家 info の応答から。判定し直さない)。あわせて 400 の errorCode を validation_error に変更"
+    },
+    {
+      "version": 46,
+      "filename": "snapshot-046.json",
+      "timestamp": "2026-08-27T07:13:08.243Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787814522146_8kd219tza",
+      "approvalTitle": "specs mcp/tools/send-back(改訂6): errorCode を種別で区別 — 差し戻し無しは no_send_back、セッション無しは session_not_found(同じ 404 でも errorCode で判別可能に)"
+    },
+    {
+      "version": 47,
+      "filename": "snapshot-047.json",
+      "timestamp": "2026-08-27T07:14:01.438Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787814617218_tr2d99gqv",
+      "approvalTitle": "specs mcp/tools/question(改訂6): パターンを追加 — セッション無し(404 / session_not_found /「そのセッションは無い。」)と承認済み拒否(409 / phase_conflict /「承認済みのセッションには提出できない。」)。エラー本文は実装で確認済み"
+    },
+    {
+      "version": 48,
+      "filename": "snapshot-048.json",
+      "timestamp": "2026-08-27T07:15:22.676Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787814619579_et85lj7z9",
+      "approvalTitle": "specs mcp/tools/steering(改訂6): 文書の有無(exists)を結果で告知 — 値は本家 info の文書状況から取り判定し直さない。「文書がまだ無い」は 200 + exists: false + 空の文章"
+    },
+    {
+      "version": 49,
+      "filename": "snapshot-049.json",
+      "timestamp": "2026-08-27T07:22:29.106Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787814948733_vgqfvu3cw",
+      "approvalTitle": "specs mcp/tools/steering(改訂7): シナリオの文書名を具体化 — 「文書がまだ無い」は tech を指定、「不正な文書名」は例として design を明記"
+    },
+    {
+      "version": 50,
+      "filename": "snapshot-050.json",
+      "timestamp": "2026-08-27T07:24:49.348Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787815431937_m1kfur4r4",
+      "approvalTitle": "specs agent/invocation(改訂3): HTTP + token 前提に書き直し — mcp-config に {type: http, url: <apiBaseUrl>/mcp, headers: x-stroke-token} を追加、既存フラグ・本家 MCP の並び維持。prompt 制約と工程列挙は削除(指摘どおり)。確認は spawn された claude のプロセス引数"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787792709079_0vgwi9j1w",
+  "approvalId": "approval_1787792265588_8ml2e0hjo",
+  "approvalTitle": "specs 5b(改訂4): mcp/tools/submit — 文書の提出（proposal / steering 文書）に限定",
+  "version": 11,
+  "timestamp": "2026-08-27T01:05:09.079Z",
+  "trigger": "revision_requested",
+  "status": "pending",
+  "content": "# mcp/tools/submit Delta\n\n## Purpose\n\n文書の提出の一本口となるツールの契約を定める。proposal と steering 文書はどちらも文書の本文の提出であり、どちらを提出するかは引数の種別で決まる。問いの提出は構造が異なるため `mcp/tools/question` が担う。\n\n## ADDED Requirements\n\n### Requirement: 文書を種別の引数で提出する\n\nツールの引数は、提出の種別（proposal / steering 文書）と文書の本文とし、steering 文書の場合は文書名（product / tech / structure）を併せて取る SHALL。ツールは proposal を自セッションの proposal として提出し、steering 文書は指定された文書名の steering 文書として書き込む SHALL。\n\n提出先の振り分けは引数だけで決まる SHALL。引数に現れない内部状態を見て振り分けや可否を変えてはならない（MUST NOT）（docs/adr/0013 の原則に整合する）。ツール側で本文の検証を行って提出を止めてはならない（MUST NOT）——検証の正は提出先にある。\n\n結果は次のいずれか1つを返す SHALL。\n\n- **受理**: 提出が受け付けられたこと\n- **エラー**: ステータスとエラー内容\n- **不達**: 提出先に到達できなかったこと（steering 文書の提出のみ）\n\n#### Scenario: proposal を提出する\n\n- **GIVEN** 把握完了に達したセッションが存在する\n- **WHEN** 種別に proposal を指定し、本文を渡してツールを実行する\n- **THEN** proposal がそのセッションに提出され、受理が返る\n\n#### Scenario: product の steering 文書を提出する\n\n- **GIVEN** 承認で昇格したプロジェクトが存在する\n- **WHEN** 種別に steering 文書、文書名に product を指定し、本文を渡してツールを実行する\n- **THEN** product の steering 文書として書き込まれ、受理が返る\n\n#### Scenario: tech の steering 文書を提出する\n\n- **GIVEN** 承認で昇格したプロジェクトが存在する\n- **WHEN** 種別に steering 文書、文書名に tech を指定し、本文を渡してツールを実行する\n- **THEN** tech の steering 文書として書き込まれ、受理が返る\n\n#### Scenario: structure の steering 文書を提出する\n\n- **GIVEN** 承認で昇格したプロジェクトが存在する\n- **WHEN** 種別に steering 文書、文書名に structure を指定し、本文を渡してツールを実行する\n- **THEN** structure の steering 文書として書き込まれ、受理が返る\n\n#### Scenario: 上限を超えた提出\n\n- **GIVEN** 把握完了に達したセッションが存在する\n- **WHEN** 規定の上限を超えた本文で proposal を提出する\n- **THEN** エラーが返り、ステータスとエラー内容を読んで同じツールの呼び直しで出し直せる\n\n#### Scenario: 本家の dashboard が停止している\n\n- **GIVEN** 承認で昇格したプロジェクトが存在し、本家の dashboard が停止している\n- **WHEN** 種別に steering 文書を指定して提出する\n- **THEN** 不達が返る\n",
+  "fileStats": {
+    "size": 3174,
+    "lines": 56,
+    "lastModified": "2026-08-27T00:58:31.963Z"
+  },
+  "comments": []
+}

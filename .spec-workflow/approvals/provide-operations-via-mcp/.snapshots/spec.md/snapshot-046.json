@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787814788243_6bgwkedxc",
+  "approvalId": "approval_1787814522146_8kd219tza",
+  "approvalTitle": "specs mcp/tools/send-back(改訂6): errorCode を種別で区別 — 差し戻し無しは no_send_back、セッション無しは session_not_found(同じ 404 でも errorCode で判別可能に)",
+  "version": 46,
+  "timestamp": "2026-08-27T07:13:08.243Z",
+  "trigger": "approved",
+  "status": "pending",
+  "content": "# mcp/tools/send-back Delta\n\n## Purpose\n\n差し戻し（ユーザーが proposal を承認せず修正を求めて返した指摘一式）を取得するツール（`get-send-back`）の契約を定める。\n\n## ADDED Requirements\n\n### Requirement: 差し戻しを引数なしで取得する\n\nツールは引数を取らない SHALL。成功の結果は `status` と保存済みの差し戻しの指摘一式を持つ SHALL。失敗の結果は `status`（HTTP ステータスコード）・`errorCode`（失敗の種別を表す機械可読コード。同じ status でも種別を区別する——差し戻しがまだ無い場合は `no_send_back`、セッションが無い場合は `session_not_found`）・`error`（endpoint が返したエラー本文）を持つ SHALL（`mcp/server` の形式）。\n\n#### Scenario: 指摘を読む\n\n- **GIVEN** 対象のセッションで差し戻しが発生した\n- **WHEN** このツールを実行する\n- **THEN** 結果に `status: 200` と指摘一式が入っている\n\n#### Scenario: 差し戻しがまだ無い\n\n- **GIVEN** 対象のセッションに差し戻しが無い\n- **WHEN** このツールを実行する\n- **THEN** 結果はエラーで、`status: 404`・`errorCode: no_send_back` と、endpoint のエラー本文「差し戻しはまだ無い。」（`error`）を持つ\n\n#### Scenario: セッションが存在しない\n\n- **GIVEN** 対象のセッションが削除されている\n- **WHEN** このツールを実行する\n- **THEN** 結果はエラーで、`status: 404`・`errorCode: session_not_found` と、endpoint のエラー本文「そのセッションは無い。」（`error`）を持つ\n",
+  "fileStats": {
+    "size": 1668,
+    "lines": 30,
+    "lastModified": "2026-08-27T07:08:32.395Z"
+  },
+  "comments": []
+}

@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787791008435_5cukg9ptr",
+  "approvalId": "approval_1787790746307_3ixz3mpxv",
+  "approvalTitle": "【先行1本】specs 2/7(改訂7): mcp/tools/overview — 「〜の形」表現を廃し、結果の内容（概要の本文／種別・ステータス・エラー内容）で記述",
+  "version": 4,
+  "timestamp": "2026-08-27T00:36:48.435Z",
+  "trigger": "revision_requested",
+  "status": "pending",
+  "content": "# mcp/tools/overview Delta\n\n## Purpose\n\nセッションの概要（ユーザーが最初に投げた、作りたいシステムの説明）を取得するツールの契約を定める。\n\n## ADDED Requirements\n\n### Requirement: 概要を引数なしで取得する\n\nツールは引数を取らない SHALL。結果は次のいずれか1つを返す SHALL。\n\n- **概要**: 概要の本文\n- **エラー**: エラーの種別（相手側エラー / 不達）。種別が相手側エラーの場合は、ステータスとエラー内容を併せ持つ\n\n#### Scenario: 概要を読む\n\n- **GIVEN** 概要を受理したセッションが存在する\n- **WHEN** このツールを実行する\n- **THEN** そのセッションの概要の本文が返る\n\n#### Scenario: セッションが存在しない\n\n- **GIVEN** 対象のセッションが削除されている\n- **WHEN** このツールを実行する\n- **THEN** 種別が相手側エラーのエラーが返り、ステータスとエラー内容を持つ\n\n#### Scenario: サーバーが停止している\n\n- **GIVEN** stroke-board のサーバーが停止している\n- **WHEN** このツールを実行する\n- **THEN** 種別が不達のエラーが返る\n",
+  "fileStats": {
+    "size": 1213,
+    "lines": 33,
+    "lastModified": "2026-08-27T00:32:17.960Z"
+  },
+  "comments": []
+}

@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/api-session/requirements.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-25T07:51:33.427Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787644293386_v8qppnqn3",
+      "approvalTitle": "specs: api/session — U 系の口を集約・U13 cwd 引数・U12 に path（修正）"
+    }
+  ]
+}

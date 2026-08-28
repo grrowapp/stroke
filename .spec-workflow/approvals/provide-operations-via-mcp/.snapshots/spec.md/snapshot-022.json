@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787799670671_cvke91xqf",
+  "approvalId": "approval_1787796185065_b4hct3lp2",
+  "approvalTitle": "specs 7/7(改訂2): agent/invocation — 抽象表現を排し「起動の --mcp-config にサーバーが含まれ env に接続情報が入る」の観測形式に書き直し",
+  "version": 22,
+  "timestamp": "2026-08-27T03:01:10.671Z",
+  "trigger": "revision_requested",
+  "status": "pending",
+  "content": "# agent/invocation Delta\n\n## ADDED Requirements\n\n### Requirement: 呼び出しは操作系の MCP サーバーを提供する\n\nシステムは、セッション工程・steering 工程の AI の呼び出しで、操作系 MCP サーバーの起動定義を MCP 設定（`--mcp-config`）に足して claude を起動する SHALL。サーバーが接続先とセッション id を解決できるよう、これらの値は MCP 設定の env で渡す SHALL。接続先やセッション id を prompt に載せてはならない（MUST NOT）。\n\n#### Scenario: セッション工程で提供される\n\n- **GIVEN** 対象のセッションが存在する\n- **WHEN** システムがストロークの往復のために claude を起動する\n- **THEN** 起動の MCP 設定に操作系 MCP サーバーが含まれ、そのセッションの接続情報が env に入っていることが確認できる\n\n#### Scenario: steering 工程で提供される\n\n- **GIVEN** 対象のプロジェクトが存在する\n- **WHEN** システムが承認の後の文書作成のために claude を起動する\n- **THEN** 起動の MCP 設定に、本家の MCP サーバーと並んで操作系 MCP サーバーが含まれていることが確認できる\n\n#### Scenario: 接続情報は prompt に現れない\n\n- **GIVEN** 対象のセッションまたはプロジェクトが存在する\n- **WHEN** システムが claude を起動する\n- **THEN** 渡された prompt に接続先・セッション id が含まれていないことが確認できる\n",
+  "fileStats": {
+    "size": 1544,
+    "lines": 26,
+    "lastModified": "2026-08-27T02:02:54.688Z"
+  },
+  "comments": []
+}

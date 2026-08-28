@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787780766949_ybu0hctwp",
+  "approvalId": "approval_1787780026301_klnvonkyy",
+  "approvalTitle": "replace-session-skills-with-mcp: proposal（API は残し、MCP ツールを前段に置く）",
+  "version": 2,
+  "timestamp": "2026-08-26T21:46:06.949Z",
+  "trigger": "revision_requested",
+  "status": "pending",
+  "content": "# replace-session-skills-with-mcp\n\n## Why\n\nエージェントの操作は今、`assets/.claude/skills/` のセッション API スキル6本が `!` フェンスの中で `curl` と `jq` を叩く形で成り立っている。この形は claude の実行系に3つの縛りを持ち込んでいる。\n\n- **`Skill` を外せない**: セッション id は `${CLAUDE_SESSION_ID}` としてフェンスの中でしか値を持たない（実測 2026-08-25）。`--allowedTools` から `Skill` を落とすと claude は取得も提出もできず、空の id を掴んだままタイムアウトする（`nuxt.config.ts`）\n- **提出の構造が二重に書かれる**: `header` 12字・`options` 1〜5件といった規定は `guidance` の散文と endpoint の検証の両方にあり、破った提出は 400 を受けてから直る\n- **資産の置き場が起動定義に結びつく**: スキルは `--add-dir` で渡したリポジトリのルート配下にある必要があり、置き場を動かすと起動フラグが動く\n\nMCP なら、接続先とセッション id は spawn 時の `--mcp-config` に埋め込める。steering 側は既にこの手を使っている（ADR-0011・`invoke.ts` の `mcpConfigFor`）。引数の構造はツールの入力スキーマとして claude に届くため、散文で伝え直さなくてよい。\n\n## What Changes\n\n- エージェントの取得3種（概要 A1・済んだストロークの記録・差し戻しの指摘一式 A4）と提出2種（問い A5・proposal A7）を **MCP ツール**として公開する\n- claude の起動に `--mcp-config` を常時付ける。接続先とセッション id はその JSON に埋め込み、環境変数 `STROKE_BASEURL` とフェンス内の `${CLAUDE_SESSION_ID}` への依存をやめる（**BREAKING**）\n- `assets/.claude/skills/` のセッション API スキル6本（`get-overview` / `get-strokes` / `get-send-back` / `question` / `proposal` / `guidance`）を撤廃する（**BREAKING**）\n- 提出の構造の規定はツールの入力スキーマが持つ。`guidance` が散文で伝えていた呼び出し方は、ツール説明と入力スキーマへ移す\n- **API の endpoint は変えない。** A1/A4/A5/A7 も A8 も今のまま残る。MCP ツールはその前段に立ち、エージェントに代わって endpoint を呼ぶ。契約（`api/stroke/*`）はエージェントの呼び方が変わっても動かない\n- steering 側の `get-product` / `get-tech` / `get-structure` は、`.mcp.json` を `jq` で辿って `localhost:5000` を叩く一行をやめ、既に与えている本家 spec-workflow の MCP を使う形へ寄せる\n\n**実装の規模**: MCP ツールの新設と、claude へ渡す指示（定型・ワークフロー定義の instruction・ツール説明）の書き換えに留める。ストロークの往復の流れ、`invocation` の4値と完了検知（output stream）、リトライと巡回、画面は変えない。\n\n## Capabilities\n\n### New Capabilities\n\n- `mcp/stroke`: エージェントの操作口を MCP ツールとして公開する。公開するツールの一覧、入力スキーマと検証の返し方、セッション id と接続先の解決、spawn 時の `--mcp-config` の与え方\n\n### Modified Capabilities\n\n- `agent/invocation`: 起動定義に `--mcp-config` を加え、セッション API スキルのための `--add-dir` と `STROKE_BASEURL` の受け渡しを外す\n\n**変更しない capability**: `api/stroke/*`（A1/A4/A5/A7/A8）は要件も path も変えない。MCP ツールはこの契約の呼び手が1つ増えるだけで、endpoint 側の振る舞いに影響しない。\n\n## Impact\n\n- 新設: MCP サーバーの実体（ツール定義と、endpoint を呼ぶ経路）。実装形態——Nitro 同居の HTTP transport か、claude が spawn する独立した stdio サーバーか——は design で決める\n- サーバー: `server/utils/stroke/invoke.ts`（`--mcp-config` の組み立てを stroke の起動にも広げる）。`server/api/strokes/[id]/**` は触らない\n- 設定: `nuxt.config.ts` の `claude.args`（`--add-dir` 2つ目・`--allowedTools`）と `claude.apiBaseUrl` の役割。正である `docs/specs/core/settings-reference.md` の改定には change とユーザー承認が要る（ADR-0004）\n- スキル資産: `assets/.claude/skills/` のセッション API スキル6本を削除、steering 側3本を見直し\n- 文書: `docs/specs/api/api-contract.md`、`docs/specs/architecture/session-workflow.md`（配線表の「起動するスキル」「接続先」「スキル・コマンドの置き場」）、`docs/specs/architecture/question-flow.md`\n",
+  "fileStats": {
+    "size": 4704,
+    "lines": 43,
+    "lastModified": "2026-08-26T21:32:28.995Z"
+  },
+  "comments": []
+}

@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787792280372_rpq72wl6n",
+  "approvalId": "approval_1787792036071_ic7j48ii3",
+  "approvalTitle": "specs 3/7(改訂5): mcp/tools/strokes — 並びの表現を「時系列順・最後の要素が最新の記録」に明確化",
+  "version": 8,
+  "timestamp": "2026-08-27T00:58:00.372Z",
+  "trigger": "approved",
+  "status": "pending",
+  "content": "# mcp/tools/strokes Delta\n\n## Purpose\n\n済んだストロークの記録（末尾が直前の回答）を取得するツールの契約を定める。\n\n## ADDED Requirements\n\n### Requirement: ストローク記録を引数なしで取得する\n\nツールは引数を取らない SHALL。結果は次のいずれか1つを返す SHALL。\n\n- **記録の一覧**: ストローク記録の一覧。時系列順に並び、最後の要素が最新の記録である\n- **エラー**: ステータスとエラー内容\n\n#### Scenario: 記録を読む\n\n- **GIVEN** ストロークを重ねたセッションが存在する\n- **WHEN** このツールを実行する\n- **THEN** ストローク記録の一覧が時系列順で返り、最後の要素が最新の記録である\n\n#### Scenario: セッションが存在しない\n\n- **GIVEN** 対象のセッションが削除されている\n- **WHEN** このツールを実行する\n- **THEN** エラーが返り、ステータスとエラー内容を持つ\n",
+  "fileStats": {
+    "size": 997,
+    "lines": 27,
+    "lastModified": "2026-08-27T00:53:47.779Z"
+  },
+  "comments": []
+}

@@ -1,0 +1,54 @@
+{
+  "filePath": ".spec-workflow/specs/connect-portal-and-strokes/requirements.md",
+  "currentVersion": 6,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-25T03:22:15.014Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787628134971_ait7g8zry",
+      "approvalTitle": "connect-portal-and-strokes — 入口と出口を繋ぐ実装計画"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2026-08-25T03:26:55.508Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787628134971_ait7g8zry",
+      "approvalTitle": "connect-portal-and-strokes — 入口と出口を繋ぐ実装計画"
+    },
+    {
+      "version": 3,
+      "filename": "snapshot-003.json",
+      "timestamp": "2026-08-25T06:00:47.888Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787637518918_gqbn6gcqv",
+      "approvalTitle": "connect-portal-and-strokes — 判定と API の対応を endpoint 番号で明示した版（U12/U13/U2/A8）"
+    },
+    {
+      "version": 4,
+      "filename": "snapshot-004.json",
+      "timestamp": "2026-08-25T06:21:53.891Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787637765793_u95nfdem9",
+      "approvalTitle": "connect-portal-and-strokes — capability の変更を1行1変更の箇条書き化・timeout の主体を U13 実装と明示"
+    },
+    {
+      "version": 5,
+      "filename": "snapshot-005.json",
+      "timestamp": "2026-08-25T06:37:26.836Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787639115512_x1om94bzo",
+      "approvalTitle": "connect-portal-and-strokes — レビュー18件反映版（U/W=api-session・A8=invocation 操作口・timeout は invokeAi・可否判定全廃）"
+    },
+    {
+      "version": 6,
+      "filename": "snapshot-006.json",
+      "timestamp": "2026-08-25T07:23:16.962Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787640179880_i5dgx6d5q",
+      "approvalTitle": "connect-portal-and-strokes — U13 は cwd を引数で受け取り、U12 は path を返す版"
+    }
+  ]
+}

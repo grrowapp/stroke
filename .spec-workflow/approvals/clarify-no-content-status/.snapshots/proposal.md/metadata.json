@@ -1,0 +1,110 @@
+{
+  "filePath": "openspec/changes/clarify-no-content-status/proposal.md",
+  "currentVersion": 13,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-27T06:02:26.924Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787810546803_ke4hyehot",
+      "approvalTitle": "clarify-no-content-status — proposal（共通規約 api/common-rules の新設）"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2026-08-27T06:10:37.403Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787810813369_ducw5z45k",
+      "approvalTitle": "clarify-no-content-status — proposal（capability を api/contract に修正）"
+    },
+    {
+      "version": 3,
+      "filename": "snapshot-003.json",
+      "timestamp": "2026-08-27T06:58:20.156Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787813436647_ar3rbvgfk",
+      "approvalTitle": "clarify-no-content-status — proposal（204 は h3 の規定。効かない 200 の行を削除）"
+    },
+    {
+      "version": 4,
+      "filename": "snapshot-004.json",
+      "timestamp": "2026-08-27T07:22:05.693Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787814295029_mjpeurisx",
+      "approvalTitle": "clarify-no-content-status — proposal（GET から 204 を外す + spec の path/メソッド取り残し 11 本）"
+    },
+    {
+      "version": 5,
+      "filename": "snapshot-005.json",
+      "timestamp": "2026-08-27T07:38:35.568Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787815532440_44mxutaaj",
+      "approvalTitle": "clarify-no-content-status — proposal（spec 修正を撤回。応答コードのみに絞る）"
+    },
+    {
+      "version": 6,
+      "filename": "snapshot-006.json",
+      "timestamp": "2026-08-27T07:42:32.684Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787816392514_q6orrcg6f",
+      "approvalTitle": "clarify-no-content-status — proposal（対象を起点の食い違いから導く / 余分な節を削除）"
+    },
+    {
+      "version": 7,
+      "filename": "snapshot-007.json",
+      "timestamp": "2026-08-27T07:44:35.290Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787816573524_aoe8v7k4l",
+      "approvalTitle": "clarify-no-content-status — proposal（何をどう変更するかを明示）"
+    },
+    {
+      "version": 8,
+      "filename": "snapshot-008.json",
+      "timestamp": "2026-08-27T07:48:18.378Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787816759920_m4y4ltxpf",
+      "approvalTitle": "clarify-no-content-status — proposal（削除の理由と、返り値を変える invoke-agent の担保を記載）"
+    },
+    {
+      "version": 9,
+      "filename": "snapshot-009.json",
+      "timestamp": "2026-08-27T07:53:33.248Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787817030103_pw29ibxez",
+      "approvalTitle": "clarify-no-content-status — proposal（return null をやめ sendNoContent(event, 204) で数字を明示）"
+    },
+    {
+      "version": 10,
+      "filename": "snapshot-010.json",
+      "timestamp": "2026-08-27T08:37:47.692Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787819749776_9rk2webed",
+      "approvalTitle": "clarify-no-content-status — proposal（承認済み spec に合わせエラー系の記述を削除）"
+    },
+    {
+      "version": 11,
+      "filename": "snapshot-011.json",
+      "timestamp": "2026-08-27T08:42:56.183Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787819992144_0rgyqcz0s",
+      "approvalTitle": "clarify-no-content-status — proposal（setResponseStatus の値を 204 に直す。sendNoContent は使わない）"
+    },
+    {
+      "version": 12,
+      "filename": "snapshot-012.json",
+      "timestamp": "2026-08-27T08:45:41.603Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787820286741_ijvgeigcx",
+      "approvalTitle": "clarify-no-content-status — proposal（return null を消すと 404 になる実測結果を追加）"
+    },
+    {
+      "version": 13,
+      "filename": "snapshot-013.json",
+      "timestamp": "2026-08-27T10:28:07.804Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787826291886_wbkt01fht",
+      "approvalTitle": "clarify-no-content-status — proposal（末尾2行を return new Response(null, { status: 204 }) に置換。delete.post.ts も対象）"
+    }
+  ]
+}

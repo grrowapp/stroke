@@ -1,0 +1,38 @@
+{
+  "filePath": ".spec-workflow/specs/file-components/requirements.md",
+  "currentVersion": 4,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-24T21:56:44.321Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787608604299_4nj2gapop",
+      "approvalTitle": "components の棚卸しと規範への対応（markdown 集約の方向を含む）"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2026-08-24T22:25:34.459Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787610157469_c1fsgb5fn",
+      "approvalTitle": "components の定義（page component を含む）"
+    },
+    {
+      "version": 3,
+      "filename": "snapshot-003.json",
+      "timestamp": "2026-08-24T22:34:30.100Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787610750491_1wijuga2m",
+      "approvalTitle": "components の定義（構成図つき）"
+    },
+    {
+      "version": 4,
+      "filename": "snapshot-004.json",
+      "timestamp": "2026-08-24T22:46:56.137Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787611431300_39wl74lku",
+      "approvalTitle": "components の定義（MarkdownComponent 統合）"
+    }
+  ]
+}

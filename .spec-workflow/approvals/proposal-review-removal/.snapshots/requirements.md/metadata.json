@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/proposal-review-removal/requirements.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-25T07:52:04.426Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787644324326_a1xb14yi7",
+      "approvalTitle": "specs: proposal-review — 廃止（→ stroke/frontier へ全要件移行）"
+    }
+  ]
+}

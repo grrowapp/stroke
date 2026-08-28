@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/document-directory-structure/requirements.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-24T18:57:18.667Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787597838650_jhktwpbit",
+      "approvalTitle": "document-directory-structure: requirements（structure 2本のマージ提案）"
+    }
+  ]
+}
