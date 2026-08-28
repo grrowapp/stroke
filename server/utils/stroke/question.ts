@@ -34,6 +34,46 @@ const rawQuestionSchema = z.object({
 })
 
 /**
+ * 読み取れなかった理由を、項目ごとに1行で述べる。
+ *
+ * **理由を伝えないと、エージェントは形を当てるまで送り続ける。** 「問いの構造として
+ * 読み取れない。」だけでは、どの項目がどの制約に反したのか分からない（実測 2026-08-28:
+ * `description` が 51 字で 1 字だけ超過し続け、`send-question` 11回中5回が 400。
+ * 何を削れば通るのか掴めず、`header` 3 字・`question` 6 字といった極端に短い問いを
+ * 投げて当てにいく挙動になった）。
+ *
+ * 上限そのものはツールの `inputSchema` の説明にも書いてあるが（ADR-0013 により
+ * MCP 側では弾かない）、実際に超えたときは**どれが何字なのか**を返す必要がある。
+ */
+export function questionViolations(value: unknown): string[] {
+  const parsed = rawQuestionSchema.safeParse(value)
+  if (parsed.success) return []
+
+  return parsed.error.issues.map((issue) => {
+    const at = issue.path.join('.') || '(全体)'
+    // 超過は「今いくつなのか」を添える。あと何字削ればよいかが一目で分かる
+    const actual = issue.code === 'too_big' || issue.code === 'too_small'
+      ? lengthAt(value, issue.path)
+      : undefined
+    return actual === undefined
+      ? `${at}: ${issue.message}`
+      : `${at}: ${issue.message}（現在 ${actual}）`
+  })
+}
+
+/** 指摘された位置の実際の長さ。文字列なら字数、配列なら件数 */
+function lengthAt(value: unknown, path: PropertyKey[]): number | undefined {
+  let at: unknown = value
+  for (const key of path) {
+    if (typeof at !== 'object' || at === null) return undefined
+    at = (at as Record<PropertyKey, unknown>)[key]
+  }
+  if (typeof at === 'string') return at.trim().length
+  if (Array.isArray(at)) return at.length
+  return undefined
+}
+
+/**
  * 規定の構造として読み取る。読み取れなければ null。
  * 呼び出し側はそれを失敗としてリトライへ流す（AI 応答）か、壊れた記録として弾く（保存分）。
  */
