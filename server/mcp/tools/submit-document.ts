@@ -23,7 +23,7 @@ const FLONTIER_ERROR_CODE_BY_STATUS: Record<number, string> = {
 export default defineStrokeTool({
   description: '文書を提出する（type: flontier は proposal、steering は指定した文書名の steering 文書）',
   // 上限・許容値は**説明として**書く（`.max()` や `.enum()` で弾かない）。検証の正は
-  // 代行先（A7 / 本家 PUT）に置いたままにする——ADR-0013。send-question と同じ理由で、
+  // 代行先（A7 / 本家 PUT）に置いたままにする——ADR-0014。send-question と同じ理由で、
   // 契約に書かないとエージェントは形を探り続けることになる。
   inputSchema: {
     type: z.enum(['flontier', 'steering']),
@@ -58,7 +58,7 @@ export default defineStrokeTool({
     // 併せて取る SHALL」）が要求するもので、文書名の値（product/tech/structure か）の
     // 検証ではない。欠けたまま本家へ発行すると URL のパスセグメントが空になり、本家の
     // fastify ルートにすらマッチせず素の 404 になってしまう（santa-method レビュー指摘）。
-    // 「引数契約を満たすか」はツール自身の責務不成立の判定であり ADR-0013 の対象外。
+    // 「引数契約を満たすか」はツール自身の責務不成立の判定であり ADR-0014 の対象外。
     if (args.name === undefined || args.name === '') {
       return { status: 400, errorCode: 'validation_error', error: '文書名（name）が無い。' }
     }

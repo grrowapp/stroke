@@ -17,12 +17,12 @@ const ERROR_CODE_BY_STATUS: Record<number, string> = {
  * **`status` は A5 の実際の応答をそのまま持つ。** `docs/specs/api/api-contract.md` の
  * A5 は「本文なし（204）」だが、現在の実装（`server/api/strokes/[id]/question.post.ts`）は
  * `setResponseStatus(event, 200)` で 200 を返しており、契約と実装がずれている
- * （provide-operations-via-mcp 実装時に判明。ここでは実際の応答を書き換えない——ADR-0013
+ * （provide-operations-via-mcp 実装時に判明。ここでは実際の応答を書き換えない——ADR-0014
  * 「MCP サーバー側の事前検証・独自分岐を足してはならない」）。
  */
 export default defineStrokeTool({
   description: 'ストロークの問い（またはさし戻しへの問い返し）を送る',
-  // 上限は**説明として**書く。`.max()` で弾かないのは ADR-0013（MCP サーバー側の
+  // 上限は**説明として**書く。`.max()` で弾かないのは ADR-0014（MCP サーバー側の
   // 事前検証・独自分岐を足さない）に従うため。検証の正は A5（`server/utils/stroke/question.ts`）
   // に置いたまま、契約としての上限だけをエージェントへ伝える。
   //

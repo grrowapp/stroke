@@ -19,7 +19,7 @@ import type { SteeringDocument } from '../../utils/upstream/rest'
  */
 export default defineStrokeTool({
   description: 'steering 文書（product / tech / structure）を取得する',
-  // 許容値は説明として書き、`.enum()` で弾かない（ADR-0013。規定外の名前は代行先が
+  // 許容値は説明として書き、`.enum()` で弾かない（ADR-0014。規定外の名前は代行先が
   // 400 `validation_error` で返す）。
   inputSchema: {
     name: z.string().describe('文書名。product / tech / structure のいずれか'),

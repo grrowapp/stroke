@@ -20,7 +20,6 @@
     "check:ws-disconnect": "tsx scripts/ws-disconnect-check.ts",
     "check:stroke": "tsx scripts/stroke-check.ts",
     "test": "vitest run",
-    "test:live": "vitest run --config vitest.live.config.ts",
     "test:e2e": "playwright test"
   },
   "dependencies": {

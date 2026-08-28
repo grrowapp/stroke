@@ -42,7 +42,7 @@ const rawQuestionSchema = z.object({
  * 何を削れば通るのか掴めず、`header` 3 字・`question` 6 字といった極端に短い問いを
  * 投げて当てにいく挙動になった）。
  *
- * 上限そのものはツールの `inputSchema` の説明にも書いてあるが（ADR-0013 により
+ * 上限そのものはツールの `inputSchema` の説明にも書いてあるが（ADR-0014 により
  * MCP 側では弾かない）、実際に超えたときは**どれが何字なのか**を返す必要がある。
  */
 export function questionViolations(value: unknown): string[] {
