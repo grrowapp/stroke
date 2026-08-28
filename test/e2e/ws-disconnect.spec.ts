@@ -2,7 +2,7 @@ import { WebSocket } from 'ws';
 
 import { expect, test, type APIRequestContext } from '@playwright/test';
 
-import { APP_PORT } from '../playwright.config';
+import { APP_PORT } from '../../playwright.config';
 
 /**
  * 配信先が切れてもシステムは動き続ける

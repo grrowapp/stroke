@@ -110,7 +110,7 @@ mkdirSync(SPEC_WORKFLOW_HOME, { recursive: true });
 writeFileSync(REGISTRY_PATH, registryContent());
 
 export default defineConfig({
-  testDir: './e2e',
+  testDir: './test/e2e',
   testMatch: '**/*.spec.ts',
   fullyParallel: false,
   workers: 1,
@@ -121,7 +121,7 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: `node e2e/fixtures/upstream-stub.mjs ${STUB_PORT}`,
+      command: `node test/e2e/fixtures/upstream-stub.mjs ${STUB_PORT}`,
       url: `http://127.0.0.1:${STUB_PORT}/api/projects/list`,
       reuseExistingServer: false,
       stdout: 'pipe',

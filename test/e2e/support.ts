@@ -6,7 +6,7 @@ import { writeFileSync } from 'node:fs';
 
 import { expect, type Page } from '@playwright/test';
 
-import { REGISTRY_PATH, STUB_PORT, registryContent } from '../playwright.config';
+import { REGISTRY_PATH, STUB_PORT, registryContent } from '../../playwright.config';
 
 export const STUB_URL = `http://127.0.0.1:${STUB_PORT}`;
 

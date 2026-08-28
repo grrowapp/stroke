@@ -2,7 +2,7 @@ import { writeFileSync } from 'node:fs';
 
 import { expect, test } from '@playwright/test';
 
-import { PROJECTS_PARENT, REGISTRY_PATH, registryContent } from '../playwright.config';
+import { PROJECTS_PARENT, REGISTRY_PATH, registryContent } from '../../playwright.config';
 import { resetBoard } from './support';
 
 /**

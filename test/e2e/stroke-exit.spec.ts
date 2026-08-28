@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import { expect, test } from '@playwright/test';
 
-import { PROJECTS_PARENT, SEEDED_PROJECT_NAME, SEEDED_SESSION_ID } from '../playwright.config';
+import { PROJECTS_PARENT, SEEDED_PROJECT_NAME, SEEDED_SESSION_ID } from '../../playwright.config';
 
 /**
  * 出口の接合（ADR 0011）。

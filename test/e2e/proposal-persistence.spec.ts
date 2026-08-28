@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import { expect, test, type APIRequestContext } from '@playwright/test';
 
-import { PROJECTS_PARENT } from '../playwright.config';
+import { PROJECTS_PARENT } from '../../playwright.config';
 
 /**
  * 受理した proposal は残る（openspec/specs/api/stroke/proposal）。
