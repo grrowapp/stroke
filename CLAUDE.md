@@ -38,10 +38,10 @@ worktree = `git worktree` で切った作業ディレクトリ。それぞれが
 
 - `system-structure.md` — 構造の定義。統合後のあるべき配置の規範（ディレクトリ構造・画面とサーバーの区切り・共有型）
 - `schema.md` — 入れ物の形と検証の規定（長さ・件数の上限）
-- `settings-reference.md` — ストローク側設定の**正**。ここに無いものは設定ではない（規定は同ファイル冒頭）。ポータル側の環境変数3件（`NUXT_UPSTREAM_BASE_URL` / `NUXT_SPEC_WORKFLOW_HOME` / `NUXT_SYNC_INTERVAL_MS`）は未統合（README「設定（ポータル側）」）
-- `file-component.md` — コンポーネント個別のリファレンス（props と参照元）10件。うち3件（`SbIcon` / `UpstreamIcon` / `MarkdownNodes`）は削除済みで未追従
-- `file-components.md` — `app/components/` 全19本の棚卸しと規範への対応。`file-component.md` と対象が重なるので、件数が食い違ったらこちらを正とする
-- `file-composables.md` — `app/composables/` 全9本の棚卸しと規範（関心単位の平置き）への対応
+- `settings-reference.md` — ストローク側設定の**正**。ここに無いものは設定ではない（`docs/adr/0004-settings-reference-is-authoritative.md`）。編集には change とユーザー承認が要る。ポータル側の環境変数4件は未統合（README 参照）
+- `file-components.md` — components の棚卸し（全19本。ポータル側7本は個別の props と参照元も持つ）
+- `file-composables.md` — composable 一覧（ポータル側・ストローク側の2系統）
+(docs: file-component.md を file-components.md へ統合する)
 - `server-structure.md` — server/utils の棚卸しと規範への対応
 
 ### `docs/specs/api/`

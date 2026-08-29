@@ -14,7 +14,7 @@
 | ステアリングの読み書き | `useSteeringDocuments` | `useProjectApi` と同じ関心の口として並べる |
 | 問いの往復 | `useAgentQuestion` | 回答送信・AI 起動（契約 U7 / U13）。そのまま |
 | セッションの WS 購読 | `useSessionChannel` | W1 / W2 の唯一の受け口。購読先のパスと届く型を引数で受け、呼び出し側が直接呼ぶ |
-| proposal のレビュー | `useProposalReview` | 39 プロパティに肥大し `Modals.vue` と密結合。分割は**保留** — markdown コンポーネント集約の確定後、`flatten-composables` の design で決める（分割案はここで固定しない） |
+| proposal のレビュー | `useProposalReview` | 39 プロパティに肥大し `Modals.vue` と密結合。分割は `separate-composable-responsibilities` の担当。39 のうち13がモーダルの状態で、`realign-component-composable-boundaries` が引き直す場所と重なるため、切り方はその結論を待つ（分割案はここで固定しない） |
 | 注釈 | `useAnnotations` | 色定義5件をコンポーネントが逆向き import している。**色の実値は CSS へ移し、データ（`Annotation.highlightColor`）は色名のみ持つ**（検討） |
 | 待機とリトライ | `useWaitingRetry` | timer は vueuse の `useIntervalFn` に委譲済み。そのまま |
 
@@ -311,13 +311,15 @@ W1 と W2 の**唯一の違いは購読先のパスと届く型**だったので
 
 呼び出し3箇所とも `useSessionChannel` を**明示 import していない**（ストローク側は auto-import）。
 
-### `useWaitingRetry.ts`（49行）
+### `useWaitingRetry.ts`（78行）
 
 ```
-useWaitingRetry(sessionId) → { waiting, failed, startWaiting, stopWaiting }
+useWaitingRetry(sessionId) → { waiting, failed, errored, startWaiting, stopWaiting, retryFromError, discard }
 ```
 
 待機中だけ3秒おきに `GET /api/strokes/<id>` を読み、`invocation` が `failed` / `idle` になったら止まる。**通常は W1 / W2 の配信が先に届くので、これは保険。**
+
+**共有 composable ではない。** 画面2 にはインスタンスが2つある（`useProposalReview` の自前と、`useAgentQuestion` の中）。待機が重なれば3秒ごとに2回叩く。
 
 timer は vueuse の `useIntervalFn(fn, 3000, { immediate: false })` に委ねている。`resume()` は張り直しのたびに前の timer を捨てるので手で clear する必要がなく、scope が壊れたときの停止も内蔵している。
 
@@ -379,7 +381,7 @@ useProposalReview(sessionId, { phase, strokes }) → 39 個のプロパティ
 内部に持っているもの。
 
 - **HTTP エラーの解体**（`statusOf` / `reasonOf` / `messageOf`）。`$fetch` が投げる `FetchError` から statusCode・409 の理由・メッセージを取り出す3関数
-- **送信〜決着の追跡**（`pendingAction` と `watch`）。差し戻しと問い返しの2種類の送信が同じ待機機構を共有していて、決着時にどちらの後始末をするかを `pendingAction` で分岐している
+- **送信〜決着の追跡**（`pendingAction` と `watch`）。`pendingAction` は型が `'send-back' | null` だが `'send-back'` しか代入されず、**分岐先が1つしかない**。問い返しの待機が `useAgentQuestion` 側へ移り、2種類の送信が待機機構を共有する形が解消された名残（`replace-handrolled-with-libraries`）
 - **モーダル4種の開閉状態**（コメント / 全体コメント / 承認 / 問い返し）と、確認・警告
 - **プロジェクト名の下書き**。ユーザーが書いたら proposal 更新で消さない
 
