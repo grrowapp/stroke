@@ -1,6 +1,6 @@
 # ADR-0011: 承認の次の工程として steering 作成を自動で始める
 
-- **状態**: 採用
+- **状態**: archive（2026-08-29。全貌は [`docs/specs/plan/portal-stroke-exit.md`](../specs/plan/portal-stroke-exit.md) に確定。対応する節 — 自動開始の流れ:「承認ボタン → 一覧へ戻る」／ 起動の形と cwd:「起動は1系統」／ `--mcp-config` の与え方:「設定に足すもの」／ 完了判定とリトライ:「完了とリトライ」）
 - **日付**: 2026-08-25
 
 ## 決定

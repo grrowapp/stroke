@@ -1,5 +1,7 @@
 # 設定値はコードの既定値に優先する
 
+- **状態**: archive（取って代わられ済み。現行の全貌は [`docs/specs/core/settings-reference.md`](../specs/core/settings-reference.md) 冒頭の規定にある）
+
 > **この ADR は [0004](0004-settings-reference-is-authoritative.md) に取って代わられた。**
 > `NUXT_*` の環境変数は、置き場の2件（`NUXT_SESSIONS_ROOT` / `NUXT_PROJECTS_ROOT`）を除いて全廃した。「既定値をモジュールに置き、環境変数があればそれを優先する」という形は、もう設定の一般則ではない。以下は、そう決めていた時期の記録である。**判断の根拠に使わない。**
 

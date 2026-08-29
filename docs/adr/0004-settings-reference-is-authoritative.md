@@ -1,5 +1,7 @@
 # 設定は `docs/specs/core/settings-reference.md` を正とする
 
+- **状態**: archive（2026-08-29。全貌は [`docs/specs/core/settings-reference.md`](../specs/core/settings-reference.md) 冒頭の規定に確定 — 正の宣言・「ここに無いものは設定ではない」・改定は change 起こし＋ユーザー承認）
+
 > [0003](0003-settings-precedence.md)（設定値はコードの既定値に優先する）に取って代わる。`NUXT_*` の環境変数は、置き場の2件（`NUXT_SESSIONS_ROOT` / `NUXT_PROJECTS_ROOT`）を除いて全廃した。
 
 `docs/specs/core/settings-reference.md` が設定の**正**である。コードに書かれた値ではなく、この資料に載っている内容が、この製品の設定として定まったものを表す。

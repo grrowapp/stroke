@@ -141,7 +141,7 @@ store（`openspec store register`）への登録は**不要**。
 
 `yarn session`（CLI）もサーバと同じ設定を読む。`.env` があれば読み込み、無ければ既定で動く。
 
-> **注**: ポータル側の環境変数4件はこの流儀に未統合（settings-reference に載っていない）。
+> **注**: ポータル側の環境変数3件（上の表）はこの流儀に未統合（settings-reference に載っていない）。
 > 設定運用の一本化は `align-settings-conventions` の続きで扱う。
 
 ### 画面

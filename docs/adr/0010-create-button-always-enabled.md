@@ -1,6 +1,6 @@
 # ADR-0010: 「作成」ボタンは常に押せる
 
-- **状態**: 採用
+- **状態**: archive（2026-08-29。全貌は [`docs/specs/plan/portal-stroke-entrance.md`](../specs/plan/portal-stroke-entrance.md) に確定。対応する節 — 常に押せる・判定の一元化:「エラーの出方（前提が欠けていても押せる）」／project-directory への影響:「仕様（project-directory）の置き直し」）
 - **日付**: 2026-08-25
 
 ## 決定
