@@ -55,9 +55,19 @@ export interface PreviewSurface {
   /**
    * その本文のもとになった生テキスト。
    *
-   * **解析に渡したものと同じでなければならない。** `parseMarkdown` は CRLF を LF に潰し、
-   * front matter を落としてから解析するので、包みの持つ位置はその後の本文を基準にする
-   * （`test/app/components/workspace/markdown-fence-position.test.ts`）。
+   * **`parseMarkdown` が実際に解析した文字列でなければならない。** つまり CRLF を LF へ
+   * 潰し、front matter を落とした**後**の本文である。`parseMarkdown` はこの2つを呼ばれた
+   * 側で行うので（`@nuxtjs/mdc/dist/runtime/parser/index.js` の `md.replace(/\r\n/g, "\n")`
+   * と `parseFrontMatter`）、渡した生ファイルと位置の基準は同じにならない。
+   *
+   * **基準がずれていても、この口は `null` に倒れない。** 切り出しと描かれた字がたまたま
+   * 揃えば照合を素通りして、**黙って別の場所を返す**（`test/modules/markdown/runtime/
+   * position/edge-cases.test.ts` に CRLF と front matter の反例がある。CRLF では隣の段落を、
+   * front matter では front matter の中を指した）。多くの場合は `null` になるが、それは
+   * 偶然の副産物であって保証ではない。**揃えるのは呼ぶ側の責任である。**
+   *
+   * 本家の文書は人間も別のエージェントも書ける平文の md なので、CRLF も front matter も
+   * 現実に来る。「来ない前提」で済ませてよい入力ではない。
    */
   source: string;
 }
@@ -134,6 +144,8 @@ function readWrapperRange(element: Element, source: string): SourceRange | null 
  *
  * **長さの差を按分してはならない。** 差は記号のぶんであって、中の字に均されるものではない。
  * 按分すると、インラインコードの中を選んだときに1〜2文字ずれた位置を黙って返すことになる。
+ * どの記法で差が出るかの実測表は
+ * `test/modules/markdown/runtime/position/silent-failure.test.ts` にある。
  * そこで「中の字が範囲の中のどこに在るか」を探し、見つかった位置を頭に採る。記号は前後に
  * 同じ数だけ付く（`` ` `` も `` `` `` も、CommonMark が剥がす前後1つの空白も）ので中央を
  * 先に試し、外れたら前から探す。
@@ -206,10 +218,24 @@ function isClosingFence(line: string, open: FenceMarker): boolean {
 /**
  * 生テキストの中のフェンスを前から並べる。
  *
- * **フェンスの位置は DOM に出ていない。** `MDCRenderer` が受け側へ渡すのは `node.props` だけで
- * `node.position` は捨てられる（実測 @nuxtjs/mdc 0.23.1。`../render/source-shown.ts` の
- * `readFenceRange` の説明）。属性で届いていれば素直にそれを使うが、届かない面のために
- * ここで生テキストの側から候補を出す。
+ * **フェンスの位置が DOM に出ない `pre` が残っているので、これが要る。**
+ *
+ * 印は `../position/source-span.ts` が `pre` の props へ載せ、`MarkdownCode` の
+ * `v-bind="attrs"` から属性として出る。だから普段はここを通らない。通るのは
+ * **生テキストの先頭（offset 0）から始まるフェンス**、つまり文書がフェンスで始まる場合
+ * だけである。`@nuxtjs/mdc` は position を真偽で拾うので
+ * （`dist/runtime/parser/compiler.js` の
+ * `node.position?.start?.offset && node.position?.end?.offset ? … : void 0`）、
+ * `start.offset` が `0` のノードは position を落とす。position の無いノードに印は打てない
+ * （打てば「対応が取れない」を言えなくなる）ので、この `pre` は印を持ちようがない。
+ *
+ * front matter を落とした後の本文は区切りの改行が1つ残るため、front matter の直後の
+ * フェンスは offset 0 にならない。**印が落ちる条件はこの1つに尽きる。**
+ *
+ * **黙ってここへ落ちることはない。** 印が有れば `resolveFence` はその範囲しか試さず、
+ * 合わなければ `null` を返す（生テキストの側を探し直さない）。どちらの経路を通ったかは
+ * `pre` の印の有無だけで決まり、その境目は
+ * `test/modules/markdown/runtime/position/edge-cases.test.ts` が固定している。
  *
  * **これは候補を出すだけで、決めるのは `buildFenceMap` である。** 出した範囲と `pre` の中の
  * 字が桁まで合ったものだけを採るので、行の読み違いは対応表が作れないという形で落ちる。
@@ -360,7 +386,13 @@ export function createPreviewPositionPort({ container, source }: PreviewSurface)
     return map;
   };
 
-  /** フェンス1つを解く。位置が届いていなければ、`after` より後ろの候補を前から試す */
+  /**
+   * フェンス1つを解く。位置が届いていなければ、`after` より後ろの候補を前から試す。
+   *
+   * **経路は `pending.position` の有無で決まる。** 有れば印の経路（1つだけ試す）、無ければ
+   * 走査の経路（候補を前から試す）。印が有って合わないときに走査へ移ることはしない
+   * （`scanFencedBlocks` の説明）。
+   */
   const resolveFence = (pending: PendingFence, text: string, after: number): FenceMap | null => {
     const positions = pending.position
       ? [pending.position]

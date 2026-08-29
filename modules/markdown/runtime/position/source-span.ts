@@ -19,6 +19,11 @@
  * 残すのがここの仕事なので値はそのまま通すが、**包みの文字数を生テキストの文字数と
  * 見なす計算はできない**。走査する側でここを踏むこと。
  *
+ * **どの記法が記号を含むかは推測で決められない。** 記号を持つ記法を一通り実測した表が
+ * `test/modules/markdown/runtime/position/silent-failure.test.ts` にある（記号を含むのは
+ * インラインコードだけで、リンクも打ち消しも自動リンクも内側どうしで揃う）。記法を
+ * 増やすときは当たりを付けずにあの表へ足すこと。
+ *
  * **位置を持たない text ノードは包まない。** フェンス（コードブロック）の中の text ノードが
  * これに当たる（実測。`keepPosition` を付けても position が乗らない）。持っていない位置を
  * でっち上げると、口が「対応が取れない場合は null」を返せなくなる。包まないことで、
@@ -108,6 +113,14 @@ function markNode(node: MDCNode): MDCNode {
   //
   // 打つのは `pre` だけにする。すべての要素に打つと DOM が属性で膨れるうえ、
   // 位置が要るのは「中の text ノードが位置を持たない領域」だけである。
+  //
+  // **印を打てない `pre` が1つだけ残る。** `@nuxtjs/mdc` は position を真偽で拾うので
+  // （`dist/runtime/parser/compiler.js` の
+  // `node.position?.start?.offset && node.position?.end?.offset ? … : void 0`）、
+  // **生テキストの先頭（offset 0）から始まるノードは position を落とす**。文書がフェンスで
+  // 始まると、その `pre` がこれに当たる。持っていない位置をでっち上げないので印は付かず、
+  // 位置の口はそこだけ生テキストの走査で当てにいく（`./preview.ts` の `scanFencedBlocks`）。
+  // 実測は `test/modules/markdown/runtime/position/edge-cases.test.ts`。
   if (node.tag === FENCE_TAG && node.position !== undefined) {
     return {
       ...node,
