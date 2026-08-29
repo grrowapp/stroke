@@ -1,6 +1,6 @@
 # ADR-0009: プロジェクト一覧の「作成」はストロークの開始である
 
-- **状態**: 採用（2026-08-25 改訂: 入場の形をモーダルに変更）
+- **状態**: archive（2026-08-29。全貌は [`docs/specs/plan/portal-stroke-entrance.md`](../specs/plan/portal-stroke-entrance.md) に確定。対応する節 — 決定本体:「作成ボタン → 全面モーダルで最後まで」／開き方:「決定: ページ遷移で開く（design.md D1）」／project-directory への影響:「仕様（project-directory）の置き直し」。2026-08-25 改訂: 入場の形をモーダルに変更）
 - **日付**: 2026-08-25
 
 ## 決定

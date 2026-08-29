@@ -1,6 +1,8 @@
 # feature のワークフロー定義
 
-feature（実装のタスクに繋がる文書の組）の定義。stroke-board は文書を **feature** と**仕様書**（システムをドキュメントとして記述し続けるもの）の2レーンで扱い、本書は feature レーンの正である。
+feature（実装のタスクに繋がる文書の組）の定義。stroke-board は文書を **feature** と**仕様書**（システムをドキュメントとして記述し続けるもの）の2レーンで扱う。
+
+> **本書は正ではない。** feature レーンの正は [`docs/feature/overview.md`](../../feature/overview.md) であり、本書と食い違ったらあちらが勝つ。本書は承認前の草稿が残ったもので、構造の記述として参照する。
 
 確定の経緯は change `define-feature-workflow`（proposal・specs 4本・design を spec-workflow 上で承認済み、2026-08-26）。仕様書レーンは仮決めのみで、器は change `define-spec-document-workflow` にある。
 
@@ -11,8 +13,9 @@ feature（実装のタスクに繋がる文書の組）の定義。stroke-board 
   │ 作成。名前は `__` 規約でエンコード
   ▼
 openspec/changes/<change-id>/             ← change。必ず作られる（確定事項）。
-openspec/tickets/<spec名>.md              ← ticket。change が何を意図したものかの
-  │                                          簡単な概要。ファイル名は `__` 置換ルール
+openspec/tickets/<change名>.md            ← ticket。change が何を意図したものかの
+  │                                          簡単な概要。ファイル名は change 名
+  │                                          そのまま（`__` 置換は適用しない）
   ▼
 .spec-workflow/specs/<spec名>/            ← 器
   ├ proposal.md       （change の proposal に対応。本家は読まないが有っても害なし）
@@ -104,7 +107,7 @@ feature には**必ず対応する change が `openspec/changes/` に存在す�
 
 - feature の proposal / requirements / design / tasks は、change の成果物（proposal / spec / design / tasks）に対応する
 - feature の tasks 全完了の後、本家の archive を起点に requirements.md が change 内の delta（`specs/<階層パス>/spec.md`）へ戻り（戻す接合）、openspec 標準の sync → archive で締まる
-- change の中に作られる `.openspec.yaml` には概要の情報が入らない。そこで `openspec/tickets/` に独自の **ticket**（md）を置き、一番初めに change が何を意図したものかの簡単な概要を記す。ファイル名の表記は命名の置換ルールと合わせる（例: `openspec/tickets/api__session.md`）
+- change の中に作られる `.openspec.yaml` には概要の情報が入らない。そこで `openspec/tickets/` に独自の **ticket**（md）を置き、一番初めに change が何を意図したものかの簡単な概要を記す。ファイル名は change 名をそのまま使い `.md` を付ける（例: change `create-feature` → `openspec/tickets/create-feature.md`）。`__` 置換ルールは feature 名（spec 名）専用であり、ticket 名には適用しない
 - change の成果物と本家の器の中身を**どう同期させるか**は未決（[未決事項](#未決事項)）。どちらに転んでも、確定した仕様の置き場が `openspec/specs/` であることは変わらない
 
 ## 概念の対応

@@ -47,3 +47,15 @@ _Avoid_: 確定、OK、マージ
 **プロジェクト**:
 承認後に `/opt/projects/` 配下へ作られるトップレベルのディレクトリ。後に spec-workflow がプロジェクトルートとして受け取る場所であり、その内部構造は stroke-board-frontier が作るものではない。
 _Avoid_: リポジトリ、ワークスペース
+
+**product**:
+それ自体で1つの定義を成すもの。stroke-board は product であり、markdown-module も product である。product は他の product に含まれず、境界と公開する口を自分で持つ。
+_Avoid_: アプリ、パッケージ、ライブラリ
+
+**機能**:
+product が利用者に対してできること。「文書を編集できる」「却下できる」の単位で数える。押せる場所が増えることや、ラベル・開き方が変わることは機能の増減ではない。
+_Avoid_: フィーチャー、能力
+
+**module**:
+product に機能をアタッチする product。それ自体が定義の塊であり、アタッチする先の内部を知らない。markdown-module は markdown-editor の機能をアタッチする。
+_Avoid_: ライブラリ、プラグイン、部品
