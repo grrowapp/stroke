@@ -10,6 +10,9 @@
  * props を宣言せず `$attrs` で受けているのは、宣言すると属性として出なくなり、
  * 受け側（`MarkdownCode`）に shiki のクラスやハイライトの指定が届かなくなるため。
  *
+ * **フェンスの生テキストの範囲もここで受ける。** 図に生テキストを添えるかどうかの判断に要る
+ * （`./source-shown.ts`）。これも属性で届くので、同じ `$attrs` から読む。
+ *
  * **名前で引かれるので global に登録する。** MDC は map の値を `resolveComponent(名前)` で
  * 引く（`MDCRenderer.vue`）。名前が解けないと `<MarkdownPre>` という未知の要素がそのまま
  * 出る（実測）。以前は `app/components/global/` に置くことでこれを満たしていたが、
@@ -20,6 +23,7 @@ import { computed, useAttrs } from 'vue';
 
 import MarkdownCode from './MarkdownCode.vue';
 import MarkdownDiagram from './MarkdownDiagram.vue';
+import { readFenceRange, useSourceShown } from './source-shown';
 
 defineOptions({ inheritAttrs: false });
 
@@ -29,9 +33,25 @@ const attrs = useAttrs();
 const mermaid = computed<string | null>(() =>
   attrs.language === 'mermaid' && typeof attrs.code === 'string' ? attrs.code : null,
 );
+
+/**
+ * このフェンスが占める生テキストの範囲。**属性で届かなければ `null`。**
+ *
+ * 図に生テキストを添えるかどうかは、外から渡された範囲とこの範囲が重なるかで決まる
+ * （`./source-shown.ts`）。届かない場合は重なりを判断できないので、添えない側に倒る。
+ */
+const sourceRange = computed(() => readFenceRange(attrs));
+
+/** 注釈の付いた範囲がこのフェンスに重なるか。重なる図には生テキストを添える */
+const sourceShown = useSourceShown(sourceRange);
 </script>
 
 <template>
-  <MarkdownDiagram v-if="mermaid !== null" :code="mermaid" />
+  <MarkdownDiagram
+    v-if="mermaid !== null"
+    :code="mermaid"
+    :show-source="sourceShown"
+    :source-range="sourceRange"
+  />
   <MarkdownCode v-else v-bind="$attrs"><slot /></MarkdownCode>
 </template>

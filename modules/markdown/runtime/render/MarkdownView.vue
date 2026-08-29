@@ -28,6 +28,14 @@
  * 正確さ」ではなく「同じ生成物であること」で担保するため。`.markdown-content` を
  * 写して起きたずれ（h1 が 36px ではなく 16px になっていた等）を繰り返さない。
  */
+import { MDCRenderer } from '#components';
+import { provide } from 'vue';
+
+import { markSourcePosition } from '../position/source-span';
+import { SOURCE_SHOWN_KEY } from './source-shown';
+
+import type { SourceRange } from '../position/types';
+
 /**
  * `class` は呼ぶ側から足せる（余白など、置かれる場所の都合）。本文の型そのものは
  * ここが持ち、呼ぶ側で差し替えさせない。
@@ -49,9 +57,26 @@ const props = withDefaults(
      * 枠と余白が二重になる。
      */
     surface?: boolean;
+    /**
+     * 図のもとになった生テキストを添えたい範囲。
+     *
+     * **モジュールは注釈を知らない。** 注釈が付いているかどうかではなく、
+     * 「ソースを見せたい生テキストの範囲」として受け取る。注釈を持つ側が、注釈の
+     * 付いている範囲を渡す。モジュールはそれが図のフェンスと重なるかだけを見る
+     * （`openspec/specs/markdown/module`）。
+     */
+    sourceShown?: readonly SourceRange[];
   }>(),
-  { testid: 'document-content', surface: true },
+  { testid: 'document-content', surface: true, sourceShown: () => [] },
 );
+
+/**
+ * 図の受け口（`MarkdownFence` → `MarkdownDiagram`）へ降ろす。
+ *
+ * **props では届かない。** MDC は `components.map` の値を `resolveComponent` で引いて
+ * `MarkdownFence` を自分で作るので、本文の器から props を渡す経路が無い。
+ */
+provide(SOURCE_SHOWN_KEY, () => props.sourceShown);
 </script>
 
 <template>
@@ -67,7 +92,41 @@ const props = withDefaults(
     :class="props.surface ? 'sb-markdown' : ''"
     :data-testid="props.testid"
   >
-    <MDC :value="props.value" />
+    <!--
+      `keepPosition` は解析の設定なので `parser-options` で渡す。module の設定
+      （`ModuleOptions`）には無い（`dist/module.d.mts` の 63行目が `MDCParseOptions`、
+      126行目が `ModuleOptions`。module 側に書くと TS2353 で落ちる）。
+
+      これで AST の各ノードに生テキストの文字オフセットが乗り、位置の口が成り立つ
+      （`openspec/specs/markdown/module`）。
+
+      **ただし `<MDC>` に描かせきると位置は DOM に出ない。** `<MDC>` の既定の中身は
+      `MDCRenderer` を呼ぶだけで、`MDCRenderer` は text ノードを `h(Text, node.value)` で
+      描いて position を捨てる（`@nuxtjs/mdc/dist/runtime/components/MDCRenderer.vue:136`。
+      割り込む口は無い）。位置の口（`../position/types.ts`）は DOM から位置を引くものなので
+      それでは成り立たない。
+
+      そこで**既定の中身だけを差し替える**。解析（`parseMarkdown` の呼び出し・
+      `useAsyncData` による payload の受け渡し・待つ位置）は `<MDC>` に残したまま、
+      渡ってきた AST を `markSourcePosition` に通してから同じ `MDCRenderer` へ送る。
+      `tag` と `class` は `<MDC>` が既定で `MDCRenderer` に渡している値をそのまま置く。
+
+      **自前で `parseMarkdown` を呼び直す形にはしない。** 一度そう書いたところ、
+      client 側で解析がもう一度走って SSR と shiki の色が食い違い、hydration mismatch に
+      なった（Vue が全体を描き直し、アイコンが消えた。実測）。解析の段は触らないこと。
+    -->
+    <MDC :value="props.value" :parser-options="{ keepPosition: true }">
+      <template #default="{ body, data }">
+        <MDCRenderer
+          v-if="body"
+          tag="div"
+          :class="''"
+          :body="markSourcePosition(body)"
+          :data="data"
+          :unwrap="false"
+        />
+      </template>
+    </MDC>
   </div>
   <slot v-else name="empty" />
 </template>

@@ -59,6 +59,19 @@ export default defineNuxtModule({
       // 既定では h2〜h4 に自動でアンカーリンクが付き、本家の文書表示と別物になるので切る
       headings: { anchorLinks: false },
 
+      // **`keepPosition` はここに置けない。** あれは `parseMarkdown` に渡す
+      // `MDCParseOptions` のオプションであって、module の `ModuleOptions` ではない
+      // （`dist/module.d.mts` の 63行目と 126行目。ここに書くと TS2353 で落ちる）。
+      // `<MDC>` の `parser-options` から渡す（`MarkdownView.vue`）。
+      //
+      // **解析そのものを自前で組み直してはならない。** `<MDC>` の `useAsyncData` +
+      // `parseMarkdown` を写して置き換えたところ、クライアントが再解析して shiki が
+      // SSR と違う色を出し、ハイドレーションがずれて**アプリ全体のアイコンが消えた**
+      // （実測。markdown の本文には症状が出ず、全画面のピクセル差分で見つかった）。
+      // 位置を運ぶ手当ては `<MDC>` のスロットの中だけで行う。
+      //
+      // 位置の口の実装は `runtime/position/` が持つ。
+
       // **生 HTML は描かない。** MDC の既定サニタイズは属性しか落とさず、`<img>` や
       // `<script>` はタグとして残る。`rehype-raw` を切ると生 HTML が要素にならず、
       // 文書側の HTML が描かれる経路そのものが無くなる。
