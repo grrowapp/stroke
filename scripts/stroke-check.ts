@@ -8,6 +8,7 @@ import { promisify } from 'node:util'
 import { chromium, type Browser, type Locator, type Page } from '@playwright/test'
 
 import nuxtConfig from '../nuxt.config'
+import { parseStrokeConfig } from '../server/utils/stroke/config'
 
 /**
  * ストロークが着地するかを、**動いている dev サーバーへブラウザで当てて**確かめる
@@ -38,19 +39,32 @@ const execFileAsync = promisify(execFile)
 const PORT = nuxtConfig.devServer?.port ?? 3399
 const BASE = `http://127.0.0.1:${PORT}`
 
-/** セッションの置き場と、claude の生出力の書き出し先。設定が正（nuxt.config.ts） */
-const claude = nuxtConfig.runtimeConfig?.claude as { debugLogDir?: string } | undefined
-const PROJECTS_ROOT = String(nuxtConfig.runtimeConfig?.projectShareRoot ?? '/opt/projects')
-const DEBUG_LOG_DIR = claude?.debugLogDir ?? ''
+/**
+ * ここが道具側の**設定を引く端**である。`session.ts` と同じく `nuxt.config.ts` を
+ * import して zod を通す（docs/specs/core/settings-reference.md）。
+ *
+ * **`??` で既定値を書かない。** 書けば `180000` や `2` の実体が
+ * `nuxt.config.ts` 以外のソースファイルにも現れ、「値の実体をこの2つ以外のソース
+ * ファイルに置かない」（同資料）を破る。キーが欠けていれば `parseStrokeConfig` が
+ * 例外で落ちる——黙って別の値で走るより落ちるほうがよい。
+ */
+const { projectShareRoot, claude } = parseStrokeConfig(nuxtConfig.runtimeConfig)
+
+const PROJECTS_ROOT = projectShareRoot
+const DEBUG_LOG_DIR = claude.debugLogDir
+
+/** claude 側の打ち切りが最も長くなる場合。刻みは起こし直しの回数だけ乗る（設定が正） */
+const LONGEST_CLAUDE_TIMEOUT_MS
+  = claude.timeoutMs + claude.timeoutStepMs * claude.maxRetries
 
 /**
  * 1往復あたりの待ちの上限。
  *
- * claude 側の打ち切り（`CLAUDE_TIMEOUT_MS` = 3分）より短くしない。短いと、まだ動いている
- * 実行を待たずに諦めることになる。少し長めに取って、claude が自分で打ち切ったあとの
- * 表示まで見届ける。
+ * claude 側の打ち切り（`claude.timeoutMs` + `claude.timeoutStepMs` × 起こし直しの回数）
+ * より短くしない。短いと、まだ動いている実行を待たずに諦めることになる。1分だけ長めに
+ * 取って、claude が自分で打ち切ったあとの表示まで見届ける。
  */
-const ROUND_TIMEOUT_MS = 4 * 60 * 1000
+const ROUND_TIMEOUT_MS = LONGEST_CLAUDE_TIMEOUT_MS + 60 * 1000
 
 /**
  * 変化が無いまま待ち続けたときに、画面を取り直す間隔。

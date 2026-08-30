@@ -22,6 +22,10 @@ export interface AiRun {
   maxRetries: number
   /** これまでに起こし直した回数。`state.json` 側が持つ */
   retries: number
+  /** 起こし直していない起動を打ち切るまでの時間。`runtimeConfig.claude.timeoutMs` */
+  timeoutMs: number
+  /** 起こし直し1回ぶんの刻み。`0` なら伸ばさない。`runtimeConfig.claude.timeoutStepMs` */
+  timeoutStepMs: number
   /**
    * 会話の続け先。**あるかどうかが初回/継続の判定そのものである。**
    *
@@ -72,7 +76,7 @@ export interface AiRun {
  */
 export async function invokeAi(sessionId: string, run: AiRun): Promise<void> {
   const {
-    launch, cwd, debugLogDir, prompts, maxRetries, retries,
+    launch, cwd, debugLogDir, prompts, maxRetries, retries, timeoutMs, timeoutStepMs,
     conversationId, hasConversation, setInvocation, remember, prepare, didWork,
   } = run
 
@@ -84,6 +88,15 @@ export async function invokeAi(sessionId: string, run: AiRun): Promise<void> {
     await setInvocation('error')
     return
   }
+
+  // 打ち切りまでの長さは**上限判定と同じ `retries`** から決める。初回のキックは 0 なので
+  // 刻みが乗らず、`timeoutMs` そのものになる。ここで `retries + 1` を見ると初回から
+  // 伸びてしまうので、上限判定の隣に置いて解釈を1箇所に閉じている
+  // （openspec/specs/agent/invocation・design.md Decision 2）。
+  //
+  // 伸びるのはひと続きの起こし直しの中だけである。完了とユーザーの再実行が `retries` を
+  // 0 に戻すので、次の連なりは再び `timeoutMs` から始まる。
+  const timeout = timeoutMs + timeoutStepMs * retries
 
   await setInvocation('running', retries + 1)
 
@@ -107,7 +120,7 @@ export async function invokeAi(sessionId: string, run: AiRun): Promise<void> {
   // **1回の呼び出しで起こすのは1回だけである。** 起こし直しは巡回（`failed` を拾って
   // U13 を叩く）が担い、回数は `state.json` が持つ。ここで内側にもループを持つと、
   // 巡回の回数と掛け算になって総起動回数が上限の意味から外れる。
-  const result = await runClaude({ sessionId: conversationId, launch, cwd, prompt, mode, debugLogDir })
+  const result = await runClaude({ sessionId: conversationId, launch, cwd, prompt, mode, debugLogDir, timeoutMs: timeout })
 
   if (result.ok) {
     // 会話 id は作業の成否に関わらず覚える。次のキックはこの続きから始める。

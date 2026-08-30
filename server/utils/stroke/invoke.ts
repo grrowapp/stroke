@@ -124,6 +124,8 @@ export function buildRun(options: {
       prompts: { first: claude.steeringPrompt, continue: claude.steeringPrompt },
       maxRetries: claude.maxRetries,
       retries,
+      timeoutMs: claude.timeoutMs,
+      timeoutStepMs: claude.timeoutStepMs,
       // 会話 id は自前採番しない。対象のディレクトリ名はプロジェクト名で uuid ではなく、
       // `--session-id` は uuid しか受け付けない（実測）。初回は claude に採番させる
       conversationId: runId,
@@ -152,6 +154,8 @@ export function buildRun(options: {
     prompts: { first: claude.firstPrompt, continue: claude.continuePrompt },
     maxRetries: claude.maxRetries,
     retries,
+    timeoutMs: claude.timeoutMs,
+    timeoutStepMs: claude.timeoutStepMs,
     // ストロークは uuid を自前採番して使う。スキルが `${CLAUDE_SESSION_ID}` でセッション
     // id を知る前提（docs/specs/architecture/session-workflow.md）に効いている
     conversationId: sessionId,

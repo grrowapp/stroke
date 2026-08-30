@@ -38,6 +38,8 @@ const { projectShareRoot, claude } = config.runtimeConfig
 | `claude.continuePrompt` | 続きを促す1文 |
 | `claude.steeringPrompt` | `/write-steering-v2` ＋ 固定指示 |
 | `claude.maxRetries` | `2` |
+| `claude.timeoutMs` | `180000` |
+| `claude.timeoutStepMs` | `0` |
 | `claude.debugLogDir` | （空 = 無効） |
 | `openspec.bin` | `openspec` |
 | `openspec.initArgs` | `init --tools none` |
@@ -81,9 +83,32 @@ const { projectShareRoot, claude } = config.runtimeConfig
 
 失敗した実行を**起こし直す**回数の上限。初回のキックは起こし直しではないので数えない。上限を超えたキックは起動せず `invocation` を `error`（終端）にする（`openspec/specs/agent/invocation`）。
 
-1回の呼び出しで起こすのは1回だけで、起こし直しは巡回が担う。したがって起動の総回数は「上限 + 1」、総待ち時間は「(上限 + 1) × タイムアウト」で決まる。`0` にすると起こし直さない（1回だけ試す）。
+1回の呼び出しで起こすのは1回だけで、起こし直しは巡回が担う。したがって起動の総回数は「上限 + 1」で決まる。`0` にすると起こし直さない（1回だけ試す）。
 
-タイムアウトは10分（設定ではない。`server/utils/stroke/claude.ts`）なので、既定の `2` では最大30分で `error` に達する。
+総待ち時間は下の2件と合わせて決まる。起動ごとのタイムアウトが刻みで伸びるため、単純な掛け算にはならない。
+
+```
+総待ち時間 = (上限 + 1) × timeoutMs + timeoutStepMs × (0 + 1 + … + 上限)
+```
+
+既定（`maxRetries: 2` / `timeoutMs: 180000` / `timeoutStepMs: 0`）では 3分 × 3 = **9分**で `error` に達する。
+
+> **この式は「起動の総回数は上限 + 1」を前提にしているが、実測がその前提と食い違っている。** `timeoutMs` / `timeoutStepMs` をどちらも 5000 にして必ず時間切れさせたところ、`error` に達するまでに起きた `claude` は**2回**だった（実測 2026-08-30）。前提が崩れていれば総待ち時間は式より短くなる。切り分けは change `fix-retry-count-without-launch` で行う。**確定するまでこの数値を鵜呑みにしないこと。**
+
+### `claude.timeoutMs` ・ `claude.timeoutStepMs`
+
+1回の起動を打ち切るまでの時間。`timeoutMs` が基準の長さ、`timeoutStepMs` は起こし直し1回ぶんの刻みである。
+
+```
+その起動のタイムアウト = timeoutMs + timeoutStepMs × これまでに起こし直した回数
+```
+
+- 打ち切られた呼び出しは `failed` になり、起こし直しは巡回が担う（`openspec/specs/agent/invocation`）
+- 参照する回数は `claude.maxRetries` の判定が見るものと同じ値である。**初回のキックは 0** なので、初回は必ず `timeoutMs` そのものになる
+- **既定の `timeoutStepMs: 0` は「伸ばさない」。** どの起動も `timeoutMs` で打ち切られる
+- 伸びるのはひと続きの起こし直しの中だけである。完了（`idle`）でも、`error` の後のユーザーの再実行でも回数は 0 に戻り、タイムアウトも `timeoutMs` へ戻る。前の連なりで伸びた長さは持ち越さない
+
+`timeoutMs` の既定 `180000`（3分）は実測から置いた値である。180秒では初回が必ず時間切れになり10分へ延ばしたが（実測 2026-08-25。当時は claude がスキルをロードし `!` フェンスの中で curl を往復させて概要を取っていた）、操作が MCP ツールへ移って所要が大きく減ったので3分へ戻した（実測 2026-08-28: 8回の呼び出しで 28.5〜64.7 秒、turns は 4〜15）。
 
 ### `claude.debugLogDir`
 
@@ -145,12 +170,12 @@ const { projectShareRoot, claude } = config.runtimeConfig
 |---|---|
 | セッションディレクトリ内のファイル名（`state.json` ほか） | `server/utils/stroke/session-core.ts` |
 | openspec ルートの名前（`openspec` / `config.yaml`） | `server/utils/stroke/openspec.ts` |
-| 子プロセスのタイムアウトと打ち切りシグナル | `server/utils/stroke/claude.ts` |
+| 子プロセスを打ち切るシグナル（`SIGKILL`） | `server/utils/stroke/claude.ts` |
 | 継続先が無いときに `claude` が出す文言 | `server/utils/stroke/claude.ts` |
 | 子プロセスへ接続先を渡す環境変数の名前（`STROKE_BASEURL`） | `server/utils/stroke/claude.ts` |
 | プロジェクト名として許す文字 | `server/utils/stroke/project.ts` |
 | 対象の id として受け付ける形 | `server/utils/stroke/session-core.ts` |
-| 失敗した実行を起こし直す巡回の間隔 | `server/plugins/02.retry-failed.ts` |
+| 失敗した実行を起こし直す巡回の間隔 | `server/plugins/01.retry-failed.ts` |
 | ログの接頭辞 | `server/utils/stroke/log.ts` |
 
 `STROKE_BASEURL` は**こちらが読む設定ではなく、子プロセスへ渡す名前**である。セッション API スキルがこの名前で接続先を読む。

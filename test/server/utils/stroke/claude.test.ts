@@ -16,6 +16,9 @@ import { runClaude, type ClaudeLaunch } from '../../../../server/utils/stroke/cl
 
 const SESSION_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
 
+/** 打ち切りに掛からない長さ。長さそのものを見るテストは別に持つ */
+const TIMEOUT_MS = 30000
+
 /** 成功エンベロープを stdout に出して 0 で終わる子プロセス。 */
 const ENVELOPE = JSON.stringify({
   type: 'result',
@@ -80,6 +83,7 @@ describe('runClaude のデバッグログ', () => {
       cwd: dir,
       prompt: 'PROMPT',
       mode: 'new',
+      timeoutMs: TIMEOUT_MS,
     })
 
     expect(result.ok).toBe(true)
@@ -98,6 +102,7 @@ describe('runClaude のデバッグログ', () => {
       prompt: 'PROMPT',
       mode: 'new' as const,
       debugLogDir: logDir,
+      timeoutMs: TIMEOUT_MS,
     }
 
     expect((await runClaude(options)).ok).toBe(true)
@@ -132,6 +137,7 @@ describe('runClaude のデバッグログ', () => {
       prompt: 'PROMPT',
       mode: 'resume',
       debugLogDir: logDir,
+      timeoutMs: TIMEOUT_MS,
     })
 
     expect(result.ok).toBe(false)
@@ -151,7 +157,7 @@ describe('runClaude のデバッグログ', () => {
 
     await runClaude({
       sessionId: SESSION_ID, launch: echoArgs, cwd: dir, prompt: 'PROMPT', mode: 'new',
-      debugLogDir: logDir,
+      debugLogDir: logDir, timeoutMs: TIMEOUT_MS,
     })
 
     const names = await waitForFiles(logDir, 1)
@@ -173,6 +179,7 @@ describe('runClaude のデバッグログ', () => {
 
     const result = await runClaude({
       sessionId: SESSION_ID, launch: echoArgs, cwd: dir, prompt: 'PROMPT', mode: 'new',
+      timeoutMs: TIMEOUT_MS,
     })
 
     expect(result.ok).toBe(true)
@@ -196,6 +203,7 @@ describe('runClaude のデバッグログ', () => {
       prompt: 'PROMPT',
       mode: 'new',
       debugLogDir: blocked,
+      timeoutMs: TIMEOUT_MS,
     })
 
     expect(result).toEqual({ ok: true, sessionId: SESSION_ID })
@@ -205,5 +213,45 @@ describe('runClaude のデバッグログ', () => {
     expect(warn).toHaveBeenCalledOnce()
     expect(String(warn.mock.calls[0]![0])).toContain('デバッグログを書けない')
     expect(await readFile(blocked, 'utf8')).toBe('occupied')
+  })
+})
+
+/**
+ * 打ち切り（openspec/specs/agent/invocation「タイムアウトで failed に変える」）。
+ * 長さは設定から決まり、算出は呼び出し側（invokeAi）が行う。ここで見るのは
+ * **渡された値がそのまま効くこと**だけである。
+ */
+describe('runClaude の打ち切り', () => {
+  it('渡した時間で打ち切り、その値を detail に載せる', async () => {
+    const dir = await tempDir()
+    // 何も出さずに居座る子プロセス。放っておけば終わらない
+    const hang = launchThat('setTimeout(() => {}, 60000)')
+
+    const result = await runClaude({
+      sessionId: SESSION_ID,
+      launch: hang,
+      cwd: dir,
+      prompt: 'PROMPT',
+      mode: 'new',
+      timeoutMs: 300,
+    })
+
+    expect(result.ok).toBe(false)
+    expect(result).toEqual({ ok: false, sessionMissing: false, detail: 'タイムアウト (300ms)' })
+  })
+
+  it('渡した時間より早く終われば打ち切らない', async () => {
+    const dir = await tempDir()
+
+    const result = await runClaude({
+      sessionId: SESSION_ID,
+      launch: SUCCESS_LAUNCH,
+      cwd: dir,
+      prompt: 'PROMPT',
+      mode: 'new',
+      timeoutMs: TIMEOUT_MS,
+    })
+
+    expect(result).toEqual({ ok: true, sessionId: SESSION_ID })
   })
 })

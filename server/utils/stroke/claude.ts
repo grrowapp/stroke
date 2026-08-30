@@ -4,23 +4,7 @@ import { join } from 'node:path'
 import { LOG_PREFIX } from './log'
 import { isSafeSegment } from './session-core'
 
-/**
- * 子プロセスを打ち切るまでの待ち時間。超えたらリトライ経路へ流す。
- * 起動後この時間内に endpoint への提出が無ければ、その呼び出しは失敗として扱う
- * （openspec/specs/agent/invocation）。設定ではない
- * （docs/specs/core/settings-reference.md）。
- *
- * **3分。**
- *
- * かつて 180 秒では初回が必ず時間切れになり 10 分へ延ばした（実測 2026-08-25）。当時は
- * claude がスキルをロードし、`!` フェンスの中で curl を往復させて概要を取っていた。
- *
- * 操作が MCP ツールへ移って所要が大きく減ったので 3 分へ戻す（実測 2026-08-28: 8回の
- * 呼び出しで 28.5〜64.7 秒、turns は 4〜15。最大でも 3 分の半分以下）。
- */
-export const CLAUDE_TIMEOUT_MS = 180000
-
-/** 打ち切るときに送るシグナル。 */
+/** 打ち切るときに送るシグナル。設定ではない（docs/specs/core/settings-reference.md）。 */
 const CLAUDE_TIMEOUT_SIGNAL = 'SIGKILL' as const
 
 /**
@@ -69,6 +53,16 @@ export interface ClaudeRunOptions {
   /** prompt。`--` の後ろに位置引数として渡す */
   prompt: string
   mode: ClaudeMode
+  /**
+   * この起動を打ち切るまでの待ち時間。超えたら `SIGKILL` を送り、失敗として返す
+   * （openspec/specs/agent/invocation「タイムアウトで failed に変える」）。
+   *
+   * **既定値を持たない。** 長さは設定から決まり（`claude.timeoutMs` /
+   * `claude.timeoutStepMs`）、起こし直した回数を知っている呼び出し側が算出して渡す。
+   * ここで既定を持つと、資料に無い設定値が core 側に戻る
+   * （docs/specs/core/settings-reference.md・ADR 0004）。
+   */
+  timeoutMs: number
   /**
    * 呼び出しの生出力（stdout 全文）を書き残すディレクトリ。省けば書かない。
    *
@@ -149,7 +143,7 @@ export async function runClaude(options: ClaudeRunOptions): Promise<ClaudeRunRes
     const timer = setTimeout(() => {
       timedOut = true
       child.kill(CLAUDE_TIMEOUT_SIGNAL)
-    }, CLAUDE_TIMEOUT_MS)
+    }, options.timeoutMs)
 
     const finish = (result: ClaudeRunResult): void => {
       if (settled) return
@@ -211,7 +205,7 @@ export async function runClaude(options: ClaudeRunOptions): Promise<ClaudeRunRes
         )
       }
       if (timedOut) {
-        finish({ ok: false, sessionMissing: false, detail: `タイムアウト (${CLAUDE_TIMEOUT_MS}ms)` })
+        finish({ ok: false, sessionMissing: false, detail: `タイムアウト (${options.timeoutMs}ms)` })
         return
       }
       const missing = `${stderr}${stdout}`.includes(CLAUDE_SESSION_MISSING_MESSAGE)
