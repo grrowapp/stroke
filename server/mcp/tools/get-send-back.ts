@@ -4,7 +4,7 @@ import { defineStrokeTool } from '../../utils/mcp/define-tool'
 import type { SendBackPayload } from '#shared/stroke'
 import { resolveConnection } from '../../utils/mcp/connection-table'
 import { readFetchFailure } from '../../utils/mcp/fetch-failure'
-import { requireConnectionSessionId } from '../../utils/mcp/require-connection'
+import { resolveConnectionSessionId } from '../../utils/mcp/require-connection'
 
 /**
  * A4 への代行。specs `mcp/tools/send-back`。
@@ -17,8 +17,23 @@ import { requireConnectionSessionId } from '../../utils/mcp/require-connection'
  * `corrupt()`、`session-store.ts`）は文言が一致しないため、素通しすると誤って
  * `no_send_back` にフォールバックしてしまう（santa-method レビュー指摘）。404 以外は
  * `unexpected_status` とする。
+ *
+ * **404 の中でも、既知の2文言のどちらでもないものは `no_send_back` に寄せない。**
+ * ルート不一致などの見覚えのない 404 まで「差し戻しはまだ無い」に畳むと、受け手は
+ * 存在しない原因を直そうとする（specs `mcp/server`「契約に載せた状況へ無理に寄せては
+ * ならない」MUST NOT。santa-method レビュー指摘 5周目 2026-08-30）。get-overview.ts と
+ * 同じ形にしてある。
+ *
+ * 成功の `status` は A4 の実際の応答をそのまま持つ。そのために `$fetch.raw` を使う
+ * ——理由は get-overview.ts と同じ（santa-method レビュー指摘 4周目 2026-08-30）。
  */
-const SESSION_NOT_FOUND_MESSAGE = 'そのセッションは無い。'
+// プロトタイプを持たせない理由は get-overview.ts と同じ（santa-method レビュー指摘 6周目）
+const ERROR_CODE_BY_404_MESSAGE: Record<string, string> = Object.assign(Object.create(null), {
+  // `server/utils/stroke/session-param.ts` の `requireSessionId`
+  'そのセッションは無い。': 'session_not_found',
+  // `server/api/strokes/[id]/send-back.get.ts`
+  '差し戻しはまだ無い。': 'no_send_back',
+})
 
 export default defineStrokeTool({
   description: '差し戻し（ユーザーが proposal を承認せず修正を求めて返した指摘一式）を取得する',
@@ -33,19 +48,36 @@ export default defineStrokeTool({
     error: z.string().optional(),
   },
   handler: async (_args, extra) => {
-    const sessionId = requireConnectionSessionId(resolveConnection(extra.requestInfo?.headers ?? {}))
+    // token の欠落・不一致も throw せず平坦なエラーで返す（理由は `connection-table.ts`）。
+    const resolved = resolveConnection(extra.requestInfo?.headers ?? {})
+    if (!resolved.ok) {
+      return { status: resolved.status, errorCode: resolved.errorCode, error: resolved.error }
+    }
+
+    // 工程の食い違いは throw せず平坦なエラーで返す（理由は `require-connection.ts`）。
+    const connected = resolveConnectionSessionId(resolved.context)
+    if (!connected.ok) {
+      return { status: connected.status, errorCode: connected.errorCode, error: connected.error }
+    }
 
     try {
-      const payload = await $fetch<SendBackPayload>(
-        `/api/strokes/${encodeURIComponent(sessionId)}/send-back`,
+      const response = await $fetch.raw<SendBackPayload>(
+        `/api/strokes/${encodeURIComponent(connected.sessionId)}/send-back`,
       )
-      return { status: 200, ...payload }
+      // **`status` を後ろに置く。** 前に置くと、A4 の本文に `status` が入っていたとき
+      // スプレッドが自分の `status` を潰す。潰れた値が数値でなければ `outputSchema` の
+      // 検証に落ち、`status` を持たない `isError` テキストになる——`mcp/server` の
+      // 「常に `status` を持つ」は無条件（santa-method レビュー指摘 7周目 2026-08-30）。
+      // いまの A4 の本文は `sendBackBody` で検証済みで `status` を持たないが、代行先の
+      // 本文の形に不変条件を預けない
+      return { ...response._data, status: response.status }
     } catch (error) {
       const failure = readFetchFailure(error)
       if (failure.status !== 404) {
         return { status: failure.status, errorCode: 'unexpected_status', error: failure.message }
       }
-      const errorCode = failure.message === SESSION_NOT_FOUND_MESSAGE ? 'session_not_found' : 'no_send_back'
+      // 見覚えのない 404 は `no_send_back` に寄せず `unexpected_status`（理由は冒頭）。
+      const errorCode = ERROR_CODE_BY_404_MESSAGE[failure.message] ?? 'unexpected_status'
       return { status: 404, errorCode, error: failure.message }
     }
   },

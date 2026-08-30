@@ -41,9 +41,14 @@ export interface ClaudeRunOptions {
    * `mode: 'new'` で**省けば claude が自分で採番する**。その値は output stream の
    * `session_id` として返るので、続きが要る用途はそれを覚えて次に渡す。
    *
-   * ストロークは自前採番の uuid を渡す。スキルが `${CLAUDE_SESSION_ID}` でセッション id を
-   * 知る前提（docs/specs/architecture/session-workflow.md の実測記録）に効いているため、
-   * ここを claude 任せにできない。
+   * ストロークは自前採番の uuid を渡す。**続きを開くのに要るからである**——次の起動が
+   * `--resume <id>` で同じ会話へ戻るには、こちら側が id を決めて覚えているしかなく、
+   * claude 任せにすると初回の採番を受け取るまで続き先が定まらない。
+   *
+   * 以前ここに書いていた「スキルが `${CLAUDE_SESSION_ID}` でセッション id を知る前提」は
+   * **もう読み手が居ない**（下の `STROKE_BASEURL` の注記と同じ事情）。セッション id が
+   * 子へ届くのは、呼び出し側が `--mcp-config` に載せる接続表の token（`x-stroke-token`）
+   * の方である（santa-method レビュー指摘 7周目 2026-08-30）。
    */
   sessionId?: string
   /** 起動定義。呼び出し側が設定から引いて渡す */
@@ -124,8 +129,13 @@ export async function runClaude(options: ClaudeRunOptions): Promise<ClaudeRunRes
   ]
 
   return await new Promise<ClaudeRunResult>((resolve) => {
-    // 接続先は prompt に載せず環境変数で渡す（design.md 決定7）。セッション API スキルは
-    // フェンスの事前実行から `printenv` でこの値を読む。
+    // 接続先は prompt に載せず環境変数で渡す（design.md 決定7）。
+    //
+    // **いまこの環境変数を読む者は居ない。** 読んでいた `assets/.claude/skills/` の
+    // セッション API スキルは provide-operations-via-mcp tasks 4.9 で `--add-dir` から
+    // 外れ、`printenv` も `--allowedTools` から落ちた。接続先が実際に子へ届くのは、
+    // 呼び出し側が同じ `apiBaseUrl` から組み立てる `--mcp-config` の url の方である
+    // （`server/utils/stroke/invoke.ts`）。渡すのをやめる判断は本 change の範囲外。
     const child = spawn(launch.command, args, {
       cwd: options.cwd,
       stdio: ['ignore', 'pipe', 'pipe'],

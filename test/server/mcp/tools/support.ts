@@ -1,5 +1,26 @@
 import { createFetchError } from 'ofetch';
 import { expect, vi } from 'vitest';
+import { z, type ZodRawShape } from 'zod';
+
+/**
+ * ツール定義の `inputSchema` が、引数を1つも渡さない呼び出しを通すか。
+ *
+ * MCP SDK は `inputSchema` を**ハンドラより前に**検証し、通らなければ
+ * `McpError(InvalidParams)` を投げる（`@modelcontextprotocol/sdk/dist/esm/server/mcp.js`:
+ * 125 行で `validateToolInput` を呼び、その中の 174-178 行で `safeParseAsync` の失敗を
+ * 投げる。ハンドラを呼ぶのは 126 行）。モジュールの try/catch はハンドラの内側しか
+ * 覆わない（`@nuxtjs/mcp-toolkit/dist/runtime/server/mcp/definitions/tools.js` 36-44 行）
+ * ので、必須項目を欠いた呼び出しは `status` も `errorCode` も持たない結果になり、
+ * specs `mcp/server` の平坦形式の SHALL（無条件）を破る。
+ *
+ * ハンドラを直に呼ぶテストはこの段を素通りしてしまうため、ここだけは SDK と同じ手順
+ * （`z.object(inputSchema).safeParse(args)`）で検証そのものを確かめる。
+ */
+export function acceptsEmptyArgs(inputSchema: ZodRawShape | undefined): boolean {
+  // `inputSchema` を持たないツールは事前検証そのものが走らない（mcp.js 167-169 行）
+  if (inputSchema === undefined) return true;
+  return z.object(inputSchema).safeParse({}).success;
+}
 
 /**
  * ツールの結果から `structuredContent` を取り出す。取り出す前に、包まれていること自体を

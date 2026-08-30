@@ -2,7 +2,19 @@ import { defineNuxtConfig } from 'nuxt/config';
 
 import { sbIcons, upstreamIcons } from './app/assets/icons';
 
-/** ADR 0001: ここを外すとスキルが一切ロードされない。 */
+/**
+ * ADR 0001 がスキルのロードに要ると定めた値。**ただし、いまはロードされるスキルが0本である。**
+ *
+ * `--add-dir` を丸ごと外した（下の args の注記）ので、project 設定の探索先はセッションの
+ * cwd（`/opt/projects/<uuid>`）だけになった。そこに `.claude/` は無いので、スキルも
+ * プロジェクト設定もロードされない——実測（2026-08-30・変更後の実行ログ3本）でも `Skill`
+ * の呼び出しは0回、`permission_denials` はすべて空で、`project` を残しても外しても結果は
+ * 変わらない。下の「`Skill` は空振りする」の注記と同じ状態を指している。
+ *
+ * それでも値は残し、`server/utils/readiness.ts` の起動時チェックで不在を落とし続ける。
+ * 案内スキルを配り直したときに要る守りであり、外す判断は本 change の範囲外である
+ * （santa-method レビュー指摘 7周目 2026-08-30）。
+ */
 const SETTING_SOURCES_REQUIRED = 'project';
 
 export default defineNuxtConfig({
@@ -232,26 +244,39 @@ export default defineNuxtConfig({
       // 起動定義。`.mcp.json` の command / args の記述形式に倣い、分解済みの配列
       // そのものを持つ（空白区切りの文字列を後から割らない）。
       //
-      // `--add-dir` に渡すのはリポジトリのルートで、`.claude` や skills をパスに
-      // 含めない（ADR 0001）。渡すのは grilling / domain-modeling / write-steering-v2 と
-      // opsx コマンドの置き場であるルートだけで、置き場所を直書きせずルートから
-      // 導く（nuxt.config.ts はリポジトリルートに在る）。
+      // **`--add-dir` を渡さない。** 作業場所はセッションのディレクトリ（cwd）だけでよい。
       //
-      // 操作系スキル（`assets/.claude/skills/` の get-* / question / proposal）の置き場は
-      // 渡さない。取得・提出は MCP ツールが担うので、スキル経由で真似る余地を残さない
-      // （provide-operations-via-mcp）。ファイル自体は HEAD に在るが（guidance 作成のため
-      // 残してあり、他は git 操作で復元されたついで）、ロードはさせない。
+      // かつてはリポジトリのルートを渡し、「grilling / domain-modeling / write-steering-v2 と
+      // opsx コマンドの置き場だから」を根拠にしていた。**その根拠は実在しなかった**——
+      // `.claude/skills/` は無く、実運用ログの `slash_commands` 67件にそれらは1件も現れない
+      // （実測 2026-08-30）。届いていたのは次の2つだけで、どちらも渡したくないものである。
+      //
+      // - **他人のセッションの全文**。`claude.debugLogDir` はリポジトリ配下にあり、
+      //   `--output-format stream-json` で概要・問い・proposal がそのまま残る。実測で、
+      //   セッション A の claude が B のログを `Read` で読めた（`permission_denials: []`）
+      // - **開発者の権限とプラグイン**。ルート配下の `.claude/settings.json` が
+      //   `--setting-sources project` で効き、`Agent` や `Bash(claude *)` が渡っていた。
+      //   `Edit` の deny は `/opt/projects/stroke-board/**` の絶対パスなので worktree には
+      //   効かず、無人実行のエージェントがソースツリーへ書ける状態だった
+      //
+      // 操作系スキル（`assets/.claude/skills/` の get-* / question / proposal）も同じく
+      // 届かなくなる。取得・提出は MCP ツールが担うので、スキル経由で真似る余地を残さない
+      // （provide-operations-via-mcp。santa-method レビュー指摘 5・6周目 2026-08-30）。
       //
       // `--setting-sources` に user を含めないのは、開発者個人の設定
       // （~/.claude/CLAUDE.md）をエンドユーザーのセッションへ持ち込まないためである。
-      // project を外すとスキルが一切ロードされない（ADR 0001）。
+      // `project` は残してあるが、`--add-dir` が無い今、探索先の cwd に `.claude/` は
+      // 無いのでロードされるスキルは0本である（冒頭の `SETTING_SOURCES_REQUIRED`）。
       //
       // 取得・提出の操作は stroke-board の MCP ツールが担う（provide-operations-via-mcp）。
       // その分の `--allowedTools`（`mcp__stroke-board`）は呼び出しごとに決まるのでここには
       // 入れず、`server/utils/mcp/allowed-tools.ts` が値へ足す。
       //
-      // **`Skill` を外してはならない。** 手順の案内（/openspec-ff-change・
-      // /write-steering-v2）はスキルが担っており、`Skill` が無いと起動できない。
+      // `Skill` は役割分担（操作系＝MCP ツール / 案内・手順＝Skill）の受け皿として残して
+      // ある。**ただし現時点で prompt が指す案内スキルは1つも無い。** `/openspec-ff-change`
+      // も `/write-steering-v2` も実体が無く、どちらも prompt から外した（下の3定型は
+      // スラッシュコマンドを持たない）。案内を配り直すまで `Skill` は空振りする
+      // （change の tasks「案内スキルの実体が無い」）。
       //
       // `-p` / `--output-format json`、`--session-id` / `--resume` とセッション id、
       // `--mcp-config`、MCP ツール分の `--allowedTools`、`--` 以降の prompt は
@@ -260,16 +285,30 @@ export default defineNuxtConfig({
       args: [
         '--setting-sources', SETTING_SOURCES_REQUIRED,
         '--model', 'sonnet',
-        '--add-dir', import.meta.dirname,
         // curl / jq / printenv は落とした（取得・提出を MCP ツール以外で真似る余地を
         // 残さない・ユーザー指示 2026-08-27）。`Write` は develop 側の追加で、proposal を
         // `docs/proposal.md` に書くのに要るので残す
         '--allowedTools', 'Skill Bash(openspec *) Read Edit Write',
         '--disallowedTools', 'Bash(cd *)',
+        // `--mcp-config` は「追加」であって「限定」ではない。これが無いと開発者個人の
+        // MCP 設定が全部読み込まれる——実測（2026-08-30・デバッグログ全23本）で
+        // `claude.ai Slack` / `Google Drive` / `Canva` など8本・約80ツールが、
+        // `--allowedTools` に無いので**呼べないまま**エンドユーザーの実行に並んでいた。
+        // 上の `--setting-sources` の注記（個人の設定を持ち込まない）と、工程ごとに
+        // 公開ツールを5本へ絞った意図（specs `mcp/server`「呼べないものを見せてから
+        // 失敗させない」）の両方を破っていた（santa-method レビュー指摘 5周目）
+        '--strict-mcp-config',
       ],
 
-      // エージェント向け endpoint の base URL。spawn 時に環境変数 STROKE_BASEURL として
-      // 渡し、セッション API スキルがそこから接続先を解決する（prompt には載せない）
+      // エージェント向け endpoint の base URL。prompt には載せない（design.md 決定7）。
+      //
+      // いまの実質的な用途は、起動ごとに組み立てる `--mcp-config` の url
+      // （`${apiBaseUrl}/mcp`）である（`server/utils/stroke/invoke.ts`）。
+      //
+      // spawn 時に環境変数 STROKE_BASEURL としても渡してはいる
+      // （`server/utils/stroke/claude.ts`）が、**読み手はもう居ない**。これを読んでいた
+      // `assets/.claude/skills/` のセッション API スキルは provide-operations-via-mcp
+      // tasks 4.9 で `--add-dir` から外れ、curl / printenv も `--allowedTools` から落ちた
       apiBaseUrl: 'http://127.0.0.1:3599',
 
       // セッションの openspec/config.yaml に書くワークフロースキーマ名。実体は
@@ -277,25 +316,35 @@ export default defineNuxtConfig({
       workflowSchema: 'flontier-strokeflow',
 
       // AI へ渡す定型。指示の本文はコードに持たない（specs/agent/invocation）。従う手順は
-      // スキル自身が持つ。初回はスキル起動＋最低限の固定指示、継続は続きを促すだけ
+      // スキル自身が持つ。初回も最低限の固定指示だけ、継続は続きを促すだけ
       // （入力は prompt に載せず、エージェントが取得ツールで読む）
       //
       // 取得・提出の操作は stroke-board の MCP ツールが担い、手順の案内はスキルが担う
-      // （provide-operations-via-mcp tasks 4.7 の役割分担）。案内スキルの起動
-      // （/openspec-ff-change）はそのまま残す
+      // （provide-operations-via-mcp tasks 4.7 の役割分担）。ただし**案内スキルの起動
+      // （`/openspec-ff-change`）は prompt から外してある。**
       // `/openspec-ff-change` は実体が無く（`.claude/skills/` にも assets にも openspec の
       // スキーマにも存在しない）、prompt の先頭に置くと `Unknown command` で初回起動が
       // 何もせず終わる（実測 2026-08-27: assistant のターンがゼロで
       // 「プロセスは成功したが提出が届かない」になり、巡回の再起動が毎回拾っていた）。
-      // 案内スキルを用意し直す話は本 change の範囲外なので、起動だけを外す
+      // 案内スキルを用意し直す話は本 change の範囲外なので、起動だけを外した
       firstPrompt: 'stroke-board の MCP ツールで内容を確認し、作業しろ',
       continuePrompt: '続きを進めろ。状況は stroke-board の MCP ツールで確認してから判断しろ。',
 
       // 承認で昇格した直後に steering 文書を作らせる定型（ADR 0011）。cwd は昇格先の
       // プロジェクトで、--mcp-config は呼び出し側がそこから組み立てて足す。
+      //
+      // **`/write-steering-v2` の起動は外した。** firstPrompt の `/openspec-ff-change` と
+      // まったく同じで実体が無く（`.claude/skills/` は存在せず、`assets/.claude/skills/` の
+      // 10件にも無い）、prompt の先頭に置くと `Unknown command` で起動が assistant の
+      // ターンをひとつも持たずに終わる。steering 工程が何もせず終わっていた直接の原因で、
+      // 5.2 の残り2ツール（get-steering / submit-document の steering 種別）が一度も
+      // 呼ばれなかったのはこれによる（santa-method レビュー指摘 4周目 2026-08-30）。
+      //
+      // 取得・提出は MCP ツールが担うので、案内スキルが無くても往復は成立する。案内を
+      // 配り直す話は別 change（`adr0016-sub-create-steering-guidance-mcp-tool`）。
       // write-steering（v2 でない方）は対話インタビュー（grill）を含み、無人実行では
       // 進まないため使わない
-      steeringPrompt: '/write-steering-v2\n\nスキルの指示に従って steering 文書を作成する。',
+      steeringPrompt: 'stroke-board の MCP ツールで steering 文書の状況を確認し、product / tech / structure を作成しろ。',
 
       // 失敗した実行を起こし直す回数の上限。上限に達したら起動せず invocation を
       // error（終端）にする。総待ち時間は下の2件と合わせて決まる
@@ -318,8 +367,8 @@ export default defineNuxtConfig({
       timeoutMs: 180000,
       timeoutStepMs: 0,
 
-      // 呼び出しの生出力を書き残すディレクトリ。空なら書かない（既定 = 無効）。
-      // 調査用の複製で、呼び出しの成否には影響しない。
+      // 呼び出しの生出力を書き残すディレクトリ。空文字なら書かない。**ここでは有効にして
+      // ある**（値が入っている）。調査用の複製で、呼び出しの成否には影響しない。
       //
       // 設定するとツールの呼び出しと結果まで残る（`--output-format stream-json`）。
       // 出力はセッションごとに1ファイルへ追記される

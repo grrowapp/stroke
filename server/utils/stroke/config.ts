@@ -75,7 +75,10 @@ export function readStrokeConfig(): StrokeConfig {
   return parseStrokeConfig(useRuntimeConfig())
 }
 
-/** ADR 0001: ここを外すとスキルが一切ロードされない。 */
+/**
+ * ADR 0001 がスキルのロードに要ると定めた値。**いまはロードされるスキルが0本である**
+ * （理由と実測は `nuxt.config.ts` の同名の定数に書いた）。
+ */
 const SETTING_SOURCES_REQUIRED = 'project'
 
 /**
@@ -83,11 +86,17 @@ const SETTING_SOURCES_REQUIRED = 'project'
  *
  * `args` が配列1本なので、`--setting-sources` の値だけを個別に検証することはできない。
  * 並びの中に `--setting-sources project` が在ることを見る。
+ *
+ * **いまこの検査は実効を持たない。** `--add-dir` を外して以降、project 設定の探索先は
+ * セッションの cwd だけで、そこに `.claude/` は無い。`project` の有無でロードされる
+ * スキルの数は変わらない（0本のまま）。それでも検査を残すのは、案内スキルを配り直した
+ * ときに要る守りだからで、外す判断は本 change の範囲外である
+ * （santa-method レビュー指摘 7周目 2026-08-30）。返す文言はその将来を前提にしている。
  */
 export function describeClaudeArgsError(args: readonly string[]): string | null {
   const at = args.indexOf('--setting-sources')
   if (at === -1 || args[at + 1] !== SETTING_SOURCES_REQUIRED) {
-    return `runtimeConfig.claude.args に \`--setting-sources ${SETTING_SOURCES_REQUIRED}\` が無い（ADR 0001: 外すとスキルがロードされない）`
+    return `runtimeConfig.claude.args に \`--setting-sources ${SETTING_SOURCES_REQUIRED}\` が無い（ADR 0001。案内スキルを配り直したときに要る）`
   }
   return null
 }

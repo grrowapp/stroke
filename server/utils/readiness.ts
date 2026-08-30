@@ -35,7 +35,11 @@ export async function missingPrerequisites(): Promise<string[]> {
     }
   }
 
-  // ADR 0001: `--setting-sources` から `project` が落ちるとスキルが一切ロードされない。
+  // ADR 0001 の `--setting-sources project` が並びに在るか。**いまこの検査は実効を持たない**
+  // ——`--add-dir` を外して以降、project 設定の探索先はセッションの cwd だけで、そこに
+  // `.claude/` は無いため、`project` の有無に関わらずロードされるスキルは0本である。
+  // 案内スキルを配り直したときに要る守りとして残してある（`describeClaudeArgsError` の
+  // 注記。santa-method レビュー指摘 7周目 2026-08-30）。
   const argsError = describeClaudeArgsError(config.claude.args)
   if (argsError) missing.push(`AI の起動定義が不正: ${argsError}`)
 

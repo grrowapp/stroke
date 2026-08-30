@@ -1,5 +1,4 @@
 import { randomBytes } from 'node:crypto'
-import { createError } from 'h3'
 
 /**
  * 接続表。
@@ -45,31 +44,58 @@ export function removeConnection(token: string): void {
 }
 
 /**
+ * `x-stroke-token` ヘッダから接続文脈を解決できなかった。
+ *
+ * **代行先の応答ではなくここで組み立てた値である。** どの接続の呼び出しかが決まらず、
+ * 代行先そのものが決まらないので、保持すべき応答が存在しない。`require-connection.ts` の
+ * `ConnectionPhaseMismatchFailure`・`resolve-project-id.ts` の `ProjectNotRegisteredFailure`
+ * と同じ扱いになる。
+ */
+export interface ConnectionUnauthorizedFailure {
+  status: 401
+  errorCode: 'unauthorized'
+  error: string
+}
+
+export type ConnectionResolution =
+  | { ok: true, context: ConnectionContext }
+  | ({ ok: false } & ConnectionUnauthorizedFailure)
+
+const TOKEN_MISSING = 'x-stroke-token ヘッダが無い。'
+const TOKEN_UNKNOWN = '無効な token。'
+
+/**
  * `x-stroke-token` ヘッダを接続表と照合し、接続文脈を解決する。
  *
- * 欠落・不一致は 401 を throw する。既定値で補わない（ADR-0014「API は暗黙の状態分岐を
+ * 欠落・不一致は 401 の失敗として返す。既定値で補わない（ADR-0014「API は暗黙の状態分岐を
  * 持たない」——ヘッダから読めない文脈を勝手に補うと、呼び出し元ごとに通る/通らないが
  * 変わる暗黙挙動になる）。
+ *
+ * **throw ではなく結果で返す。** ここはツールハンドラの中から呼ばれるので、throw すると
+ * モジュールの `normalizeErrorToResult` が `isError: true` のテキストへ畳んでしまい、
+ * `status` も `errorCode` も持たない結果になる——specs `mcp/server`「各ツールの結果は
+ * 1階層とし、常に `status` を持つ」（無条件）に反する。`require-connection.ts` が throw を
+ * 全廃したのと同じ理由で、ここも平坦なエラーへ倒す（santa-method レビュー指摘 4周目
+ * 2026-08-30）。
+ *
+ * 「有効な token を持たないツール呼び出しは HTTP 401 で拒否する」（specs
+ * `server/session-management`）は `/mcp` の middleware（`server/middleware/mcp-token.ts`）が
+ * 担う。middleware はこの結果を見て自分で 401 を throw する——HTTP の層で弾けるのは
+ * ツールハンドラより手前にいるからで、理由は同ファイルの冒頭に書いた。
+ * ここでの解決は多重防御と、接続文脈そのものの解決のためで、呼ぶのをやめると
+ * 工程の識別ができなくなる。
  */
-export function resolveConnection(headers: ConnectionHeaders): ConnectionContext {
+export function resolveConnection(headers: ConnectionHeaders): ConnectionResolution {
   const raw = headers['x-stroke-token']
   const token = Array.isArray(raw) ? raw[0] : raw
   if (!token) {
-    throw createError({
-      statusCode: 401,
-      statusMessage: 'Unauthorized',
-      message: 'x-stroke-token ヘッダが無い。',
-    })
+    return { ok: false, status: 401, errorCode: 'unauthorized', error: TOKEN_MISSING }
   }
 
   const context = connections.get(token)
   if (context === undefined) {
-    throw createError({
-      statusCode: 401,
-      statusMessage: 'Unauthorized',
-      message: '無効な token。',
-    })
+    return { ok: false, status: 401, errorCode: 'unauthorized', error: TOKEN_UNKNOWN }
   }
 
-  return context
+  return { ok: true, context }
 }

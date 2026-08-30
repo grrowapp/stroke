@@ -2,10 +2,17 @@ import type { Invocation, SessionSummary } from '#shared/stroke'
 import { invokeAi, type AiRun } from './ai'
 import { readStrokeConfig } from './config'
 import { initSessionOpenspec } from './openspec'
-import { readState, writeState } from './session-store'
+import { readState, sessionExists, writeState } from './session-store'
 import { submissionCount } from './submission-signal'
-import { MCP_SERVER_NAME, withMcpToolsAllowed } from '../mcp/allowed-tools'
+import {
+  MCP_SERVER_ALLOWED_TOOL,
+  MCP_SERVER_NAME,
+  UPSTREAM_MCP_ALLOWED_TOOL,
+  UPSTREAM_MCP_SERVER_NAME,
+  withMcpToolsAllowed,
+} from '../mcp/allowed-tools'
 import { issueConnectionToken, registerConnection, removeConnection } from '../mcp/connection-table'
+import { exposedToolsHeaderValue, MCP_TOOLS_HEADER, type McpToolPhase } from '../mcp/exposed-tools'
 
 /**
  * 起動の材料を設定から組み立てる端。
@@ -110,9 +117,11 @@ export function buildRun(options: {
         // 自前 MCP サーバー（provide-operations-via-mcp）も同じ --mcp-config に並べる
         // （既存フラグ・本家 MCP の並びは変えない）。
         // MCP ツールは --allowedTools に載っていないと呼べないため、同じく呼び出し
-        // ごとにここで足す（tasks 4.5）。
+        // ごとにここで足す（tasks 4.5）。**本家 MCP の分も足す**——配るだけでは
+        // 一覧に出るのに1つも呼べず、「呼べないものを見せてから失敗させない」
+        // （specs `mcp/server`）を破る（santa-method レビュー指摘 4周目 2026-08-30）。
         args: [
-          ...withMcpToolsAllowed(claude.args),
+          ...withMcpToolsAllowed(claude.args, [MCP_SERVER_ALLOWED_TOOL, UPSTREAM_MCP_ALLOWED_TOOL]),
           '--mcp-config',
           mcpConfigFor(cwd, token, claude.apiBaseUrl),
         ],
@@ -156,8 +165,13 @@ export function buildRun(options: {
     retries,
     timeoutMs: claude.timeoutMs,
     timeoutStepMs: claude.timeoutStepMs,
-    // ストロークは uuid を自前採番して使う。スキルが `${CLAUDE_SESSION_ID}` でセッション
-    // id を知る前提（docs/specs/architecture/session-workflow.md）に効いている
+    // ストロークは uuid を自前採番して使う。**続きを開くのに要るからである**——次の起動が
+    // `--resume <id>` で同じ会話へ戻るには、こちら側が id を決めて覚えているしかない。
+    //
+    // かつては「スキルが `${CLAUDE_SESSION_ID}` でセッション id を知る前提」を理由に
+    // 書いていたが、**その読み手はもう居ない**（`claude.ts` の `STROKE_BASEURL` と同じ）。
+    // セッション id を子へ渡しているのは、上の `--mcp-config` に載る接続表の token
+    // （`x-stroke-token`）の方である（santa-method レビュー指摘 7周目 2026-08-30）
     conversationId: sessionId,
     // 実体の揃ったセッション（ディレクトリ・openspec ルート・スキーマ設定済み）として
     // 一覧に載っていれば、初回の起動を済ませている = 続き先が在る。
@@ -173,6 +187,8 @@ export function buildRun(options: {
       bin: openspec.bin,
       initArgs: openspec.initArgs,
       schemaName: claude.workflowSchema,
+      // 実在の判定を渡す端はここ。消えたセッションのために掘らせない（openspec.ts）
+      sessionExists: () => sessionExists(sessionId),
     }),
   }
 }
@@ -183,12 +199,23 @@ export function buildRun(options: {
  * url は `runtimeConfig.claude.apiBaseUrl` から組み立てる（design.md「MCP の url は
  * 既存設定から組み立てる」。新しい設定は増やさない）。token はこの起動専用の一時値
  * （接続表 `server/utils/mcp/connection-table.ts`）。
+ *
+ * 工程は url ではなくヘッダで分ける。`x-mcp-tools` に載せた名前のツールだけが claude の
+ * tools 一覧に載るので、その工程で呼べないツールは初めから見えない
+ * （`server/utils/mcp/exposed-tools.ts`）。
  */
-function mcpToolServerEntry(token: string, apiBaseUrl: string): Record<string, unknown> {
+function mcpToolServerEntry(
+  token: string,
+  apiBaseUrl: string,
+  phase: McpToolPhase,
+): Record<string, unknown> {
   return {
     type: 'http',
     url: `${apiBaseUrl}/mcp`,
-    headers: { 'x-stroke-token': token },
+    headers: {
+      'x-stroke-token': token,
+      [MCP_TOOLS_HEADER]: exposedToolsHeaderValue(phase),
+    },
   }
 }
 
@@ -196,7 +223,7 @@ function mcpToolServerEntry(token: string, apiBaseUrl: string): Record<string, u
 function mcpToolConfigFor(token: string, apiBaseUrl: string): string {
   return JSON.stringify({
     mcpServers: {
-      [MCP_SERVER_NAME]: mcpToolServerEntry(token, apiBaseUrl),
+      [MCP_SERVER_NAME]: mcpToolServerEntry(token, apiBaseUrl, 'flontier'),
     },
   })
 }
@@ -211,12 +238,12 @@ function mcpToolConfigFor(token: string, apiBaseUrl: string): string {
 function mcpConfigFor(cwd: string, token: string, apiBaseUrl: string): string {
   return JSON.stringify({
     mcpServers: {
-      specworkflow: {
+      [UPSTREAM_MCP_SERVER_NAME]: {
         type: 'stdio',
         command: 'npx',
         args: ['-y', '@pimzino/spec-workflow-mcp@latest', cwd],
       },
-      [MCP_SERVER_NAME]: mcpToolServerEntry(token, apiBaseUrl),
+      [MCP_SERVER_NAME]: mcpToolServerEntry(token, apiBaseUrl, 'steering'),
     },
   })
 }

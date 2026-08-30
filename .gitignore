@@ -53,3 +53,10 @@ workflow/openspec/changes/
 
 # openspec の store 登録マーカー。マシンローカルな台帳メタデータで、リポジトリの成果物ではない
 .openspec-store/
+
+# nanopm — local PM state (not for version control)
+.nanopm/
+
+# @nuxt/test-utils がテスト実行時に書く生成物。ツール定義の置き場（ファイル名＝ツール名）に
+# 成果物でないファイルを残さない（provide-operations-via-mcp・santa-method レビュー指摘）
+server/mcp/tools/.nuxtrc

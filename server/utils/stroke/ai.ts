@@ -29,8 +29,10 @@ export interface AiRun {
   /**
    * 会話の続け先。**あるかどうかが初回/継続の判定そのものである。**
    *
-   * - ストローク: 自前採番の uuid。スキルが `${CLAUDE_SESSION_ID}` でセッション id を
-   *   知る前提（docs/specs/architecture/session-workflow.md）に効くので必ず渡す。
+   * - ストローク: 自前採番の uuid。**`--resume` で同じ会話へ戻るために必ず渡す**
+   *   （id を決めて覚えているのは呼び出し側だけである）。かつて理由に挙げていた
+   *   「スキルが `${CLAUDE_SESSION_ID}` で知る」は読み手がもう居ない
+   *   （santa-method レビュー指摘 7周目 2026-08-30）。
    *   初回か継続かは `hasConversation` が決める
    * - steering: 初回は `undefined`（claude に採番させる）。走った後に `remember` で
    *   受け取った id が次回の続き先になる

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { mockFetch, fetchErrorWith, withHeaders, structuredResult } from './support';
+import { acceptsEmptyArgs, mockFetch, fetchErrorWith, withHeaders, structuredResult } from './support';
 
 vi.mock('#build/fetch.mjs', () => ({ $fetch: mockFetch() }));
 vi.mock('@nuxtjs/mcp-toolkit/server', () => ({ defineMcpTool: (def: unknown) => def }));
@@ -20,14 +20,14 @@ describe('send-question', () => {
     $fetch.raw.mockClear();
   });
 
-  it('A5 の実際の応答ステータスをそのまま返す（現状は200。api-contract.md の204とは食い違う）', async () => {
+  it('A5 の実際の応答ステータスをそのまま返す（受理は本文なしの204）', async () => {
     const token = issueConnectionToken();
     registerConnection(token, { sessionId: 'session-1' });
-    $fetch.raw.mockResolvedValueOnce({ status: 200 });
+    $fetch.raw.mockResolvedValueOnce({ status: 204 });
 
     const result = await sendQuestionHandler(QUESTION, { 'x-stroke-token': token });
 
-    expect(result).toEqual({ status: 200 });
+    expect(result).toEqual({ status: 204 });
     expect($fetch.raw).toHaveBeenCalledWith(
       '/api/strokes/session-1/question',
       expect.objectContaining({ method: 'POST', body: QUESTION }),
@@ -73,6 +73,35 @@ describe('send-question', () => {
     removeConnection(token);
   });
 
+  it('既知の文言でない 404 は session_not_found に寄せず unexpected_status とする', async () => {
+    // ルート不一致などの見覚えのない 404 まで「そのセッションは無い」に畳むと、受け手は
+    // 存在しない原因を直そうとする（specs mcp/server「契約に載せた状況へ無理に寄せては
+    // ならない」MUST NOT）。get-overview / get-send-back と同じ守り
+    const token = issueConnectionToken();
+    registerConnection(token, { sessionId: 'session-1' });
+    $fetch.raw.mockRejectedValueOnce(fetchErrorWith(404, { message: 'Cannot find any route matching.' }));
+
+    const result = await sendQuestionHandler(QUESTION, { 'x-stroke-token': token });
+
+    expect(result).toEqual({ status: 404, errorCode: 'unexpected_status', error: 'Cannot find any route matching.' });
+    removeConnection(token);
+  });
+
+  it('steering 接続から呼ばれても throw せず 400 connection_mismatch を返す', async () => {
+    const token = issueConnectionToken();
+    registerConnection(token, { projectPath: '/opt/projects/example' });
+
+    const result = await sendQuestionHandler(QUESTION, { 'x-stroke-token': token });
+
+    expect(result).toEqual({
+      status: 400,
+      errorCode: 'connection_mismatch',
+      error: 'この接続は flontier 工程向けではない。',
+    });
+    expect($fetch.raw).not.toHaveBeenCalled();
+    removeConnection(token);
+  });
+
   it('承認済みセッションには 409 phase_conflict として整形する', async () => {
     const token = issueConnectionToken();
     registerConnection(token, { sessionId: 'session-approved' });
@@ -95,8 +124,40 @@ describe('send-question', () => {
     removeConnection(token);
   });
 
-  it('token が無効なら拒否され、A5 を叩かない', async () => {
-    await expect(sendQuestionHandler(QUESTION, { 'x-stroke-token': 'never-issued' })).rejects.toThrow();
+  it('inputSchema は引数なしの呼び出しを通す（SDK の事前検証で弾かせない）', () => {
+    // 必須にすると SDK がハンドラより前に McpError(InvalidParams) を投げ、結果が status も
+    // errorCode も持たなくなる（specs mcp/server の平坦形式の SHALL は無条件）
+    expect(acceptsEmptyArgs(sendQuestionTool.inputSchema)).toBe(true);
+  });
+
+  it('項目を省いた呼び出しも A5 へそのまま渡し、A5 の 400 と違反箇所を載せる', async () => {
+    // 検証の正は送信先にある（specs mcp/tools/question「ツール側で引数の値の検証を行って
+    // 送信を止めてはならない」MUST NOT）。ツール側で止めると、送り手は何を直せばよいかを
+    // 代行先の文言として受け取れない
+    const token = issueConnectionToken();
+    registerConnection(token, { sessionId: 'session-1' });
+    const body = '問いの構造として読み取れない。'
+      + 'header: 話題タグが無い。'
+      + ' / question: 問いの本文が無い。'
+      + ' / options: 選択肢が無い。';
+    $fetch.raw.mockRejectedValueOnce(fetchErrorWith(400, { message: body }));
+
+    const result = await sendQuestionHandler({}, { 'x-stroke-token': token });
+
+    expect(result).toEqual({ status: 400, errorCode: 'validation_error', error: body });
+    expect($fetch.raw).toHaveBeenCalledWith(
+      '/api/strokes/session-1/question',
+      expect.objectContaining({ method: 'POST', body: {} }),
+    );
+    removeConnection(token);
+  });
+
+  it('token が無効でも throw せず 401 unauthorized を返し、A5 を叩かない', async () => {
+    // throw すると status も errorCode も持たない isError テキストになり、結果の平坦形が
+    // 崩れる（specs mcp/server は無条件）。HTTP 401 は middleware が担う
+    const result = await sendQuestionHandler(QUESTION, { 'x-stroke-token': 'never-issued' });
+
+    expect(result).toEqual({ status: 401, errorCode: 'unauthorized', error: '無効な token。' });
     expect($fetch.raw).not.toHaveBeenCalled();
   });
 });

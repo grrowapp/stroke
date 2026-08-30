@@ -24,8 +24,14 @@ describe('readFetchFailure', () => {
     expect(typeof result.message).toBe('string');
   });
 
-  it('status を持たない失敗（FetchError ではない）は想定外として再送出する', () => {
+  it('status を持たない失敗（FetchError ではない）でも投げ返さず、502 と例外のメッセージを返す', () => {
+    // 投げ返すとツールハンドラの外へ抜け、結果が status も errorCode も持たない
+    // isError テキストに畳まれてしまう（mcp/server の平坦形式の SHALL は無条件）
     const error = new Error('接続が成立しない');
-    expect(() => readFetchFailure(error)).toThrow(error);
+    expect(readFetchFailure(error)).toEqual({ status: 502, message: '接続が成立しない' });
+  });
+
+  it('Error ですらない値が投げられても平坦な失敗として返す', () => {
+    expect(readFetchFailure('壊れた何か')).toEqual({ status: 502, message: '壊れた何か' });
   });
 });
