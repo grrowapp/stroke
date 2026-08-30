@@ -30,7 +30,7 @@ worktree = `git worktree` で切った作業ディレクトリ。それぞれが
 
 ## Docs
 
-`docs/` 配下の目録。`docs/specs/` は**定義としての specs** の置き場で、`core`（構造・入れ物・設定）/ `api`（契約）/ `architecture`（流れ）/ `reference`（調べた事実）/ `plan`（未確定の検討）で区分する。以下、`docs/specs/*` の5区分 → `docs/feature/` → `docs/agents/` の順に並べる。`docs/adr/` は決めの記録で、一覧は置かない。
+`docs/` 配下の目録。`docs/specs/` は**定義としての specs** の置き場で、`core`（構造・入れ物・設定）/ `api`（契約）/ `architecture`（流れ）/ `reference`（調べた事実）/ `plan`（未確定の検討）で区分する。以下、`docs/specs/*` の5区分 → `docs/agents/` の順に並べる。`docs/adr/` は決めの記録で、一覧は置かない。
 
 機能的 specs（Requirement + Scenario）は `openspec/specs/` にある（確定には入らない。扱いは `docs/agents/issue-tracker.md`「参照の方向」）。
 
@@ -51,7 +51,6 @@ worktree = `git worktree` で切った作業ディレクトリ。それぞれが
 ### `docs/specs/architecture/`
 
 - `session-workflow.md` — セッションのワークフロー定義（store・スキル・配線・実測で確定した制約）
-- `feature-workflow.md` — feature ワークフローの構造の記述（規定は `docs/feature/overview.md` が正）
 - `question-flow.md` — 問いの往復（誰がいつ何を送り、状態がどう動くか）を図で示す
 - `spec-screen-flow.md` — ポータル側: 仕様書画面の流れ
 - `data-fetching.md` — 画面のデータ取得と SSR の設計
@@ -64,7 +63,7 @@ worktree = `git worktree` で切った作業ディレクトリ。それぞれが
 ### `docs/specs/plan/`
 
 - `feature/overview.md` — feature のワークフロー定義（`__` 命名・器・工程・締め。2レーンのうち feature レーンの正）
-- `feature/feature-workflow.md` — 上の旧版。中身が食い違ったまま残っている（統合は未着手）
+- `feature/feature-workflow.md` — 上の旧版。こちらも正を名乗っているが、食い違ったら `feature/overview.md` が勝つ。統合は change `adr0018-sub-update-feature-workflow` で行う
 - `artifact-extension-plan.md` — 拡張 artifact の検討資料（未決定）
 - `portal-stroke-entrance.md` — 入口の接合の対応方法（作成ボタン→ストローク概要入力。ADR-0009/0010 の確定先）
 - `portal-stroke-exit.md` — 出口の接合の対応方法（承認→steering 工程の自動開始。ADR-0011 の確定先）
@@ -73,10 +72,6 @@ worktree = `git worktree` で切った作業ディレクトリ。それぞれが
 - `next-agent-run.md` — エージェント実行の3区分への汎用化案（未着手）
 - `mainline-merge.md` — 旧 stroke-board-frontier 統合の道筋（change 一覧・依存・区分の基準・終了条件）
 - `structure-migration.md` — 構造の規範に対する現状の差分（移行課題）
-
-### `docs/feature/`
-
-- `overview.md` — feature のワークフロー定義（`__` 命名・器・工程・締め）。feature と仕様書の2レーンのうち **feature レーンの正**。`docs/specs/architecture/feature-workflow.md` と内容が重なるが、食い違ったら `overview.md` が勝つ（あちらも正を名乗っている。統合は change `adr0018-sub-update-feature-workflow` で行う）
 
 ### `docs/agents/`
 

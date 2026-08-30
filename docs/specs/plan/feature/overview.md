@@ -93,16 +93,20 @@ stroke が始まる口は複数ある。代表は2つで、網羅と挙動の定
 
 ## 締め（本家 archive → openspec 標準ライフサイクル）
 
-feature 固有の sync 工程は**定義しない**。締めは既存の2つの機能の接合である。
+feature 固有の sync 工程は**定義しない**。締めは既存の2つの機能の接合であり、3段で進む。起点は **archive**（spec-workflow が元々持つ機能。実行の主体は規定しない）。
 
-- 起点は **archive**（spec-workflow が元々持つ機能。実行の主体は規定しない）
-- **戻す接合**: archive のとき、対応する change 内の **delta** `openspec/changes/<change名>/specs/<階層パス>/spec.md` へ、requirements.md の中身を戻す（proposal の後に作られた spec.md を更新する）。階層パスは spec 名に置換ルールを適用して得る（`api__session` → `specs/api/session/spec.md`）
-- **sync**: openspec 標準の sync が change 内の delta を**同じパス**の `openspec/specs/<階層パス>/spec.md` へ反映する。spec 名から配置先を計算する機能は openspec に無く、配置先は delta のパスだけで決まる
-- **archive**: openspec 標準の archive が change を片づけ、工程が終わる（openspec の `archive` コマンドは sync と片づけの両方を行う）
-- change の対象 capability が複数のときは、**すべての対象の戻す接合が揃ってから** sync → archive を実行する。揃ったかどうかは、stroke-board が **archive 操作の度に、capability に対する delta の充足チェック**を行って判定する
-- proposal 上に capability が複数定義されていた場合、spec-workflow への配置時に、**分解された feature 全てに同じ proposal.md を配置**する。これが集合定義（この change が対象とする capability の全量）の拠り所になる
-- 戻す接合は **delta 形式への変換をしない**。requirements.md は delta 形式（`## ADDED Requirements` 等 + Requirement / Scenario）を満たしており、sync がそのまま読める
-- 結果として `openspec/specs/` に入る spec.md は openspec の機能的 spec の形式（Requirement + Scenario）に適合する
+**1. 戻す接合。** archive のとき、対応する change 内の **delta** `openspec/changes/<change名>/specs/<階層パス>/spec.md` へ、requirements.md の中身を戻す（proposal の後に作られた spec.md を更新する）。階層パスは spec 名に置換ルールを適用して得る（`api__session` → `specs/api/session/spec.md`）。
+
+**2. sync。** openspec 標準の sync が change 内の delta を**同じパス**の `openspec/specs/<階層パス>/spec.md` へ反映する。spec 名から配置先を計算する機能は openspec に無く、配置先は delta のパスだけで決まる。
+
+**3. archive。** openspec 標準の archive が change を片づけ、工程が終わる（openspec の `archive` コマンドは sync と片づけの両方を行う）。
+
+3段に掛かる規定は4つ。
+
+- **複数 capability の待ち合わせ**: change の対象 capability が複数のときは、すべての対象の戻す接合が揃ってから sync → archive を実行する。揃ったかどうかは、stroke-board が archive 操作の度に、capability に対する delta の充足チェックを行って判定する
+- **proposal.md の配置**: proposal 上に capability が複数定義されていた場合、spec-workflow への配置時に、分解された feature 全てに同じ proposal.md を配置する。これが集合定義（この change が対象とする capability の全量）の拠り所になる
+- **delta 形式への変換**: しない。requirements.md は delta 形式（`## ADDED Requirements` 等 + Requirement / Scenario）を満たしており、sync がそのまま読める
+- **結果の形式**: `openspec/specs/` に入る spec.md は openspec の機能的 spec の形式（Requirement + Scenario）に適合する
 
 ### 本家操作との混在への対応（archive からの戻し）
 

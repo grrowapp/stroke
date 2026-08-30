@@ -2,7 +2,7 @@
 
 feature（実装のタスクに繋がる文書の組）の定義。stroke-board は文書を **feature** と**仕様書**（システムをドキュメントとして記述し続けるもの）の2レーンで扱う。
 
-> **本書は正ではない。** feature レーンの正は [`docs/feature/overview.md`](../../feature/overview.md) であり、本書と食い違ったらあちらが勝つ。本書は承認前の草稿が残ったもので、構造の記述として参照する。
+> **本書は正ではない。** feature レーンの正は [`overview.md`](overview.md)（同じディレクトリ）であり、本書と食い違ったらあちらが勝つ。本書は承認前の草稿が残ったもので、構造の記述として参照する。
 
 確定の経緯は change `define-feature-workflow`（proposal・specs 4本・design を spec-workflow 上で承認済み、2026-08-26）。仕様書レーンは仮決めのみで、器は change `define-spec-document-workflow` にある。
 
