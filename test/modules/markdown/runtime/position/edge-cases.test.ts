@@ -385,26 +385,32 @@ beforeEach(() => {
  * 書くのは人間か別のエージェントなので、**CRLF も front matter も現実に来うる**。
  * 「扱わない」で済ませられる入力ではない。
  */
-describe('CRLF と front matter は、正規化した後の基準で揃える', () => {
+describe('CRLF と front matter は、面が自分で吸収する', () => {
   /**
    * CRLF の文書。
    *
-   * 生ファイルでは3つめの段落の `x` は offset 15 に在る。ところが `position` は LF へ
-   * 潰した後（offset 10）を基準にしていて、生ファイルの offset 10 にも `x` が在る
-   * （2つめの段落）。長さも字も揃ってしまうので、`alignWrapper` の照合を素通りする。
+   * 生ファイルでは3つめの段落の `x` は offset 15 に在る。位置の印は LF へ潰した後
+   * （offset 10）を基準にしている。
+   *
+   * **かつてはここで別の場所が返っていた。** 生ファイルの offset 10 にも `x` が在り
+   * （2つめの段落）、長さも字も揃うので `alignWrapper` の照合を素通りしていた。
+   * 面が写像を持つようになって解消した（`../normalize.ts`）。
    */
   const CRLF = 'ab\r\ncd\r\n\r\nx\r\n\r\nx\r\n';
 
   /**
    * front matter 付きの文書。
    *
-   * 本文の `**b**` の `b` は生ファイルの offset 19 に在るが、`position` は front matter を
-   * 落とした後を基準にしていて offset 7 を指す。生ファイルの offset 7 は front matter の
-   * `a: b` の `b` である。**本文を選んだのに front matter の中を返す。**
+   * 本文の `**b**` の `b` は生ファイルの offset 19。位置の印は front matter を落とした後を
+   * 基準にしていて offset 7 を指す。
+   *
+   * **かつてはここで別の場所が返っていた。** 生ファイルの offset 7 は front matter の
+   * `a: b` の `b` で、**本文を選んだのに front matter の中を返していた。**
    */
   const FRONT_MATTER = '---\na: b\n---\nab\n\n**b**\n';
 
-  it('CRLF: 正規化して渡せば正しく引ける', async () => {
+  it('CRLF: 揃えた文字列を渡せば、その文字列の基準で答える', async () => {
+    // 面から見れば「渡された文字列」がこれなので、この文字列を基準に答える
     const normalized = CRLF.replace(/\r\n/g, '\n');
     const surfaced = await surface(normalized);
 
@@ -414,16 +420,15 @@ describe('CRLF と front matter は、正規化した後の基準で揃える', 
     expect(normalized.slice(0, range!.start)).toBe('ab\ncd\n\nx\n\n');
   });
 
-  it('CRLF: 生ファイルを渡すと、黙って別の段落を指す', async () => {
+  it('CRLF: 生ファイルを渡しても、その生ファイルの基準で正しく答える', async () => {
     const surfaced = await surface(CRLF);
 
     const range = surfaced.port.toSourceRange(selectNth(surfaced, 'x', 1));
 
-    // **`null` にならない。** 返った字は選んだ字と同じなので、受け取る側から誤りが見えない
     expect(range).not.toBeNull();
     expect(CRLF.slice(range!.start, range!.end)).toBe('x');
-    // が、指しているのは2つめの段落の `x`（正しくは 15）
-    expect(range).toEqual({ start: 10, end: 11 });
+    // **3つめの段落の `x`。** かつてはここが 10（2つめの段落）だった
+    expect(range).toEqual({ start: 15, end: 16 });
     expect(CRLF.indexOf('x', 11)).toBe(15);
   });
 
@@ -440,7 +445,7 @@ describe('CRLF と front matter は、正規化した後の基準で揃える', 
     expect(range).toEqual({ start: 7, end: 8 });
   });
 
-  it('front matter: 生ファイルを渡すと、黙って front matter の中を指す', async () => {
+  it('front matter: 生ファイルを渡しても、本文の側を指す', async () => {
     const surfaced = await surface(FRONT_MATTER);
 
     // 本文の `**b**` の `b`（面では2つめの `b`）
@@ -448,18 +453,22 @@ describe('CRLF と front matter は、正規化した後の基準で揃える', 
 
     expect(range).not.toBeNull();
     expect(FRONT_MATTER.slice(range!.start, range!.end)).toBe('b');
-    // 指しているのは front matter の `a: b` の `b`。本文の `b` は 19
-    expect(range).toEqual({ start: 7, end: 8 });
+    // **本文の `b`。** かつてはここが 7（front matter の `a: b` の `b`）だった
+    expect(range).toEqual({ start: 19, end: 20 });
     expect(FRONT_MATTER.indexOf('b', 16)).toBe(19);
   });
 
-  it('ずれが小さければ `null` に倒れることも多い。だが当てにはできない', async () => {
-    // 多数派はこちら（切り出しに `\r` が入り、描かれた字には `\r` が無いので照合が外れる）。
-    // **`null` が返るのは偶然の副産物であって、保証ではない。** 上の2つがその反例
+  it('CRLF の文書でも、記号を伴う記法の中を選べる', async () => {
+    // **かつてはここが `null` だった。** 切り出しに `\r` が入り、描かれた字には `\r` が
+    // 無いので照合が外れていた。当時は「ずれが小さければ `null` に倒れることも多い。
+    // だが当てにはできない」という題で、`null` を偶然の副産物として記録していた。
+    // 面が写像を持ついま、倒れる理由が無くなったので正しく引ける側へ移した
     const source = 'まえ\r\n\r\nいろは**強調**にほへと\r\n';
     const surfaced = await surface(source);
 
-    expect(surfaced.port.toSourceRange(selectNth(surfaced, '強調'))).toBeNull();
+    const range = surfaced.port.toSourceRange(selectNth(surfaced, '強調'));
+    expect(range).not.toBeNull();
+    expect(source.slice(range!.start, range!.end)).toBe('強調');
   });
 });
 
@@ -482,10 +491,15 @@ describe('CRLF と front matter は、正規化した後の基準で揃える', 
  *
  * **どちらの経路を通ったかは印の有無で決まる。** 印が有れば口はその範囲しか試さず、
  * 合わなければ `null` を返す（生テキストの側を探し直さない）。印が無いときだけ走査へ
- * 落ちる。下の3つがその境目を固定する。
+ * 落ちる。下の束がその境目を固定する。
+ *
+ * **経路の見分けはテストの名前で示す。実行時に経路を返す仕組みは足さない**
+ * （`openspec/changes/adr0017-sub-add-detection-assumptions/design.md` の決定3）。
+ * 検査のために内部の形を外へ広げると、そこが新しい公開面になる。だから頭に
+ * 「印の経路」「走査の経路」と書き、入力もそれぞれ別の it に分けてある。
  */
 describe('印の無い pre だけが、生テキストの走査へ落ちる', () => {
-  it('文書の途中のフェンスには印が付く。走査は要らない', async () => {
+  it('印の経路: 文書の途中のフェンスには印が付く（走査は要らない）', async () => {
     const source = 'まえ\n\n```ts\nconst a = 1;\n```\n';
     const surfaced = await surface(source);
 
@@ -496,7 +510,7 @@ describe('印の無い pre だけが、生テキストの走査へ落ちる', ()
     });
   });
 
-  it('文書がフェンスで始まると印が落ちる。走査でしか解けない', async () => {
+  it('走査の経路: 文書がフェンスで始まると印が落ちる（ここだけが走査へ落ちる）', async () => {
     const source = '```ts\nconst a = 1;\n```\n';
     const surfaced = await surface(source);
 
@@ -508,7 +522,7 @@ describe('印の無い pre だけが、生テキストの走査へ落ちる', ()
     });
   });
 
-  it('印の落ちたフェンスと、印の付いたフェンスが混ざっても取り違えない', async () => {
+  it('両方の経路: 印の落ちたフェンスと印の付いたフェンスが混ざっても取り違えない', async () => {
     // 先頭のフェンスだけ走査で、あとは印で解く
     const source = '```ts\nconst a = 1;\n```\n\nあと\n\n```ts\nconst b = 2;\n```\n';
     const surfaced = await surface(source);
@@ -524,7 +538,7 @@ describe('印の無い pre だけが、生テキストの走査へ落ちる', ()
     });
   });
 
-  it('印が付いていれば、合わなくても走査へは落ちない', async () => {
+  it('印の経路: 合わなくても `null`。走査は代わりを務めない', async () => {
     // 基準のずれた生テキストを渡すと、印の指す範囲は中の字と合わなくなる。
     // ここで生テキストの側を探し直すと、面の言い分を黙って上書きすることになる。
     // **合わなければ `null`。** 走査は代わりを務めない
@@ -535,7 +549,20 @@ describe('印の無い pre だけが、生テキストの走査へ落ちる', ()
     expect(surfaced.port.toSourceRange(selectNth(surfaced, 'const a'))).toBeNull();
   });
 
-  it('4スペースのインデントは印が付いてもフェンスではない。対応表が作れず `null`', async () => {
+  it('走査の経路: 生テキストの側に合う候補が無ければ `null`（推測で当てにいかない）', async () => {
+    // 印の無いフェンス（＝走査へ落ちる唯一の入口）で、面に出ている字と生テキストが
+    // 食い違う場合。走査は候補を前から試すが、**桁まで合わなければ採らない**
+    // （`preview.ts` の `resolveFence` → `fence.ts` の `buildFenceMap`）。
+    // ここで「近いから」と当てにいくと、コードブロックの中を黙って別の場所へ写す
+    const parsed = '```ts\nconst a = 1;\n```\n';
+    const surfaced = await surface('```ts\nconst b = 2;\n```\n', parsed);
+
+    expect(surfaced.marks, '印が付いていたら、この it は走査の経路を見ていない').toEqual([null]);
+    expect(surfaced.text).toContain('const a = 1;');
+    expect(surfaced.port.toSourceRange(selectNth(surfaced, 'const a'))).toBeNull();
+  });
+
+  it('どちらの経路でも解けない: 4スペースのインデントは印が付いてもフェンスではない', async () => {
     // 印は `pre` に付くが、フェンスの行が無いので `buildFenceMap` が作れない
     // （`./fence.test.ts`）。走査もフェンスを見つけないので、どちらの経路でも解けない
     const source = 'まえ\n\n    const a = 1;\n    const b = 2;\n';
@@ -546,7 +573,7 @@ describe('印の無い pre だけが、生テキストの走査へ落ちる', ()
     expect(surfaced.port.toSourceRange(selectNth(surfaced, 'const a'))).toBeNull();
   });
 
-  it('図（mermaid）は `pre` にならないので、印も走査の相手も持たない', async () => {
+  it('印の経路: 図（mermaid）は `pre` にならないので、印も走査の相手も持たない', async () => {
     // 先頭が図でも、後ろのフェンスは印で解ける（走査の出す候補と `pre` の数は合わない）
     const source = '```mermaid\ngraph TD\nA-->B\n```\n\n```ts\nconst a = 1;\n```\n';
     const surfaced = await surface(source);

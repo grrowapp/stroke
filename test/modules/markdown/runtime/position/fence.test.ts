@@ -6,6 +6,17 @@
  * （食い違いそのものは `test/app/components/workspace/markdown-fence-position.test.ts`
  * が固定している。こちらはその食い違いを埋める側の検査）。
  *
+ * **生テキストと表示文字列の差は5つある**（`./fence.ts` の冒頭）。どれをどこで固定して
+ * いるかが名前から読めるようにしてある。
+ *
+ * | 差 | 固定している場所 |
+ * | --- | --- |
+ * | 4桁のタブストップ | describe「タブは4桁のタブストップまで開く」 |
+ * | 器のインデント剥がし | describe「器の印（インデント・引用の `> `）は各行から剥がされる」 |
+ * | 引用記号の剥がし | 同上（`> ` の it） |
+ * | 末尾改行の付与 | describe「末尾の改行は `code` に必ず足される（生テキストに無くても）」 |
+ * | メタの分離 | it「情報行のメタ（`title="x"`）は `code` に入らない。中身の対応は変わらない」 |
+ *
  * 実測は @nuxtjs/mdc 0.23.1。
  */
 import { parseMarkdown } from '@nuxtjs/mdc/runtime';
@@ -112,7 +123,7 @@ describe('フェンスの対応表', () => {
     expectRoundTrip(source, code, map);
   });
 
-  it('情報行にメタが付いても、中身の対応は変わらない', async () => {
+  it('情報行のメタ（`title="x"`）は `code` に入らない。中身の対応は変わらない', async () => {
     const source = `${PREFIX}\`\`\`ts title="x"\nconst a = 1;\n\`\`\`\n`;
     const { map, code } = await requireMapOf(source);
 
@@ -175,7 +186,7 @@ describe('タブは4桁のタブストップまで開く', () => {
   });
 });
 
-describe('器の印は各行から剥がされる', () => {
+describe('器の印（インデント・引用の `> `）は各行から剥がされる', () => {
   it('リストの中のフェンス: インデントは表示に出ない', async () => {
     const source = `${PREFIX}- 項目\n\n  \`\`\`ts\n  const a = 1;\n  \`\`\`\n`;
     const { map, code } = await requireMapOf(source);
@@ -301,7 +312,7 @@ describe('オフセットは UTF-16 の単位', () => {
   });
 });
 
-describe('末尾の改行', () => {
+describe('末尾の改行は `code` に必ず足される（生テキストに無くても）', () => {
   it('文書が改行で終わらなくても、閉じ行があれば普通に対応する', async () => {
     const source = `${PREFIX}\`\`\`ts\nconst a = 1;\n\`\`\``;
     const { map, code } = await requireMapOf(source);

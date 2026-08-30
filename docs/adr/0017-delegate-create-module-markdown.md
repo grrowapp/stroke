@@ -19,6 +19,7 @@
 - `adr0017-sub-add-detection-assumptions`
 - `adr0017-sub-fix-normalization-offset`
 - `adr0017-sub-create-reference-mdc`
+- `adr0017-sub-update-module-terminology`
 
 ## 背景
 
@@ -293,6 +294,22 @@ markdown を扱う実体が `nuxt.config.ts`（parse 設定）・`app/components
 - 移設は移動のみで、テストの中身と結果が変わっていない
 
 **親との関係** — 分割。`adr0017-sub-create-position-port-preview` の後続。6.8.2（どのテストが固定しているか）は `adr0017-sub-add-detection-assumptions` が加える検知の名前を突き合わせる必要があるため、その完了後に一度だけ確認する。
+
+### 資料化（続き）
+
+#### adr0017-sub-update-module-terminology
+
+- **種別**: 資料化
+- **状態**: 未着手
+- **成果物**: 未作成
+- **触るファイル**: `modules/markdown/` のコメント33箇所、`app/` 12箇所、本 ADR、`specs/_epics/create-module-markdown/epic.md`、親 change の artifact、子 change の artifact と ticket
+- **引き取る tasks**: 無し（親の tasks に項目が無い。grilling で生じた）
+
+**対応内容** — 「口」という語を落とし、普通の用語へ置き換える。同じ語が **alias / 公開コンポーネント / `defineExpose` の型 / 差し替え先** の4つに当てられており、「位置の口を出す」が何を足すことなのか読めない。新しいドメイン用語は立てず、`CONTEXT.md` にも定義を置かない。
+
+対象は **146箇所 / 29ファイル**（実測。`入口`・`出口` などの複合語12箇所は対象外）。**specs の Requirement 見出しを2本含む**ため、振る舞いを変えないまま規範文書の見出しが変わる。
+
+**親との関係** — 分割。`create-module-markdown` の grilling でユーザーが指摘した（「口とは？ その用語定義やめない？ 禁止」）。当時「別 change に切る」と言われたまま起票されずに落ちていたものを、後から起こした。`CONTEXT.md:52` と `MarkdownView.vue` / `types.ts` の分は `adr0017-sub-create-position-port-preview` が先に直している。
 
 ## 経緯の記録
 

@@ -11,6 +11,14 @@
  *   生テキストと違う）
  *
  * DOM が要るので happy-dom で動かす。
+ *
+ * **ここはパーサを通らない。だからパーサの変化を捉える力を持たない。それでよい。**
+ *
+ * 生テキストの面は `parseMarkdown` を呼ばず、DOM と文字列の対応を見るだけである。
+ * `@nuxtjs/mdc` の出力がどう変わってもこの束は何も言わないが、それは穴ではなく役割の
+ * 違いである（`openspec/changes/adr0017-sub-add-detection-assumptions/design.md` の R5）。
+ * **AST の形を固定する検査をここへ足さないこと。** 解析を通らない面に解析の前提を置くと、
+ * 読む人が「ここもパーサに追随する」と誤解する。パーサの形は `./ast-shape.test.ts` が持つ。
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 

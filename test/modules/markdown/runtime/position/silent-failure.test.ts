@@ -107,6 +107,17 @@ function parseStageViolations(vue: string): string[] {
   return found;
 }
 
+/**
+ * **ここは従である。**
+ *
+ * 主は `../render/markdown-view-position.test.ts` の「解析の段は `<MDC>` に残っている」で、
+ * あちらは `<MDC>` のスタブが**実際に描かれたか**で見る（`openspec/changes/
+ * adr0017-sub-add-detection-assumptions/design.md` の決定2）。文字列の検査は書き方に依存し、
+ * `import()` の動的形や再輸出で抜けるので、こちらは安い補助として置く。
+ *
+ * **偽陽性が続くようならこの束だけを落とす**（同 design.md の R6）。主が生きていれば
+ * 検知は成り立つ。
+ */
 describe('件1: 解析の段を自前で組み直させない', () => {
   const vue = readFileSync(MARKDOWN_VIEW, 'utf-8');
 

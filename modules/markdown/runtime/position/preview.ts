@@ -27,6 +27,7 @@
  * と同じ理由）。生テキストは作った時点で決まるので、そちらから作る材料だけは控えておく。
  */
 import { buildFenceMap, type FenceMap } from './fence';
+import { createSourceMapping } from './normalize';
 import { SOURCE_END_ATTR, SOURCE_START_ATTR } from './source-span';
 import type { PositionPort, SourceRange } from './types';
 
@@ -53,18 +54,19 @@ export interface PreviewSurface {
    */
   container: Node;
   /**
-   * その本文のもとになった生テキスト。
+   * その本文のもとになった生テキスト。**面に渡された、そのままの文字列でよい。**
    *
-   * **`parseMarkdown` が実際に解析した文字列でなければならない。** つまり CRLF を LF へ
-   * 潰し、front matter を落とした**後**の本文である。`parseMarkdown` はこの2つを呼ばれた
-   * 側で行うので（`@nuxtjs/mdc/dist/runtime/parser/index.js` の `md.replace(/\r\n/g, "\n")`
-   * と `parseFrontMatter`）、渡した生ファイルと位置の基準は同じにならない。
+   * `parseMarkdown` は解析の前に CRLF を LF へ潰し、front matter を落とす
+   * （`@nuxtjs/mdc/dist/runtime/parser/index.js` の `md.replace(/\r\n/g, "\n")` と
+   * `parseFrontMatter`）。DOM に出る位置の印はその**後**の文字列を指すので、
+   * 渡された文字列とは基準が割れる。
    *
-   * **基準がずれていても、この口は `null` に倒れない。** 切り出しと描かれた字がたまたま
-   * 揃えば照合を素通りして、**黙って別の場所を返す**（`test/modules/markdown/runtime/
-   * position/edge-cases.test.ts` に CRLF と front matter の反例がある。CRLF では隣の段落を、
-   * front matter では front matter の中を指した）。多くの場合は `null` になるが、それは
-   * 偶然の副産物であって保証ではない。**揃えるのは呼ぶ側の責任である。**
+   * **その食い違いは面が自分で吸収する。** 揃えてから渡す手続きを呼ぶ側に課さない
+   * （`openspec/specs/markdown/module` の「面は解析のための正規化を自分で吸収する」）。
+   * 揃え忘れは実行時に何の合図も出さず、誤った位置が返るだけになるためである。
+   *
+   * 返る位置も、外から渡す位置も、**この文字列を基準に読む**。写像は
+   * `./normalize.ts` が作り、作れなければ両方向とも `null` になる（推測で答えない）。
    *
    * 本家の文書は人間も別のエージェントも書ける平文の md なので、CRLF も front matter も
    * 現実に来る。「来ない前提」で済ませてよい入力ではない。
@@ -119,9 +121,18 @@ interface Fenced {
   end: number;
 }
 
-/** 属性で届いた値を生テキストのオフセットとして読む。読めなければ `null` */
+/**
+ * 属性で届いた値を生テキストのオフセットとして読む。読めなければ `null`。
+ *
+ * **空の属性は 0 ではない。** `Number('')` も `Number(' ')` も `0` になるので、
+ * 数だけを見るガード（`Number.isInteger(parsed) && parsed >= 0`）はこれを素通しする。
+ * `data-src-start=""` が有効なオフセット 0 として読まれると、その包みは文書の冒頭を
+ * 指したまま黙って通る——「位置が無い」と「offset 0」の取り違えそのものである
+ * （`./source-span.ts` の「位置を持たない text ノードは包まない」）。
+ */
 function readOffset(value: string | null): number | null {
   if (value === null) return null;
+  if (value.trim() === '') return null;
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
 }
@@ -363,7 +374,23 @@ type Entry = { kind: 'mapped'; start: number; piece: Mapped } | PendingFence;
  * 5. 生テキストの範囲が `0` 以上 `source.length` 以下に収まらない、または整数でない
  * 6. 生テキストの範囲に当たる字が面に1つも無い（`toDomRange`）
  */
-export function createPreviewPositionPort({ container, source }: PreviewSurface): PositionPort {
+export function createPreviewPositionPort({
+  container,
+  source: given,
+}: PreviewSurface): PositionPort {
+  /**
+   * 渡された文字列と、解析に使われた文字列との写像。
+   *
+   * **この関数の中はすべて解析側の座標で動く。** 位置の印（`data-src-*`）も、フェンスの
+   * 対応表も、照合もその基準だからである。渡された文字列の座標へ戻すのは、外へ答える
+   * 直前の1箇所だけにする（`toSourceRange` の出口・`toDomRange` の入口）。
+   *
+   * **写像が作れなければ両方向とも `null` を返す。** 恒等で代用しない。代用すると
+   * 基準の違う位置を正しいかのように返すことになり、塞ごうとしている症状そのものになる。
+   */
+  const mapping = createSourceMapping(given);
+  const source = mapping?.parsed ?? '';
+
   /** 生テキストは作った時点で決まるので、フェンスの候補は1度出せばよい */
   const blocks = scanFencedBlocks(source);
 
@@ -491,7 +518,13 @@ export function createPreviewPositionPort({ container, source }: PreviewSurface)
     return { spans, texts, mapped };
   };
 
-  return {
+  /**
+   * 解析側の座標で答える中身。外向きの2つがこれを包んで写像を通す。
+   *
+   * **ここから下は渡された文字列を知らない。** 知る必要が無いし、知ると基準が2つ
+   * 混ざる場所が増える。
+   */
+  const inParsed: PositionPort = {
     toSourceRange(range: Range): SourceRange | null {
       const scanned = scan();
 
@@ -551,6 +584,22 @@ export function createPreviewPositionPort({ container, source }: PreviewSurface)
       range.setStart(head.node, head.offset);
       range.setEnd(tail.node, tail.offset);
       return range;
+    },
+  };
+
+  return {
+    toSourceRange(range: Range): SourceRange | null {
+      if (!mapping) return null;
+      const parsedRange = inParsed.toSourceRange(range);
+      if (!parsedRange) return null;
+      return mapping.toGiven(parsedRange);
+    },
+
+    toDomRange(range: SourceRange): Range | null {
+      if (!mapping) return null;
+      const parsedRange = mapping.toParsed(range);
+      if (!parsedRange) return null;
+      return inParsed.toDomRange(parsedRange);
     },
   };
 }

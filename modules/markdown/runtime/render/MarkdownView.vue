@@ -83,7 +83,23 @@ const props = withDefaults(
  * **props では届かない。** MDC は `components.map` の値を `resolveComponent` で引いて
  * `MarkdownFence` を自分で作るので、本文の器から props を渡す経路が無い。
  */
-provide(SOURCE_SHOWN_KEY, () => props.sourceShown);
+/**
+ * **降ろす前に解析側の座標へ写す。**
+ *
+ * 受け取る範囲は `props.value` を基準にしている（`../position/types.ts`）。一方、
+ * フェンス側が突き合わせる `data-src-*` は解析に使われた文字列を指す。返す側だけ
+ * 写像を通すと、ここが新しい食い違いの置き場になる。
+ *
+ * **写せない範囲は落とす。推測で添えない**（`readFenceRange` が読めないときに図だけを
+ * 出す既存の構えと同じ）。写像そのものが作れないときは全部落ちる。
+ */
+const shownInParsed = computed<readonly SourceRange[]>(() => {
+  const mapping = createSourceMapping(props.value ?? '');
+  if (!mapping) return [];
+  return props.sourceShown.map((range) => mapping.toParsed(range)).filter((r) => r !== null);
+});
+
+provide(SOURCE_SHOWN_KEY, () => shownInParsed.value);
 
 const root = useTemplateRef<HTMLElement>('root');
 
@@ -154,6 +170,14 @@ defineExpose({ toSourceRange, toDomRange } satisfies PositionPort);
       **自前で `parseMarkdown` を呼び直す形にはしない。** 一度そう書いたところ、
       client 側で解析がもう一度走って SSR と shiki の色が食い違い、hydration mismatch に
       なった（Vue が全体を描き直し、アイコンが消えた。実測）。解析の段は触らないこと。
+
+      **この形は検知されている。** 主は
+      `test/modules/markdown/runtime/render/markdown-view-position.test.ts` の
+      「解析の段は `<MDC>` に残っている」で、`<MDC>` のスタブが**実際に描かれたか**を見る。
+      従は `test/modules/markdown/runtime/position/silent-failure.test.ts` の「件1」
+      （このファイルの中身を読む文字列検査）。症状の側は `e2e/markdown-hydration.spec.ts`。
+      実測: ここを `watchEffect` + `parseMarkdown` の自前呼び出しへ書き換えると、
+      その2ファイルで12本が落ちた（うち markdown-view-position が7本。2026-08-30）。
     -->
     <MDC :value="props.value" :parser-options="{ keepPosition: true }">
       <template #default="{ body, data }">

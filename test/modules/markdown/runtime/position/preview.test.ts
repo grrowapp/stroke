@@ -309,6 +309,61 @@ describe('文書のいちばん先頭から選ぶ', () => {
   });
 });
 
+describe('空の属性を「offset 0」と読まない', () => {
+  /**
+   * **`Number('') === 0` である。** 数だけを見るガード
+   * （`Number.isInteger(parsed) && parsed >= 0`）はこれを素通しするので、`data-src-start=""`
+   * が有効なオフセット 0 として読まれ、その包みが黙って文書の冒頭を指す。
+   *
+   * 「位置が無い」と「offset 0」の取り違えには経路が3つある。AST の側（包みを作らない）は
+   * `./silent-failure.test.ts` の件2、`pre` の側（印を打たない）は `./pre-mark.test.ts`、
+   * **属性を読む側がここ**である。
+   */
+  /**
+   * 同じ字を持つ段落を2つ置く。
+   *
+   * **これで「黙って冒頭を指す」が見える形になる。** 空の属性が 0 として読まれると、
+   * 包みの範囲が文書の頭まで広がり、`alignWrapper` の照合は**前の段落のほうの字**に
+   * 当たってしまう（字が同じなので照合は通る）。返るのは `null` でも例外でもなく、
+   * **もっともらしい別の場所**である。
+   *
+   * 前の段落が包まれないのは、生テキストの先頭（offset 0）から始まるノードが position を
+   * 落とすためである（`./silent-failure.test.ts` の件2）。
+   */
+  const SOURCE = 'いろはにほへと\n\nいろはにほへと\n';
+
+  /** 後ろの段落の `いろは`。面では7文字目から */
+  const BEHIND = { from: 7, to: 10 };
+
+  async function blanked(value: string): Promise<Surface> {
+    const surfaced = await surface(SOURCE);
+    const found = surfaced.container.querySelectorAll('span[data-src-start]');
+    expect(found, '包みは後ろの段落のぶん1つだけのはず').toHaveLength(1);
+
+    // 前提。属性が入っているうちは**後ろの段落**を指す（＝下の `null` は属性を潰した結果）
+    expect(surfaced.port.toSourceRange(select(surfaced.container, BEHIND.from, BEHIND.to))).toEqual({
+      start: SOURCE.lastIndexOf('いろは'),
+      end: SOURCE.lastIndexOf('いろは') + 3,
+    });
+
+    found[0]!.setAttribute('data-src-start', value);
+    return surfaced;
+  }
+
+  it('空の属性を持つ包みは、対応の取れない領域になる', async () => {
+    // ガードを外すと `{ start: 0, end: 3 }`——**前の段落の `いろは`**——が返る
+    const surfaced = await blanked('');
+
+    expect(surfaced.port.toSourceRange(select(surfaced.container, BEHIND.from, BEHIND.to))).toBeNull();
+  });
+
+  it('空白だけの属性も同じ（`Number(" ") === 0`）', async () => {
+    const surfaced = await blanked(' ');
+
+    expect(surfaced.port.toSourceRange(select(surfaced.container, BEHIND.from, BEHIND.to))).toBeNull();
+  });
+});
+
 describe('フェンス（コードブロック）', () => {
   const source = 'まえ\n\n```ts\nconst a = 1;\nconst b = 2;\n```\n\nあと\n';
 

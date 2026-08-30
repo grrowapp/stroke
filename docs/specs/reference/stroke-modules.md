@@ -238,6 +238,7 @@ watch(error, (reason) => {
 
 ## 関連
 
+- `docs/specs/reference/mdc-observations.md` — markdown モジュールが乗っている `@nuxtjs/mdc` の癖（崩れた前提7件と、それを固定しているテスト）
 - `docs/specs/plan/next-agent-run.md` — この2つを汎用のエージェント実行へ広げる案（未着手）
 - `openspec/specs/agent-question/spec.md` — 振る舞いの規定（本体）
 - `openspec/specs/proposal-review/spec.md` — 画面2 に固有の規定

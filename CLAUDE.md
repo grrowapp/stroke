@@ -60,6 +60,7 @@ worktree = `git worktree` で切った作業ディレクトリ。それぞれが
 
 - `stroke-modules.md` — stroke のモジュール（`useAgentQuestion` / `AgentQuestionModal`）の使い方
 - `upstream-observations.md` — 本家 spec-workflow-mcp をソースから調べた事実（WS メッセージ9種・接続の制約・反映までの遅延）。方針は ADR-0006、基準バージョンは ADR-0008
+- `mdc-observations.md` — `@nuxtjs/mdc` を実測で調べた事実（実装の途中で崩れた前提7件・パーサを変異させて測った検知力）。件ごとに、踏んだときに落ちるテストを併記する
 
 ### `docs/specs/plan/`
 

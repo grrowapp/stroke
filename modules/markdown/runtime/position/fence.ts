@@ -234,7 +234,18 @@ function choosePrefixLength(line: string, shown: string, containerPrefix: string
  * 4. 行数が合わない、または行の中の桁を照合で合わせられない
  */
 export function buildFenceMap({ source, position, code }: FenceSource): FenceMap | null {
-  // 1. 先頭から始まる要素は position を持たない
+  // 1. 先頭から始まる要素は position を持たない。
+  //
+  // **見るのは `position` が届いたかどうかだけである。** `!position.start` や
+  // `!position?.start` と書いてはならない。`start` が 0 の位置——冒頭のフェンスを
+  // 属性で受け取る面（`../render/MarkdownDiagram.vue`）では実在する——を「位置が無い」と
+  // 取り違え、そこだけ黙って `null` になる（`test/modules/markdown/runtime/position/
+  // silent-failure.test.ts` の「`start` が 0 の位置は「無い」ではない」。`!position?.start`
+  // へ書き換えると4本落ちる。実測 2026-08-30）。
+  //
+  // 下の `!position` が正しいのは、`position` がオブジェクト（＝真）だからである。
+  // **形に助けられているだけ**で、`SourceRange` を平坦な数（`positionStart` など）に
+  // 開いた日には、同じ真偽判定が 0 を落とす。見るのは値の**有無**だけだと覚えておくこと
   if (!position) return null;
 
   const { start, end } = position;

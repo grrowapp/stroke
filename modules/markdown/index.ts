@@ -61,14 +61,23 @@ export default defineNuxtModule({
 
       // **`keepPosition` はここに置けない。** あれは `parseMarkdown` に渡す
       // `MDCParseOptions` のオプションであって、module の `ModuleOptions` ではない
-      // （`dist/module.d.mts` の 63行目と 126行目。ここに書くと TS2353 で落ちる）。
+      // （`dist/module.d.mts` の 63行目と 126行目）。
       // `<MDC>` の `parser-options` から渡す（`MarkdownView.vue`）。
+      //
+      // 置いたら型で止まる。実測（2026-08-30）: ここへ `keepPosition: true` を書いて
+      // `yarn typecheck` を回すと
+      // `error TS2353: Object literal may only specify known properties, and
+      // 'keepPosition' does not exist in type 'Partial<ModuleOptions>'` で落ちる。
       //
       // **解析そのものを自前で組み直してはならない。** `<MDC>` の `useAsyncData` +
       // `parseMarkdown` を写して置き換えたところ、クライアントが再解析して shiki が
       // SSR と違う色を出し、ハイドレーションがずれて**アプリ全体のアイコンが消えた**
       // （実測。markdown の本文には症状が出ず、全画面のピクセル差分で見つかった）。
       // 位置を運ぶ手当ては `<MDC>` のスロットの中だけで行う。
+      //
+      // 踏んだら止まる。`test/modules/markdown/runtime/render/markdown-view-position.test.ts`
+      // が `<MDC>` の実際に描かれたことで形を固定しており、自前の `parseMarkdown` 呼び出しへ
+      // 書き換えると12本落ちる（実測 2026-08-30）。
       //
       // 位置の口の実装は `runtime/position/` が持つ。
 

@@ -15,14 +15,40 @@ import { ALPHA, resetBoard } from './support';
  * 全画面のピクセル差分だった。だからここは本文の中身ではなく、**サーバが送った HTML と
  * ハイドレーション後の DOM が同じか**を見る。ずれた瞬間に落ちる。
  *
- * 形の側（`parseMarkdown` を直に呼んでいないか・`<MDC>` を通しているか）は
- * `test/modules/markdown/runtime/position/silent-failure.test.ts` が単体で落とす。
+ * 形の側は単体が落とす。主は
+ * `test/modules/markdown/runtime/render/markdown-view-position.test.ts`（`<MDC>` が実際に
+ * 描かれたか）、従は `test/modules/markdown/runtime/position/silent-failure.test.ts`
+ * （`parseMarkdown` を直に呼んでいないか・`<MDC>` を通しているかの文字列検査）。
  * こちらは形を保ったまま別の理由でずれた場合にも気づくための、症状の側の網である。
  *
  * **この網が拾えない食い違いが1つある。** Vue は本番ビルドでは要素の属性のずれを直さない
  * （実測。配る HTML の `style` だけを書き換えても、ハイドレーション後の DOM はサーバの値の
  * まま残った）。つまり**色だけが違う**場合はここを素通りする。拾えるのは字と要素の並びの
  * ずれ——Vue が描き直す側のずれで、実測の症状（アイコンの消失）はそちらの結果である。
+ *
+ * **別の手段を探したが、いまの構えでは拾えない**（`openspec/changes/
+ * adr0017-sub-add-detection-assumptions/design.md` の決定5）。
+ *
+ * - **DOM を突き合わせても出てこない。** 属性のずれは「客側が描こうとした値」と DOM の
+ *   食い違いであって、DOM もサーバの HTML もサーバの値のまま一致する。ここで何を比べても
+ *   現れない
+ * - **Vue は本番ビルドで属性の照合そのものを回していない。** `propHasMismatch` の呼び出しは
+ *   `__VUE_PROD_HYDRATION_MISMATCH_DETAILS__` で囲われており（実測:
+ *   `node_modules/@vue/runtime-core/dist/runtime-core.esm-bundler.js:2202`）、本番では
+ *   警告も `console.error('Hydration completed but contains mismatches.')` も出ない。
+ *   **拾うにはこのフラグを立てたビルドが要る**——配るものを変える話なので、検知のためだけに
+ *   入れない
+ *
+ * **主の検知はこれで足りている。** 実測した症状（アイコンの消失）は字と要素の並びのずれから
+ * 来ており、そちらは下の検査が拾う。色だけのずれを拾う仕掛けを新設すると、この網が
+ * 「ハイドレーションの検査基盤」へ育つ。
+ *
+ * **`@nuxt/icon` の 404 は直さない**（proposal の対象外）。この環境ではカスタムコレクションが
+ * 読めず、SSR も客側も空の `<svg>` を出すため**アイコン消失そのものが再現しない**。だが
+ * 消失は症状であって原因ではない。原因は「SSR と客側で字と要素の並びがずれる」ことで、
+ * 下の検査はその原因側を見ているので、404 が直っていなくても検知は成り立つ。
+ * （`icons` の本数を見る行は、アイコンが**在る**環境で描き直しの症状を捉えるためのもので、
+ * 空の `<svg>` しか出ない環境でも「減っていないこと」は同じように見られる。）
  */
 
 const DOCUMENT = `/projects/${ALPHA}/steering/product`;
