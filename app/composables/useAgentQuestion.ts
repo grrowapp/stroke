@@ -12,10 +12,8 @@ interface HttpError {
   message?: unknown
 }
 
-function statusOf(error: unknown): number | undefined {
-  const code = (error as HttpError | null)?.statusCode
-  return typeof code === 'number' ? code : undefined
-}
+// 状態コードの判別はここには置かない。409 を待機へ倒すのは `useWaitingRetry.requestRun` の
+// 役目で、ここに残すと同じ判定が2箇所に増える（design.md Decision 3）
 
 function messageOf(error: unknown): string {
   const e = error as HttpError | null
@@ -114,17 +112,12 @@ export function useAgentQuestion(sessionId: MaybeRefOrGetter<string>): AgentQues
       return
     }
 
-    try {
-      await $fetch(`${base.value}/invoke-agent`)
-      waitingRetry.startWaiting()
-    } catch (e) {
-      // 409 は「まだ前の応答を待っている」。他の起動失敗と区別して伝える。
-      error.value = statusOf(e) === 409
-        ? {
-            title: 'まだ前の応答を待っています',
-            message: 'AI が応答を返すまで、続けて送ることはできません。',
-          }
-        : { title: 'AI を起動できませんでした', message: messageOf(e) }
+    // 409（前の claude がまだ走っている）は待機へ倒れる。失敗として示さない
+    // （`specs/agent-question`「前の応答をまだ待っている」の MUST NOT）。待機の表示が
+    // 出るので、重ねて文言を足さない（design.md Decision 4）
+    const run = await waitingRetry.requestRun()
+    if (!run.ok) {
+      error.value = { title: 'AI を起動できませんでした', message: messageOf(run.error) }
     }
   }
 

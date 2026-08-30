@@ -303,17 +303,12 @@ export function useProposalReview(
       return
     }
     // 受理と起動は分かれている(specs/api/send-back)。成功応答の直後に起動を要求する
-    // (design.md 決定6)。busy(409)は invoke-agent 側が返す。
-    try {
-      await $fetch(`${base.value}/invoke-agent`)
-      waitingRetry.startWaiting()
-    } catch (error) {
+    // (design.md 決定6)。busy(409)は invoke-agent 側が返すが、それは走っているという
+    // 事実であって失敗ではない。`requestRun` が待機へ倒す
+    const run = await waitingRetry.requestRun()
+    if (!run.ok) {
       pendingAction.value = null
-      if (statusOf(error) === 409) {
-        warn('まだ前の応答を待っています', 'AI が応答を返すまで、続けて送ることはできません。')
-      } else {
-        warn('AI を起動できませんでした', messageOf(error))
-      }
+      warn('AI を起動できませんでした', messageOf(run.error))
     }
   }
 
