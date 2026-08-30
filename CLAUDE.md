@@ -4,43 +4,10 @@
 
 ### Issue tracker
 
-作業は `openspec/changes/<change-id>/` 配下の OpenSpec change として管理する。詳細は `docs/agents/issue-tracker.md`。
-
-**起票時の ticket**（1対1・ファイル名・後書き禁止の正は `docs/feature/overview.md`「対応の定義」。frontmatter と採用日・archive の運用は `docs/agents/issue-tracker.md` が正）:
-
-- change-id は動詞始まりの `<動詞>-<対象>`（`create` / `add` / `update` / `fix` / `remove` の5つから選ぶ）
-- change の起票時には ticket を併せて作る: `openspec/tickets/<change-id>.md`（2026-08-28 以降に起票する change に掛かる。それ以前の ticket 無し change に遡って作らない）
-- ファイル名は change-id ＋ `.md`。feature 名の `/` ↔ `__` 置換ルールは**適用しない**
-- 中身は frontmatter（`status`。`tags` は任意）＋起票時点の概要。**本文は以後一切追記しない**
-
-**⚠ 参照の方向**（**規定の正は `docs/agents/issue-tracker.md` の「参照の方向」**。ここは注意喚起で、迷ったら必ずそちらを開く）:
-
-- 序列は **docs（`docs/adr/` を除く `docs/`）> ADR（`docs/adr/`）> specs（`openspec/specs/`）**。ticket・steering（`.spec-workflow/steering/` の工程横断の指針文書）・change の artifact（proposal / specs / ui / design / tasks）はこの序列で引く（`docs/specs/` は docs 層であり、この「specs」ではない）
-- ADR が**序列内で**引けるのは docs と specs のみ（序列の外の CLAUDE.md・CONTEXT.md はどの層からも引ける）
-- **docs** は序列内の他層を参照しない（唯一の例外が specs への参照で、specs が docs へ追従する制約を示すためのもの）。ツールの設定・スキーマ・コードは序列の外の実体で、どの層からも事実として参照してよい
-- 拠り所: **docs に記述があれば docs**。docs に無く ADR にあれば方向性の拠り所になるが、エージェントの解釈が混ざりうるため**盲信厳禁**（都度ユーザー確認）
-- specs は docs・ADR に付随する「その時点の決めの物差し」で、**確定には入らない**
-- 同層内は docs ↔ docs・ticket ↔ ticket のみ可。**ADR ↔ ADR・specs ↔ specs は禁止**（未確定が未確定を土台に枝葉を伸ばす連鎖を断つ）
-- **逆流はない**: docs・ADR・specs が ticket・change・steering を根拠に参照することはない。change の作業が ticket を入力・規範として参照することもない（一覧の起点として ticket から artifact へ辿るのは可）
-- CLAUDE.md は guidance と reference（序列の外。すべてを参照でき、どの層からも引ける）。CONTEXT.md は用語集で、ルール・決めは持たず、他を参照せず、どの文書からも用語の定義としてのみ引ける
-
-**⚠ 更新対応**（**規定の正は `docs/agents/issue-tracker.md` の「更新対応」**）:
-
-- specs へ delta を入れるとき、規定する上位資料（docs・ADR）があるなら**上位資料への整合反映までが change の責務範囲**。整合反映は design.md で提案し、ユーザー承認を持って許可される。承認前に上位資料を書き換えない
-- specs が docs と食い違っていたら、**見つけた者が責任を持って** docs > ADR の規定に沿った specs へ直す
-- ADR の内容が docs に確定したら、その ADR は**状態行を `archive` に書き換える**（ファイルは動かさない）。引き継ぎ先を docs の節まで、相対 markdown リンクで状態行に明示する。取りこぼす規約が残るなら archive にしない
-
-### Triage labels
-
-取りうる値は `docs/agents/triage-labels.md` の5つ。5つ以外の値を見つけたら5つのいずれかに直す（規定の正は `docs/agents/issue-tracker.md`「change を起票したら ticket も作る」）。
-
-### Domain docs
-
-単一コンテキスト — リポジトリ直下の `CONTEXT.md` 1本と `docs/adr/`。詳細は `docs/agents/domain.md`。
-
-### Subagents
-
-コンテキストを持ち込ませないことが目的なら、`fork` ではなく新規エージェントを使う。詳細は `docs/agents/subagents.md`。
+- `docs/agents/issue-tracker.md` の「更新対応）`
+  - specs へ delta を入れるとき、規定する上位資料（docs・ADR）があるなら**上位資料への整合反映までが change の責務範囲**。整合反映は design.md で提案し、ユーザー承認を持って許可される。承認前に上位資料を書き換えない
+  - specs が docs と食い違っていたら、**見つけた者が責任を持って** docs > ADR の規定に沿った specs へ直す
+  - ADR の内容が docs に確定したら、その ADR は**状態行を `archive` に書き換える**（ファイルは動かさない）。引き継ぎ先を docs の節まで、相対 markdown リンクで状態行に明示する。取りこぼす規約が残るなら archive にしない
 
 ## Dev サーバー
 
@@ -54,11 +21,12 @@
 worktree = `git worktree` で切った作業ディレクトリ。それぞれが**もとになった親ブランチ**を1つ持つ。
 
 - 合流点はこの親ブランチ。main を直接の合流点にしない
-- 成果のマージ先・追随の取り込み元・ユーザー指示で扱う対象は、いずれもこの親ブランチ
+- 成果のマージ先・追随の取り込み元・ユーザー指示で扱う対象は、いずれもこの worktree のブランチ
 - 親ブランチが判定できないときは、推測せずユーザーに確認する
-- 各 worktree は親ブランチを**取り込めるタイミングで自主的に** merge して追随する。親から worktree へ配ることはしない（作業途中の土台を動かさないため）
-- 取り込みを先延ばしするほどコンフリクトが育つ。小さく頻繁に取り込むこと
-- **main へのマージ**は、ユーザー指示を受けてから確認→承認を一回踏んで行う
+- 各 worktree は親ブランチに更新が入っていたら、**取り込めるタイミングで自主的に** `git rebase develop` して追随する
+- 取り込みを先延ばしするほどコンフリクトが育つ。**小さく頻繁に**取り込むこと
+- **main・develop へのマージ**は、ユーザー指示を受けてから確認→承認を一回踏んで行う
+- **change の実装（apply）は、この worktree のブランチへ直接コミットする**
 
 ## Docs
 
