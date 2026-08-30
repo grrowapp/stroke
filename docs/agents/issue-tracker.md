@@ -30,8 +30,6 @@ openspec/
     └── archive/             完了した change（YYYY-MM-DD-<change-id>/）
 ```
 
-`openspec/specs/` は archive 時または `/opsx:sync` で更新される。確定ではない（[各層の性質](#各層の性質)）。
-
 ## artifact を書く前に読むもの
 
 性質は[各層の性質](#各層の性質)にある。

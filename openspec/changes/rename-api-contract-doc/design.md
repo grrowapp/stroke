@@ -12,7 +12,7 @@
 | 資料 | `docs/specs/core/system-structure.md` / `docs/specs/architecture/data-fetching.md` / `docs/specs/architecture/question-flow.md` / `docs/specs/reference/stroke-modules.md` / `docs/specs/plan/next-agent-run.md` |
 | コード | `server/utils/stroke/request-schemas.ts`（コメント） |
 
-openspec 側（`openspec/changes/**` と `openspec/ticket/`）にも参照があるが、そちらは**過去の記録**である。archive された change は当時の path を書いたまま残すのが正しく、書き換えない。
+openspec 側（`openspec/changes/**` と `openspec/tickets/`）にも参照があるが、そちらは**過去の記録**である。archive された change は当時の path を書いたまま残すのが正しく、書き換えない。
 
 **既存の網との関係**
 

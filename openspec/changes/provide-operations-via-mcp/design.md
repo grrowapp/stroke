@@ -17,9 +17,9 @@
 
 **Non-Goals:**
 
-- ワークフロースキーマ側の instruction の作り直し・スキル相当の手順書の整備（`switch-workflow-to-mcp-tools`）。MCP ツール分の allowedTools の追加・curl / jq の削除・prompt 3件の向き先変更は、提供したツールで往復が成立するために要るので本 change に含む
-- ツールの実処理化・transport の変更（`implement-mcp-operations`）
-- `docs/` の変更（`document-mcp-operations`）
+- ワークフロースキーマ側の instruction の作り直し・スキル相当の手順書の整備（`adr0016-sub-switch-workflow-to-mcp-tools`）。MCP ツール分の allowedTools の追加・curl / jq の削除・prompt 3件の向き先変更は、提供したツールで往復が成立するために要るので本 change に含む
+- ツールの実処理化・transport の変更（`adr0016-sub-implement-mcp-operations`）
+- `docs/` の変更（`adr0016-sub-document-mcp-operations`）
 
 ## MCP 提供の全体設計
 

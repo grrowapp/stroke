@@ -8,7 +8,7 @@
 - [x] 2.1 `CLAUDE.md` の Docs の節を `contract.md` に直した
 - [x] 2.2 資料側5件を直した — `system-structure.md`（3箇所）/ `data-fetching.md` / `question-flow.md`（2箇所）/ `stroke-modules.md`（3箇所）/ `next-agent-run.md`
 - [x] 2.3 コード側を直した — `server/utils/stroke/request-schemas.ts` のコメント
-- [x] 2.4 `openspec/changes/**`（archive 含む・35ファイル）と `openspec/ticket/` は触っていない
+- [x] 2.4 `openspec/changes/**`（archive 含む・35ファイル）と `openspec/tickets/` は触っていない
 - [x] 2.5 `grep -rn "api-contract"` を走らせ、作業ツリー側の残存が **0件**であることを確かめた
 - [x] 2.6 design で洗い出せていなかった7件目 `santa-ts-review.SKILL.md:60` を発見して直した。過去の記録ではなく現役のレビュー用スキルからの参照なので対象に含めた
 

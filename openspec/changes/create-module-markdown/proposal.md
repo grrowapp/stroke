@@ -22,7 +22,7 @@ markdown を扱う実体が散っている。parse の設定は `nuxt.config.ts`
 
 - `markdown/module`: markdown を扱う実体の境界。何がモジュールの内側で、外へ何を公開するか（描く口・直す口・位置の口）。モジュールの外が `@nuxtjs/mdc` を直に触らないこと
 
-注釈（`annotation/module`）はこの change に含めない。`create-module-annotation` が持つ。あちらはこの change が公開する位置の口の利用者であり、位置の口が揃うまで着手できない。
+注釈（`annotation/module`）はこの change に含めない。`adr0017-sub-create-module-annotation` が持つ。あちらはこの change が公開する位置の口の利用者であり、位置の口が揃うまで着手できない。
 
 ### Modified Capabilities
 

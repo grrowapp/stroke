@@ -4,7 +4,7 @@
 
 ---
 
-**起票時のメモとの差**（`.openspec.yaml` の note・`openspec/ticket/move-conventions-to-steering.md` は 2026-08-24 時点のもので、3項目すべてが未移設という前提で書かれている）
+**起票時のメモとの差**（`.openspec.yaml` の note・`openspec/tickets/move-conventions-to-steering.md` は 2026-08-24 時点のもので、3項目すべてが未移設という前提で書かれている）
 
 調べた結果、auto-import 不使用・明示 import と「画面は判断しない」は steering `structure.md` に着地済みだった。未移設はテスト規約だけで、この change が実際に移したのは次の2件。
 
