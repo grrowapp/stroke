@@ -5,7 +5,7 @@
 
 ## 決定
 
-`provide-operations-via-mcp` の範囲を**現行操作の代行**（既存 REST への薄いプロキシ）に限り、そこに収まらないものを 9 本の change へ委譲する。委譲は2種に分ける。
+`provide-operations-via-mcp` の範囲を**現行操作の代行**（既存 REST への薄いプロキシ）に限り、そこに収まらないものを 10 本の change へ委譲する。委譲は3種に分ける。
 
 - **後続**（この change の完了後に着手する。範囲を意図的に切った先）
   - `adr0016-sub-implement-mcp-operations`
@@ -18,6 +18,8 @@
   - `adr0016-sub-define-request-validation-messages`
   - `adr0016-sub-update-debug-log-per-session`
   - `adr0016-sub-fix-busy-response-handling`
+- **併走**（前提でも後続でもない。この change の作業が明るみに出したが、完了を待つ関係にない）
+  - `adr0016-sub-add-timeout-to-config`
 
 前提のいずれかが未了のうちは、`provide-operations-via-mcp` は承認依頼へ進まない。
 
@@ -35,7 +37,7 @@
 
 ### 拡張
 
-ticket の tags が enhancement のもの。新しい口・選べる幅を増やす（7件）。
+ticket の tags が enhancement のもの。新しい口・選べる幅を増やす（8件）。
 
 #### adr0016-sub-implement-mcp-operations
 
@@ -200,6 +202,41 @@ instruction は `/get-overview` `/get-strokes` `/get-send-back` というスラ�
 - メイン spec `openspec/specs/debug/logging/spec.md` の Requirement「中身は claude が `--output-format json` で stdout へ出した全文と一致する」が、この change の delta で MODIFY されている（現状は未 MODIFY で、このまま archive するとメイン spec に実装と矛盾した記述が残る）
 
 **親との関係** — 前提。親 change の5章の証跡（`tool_use` の抽出）がこのログ形式に依存する。なお archive を阻む問題が別にある。メイン spec `openspec/specs/debug/logging/spec.md` の Requirement が「中身は claude が `--output-format json` で stdout へ出した全文と一致する」のままで、この change の delta がその Requirement を MODIFY していない。このまま archive するとメイン spec に実装と矛盾した記述が残る。
+
+#### adr0016-sub-add-timeout-to-config
+
+- **状態**: ready-for-agent / enhancement
+- **成果物**: proposal / specs / design / tasks（2026-08-30 に実装まで完了。ui は画面を持たないため省略）
+- **触るファイル**:
+  - `server/utils/stroke/claude.ts` — `CLAUDE_TIMEOUT_MS` の廃止と、渡された値での打ち切り
+  - `server/utils/stroke/ai.ts` — リトライ回数から今回の長さを決めて渡す
+  - `nuxt.config.ts` — `runtimeConfig.claude` へ2件追加
+  - `docs/specs/core/settings-reference.md` — 式の改訂・表からの削除・新設定の記述
+
+**対応内容** — 設定を2件増やす。`claude.timeoutMs`（打ち切るまでの時間。`retries` が 0 のときの値）と `claude.timeoutStepMs`（同じターンでリトライを重ねる間、`retries` 1つにつき足す刻み）である。前者は `claude.ts` のハードコード定数を `runtimeConfig` へ昇格させて `maxRetries` と同じ場所に揃えるもの、後者は新規。
+
+```
+今回のタイムアウト = timeoutMs + timeoutStepMs × retries
+```
+
+**伸びるのは1つのターンの中だけである。** `retries` は `state.json` が持つ「そのターンでこれまでに起こし直した回数」で、`maxRetries` の上限に達すればそこで終わる。次のターンでは `retries` が 0 に戻り、タイムアウトも `timeoutMs` へ巻き戻る。上限に達して `error` で終わったターンの後でも同じで、ターンをまたいで積み上がらない。`timeoutStepMs` に `0` を入れれば現在と同じ固定の振る舞いになる。
+
+いまタイムアウトは `claude.ts:21` のハードコード定数で、同じ式（`総待ち時間 = (maxRetries + 1) × タイムアウト`）を作る `maxRetries` は `runtimeConfig` にある。**同じ式の因子が別の手続きに属しており**、片方は ADR-0004 の承認が要るのに、片方は定数を書き換えるだけで変えられる。
+
+さらに `settings-reference.md` が同じ資料の中で二枚舌になっている。タイムアウトを「設定ではないもの」の表（`:149`）に載せながら、設定の説明にその値を使っている（`:86`「既定の `2` では最大30分」）。
+
+**完了判定** — 次をすべて満たしたとき完了とする。
+
+- タイムアウトが `runtimeConfig.claude` から決まり、`CLAUDE_TIMEOUT_MS` の定数が無い
+- 同じターンでリトライを重ねる間だけタイムアウトが伸び、その刻みが設定から決まる
+- 次のターンでタイムアウトが `timeoutMs` へ巻き戻る（`error` で終わったターンの後も同じ）
+- `settings-reference.md` の総待ち時間の式が刻みを含む形になっている
+- 同資料の「設定ではないもの」の表からタイムアウトの行が落ちている
+- 上記の資料変更が ADR-0004 の手続き（change 起票 → ユーザー承認 → 資料編集 → コード追随）を経ている
+
+**親との関係** — 拡張。親 change の完了を待たない。ただし値の調整履歴は親 change の検証が作った。180 秒では初回が必ず時間切れになり10分へ延ばし（実測 2026-08-25、当時は claude がスキルをロードし `!` フェンスで curl を往復させていた）、操作が MCP ツールへ移って所要が減ったので3分へ戻した（実測 2026-08-28: 8回の呼び出しで 28.5〜64.7 秒）。**代行への移行が所要を変えたことが、この値を設定に出すべき理由を作っている。**
+
+なお現在の2つの記述（`claude.ts` の「設定ではない」、`settings-reference.md:86`）は `ccfb65b` / `494c156` の feat / chore コミットで入っており、ADR-0004 の手続きを経ていない。この change で手続きに載せ直す。
 
 ### バグ
 
