@@ -120,6 +120,22 @@ export async function deleteSessionCore(root: string, sessionId: string): Promis
   if ((await readPhase(root, sessionId)) === 'approved') {
     throw new SessionCoreError('phase', `承認済みのプロジェクトはここでは消せない: ${sessionId}`)
   }
+  await removeSessionDir(root, sessionId)
+}
+
+/**
+ * ディレクトリを消すだけの層。**検査は一切しない。**
+ *
+ * `deleteSessionCore` から実体を切り出したもので、本番の削除（endpoint U11・CLI
+ * `yarn session delete`）は必ず `deleteSessionCore` を通り、存在検査と phase の検査を
+ * 受ける。ここを直に呼んでよいのは、その検査を通す理由が無い呼び出しだけである。
+ *
+ * **切り出す理由は、消す実体を1箇所に保つためである。** 検証の道具（`yarn check:stroke`）は
+ * 自分が作ったセッションを後始末するが、その用途に `fse.remove` を独自に書くと、削除の
+ * 経路が3本（endpoint・CLI・道具）に増える。判定を迂回する経路を作るのではなく、判定の
+ * 無い層をここに1つ置いて共有する。
+ */
+export async function removeSessionDir(root: string, sessionId: string): Promise<void> {
   try {
     await fse.remove(sessionDir(root, sessionId))
   } catch (error) {

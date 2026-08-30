@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 
@@ -9,6 +9,7 @@ import { chromium, type Browser, type Locator, type Page } from '@playwright/tes
 
 import nuxtConfig from '../nuxt.config'
 import { parseStrokeConfig } from '../server/utils/stroke/config'
+import { isSafeSegment, removeSessionDir } from '../server/utils/stroke/session-core'
 
 /**
  * ストロークが着地するかを、**動いている dev サーバーへブラウザで当てて**確かめる
@@ -31,6 +32,7 @@ import { parseStrokeConfig } from '../server/utils/stroke/config'
  *   yarn check:stroke --overview ./foo.md    概要を差し替える
  *   yarn check:stroke --send-back           proposal を1回差し戻す（指摘は haiku が書く）
  *   yarn check:stroke --send-back '<指摘>'  指摘の文言を指定して差し戻す
+ *   yarn check:stroke --approve             承認まで進め、steering 工程の着地まで見る
  *   yarn check:stroke --cleanup             この実行で作ったセッションを最後に片付ける
  */
 
@@ -73,6 +75,20 @@ const ROUND_TIMEOUT_MS = LONGEST_CLAUDE_TIMEOUT_MS + 60 * 1000
  * 止まる。取り直せば現在の状態を拾い直せる（`sendBack`）。
  */
 const RELOAD_INTERVAL_MS = 60 * 1000
+
+/**
+ * 承認の名前を変えて出し直す上限。
+ *
+ * 同じ概要を流せば同じ名前が提案されるので、回すたびに衝突する。連番を足して抜けるが、
+ * 際限なく試さない（`approve`）。
+ */
+const APPROVE_NAME_ATTEMPTS = 5
+
+/** steering 文書の本数（product / tech / structure）。3本揃ったら着地とみなす */
+const STEERING_DOCUMENTS = 3
+
+/** 画面1 を開き直す上限。dev がモジュールを取り落とすと数回に1回は開けない（`openStrokes`） */
+const OPEN_ATTEMPTS = 5
 
 /** 投入する既定の概要。設計判断が既にいくつか入っていて、問いが立ちやすいもの */
 const DEFAULT_OVERVIEW = `## setai
@@ -132,16 +148,16 @@ const maxRounds = Number(arg('rounds') ?? 12)
 const seed = Number(arg('seed') ?? 1)
 
 /**
- * proposal の着地後に差し戻すかどうか。`--send-back` を渡したときだけ差し戻す。
+ * proposal の着地後に承認まで進めるかどうか。`--approve` を渡したときだけ進む。
  *
- * 差し戻しは `get-send-back` の**成功経路**を通す唯一の手段である。差し戻しが無い間、
- * このツールが返す 404（`no_send_back`）は正常動作であって成功結果ではない。
+ * **既定は proposal で止める。** 承認はプロジェクトを生成する不可逆な操作であり、意図せず
+ * 走らせない。取り違えたときの損害が非対称なので、既定は安全側に倒す。
  *
- * **指摘の文言は実行前に決め打てない。** proposal の中身は実行してみるまで分からず、
- * 固定文言では噛み合わない。噛み合わない指摘では、出し直された proposal が改善したのか
- * どうかを見られない。そこで値なしのときは、着地した proposal を読ませて haiku に
- * 指摘を書かせる（`draftSendBack`）。値を添えたときはその文言をそのまま使う
+ * 承認まで進めると、`get-steering` と `submit-document`（`type: steering`）の成功経路を
+ * 初めて通せる。この2本は提供以来一度も実機で動作を見られていない。
  */
+const approveRequested = args.includes('--approve')
+
 /**
  * 実行の最後に、この実行で作ったセッションを消すかどうか。
  *
@@ -155,6 +171,99 @@ const seed = Number(arg('seed') ?? 1)
  */
 const cleanup = args.includes('--cleanup')
 
+/**
+ * この実行が作ったものの名前。片付けの対象である。
+ *
+ * 片付けは `run` の戻り値ではなくここを見る。**途中で落ちても片付けるためである。**
+ * 戻り値からしか名前を知れないと、クラッシュした実行のセッションが必ず残り、`phase` が
+ * `stroking` のまま巡回（`server/plugins/01.retry-failed.ts`）に拾われて勝手に再キック
+ * され続ける。落ちたときこそ片付けが要る。
+ *
+ * **承認するとセッションディレクトリはプロジェクト名へ改名される**（U10）が、差し替えでは
+ * なく**足す**。`approve` は承認の応答を取り逃したときも名前を返す（`response === null`
+ * を成功として扱う）ので、差し替えにすると、実際には改名が起きていない場合に uuid の
+ * セッションが対象から外れて残る。両方を候補にしておけば、在るほうが消える——無いほうは
+ * `removeSession` が「無かった」と告げて終わるだけである。
+ */
+const cleanupTargets = new Set<string>()
+
+/** 起動中のブラウザ。信号を受けたときに閉じるため、`main` の外からも触れるようにする */
+let openBrowser: Browser | null = null
+
+/** ブラウザを閉じるのを待つ上限。閉じ切れなくても片付けは進める */
+const BROWSER_CLOSE_TIMEOUT_MS = 10_000
+
+/**
+ * 走っている片付け。**二度目の呼び出しは、済んだことにせず同じ完了を待つ。**
+ *
+ * `finally` と信号ハンドラの両方から呼ばれ、両方が同時に来ることがある。二度目を
+ * 素通しにすると、信号側の片付けがまだセッションを消している最中に本流の例外が
+ * top-level まで抜け、node がそこで終了して片付けごと落ちる（実測 2026-08-30:
+ * 「片付けてから終わる」だけ出てディレクトリが残った）。
+ */
+let teardownRun: Promise<void> | null = null
+
+/**
+ * ブラウザを閉じ、`--cleanup` ならこの実行が作ったセッションを消す。
+ *
+ * ブラウザを先に閉じる。開いたままだと画面が消えた先を叩き続ける。消せなくても実行は
+ * 落とさない（`removeSession` が飲み込む）ので、元の失敗を隠さない。
+ */
+function teardown(): Promise<void> {
+  teardownRun ??= (async () => {
+    if (openBrowser !== null) {
+      // **閉じるのを無限には待たない。** 固まると、その先のセッション削除が永久に来ない。
+      // 信号の経路には「2度目で待たずに落ちる」逃げ道があるが、`finally` には無い。
+      // 閉じ切れなくても片付けは進める——残るのは子プロセス1つで、残せば困るのは
+      // 巡回に拾われ続けるセッションのほうである
+      // 逃げ用のタイマーは `unref` する。付けないと、閉じるのが先に済んでもタイマーが
+      // イベントループに残り、正常終了の実行が最後に上限ぶんぶら下がる
+      await Promise.race([
+        openBrowser.close().catch(() => {}),
+        new Promise((resolve) => { setTimeout(resolve, BROWSER_CLOSE_TIMEOUT_MS).unref() }),
+      ])
+    }
+    if (!cleanup) return
+    for (const target of cleanupTargets) await removeSession(target)
+  })()
+  return teardownRun
+}
+
+// **信号で殺されても片付ける。** `finally` は SIGINT / SIGTERM では走らない。片付かないと
+// セッションが `stroking` のまま残り、巡回（`server/plugins/01.retry-failed.ts`）に拾われて
+// 再キックされ続ける。
+//
+// この道具は外から落とされる。実測 2026-08-30: 同じマシンの別 worktree が E2E を回している
+// 間、chromium が外部から SIGTERM（exitCode 143）され、この道具ごと落ちた。
+//
+// **2度目の信号は待たずに落ちる。** 片付けを待つあいだ node 既定の終了は効かないので、
+// `browser.close()` が固まると Ctrl-C を何度押しても同じ promise を待つだけになる。
+// 逃げ道を残す（片付けは諦める）。
+let signalled = false
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
+  process.on(signal, () => {
+    const code = 128 + (signal === 'SIGHUP' ? 1 : signal === 'SIGINT' ? 2 : 15)
+    if (signalled) {
+      console.log(`\n${signal} をもう一度受けた。片付けを待たずに終わる`)
+      process.exit(code)
+    }
+    signalled = true
+    console.log(`\n${signal} を受けた。片付けてから終わる`)
+    void teardown().finally(() => process.exit(code))
+  })
+}
+
+/**
+ * proposal の着地後に差し戻すかどうか。`--send-back` を渡したときだけ差し戻す。
+ *
+ * 差し戻しは `get-send-back` の**成功経路**を通す唯一の手段である。差し戻しが無い間、
+ * このツールが返す 404（`no_send_back`）は正常動作であって成功結果ではない。
+ *
+ * **指摘の文言は実行前に決め打てない。** proposal の中身は実行してみるまで分からず、
+ * 固定文言では噛み合わない。噛み合わない指摘では、出し直された proposal が改善したのか
+ * どうかを見られない。そこで値なしのときは、着地した proposal を読ませて haiku に
+ * 指摘を書かせる（`draftSendBack`）。値を添えたときはその文言をそのまま使う
+ */
 const sendBackAt = args.indexOf('--send-back')
 const sendBackRequested = sendBackAt !== -1
 const nextOfSendBack = sendBackAt === -1 ? undefined : args[sendBackAt + 1]
@@ -181,9 +290,16 @@ async function main(): Promise<void> {
 
   const before = new Set(logNames())
 
-  const browser = await chromium.launch()
+  // **`handleSIGINT: false` を外さない。** Playwright は既定で自前の SIGINT ハンドラを入れ、
+  // ブラウザを閉じ終えた**直後に `process.exit(130)` を呼ぶ**（playwright-core の
+  // `sigintHandler`）。こちらの片付けはブラウザを閉じてからセッションを消すので、
+  // 既定のままだと Ctrl-C で削除の手前で node が落ち、セッションが残る（実測 2026-08-30）。
+  // 残れば `stroking` のまま巡回に拾われて再キックされ続ける——この道具が塞ごうとした故障
+  // そのものである。SIGTERM / SIGHUP のハンドラは exit を呼ばないので触らない。
+  const browser = await chromium.launch({ handleSIGINT: false })
+  openBrowser = browser
   try {
-    const { rounds, landed, sessionId, revised } = await run(browser, policy)
+    const { rounds, landed, sessionId, revised, approved, steered } = await run(browser, policy)
     const html = render({ rounds, landed, sessionId, logs: logNames().filter(n => !before.has(n)) })
     const out = join(process.cwd(), '.stroke-check', `${sessionId}.html`)
     mkdirSync(join(process.cwd(), '.stroke-check'), { recursive: true })
@@ -194,15 +310,20 @@ async function main(): Promise<void> {
     if (revised !== null) {
       console.log(`差し戻し: ${revised ? 'proposal が出し直された' : `出し直されないまま時間切れ（${ROUND_TIMEOUT_MS}ms）`}`)
     }
+    if (approved !== null) {
+      console.log(`承認: プロジェクト「${approved}」を作った`)
+      console.log(`steering: ${steered === true ? `文書 ${STEERING_DOCUMENTS} 本が揃った` : '揃わないまま時間切れ'}`)
+    }
     console.log(`記録: ${out}`)
 
-    if (cleanup) removeSession(sessionId)
-
-    // 差し戻しを頼んだのに出し直されなかったら、着地していても失敗として扱う。
-    // `get-send-back` の成功経路を見るのが目的なので、差し戻しが空振りしたら意味がない
-    if (!landed || revised === false) process.exitCode = 1
+    // 頼んだことが空振りしたら、着地していても失敗として扱う。成功経路を見るのが目的で、
+    // 空振りしたら見られていない
+    if (!landed || revised === false || steered === false) process.exitCode = 1
   } finally {
-    await browser.close()
+    // **片付けは finally に置く。** 成功経路に置くと、途中で落ちた実行のセッションが
+    // 必ず残る（実測 2026-08-30: 2往復目でブラウザが閉じた2回とも残った）。残ったものは
+    // `stroking` のまま巡回に拾われて再キックされ続けるので、落ちたときこそ消す
+    await teardown()
   }
 }
 
@@ -212,6 +333,10 @@ async function run(browser: Browser, policy: Policy): Promise<{
   sessionId: string
   /** 差し戻しの結果。`--send-back` を渡していなければ null */
   revised: boolean | null
+  /** 承認で確定したプロジェクト名。`--approve` を渡していなければ null */
+  approved: string | null
+  /** steering 工程の着地。承認まで進めていなければ null */
+  steered: boolean | null
 }> {
   const page = await browser.newPage({ baseURL: BASE })
 
@@ -220,6 +345,16 @@ async function run(browser: Browser, policy: Policy): Promise<{
   await page.getByRole('textbox').first().fill(overview)
 
   // 概要の投稿もセッションの作成と起動要求の2本立て（`app/pages/strokes/index.vue`）
+  //
+  // **セッションは受理（`POST /api/strokes`）の時点で出来ている。** 起動要求より早いので、
+  // 片付けの対象はこちらで拾うのが最短である。ここを待たずにいると、投稿の直後に画面が
+  // 死んだとき（実測 2026-08-30: chromium が外から SIGTERM される）、サーバー側に出来た
+  // セッションが対象から外れ、`stroking` のまま巡回に拾われて再キックされ続ける
+  const created = page.waitForResponse(
+    response => response.request().method() === 'POST' && /\/api\/strokes\/?($|\?)/.test(response.url()),
+    { timeout: 60_000 },
+  ).catch(() => null)
+
   const launched = page.waitForResponse(
     response => response.url().includes('/invoke-agent'),
     { timeout: 60_000 },
@@ -227,7 +362,24 @@ async function run(browser: Browser, policy: Policy): Promise<{
 
   await page.getByRole('button', { name: '投稿' }).click()
 
+  const createResponse = await created
+  if (createResponse !== null) {
+    const body = await createResponse.json().catch(() => null) as { sessionId?: unknown } | null
+    if (typeof body?.sessionId === 'string') cleanupTargets.add(body.sessionId)
+  }
+
   const launchResponse = await launched
+
+  // **id が分かった時点で覚える。** 起動要求の URL には既にセッション id が入っている
+  // （`/api/strokes/<uuid>/invoke-agent`）ので、下の `waitForURL` を待たずにここで拾う。
+  // 待ってから覚えると、その手前の分岐——409 の起こし直し・非 ok の throw・URL 待ちの
+  // 時間切れ——で落ちたときに、**サーバー側に出来ているセッションが片付けの対象から
+  // 外れる**。残れば `stroking` のまま巡回に拾われて再キックされ続ける
+  if (launchResponse !== null) {
+    const fromLaunch = /\/strokes\/([0-9a-f-]{36})\//.exec(launchResponse.url())?.[1]
+    if (fromLaunch !== undefined) cleanupTargets.add(fromLaunch)
+  }
+
   if (launchResponse !== null && launchResponse.status() === 409) {
     // 概要の直後なので、まだ問いは1つも出ていない
     await relaunch(page, undefined)
@@ -239,6 +391,8 @@ async function run(browser: Browser, policy: Policy): Promise<{
   // 概要を受理するとセッションが立ち、URL に id が入る
   await page.waitForURL(/\/strokes\/[0-9a-f-]{36}/, { timeout: 60_000 })
   const sessionId = page.url().split('/strokes/')[1]!.split('/')[0]!
+  // 起動要求を取り逃していた場合はここが最初の記録になる（Set なので重複は畳まれる）
+  cleanupTargets.add(sessionId)
   console.log(`セッション ${sessionId} を作った。ポリシー: ${policyName}`)
 
   const rounds: Round[] = []
@@ -246,9 +400,25 @@ async function run(browser: Browser, policy: Policy): Promise<{
   for (let round = 1; round <= maxRounds; round++) {
     console.log(`  [${round}/${maxRounds}] 次を待つ`)
     if (await waitForNext(page, previous) === 'proposal') {
-      if (!sendBackRequested) return { rounds, landed: true, sessionId, revised: null }
-      const revised = await sendBack(page, policy, rounds, sessionId)
-      return { rounds, landed: true, sessionId, revised }
+      // 差し戻し → 出し直し → 承認 の順で、1回の実行に通せる（併用できる）
+      const revised = sendBackRequested ? await sendBack(page, policy, rounds, sessionId) : null
+      const approved = approveRequested ? await approve(page) : null
+      // 承認で uuid のディレクトリはプロジェクト名へ改名される（U10）。
+      //
+      // **名乗られた名前を鵜呑みにしない。** `approve` は承認の応答を取り逃したときも
+      // 名前を返す（`response === null` を成功として扱う）。その名前をそのまま消しに行くと、
+      // 承認が名前の衝突で失敗していた場合に**他人が作った同名のプロジェクトを消す**。
+      // 消す先は phase の検査を持たない `removeSessionDir` なので、承認済みでも止まらない。
+      // `--cleanup` の約束（消すのはこの実行が作った1本だけ）を破る不可逆な削除になる。
+      //
+      // 改名が起きたことを、uuid が消えて名前のほうが在ることで確かめてから足す。
+      if (approved !== null
+        && !existsSync(join(PROJECTS_ROOT, sessionId))
+        && existsSync(join(PROJECTS_ROOT, approved))) {
+        cleanupTargets.add(approved)
+      }
+      const steered = approved === null ? null : await waitForSteering(page, approved)
+      return { rounds, landed: true, sessionId, revised, approved, steered }
     }
     await settle(page)
     const answered = await answer(page, policy, round)
@@ -257,7 +427,7 @@ async function run(browser: Browser, policy: Policy): Promise<{
     console.log(`  Q${round} ${answered.header}: ${answered.question} → ${answered.answer}`)
   }
 
-  return { rounds, landed: false, sessionId, revised: null }
+  return { rounds, landed: false, sessionId, revised: null, approved: null, steered: null }
 }
 
 /**
@@ -365,21 +535,185 @@ async function draftFreeAnswer(
 /**
  * この実行で作ったセッションを消す（`--cleanup`）。
  *
+ * **消す実体はアプリと共有する**（`removeSessionDir`）。ここで `fse.remove` なり `rmSync` なりを
+ * 独自に書くと、削除の経路が endpoint・CLI・道具の3本に増える。`session-core.ts` は
+ * 「検査は core に置く。endpoint と CLI の両方がここを通るので、片方だけ守っても意味がない」
+ * として判定を1箇所に集めており、道具が独自の経路を持つとその設計が崩れる。
+ *
+ * 呼ぶのは検査の無い層（`removeSessionDir`）である。本番の削除（U11・`yarn session delete`）は
+ * `deleteSessionCore` を通って存在検査と phase の検査を受けるが、道具が片付けるのは自分が
+ * 作ったものに限られ、承認まで進めた場合は消す対象がプロジェクトへ変わる。その判定を
+ * 通す理由が無い。
+ *
  * 消せなくても実行は落とさない。片付けは検証の結果とは別の関心で、ここで落とすと
  * 合否の報告まで失う。消えなかったことは告げて、あとは人に委ねる。
- *
- * **承認まで進んだ場合は名前が変わる**（セッションディレクトリがプロジェクト名へ改名される）。
- * その場合 uuid のディレクトリはもう無いので、消すものが無いという結果になる。
  */
-function removeSession(sessionId: string): void {
-  const dir = join(PROJECTS_ROOT, sessionId)
+async function removeSession(target: string): Promise<void> {
+  // **消す名前は必ず1階層の識別子として検査する。** `removeSessionDir` は `join` するだけで
+  // 検査を持たない（検査の無い層である、というのがそちらの役目）。空文字が混ざれば
+  // `join('/opt/projects', '')` は `/opt/projects` そのものになり、`existsSync` を通って
+  // 親ごと消える形になる。承認名は画面の入力値を経由してくるので、出どころを信用しない
+  if (!isSafeSegment(target)) {
+    console.log(`片付け: 名前として受け付けられないので消さない（${target}）`)
+    return
+  }
+
+  const path = join(PROJECTS_ROOT, target)
+
+  // **消す前に在るかを見る。** `removeSessionDir` は無いパスでも黙って成功するので、
+  // 見ずに「消した」と出すと、片付けたつもりの取りこぼしが実行ログからも分からない。
+  // 承認の応答を取り逃したときのように、対象が2つあってどちらか一方しか実在しない
+  // 場合もある（`cleanupTargets`）
+  if (!existsSync(path)) {
+    console.log(`片付け: ${path} は無かった`)
+    return
+  }
+
   try {
-    rmSync(dir, { recursive: true, force: true })
-    console.log(`片付け: ${dir} を消した`)
+    await removeSessionDir(PROJECTS_ROOT, target)
+    console.log(`片付け: ${path} を消した`)
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
-    console.log(`片付け: ${dir} を消せなかった（${detail}）`)
+    console.log(`片付け: ${path} を消せなかった（${detail}）`)
   }
+}
+
+/**
+ * proposal が名前を出さなかったときに使う、この道具だと分かる名前。
+ *
+ * 検証で作ったものだと後から見分けられるよう接頭辞を付ける。kebab-case で、時刻で一意にする。
+ */
+function fallbackProjectName(): string {
+  const now = new Date()
+  const pad = (value: number): string => String(value).padStart(2, '0')
+  const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`
+    + `-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`
+  return `check-stroke-${stamp}`
+}
+
+/**
+ * proposal を承認してプロジェクトを作る（`--approve`）。
+ *
+ * **承認は不可逆である。** セッションディレクトリが `<projectName>` へ改名され、以後は
+ * プロジェクトとして扱われる（`docs/specs/api/contract.md` U10）。本番の削除経路
+ * （U11・`yarn session delete`）はもう受け付けない。
+ *
+ * 名前の衝突（409 `name-conflict`）はサフィックスを足して出し直す。**同じ概要を流せば
+ * 同じ名前が提案されて必ず衝突する**ので、人が毎回考える形にはしない。衝突以外の 409
+ * （AI が実行中 / phase 不整合）は名前を変えても通らないので、そのまま落とす。
+ *
+ * @returns 承認で確定したプロジェクト名
+ */
+async function approve(page: Page): Promise<string> {
+  // 承認が通るのは `phase` が `proposed` のときだけで、AI の実行中は 409 で弾かれる
+  // （`settle` と同じ理由。機械が即座に押すと必ず当たる）
+  await settle(page)
+
+  await page.getByRole('button', { name: '承認して作る' }).click()
+
+  const dialog = page.getByRole('dialog')
+  const nameInput = dialog.getByRole('textbox')
+  await nameInput.waitFor({ state: 'visible', timeout: 30_000 })
+
+  // 既定値は proposal が提示した名前。衝突したときの土台にする。
+  //
+  // **空のことがある。** 画面は `ProposalMessage.projectName` を初期値に入れるが、MCP ツール
+  // `submit-document` には projectName を渡す口が無く、MCP 経由の提出では null になる
+  // （A7 の契約は `{ proposal, projectName? }` を受けるのに、ツールが送っていない）。
+  // 名前が空だと `approveBlocked` で「作る」が押せず、承認の検証がそこで止まる。
+  // 道具は自前の名前を入れて先へ進む——成果物側の欠陥は別に起票する（実測 2026-08-30）
+  const offered = (await nameInput.inputValue()).trim()
+  const proposed = offered === '' ? fallbackProjectName() : offered
+  if (offered === '') console.log(`  proposal が名前を出していない。${proposed} で進める`)
+
+  for (let attempt = 1; attempt <= APPROVE_NAME_ATTEMPTS; attempt++) {
+    // 初回も書き込む。既定値が空のことがあり（下記 `offered`）、書かないと
+    // `approveBlocked` が解けず「作る」を押せない
+    const name = attempt === 1 ? proposed : `${proposed}-${attempt}`
+    await nameInput.fill(name)
+
+    const responded = page.waitForResponse(
+      response => response.url().includes('/approve'),
+      { timeout: 60_000 },
+    ).catch(() => null)
+
+    await dialog.getByRole('button', { name: '作る', exact: true }).click()
+    const response = await responded
+
+    if (response === null || response.ok()) {
+      console.log(`  承認: ${name}`)
+      return name
+    }
+
+    const body = await response.text().catch(() => '')
+    // 409 は3つの意味を持つ（名前の衝突 / AI が実行中 / phase 不整合）。名前を変えて
+    // 通るのは衝突のときだけなので、理由を見て分ける（`useProposalReview.approve` と同じ判断）
+    if (response.status() === 409 && body.includes('name-conflict')) {
+      console.log(`  「${name}」は既にある。名前を変えて出し直す`)
+      continue
+    }
+    throw new Error(`承認が ${response.status()}: ${body.slice(0, 300)}`)
+  }
+
+  throw new Error(`名前を ${APPROVE_NAME_ATTEMPTS} 回変えても承認が通らなかった`)
+}
+
+/**
+ * 承認後の steering 工程が着地するのを見届ける。
+ *
+ * **承認の導線は steering を見せない。** 承認すると画面は `/projects` へ移って流れが終わる
+ * （ADR 0011: この後の steering はサーバーが裏で起こすので、ユーザーは待たない）。だが
+ * ステアリング文書の一覧画面は在るので、そこを開いて文書が書かれるのを待つ。endpoint を
+ * 直接叩かずに済む（specs「操作はブラウザから行う」）。
+ *
+ * 承認は**セッションディレクトリを `<projectName>` へ改名するだけ**なので、プロジェクトの
+ * id は承認で使った名前そのものである（`docs/specs/api/contract.md` U10）。一覧を探さずに
+ * 直接開ける。
+ *
+ * 一覧の各文書は「利用可」か「未作成」のバッジを持つ（`steering/index.vue`）。3本すべてが
+ * 「利用可」になったら着地とみなす。
+ */
+async function waitForSteering(page: Page, projectName: string): Promise<boolean> {
+  const url = `/projects/${projectName}/steering`
+  await page.goto(url)
+
+  const available = page.getByTestId('steering-list').getByText('利用可')
+  const deadline = Date.now() + ROUND_TIMEOUT_MS
+  const logs = logNames().length
+  let started = Date.now()
+  let notified = 0
+  let reloadedAt = Date.now()
+
+  while (Date.now() < deadline) {
+    const ready = await available.count()
+    if (ready >= STEERING_DOCUMENTS) { endProgress(); return true }
+
+    // 画面が固まると文書が書かれても表示が変わらない（`sendBack` と同じ事情）。
+    // 一覧は自動で追随しないので、取り直して読み直す
+    if (Date.now() - reloadedAt > RELOAD_INTERVAL_MS) {
+      endProgress()
+      await page.goto(url)
+      reloadedAt = Date.now()
+      started = Date.now()
+      notified = 0
+      continue
+    }
+
+    const elapsed = Math.floor((Date.now() - started) / 1000)
+    if (elapsed > notified) {
+      notified = elapsed
+      const done = logNames().length - logs
+      progress(
+        `${elapsed}秒 — steering 文書 ${ready}/${STEERING_DOCUMENTS}`
+        + `（${done > 0 ? '応答は返った' : 'AI が書いている'}）`,
+      )
+    }
+    await page.waitForTimeout(1000)
+  }
+
+  endProgress()
+  console.log(`  steering 文書は ${await available.count()}/${STEERING_DOCUMENTS} で時間切れ`)
+  return false
 }
 
 /**
@@ -394,16 +728,19 @@ function removeSession(sessionId: string): void {
  * よう、ここで吸収する。開き直しても出ないなら、そのときは環境として落とす。
  */
 async function openStrokes(page: Page): Promise<void> {
-  for (let attempt = 1; attempt <= 5; attempt++) {
-    await page.goto('/strokes')
-    const shown = await page.getByTestId('stroke-modal')
+  for (let attempt = 1; attempt <= OPEN_ATTEMPTS; attempt++) {
+    // **`goto` 自体も落ちる。** モジュールを取り落とすと `load` が終わらず、ここで
+    // タイムアウトする（実測 2026-08-30）。要素の待ちだけ拾っても、その手前で例外が
+    // 抜けてリトライに入れない
+    const navigated = await page.goto('/strokes').then(() => true).catch(() => false)
+    const shown = navigated && await page.getByTestId('stroke-modal')
       .waitFor({ state: 'visible', timeout: 30_000 })
       .then(() => true)
       .catch(() => false)
     if (shown) return
-    console.log(`  画面1 が出ない（${attempt}/5）。開き直す`)
+    console.log(`  画面1 が出ない（${attempt}/${OPEN_ATTEMPTS}）。開き直す`)
   }
-  throw new Error('画面1（概要の入力）が5回開き直しても出なかった。dev サーバーの状態を疑う')
+  throw new Error(`画面1（概要の入力）が ${OPEN_ATTEMPTS} 回開き直しても出なかった。dev サーバーの状態を疑う`)
 }
 
 /**
