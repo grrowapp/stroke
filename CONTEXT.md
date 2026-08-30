@@ -49,7 +49,7 @@ _Avoid_: 確定、OK、マージ
 _Avoid_: リポジトリ、ワークスペース
 
 **product**:
-それ自体で1つの定義を成すもの。stroke-board は product であり、markdown-module も product である。product は他の product に含まれず、境界と公開する口を自分で持つ。
+それ自体で1つの定義を成すもの。stroke-board は product であり、markdown-module も product である。product は他の product に含まれず、境界と外へ公開するものを自分で持つ。
 _Avoid_: アプリ、パッケージ、ライブラリ
 
 **機能**:
