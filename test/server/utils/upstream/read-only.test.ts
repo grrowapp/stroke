@@ -64,6 +64,7 @@ describe('接点層の書き込みは決めた3つだけである', () => {
   it('検査対象のファイルが存在する', async () => {
     const files = await sourceFiles();
     expect(files.map((file) => file.name).sort()).toEqual([
+      'project-id.ts',
       'registry.ts',
       'rest.ts',
       'scan.ts',

@@ -217,7 +217,7 @@ export default defineNuxtConfig({
     projectShareRoot: '/opt/projects',
 
     // --- ポータル: 本家に触るために要る2つ。読み方は server/utils/config.ts に閉じる
-    upstreamBaseUrl: 'http://127.0.0.1:5000',
+    upstreamBaseUrl: 'http://192.168.1.204:5000',
     specWorkflowHome: '/opt/projects/.spec-workflow-mcp',
 
     // --- ポータル: アクティブ集合を見直す間隔（ミリ秒）

@@ -57,6 +57,8 @@ const {
   followupWaiting,
   answered,
   deleteId,
+  promotionFailed,
+  promotionNotice,
 } = review
 
 const hasProposal = computed(() => !!proposal.value)
@@ -243,5 +245,24 @@ const modes = [
       </template>
     </UModal>
     </template>
+
+    <!--
+      昇格に失敗したときの決着。器は一覧の決着と同じで、選択肢の指す先だけが違う——
+      この時点ではプロジェクトが無く phase は `proposed` なので、破棄はセッション側、
+      やり直すは再承認になる（specs/project/generation）。
+    -->
+    <ProjectCreationNotice
+      :name="promotionNotice"
+      outcome="failed"
+      @done="review.promotionNoticeDone"
+    />
+    <ProjectCreationChoiceModal
+      :name="promotionFailed"
+      outcome="failed"
+      :can-review="false"
+      :busy="false"
+      @retry="review.retryPromotion"
+      @discard="review.discardSession"
+    />
   </div>
 </template>

@@ -340,6 +340,40 @@ export function useProposalReview(
     () => !projectName.value.trim() || projectName.value.trim() === conflictName.value,
   )
 
+  /**
+   * 昇格に失敗した対象の名前。null なら何も出ていない。
+   *
+   * 改名はシステムの動作で、ユーザーの決定ではない。だから**決定をやり直させない**——
+   * 確定した名前はここに残っており、「やり直す」はそれで実行だけを再試行する。
+   */
+  const promotionFailed = ref<string | null>(null)
+  /** 知らせる面に出している間の名前。引いたらモーダルへ渡す */
+  const promotionNotice = ref<string | null>(null)
+
+  /** 知らせる面が引いた。続けて選ばせるモーダルを出す（specs/project/generation） */
+  function promotionNoticeDone(): void {
+    promotionFailed.value = promotionNotice.value
+    promotionNotice.value = null
+  }
+
+  /** やり直す — 同じ名前で承認をもう一度実行する。ユーザーに名前を聞き直さない */
+  async function retryPromotion(): Promise<void> {
+    promotionFailed.value = null
+    await approve()
+  }
+
+  /** 破棄する — セッションを消して一覧へ戻る。まだプロジェクトになっていない */
+  async function discardSession(): Promise<void> {
+    promotionFailed.value = null
+    try {
+      await $fetch(`/api/sessions/${sessionId}`, { method: 'DELETE' })
+    } catch (error) {
+      warn('破棄できませんでした', messageOf(error))
+      return
+    }
+    await navigateTo('/projects')
+  }
+
   async function approve(): Promise<void> {
     if (busy.value || approveBlocked.value) return
     if (phase.value !== 'proposed') return
@@ -357,9 +391,20 @@ export function useProposalReview(
     } catch (error) {
       // サーバは 409 を3つの意味で返す(名前の衝突 / AI が実行中 / phase 不整合)。
       // 名前を変えるまで承認を止めるのは、衝突と分かったときだけにする。
-      if (statusOf(error) === 409 && reasonOf(error) === 'name-conflict') {
+      const status = statusOf(error)
+
+      if (status === 409 && reasonOf(error) === 'name-conflict') {
         conflictName.value = name
+      } else if (status === 500) {
+        // **昇格の実行が失敗した**（改名の I/O・`phase` の書き込み）。決定は下りているので、
+        // 決着と同じ器で次を選ばせる（specs/project/generation）。この時点ではプロジェクトが
+        // 無く phase は `proposed` なので、破棄はセッション側、やり直すは同じ名前での再実行になる
+        promotionNotice.value = name
       } else {
+        // **決定のやり直しが要るもの**は器に載せない。400（環境が名前を受け付けない）は
+        // 同じ名前で再試行しても必ずまた落ちるので、spec が求めるとおり
+        // 「別の名前で再度承認できる」状態に留める（specs/project/generation）。
+        // 409 の残り（phase 不整合・実行中）は承認そのものが成立しない
         warn('承認できませんでした', messageOf(error))
       }
     } finally {
@@ -397,6 +442,11 @@ export function useProposalReview(
     approveOpen,
     conflictName,
     approveBlocked,
+    promotionFailed,
+    promotionNotice,
+    promotionNoticeDone,
+    retryPromotion,
+    discardSession,
     // 問い返し
     followupOpen,
     answered,

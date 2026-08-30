@@ -98,7 +98,7 @@ test.describe('配信先が切れてもシステムは動き続ける', () => {
 
   test.afterEach(async ({ request }) => {
     for (const sessionId of created) {
-      await request.post(`/api/strokes/${sessionId}/delete`).catch(() => undefined);
+      await request.delete(`/api/sessions/${sessionId}`).catch(() => undefined);
     }
     created = [];
   });

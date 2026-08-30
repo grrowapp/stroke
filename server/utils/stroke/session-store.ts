@@ -2,6 +2,8 @@ import { mkdir, readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { z } from 'zod'
 import type { Answer, Invocation, Question, SendBackPayload, Stroke } from '#shared/stroke'
+import type { ProjectCreationOutcome } from '#shared/types'
+import { broadcastProjectCreation } from '../control/board'
 import { conflict } from './conflict'
 import { sessionFile } from './paths'
 import { PROJECT_DOCS_DIR, PROJECT_PROPOSAL_FILE } from './project'
@@ -171,6 +173,40 @@ export async function writeInvocation(
     invocation,
     ...(retries === undefined ? {} : { retries }),
   })
+
+  // 昇格したプロジェクトの実行だけが上層に関係する。ストロークのセッション（uuid）の
+  // 実行は一覧に出ないので流さない。
+  //
+  // **ここに置くのは、`invocation` の書き込みが必ずここを通るからである**（A8 の endpoint も
+  // invokeAi へ渡す書き込み口も、同じこの実体を呼ぶ）。呼び出し側それぞれに置くと、書いたのに
+  // 流れない経路が生まれる。
+  //
+  // **流すのは合図であって、行の状態ではない。** 一覧の行が生成中か完了かは
+  // ファイルシステム（`.spec-workflow/` の有無）から毎回導く（design.md D7）。ここは
+  // 「何かが決着したから取り直せ」と、モーダルを出す引き金を伝えるだけである。だから
+  // `invocation` を合図の材料に使っても、行の判定が `invocation` に依存することはない。
+  const outcome = creationOutcomeOf(state.phase, invocation)
+  if (outcome !== null) broadcastProjectCreation(sessionId, outcome)
+}
+
+/**
+ * その書き込みが上層への合図になるか。なるなら何を流すか。
+ *
+ * **判定だけを切り出してある。** 書き込みの副作用と混ぜると、条件を確かめるのに保存先と
+ * Nitro の設定が要る。ここは phase と `invocation` だけを見る。
+ *
+ * - 昇格していない（ストロークのセッション）→ 流さない。一覧に出ないので上層に関係がない
+ * - `failed` → 流さない。巡回が起こし直す途中で、決着ではない。流すと勝手に直る行ができる
+ * - `running` → 流さない。始まっただけで、決着ではない
+ */
+export function creationOutcomeOf(
+  phase: SessionState['phase'],
+  invocation: Invocation,
+): ProjectCreationOutcome | null {
+  if (phase !== 'approved') return null
+  if (invocation === 'idle') return 'done'
+  if (invocation === 'error') return 'failed'
+  return null
 }
 
 export async function writeState(sessionId: string, state: SessionState): Promise<void> {

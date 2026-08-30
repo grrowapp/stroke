@@ -144,6 +144,51 @@ export function saveSteeringDocument(
  * 運べるのは `needs-revision` だけで、`approve` / `reject` は `response` しか持たない
  * （サーバー側でも弾く）。
  */
+/**
+ * 保留中の承認依頼を**一度だけ**取る。
+ *
+ * `useProjectApprovals` は画面に貼り付ける取得（`useFetch`）で、決着のモーダルのように
+ * 「今この瞬間に1件引きたい」場面には向かない。同じ URL を画面に書かせないためにここに置く。
+ */
+export async function fetchPendingApprovals(projectId: string): Promise<ApprovalDto[]> {
+  return $fetch<ApprovalDto[]>(`${base(projectId)}/approvals`);
+}
+
+/**
+ * プロジェクトを消す（`openspec/specs/api/project/delete`）。失敗したら理由の文字列、成功なら null。
+ *
+ * メソッドで振り分ける。パスに動詞を置かない（design.md D11）。
+ */
+export async function deleteProject(projectId: string): Promise<string | null> {
+  try {
+    await $fetch(`${base(projectId)}`, { method: 'DELETE' });
+    return null;
+  } catch (error) {
+    return approvalReasonOf(error);
+  }
+}
+
+/**
+ * ステアリングを起こし直す（U13）。失敗したら理由の文字列、成功なら null。
+ *
+ * **`cwd` を必ず渡す。** `docs/specs/api/contract.md` の U13 が「endpoint は cwd を自分で
+ * 導出しない——キックする側が path を渡す」と定めている。昇格後の対象は保存先直下の
+ * プロジェクト名なので、行が持つ path をそのまま渡す。
+ *
+ * `reset=1` はリトライ回数を戻す。上限に達して終端の失敗になっているため、戻さないと
+ * 起こしてもすぐ諦める（openspec/specs/agent/invocation「ユーザーが再実行する」）。
+ */
+export async function restartSteering(name: string, cwd: string): Promise<string | null> {
+  try {
+    await $fetch(`/api/strokes/${encodeURIComponent(name)}/invoke-agent`, {
+      query: { reset: 1, cwd },
+    });
+    return null;
+  } catch (error) {
+    return approvalReasonOf(error);
+  }
+}
+
 export async function respondToApproval(
   projectId: string,
   approvalId: string,

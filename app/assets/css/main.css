@@ -196,6 +196,257 @@ body {
   }
 
   /*
+   * 生成中の行（specs/project/generation「昇格した瞬間から、生成中であることを一覧で示す」）。
+   *
+   * 示すのは2つ。**行の地を変える**ことと、**フォルダのアイコンの位置でローダーを回す**こと。
+   *
+   * **明滅は持たない。** 一覧の行は情報が詰まっており、周期的に薄くすると「進行中」ではなく
+   * 「読みにくい行」になる。prototype で実物を見て決めた（ui.md）。動きはローダーだけが持つ。
+   *
+   * 地は `#161f32`。通常の行の地（`--surface-panel`）を敷いた上に重ねる。下地を敷かずに
+   * 1枚置くと、ページの地（`#0f172a`）が透けて薄めるほど暗く沈むためである。
+   */
+  .sb-row-creating {
+    cursor: not-allowed;
+  }
+
+  /*
+   * 名前と日付は**未接続の行と同じ薄さ**にする（specs/project/generation・ui.md）。
+   * 生成中を「薄いだけの行」にしないため、薄くするのは中身だけで、地はそのまま残す
+   * ——地は下の `td` の重ねが受け持つ。
+   */
+  .sb-row-creating td > * {
+    opacity: 0.45;
+  }
+
+  .sb-row-creating td {
+    background-color: var(--surface-panel);
+    background-image: linear-gradient(#161f32, #161f32);
+  }
+
+  /*
+   * 決着を知らせる面（specs/project/generation「決着したら、知らせてから次を選ばせる」）。
+   *
+   * **画面の半分くらいを埋める。** 小さすぎず、画面全体も覆わない。行の中には収めず、画面遷移も
+   * しない。フェードアウトで自ら消える——消えないと操作ができないためである（ui.md）。
+   *
+   * 下の一覧は見えたまま・操作できたままにする（`pointer-events: none`）。
+   */
+  @keyframes sb-notice-in {
+    from {
+      opacity: 0;
+      transform: translate(-50%, -46%) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+  }
+
+  .sb-notice {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    z-index: 40;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: min(52rem, calc(100vw - 4rem));
+    height: 50vh;
+    padding: 24px 32px;
+    text-align: center;
+    border-radius: 18px;
+    border: 1px solid var(--border-default);
+    background: color-mix(in srgb, var(--surface-panel) 92%, transparent);
+    backdrop-filter: blur(2px);
+    box-shadow: 0 24px 60px -20px rgb(0 0 0 / 0.5);
+    animation: sb-notice-in 260ms ease-out both;
+    transition:
+      opacity 420ms ease,
+      transform 420ms ease;
+  }
+
+  .sb-notice-leaving {
+    opacity: 0;
+    transform: translate(-50%, -54%);
+  }
+
+  .sb-notice-title {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .sb-notice[data-outcome='done'] .sb-notice-title {
+    color: var(--status-success);
+  }
+
+  .sb-notice[data-outcome='failed'] .sb-notice-title {
+    color: var(--status-error);
+  }
+
+  /*
+   * 次を選ばせるモーダル。**選ぶまで閉じない**（specs/project/generation）。
+   *
+   * 知らせる面が引いた後に出る。背後は暗くするが、画面遷移はしない。
+   */
+  .sb-choice-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgb(2 6 23 / 0.55);
+  }
+
+  .sb-choice {
+    width: min(26rem, calc(100vw - 3rem));
+    padding: 22px 24px;
+    border-radius: 14px;
+    border: 1px solid var(--border-default);
+    background: var(--surface-panel);
+    box-shadow: 0 24px 60px -20px rgb(0 0 0 / 0.55);
+  }
+
+  .sb-choice-title {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .sb-choice-note {
+    margin: 6px 0 18px;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .sb-choice-error {
+    margin: 0 0 12px;
+    font-size: 12px;
+    color: var(--status-error);
+  }
+
+  .sb-choice-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
+  .sb-choice-actions button {
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .sb-choice-actions button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .sb-choice-primary {
+    background: var(--interactive-primary);
+    color: #fff;
+    border: 0;
+  }
+
+  .sb-choice-secondary {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-default);
+  }
+
+  .sb-choice-danger {
+    background: transparent;
+    color: var(--status-error);
+    border: 1px solid color-mix(in srgb, var(--status-error) 45%, transparent);
+  }
+
+  /*
+   * 回転するローダー。
+   *
+   * アイコンのコレクション（`app/assets/icons.ts`）は prototype と本家から持ち込んだ絵だけを
+   * 置く場所で、そこに無いものを足さない。だから CSS で作る。
+   */
+  @keyframes sb-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /*
+   * 明滅は2点の行き来。`ease` を入れると中間の濃さに留まって U 字に沈む動きになるので
+   * `linear` のまま、明と暗をそれぞれ長く保持して切り替えだけを短くする（ui.md）。
+   */
+  @keyframes sb-loader-blink {
+    0%,
+    42% {
+      opacity: 1;
+    }
+    50%,
+    92% {
+      opacity: 0.25;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+
+  /*
+   * 生成中のローダー。フォルダのアイコンを外した位置で回る。
+   *
+   * 帯は 180°、輪の太さ 2px、大きさ 15px、白（ui.md の確定値）。円錐グラデーションで帯を
+   * 作り、マスクで中を抜いて輪にする。
+   */
+  .sb-spinner {
+    display: inline-block;
+    width: 15px;
+    height: 15px;
+    flex: none;
+    border-radius: 999px;
+    background: conic-gradient(
+      #fff 0deg,
+      rgb(255 255 255 / 0.72) 54deg,
+      rgb(255 255 255 / 0.34) 112deg,
+      rgb(255 255 255 / 0.1) 180deg,
+      rgb(255 255 255 / 0.1) 360deg
+    );
+    mask: radial-gradient(closest-side, transparent calc(100% - 2px), #000 calc(100% - 2px));
+    -webkit-mask: radial-gradient(closest-side, transparent calc(100% - 2px), #000 calc(100% - 2px));
+    animation:
+      sb-spin 0.9s linear infinite,
+      sb-loader-blink 1.6s linear infinite;
+  }
+
+  /*
+   * 動きを抑える設定に従う（specs/project/generation は「示す」ことを求めており、
+   * 動きそのものは求めていない）。明滅は止めて不透明度だけ残し、ローダーは回さずに
+   * 形だけ残す——止まった輪でも「まだ何かが続いている」ことは伝わる。
+   */
+  @media (prefers-reduced-motion: reduce) {
+    .sb-row-creating {
+      animation: none;
+      opacity: 0.45;
+    }
+
+    .sb-spinner {
+      animation: none;
+    }
+
+    /* 知らせる面は残す。動いて出るのをやめるだけ（confetti は component 側で止める） */
+    .sb-notice {
+      animation: none;
+      transition: none;
+    }
+  }
+
+  /*
    * 状態チップ。prototype の `.chipOff`（無彩色・枠あり）が既定。
    *
    * ui.md の Visual Language には「アクティブ / 未接続の区別は色ではなく、チップの文言と
@@ -204,6 +455,9 @@ body {
    */
   .sb-chip {
     display: inline-block;
+    /* 4状態で同じ形にする。灯るかどうかだけが違い、幅は揃える（ui.md） */
+    min-width: 76px;
+    text-align: center;
     font-size: var(--text-xs);
     padding: 2px 8px;
     border-radius: 999px;

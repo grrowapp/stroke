@@ -40,6 +40,11 @@ function post(path: string, data: unknown = {}): Promise<Response> {
   })
 }
 
+/** U11: セッションを消す。メソッドで振り分ける（`openspec/specs/api/session/delete`） */
+function del(path: string): Promise<Response> {
+  return fetch(BASE + path, { method: 'DELETE' })
+}
+
 async function responds(): Promise<boolean> {
   try {
     return (await fetch(`${BASE}/api/projects`)).ok
@@ -115,7 +120,7 @@ async function main(): Promise<void> {
     }
   } finally {
     // 途中で落ちても後片付けはする。サーバーが止まっていれば削除も通らないので握る
-    await post(`/api/strokes/${sessionId}/delete`).catch(() => undefined)
+    await del(`/api/sessions/${sessionId}`).catch(() => undefined)
   }
 
   if (failed.length > 0) {

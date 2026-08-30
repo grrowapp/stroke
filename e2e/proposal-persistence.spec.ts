@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -41,12 +42,28 @@ async function submitProposal(
 
 test.describe('受理した proposal は残る', () => {
   let created: string[] = [];
+  /**
+   * 昇格したものは名前が変わり、セッションの口では消せない。**プロジェクトの口で消す。**
+   *
+   * 残すと、承認済み（`phase: 'approved'`）で `.spec-workflow` を持たないディレクトリが
+   * 保存先に居座り、**次の実行から一覧に「生成中」として出る**（specs/project/directory）。
+   * それが他の spec の行数を狂わせる。
+   */
+  let promoted: string[] = [];
 
   test.afterEach(async ({ request }) => {
     for (const name of created) {
-      await request.post(`/api/strokes/${name}/delete`).catch(() => undefined);
+      await request.delete(`/api/sessions/${name}`).catch(() => undefined);
+    }
+    for (const name of promoted) {
+      const projectId = createHash('sha1')
+        .update(join(PROJECTS_PARENT, name))
+        .digest('base64url')
+        .substring(0, 16);
+      await request.delete(`/api/projects/${projectId}`).catch(() => undefined);
     }
     created = [];
+    promoted = [];
   });
 
   test('提出した後に繋いだ画面へ proposal が届く', async ({ page, request }) => {
@@ -68,6 +85,7 @@ test.describe('受理した proposal は残る', () => {
     // 昇格したプロジェクトは U11 で消せない（`stroke-exit.spec.ts` が確かめている仕様）。
     // 固定名にすると2回目の実行が名前衝突で落ちるので、走るたびに違う名前を使う。
     const projectName = `e2e-proposal-approved-${Date.now()}`;
+    promoted.push(projectName);
 
     await submitProposal(request, sessionId, projectName);
 

@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { existsSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { SessionCoreError, deleteSessionCore, listSessionsCore } from './session-core'
+import { SessionCoreError, deleteSessionCore, listSessionsCore } from '../../../../server/utils/stroke/session-core'
 
 /**
  * 保存先にはセッション（uuid）と昇格したプロジェクト（名前）が並ぶ。
@@ -96,11 +96,13 @@ describe('deleteSessionCore', () => {
     expect(existsSync(join(root, SESSION_ID))).toBe(false)
   })
 
-  it('昇格したプロジェクトは消せない', async () => {
+  it('phase を見ない。CLI の素通しの口なので昇格済みでも消える', async () => {
+    // どの局面のものを消してよいかは削除の口（endpoint）が決める。ここは実行だけを持つ。
+    // CLI（`yarn session delete`）には同じ守りが無い——手元の道具として、そう決めてある
     await place(PROJECT_NAME, 'approved')
 
-    await expect(deleteSessionCore(root, PROJECT_NAME)).rejects.toMatchObject({ kind: 'phase' })
-    expect(existsSync(join(root, PROJECT_NAME))).toBe(true)
+    await expect(deleteSessionCore(root, PROJECT_NAME)).resolves.toBeUndefined()
+    expect(existsSync(join(root, PROJECT_NAME))).toBe(false)
   })
 
   it('無い id は消さずに失敗する', async () => {

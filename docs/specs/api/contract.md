@@ -41,9 +41,29 @@
 | U7 | `POST /api/strokes/:id/answer` | 今の1問に回答する（ストロークの問い・問い返しの区別なし。起動しない） |
 | U9 | `POST /api/strokes/:id/send-back` | 差し戻す（指摘一式を送る。起動しない） |
 | U10 | `POST /api/strokes/:id/approve` | 承認する |
-| U11 | `POST /api/strokes/:id/delete` | セッションを消す（セッションに属するものが残らない） |
+| U11 | `DELETE /api/sessions/:id` | セッションを消す（セッションに属するものが残らない）。承認**前**の局面のものだけ |
 | U12 | `GET /api/strokes` | 残っているセッションを一覧する |
 | U13 | `GET /api/strokes/:id/invoke-agent` | AI を起動する（claude 起動の唯一の入口。cwd をクエリで受け取る） |
+
+U11 だけ path が `/api/sessions/` なのは、capability（`openspec/specs/api/session/delete`）が
+そう規定しているためである。他の U 系は実装が `/api/strokes/` のままで、spec と食い違っている
+——削除に触ったこの機会に、削除だけを spec 側へ寄せた。
+
+**削除はメソッドで振り分ける。** パスに `delete` という動詞を置かず、メソッドを絞らない
+handler も作らない。`delete.ts`（メソッド接尾辞なし）にすると `GET /api/…/delete` でも
+消えてしまう——Nitro がメソッドとして読むのはドットで続く接尾辞だけである。
+
+### プロジェクトを操作する — 1本
+
+| # | メソッド / パス | 内容 |
+|---|---|---|
+| P1 | `DELETE /api/projects/:projectId` | 作りきれなかったプロジェクトを消す。承認**以降**の局面のものだけで、`.spec-workflow/` を持つものは拒否する |
+
+対象は `projectId` で指す。生成中・失敗した行は本家に登録されておらず registry から引けない
+ので、**本家と同じ式で導出した値**を使う（`server/utils/upstream/project-id.ts`）。
+
+削除の実行は U11 と共通で `server/handler/delete.ts` に1つ置く。**どの局面のものを許すかは
+各 endpoint が持つ**——共通の実行に呼び出し元を知らせて分岐させない。
 
 ### エージェントが操作する — 5本
 
@@ -55,12 +75,33 @@
 | A7 | `POST /api/strokes/:id/proposal` | proposal を提出する（受理した本文を残す） |
 | A8 | `POST /api/strokes/:id/submission` | 実行の記録（`invocation`）を変える。**叩くのは invokeAi だけ** |
 
-### WS 配信 — 2本（サーバ → 画面のみ。画面からは何も送らない）
+### WS 配信 — 3本（サーバ → 画面のみ。画面からは何も送らない）
 
-| # | パス | 内容 |
+配信の規約は `openspec/specs/ws/delivery` が持つ。要点は3つ。**サーバ → 画面の一方向**、
+**接続した瞬間に現在分を流す**、そして **出来事の種類が増えても口を増やさない**。増やして
+よいのは運ぶ相手が違うときだけで、同じ相手へ届く出来事が2種類あることを理由に口を2本に
+しない。
+
+| # | パス | 相手 | 内容 |
+|---|---|---|---|
+| W1 | `/api/strokes/:id/ws/question` | セッション1件を見ている画面 | 今の1問分。A5 の受理・接続の瞬間に配信 |
+| W2 | `/api/strokes/:id/ws/proposal` | セッション1件を見ている画面 | proposal と名前候補。A7 の受理・接続の瞬間に配信 |
+| WB | `/ws` | 上層を開いているブラウザ | 上層へのサーバー発イベント。**メッセージの種別で分ける** |
+
+WB が運ぶ種別（`BoardMessage`）。
+
+| 種別 | いつ | 内容 |
 |---|---|---|
-| W1 | `/api/strokes/:id/ws/question` | 今の1問分。A5 の受理・接続の瞬間に配信 |
-| W2 | `/api/strokes/:id/ws/proposal` | proposal と名前候補。A7 の受理・接続の瞬間に配信 |
+| `snapshot` | 接続の瞬間 | 通知の一覧・本家との接続状態 |
+| `notification` | 本家由来の通知が起きたとき | 通知1件 |
+| `upstream-connection` | 本家との接続が変わったとき | 繋がっているか |
+| `project-creation` | 昇格・生成の完了・生成の失敗 | プロジェクト名と `done` / `in-progress` / `failed` |
+
+WB は行の中身を運ばない。プロジェクト一覧の正は `GET /api/projects` の1つのままで、WB は
+「取り直せ」の合図と、完了を祝う引き金である。
+
+`snapshot` は現在分であって、出来事ではない。受けた画面は一覧を取り直す（切れていた間の
+変化がそこで揃う）が、トーストも祝いも出さない。
 
 対称性: リソースは「書き手 POST ↔ 読み手 GET / WS」の1対。
 
@@ -127,14 +168,14 @@ invokeAi だけである（`openspec/specs/api/stroke/submission`）。
 - 前提: `docs/proposal.md` が在ること。書くのは A7 で、残せたときだけ受理を成立させるので、
   `proposed` まで進んだセッションでは通常在る。外から消された場合は 409（proposal が
   見つからない）で止まる。**承認は proposal を書かず、既にあるものに触れない。**
-- 順序は「衝突確認 → phase 書き換え → 改名」で、改名が失敗したら phase を `proposed` へ
-  書き戻す。`approved` かつ未改名の宙吊りは作らない。
+- 順序は「衝突確認 → 改名 → phase 書き換え」で、phase の書き込みが失敗したら改名を戻す。
+  `approved` かつ未改名の宙吊りは作らない。
 - 改名の成功直後に steering の claude を起こす（cwd＝生成先。完了は待たない・ADR 0011）。
   昇格に失敗したときは起こさない。
 - エラー: 400 形式不正 / 404 / 409 name-conflict / 409 phase（`proposed` のみ受理）/
   409 proposal なし / 500 改名失敗
 
-### U11 `POST /api/strokes/:id/delete`
+### U11 `DELETE /api/sessions/:id`
 
 - input: 本文なし
 - output: 本文なし（204）
