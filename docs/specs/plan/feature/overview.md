@@ -54,7 +54,7 @@ stroke が始まる口は複数ある。代表は2つで、網羅と挙動の定
 
 ## 命名
 
-**本書のこの節が命名の正である**（[ADR-0013](../adr/0013-feature-name-encodes-capability-path.md) は決定の経緯の記録）。命名は1つの**置換ルール**として定義する。
+**本書のこの節が命名の正である**（[ADR-0013](../../../adr/0013-feature-name-encodes-capability-path.md) は決定の経緯の記録）。命名は1つの**置換ルール**として定義する。
 
 - 階層パス（`/` 区切り）とフラット名は、`/` ↔ `__`（2重アンダーバー）の置換で相互変換する
   - `api/session` ↔ `api__session`
@@ -82,7 +82,7 @@ stroke が始まる口は複数ある。代表は2つで、網羅と挙動の定
 - feature は `.spec-workflow/specs/<spec名>/` 直下の proposal.md / requirements.md / design.md / tasks.md で構成される
 - 本家が spec として扱うのは requirements / design / tasks の3文書のみ。proposal.md は本家からは見えないが、置いてあっても害はない
 - stroke-board は配置時に change の proposal.md を feature へ置く。**capability が複数のときは、分解された feature 全てに同じ proposal.md を置き**、これを集合定義（この change が対象とする capability の全量）の拠り所とする
-- `.spec-workflow/specs/` 配下に入れ子ディレクトリを持たない。入れ子は本家の一覧に現れず、本家のファイル監視が親 spec に存在しない文書の更新イベントを飛ばす（実測 2026-08-26、[upstream-observations](../specs/reference/upstream-observations.md)）。階層は入れ子ではなく `__` エンコードのフラット名で表す
+- `.spec-workflow/specs/` 配下に入れ子ディレクトリを持たない。入れ子は本家の一覧に現れず、本家のファイル監視が親 spec に存在しない文書の更新イベントを飛ばす（実測 2026-08-26、[upstream-observations](../../reference/upstream-observations.md)）。階層は入れ子ではなく `__` エンコードのフラット名で表す
 
 ## 工程
 
@@ -112,9 +112,9 @@ feature 固有の sync 工程は**定義しない**。締めは既存の2つの�
 
 #### 突き合わせ（状態の判定）
 
-軸は**本家が返す specs の一覧**である。WS `spec-update` は `{specs, archivedSpecs}`（アクティブな器と archive 済みの器の全件一覧）を運ぶ（[upstream-observations](../specs/reference/upstream-observations.md)）。画面ロード時も同じ一覧を本家から取得する（ADR-0012 の流儀）。stroke-board は一覧を受け取るたびに、判定を全量やり直す。
+軸は**本家が返す specs の一覧**である。WS `spec-update` は `{specs, archivedSpecs}`（アクティブな器と archive 済みの器の全件一覧）を運ぶ（[upstream-observations](../../reference/upstream-observations.md)）。画面ロード時も同じ一覧を本家から取得する（ADR-0012 の流儀）。stroke-board は一覧を受け取るたびに、判定を全量やり直す。
 
-受け取った一覧の spec 名ごとに、openspec 側の2点を見る（spec 名からの逆変換はしない。[ADR-0005](../adr/0005-do-not-derive-from-upstream-data.md)）。
+受け取った一覧の spec 名ごとに、openspec 側の2点を見る（spec 名からの逆変換はしない。[ADR-0005](../../../adr/0005-do-not-derive-from-upstream-data.md)）。
 
 - **確定した仕様があるか** — `openspec/specs/<パス>/spec.md` がある（パス ↔ spec 名は置換ルール）
 - **update change があるか** — `openspec/changes/update-<spec名>/`（`archive/` 除く）がある（名前が対象を表す）

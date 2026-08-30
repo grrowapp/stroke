@@ -63,6 +63,8 @@ worktree = `git worktree` で切った作業ディレクトリ。それぞれが
 
 ### `docs/specs/plan/`
 
+- `feature/overview.md` — feature のワークフロー定義（`__` 命名・器・工程・締め。2レーンのうち feature レーンの正）
+- `feature/feature-workflow.md` — 上の旧版。中身が食い違ったまま残っている（統合は未着手）
 - `artifact-extension-plan.md` — 拡張 artifact の検討資料（未決定）
 - `portal-stroke-entrance.md` — 入口の接合の対応方法（作成ボタン→ストローク概要入力。ADR-0009/0010 の確定先）
 - `portal-stroke-exit.md` — 出口の接合の対応方法（承認→steering 工程の自動開始。ADR-0011 の確定先）
