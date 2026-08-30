@@ -78,14 +78,14 @@ test.describe('一覧の列は prototype と同じ', () => {
     ]);
   });
 
-  test('アクティブな行は状態列に PID を出す', async ({ page }) => {
+  /**
+   * PID は出さない（specs/project/directory「一覧は4つの列を持つ」）。一覧で下す判断は
+   * 「その行に入るかどうか」だけで、PID はその判断に使われない。
+   */
+  test('アクティブな行にも PID は出ない', async ({ page }) => {
     const row = page.getByTestId('project-row').filter({ hasText: 'alpha' });
-    await expect(row.getByTestId('project-pid')).toContainText('PID');
-  });
-
-  test('未接続の行に PID は出ない', async ({ page }) => {
-    const row = page.getByTestId('project-row').filter({ hasText: 'idle-project' });
     await expect(row.getByTestId('project-pid')).toHaveCount(0);
+    await expect(row).toContainText('アクティブ');
   });
 
   test('未処理の通知が無ければ — を出す', async ({ page }) => {

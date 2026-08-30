@@ -71,7 +71,7 @@ export function useWaitingRetry(sessionId: MaybeRefOrGetter<string>) {
 
   /** `error` からの削除。回復手段のもう一方（U11）。 */
   async function discard(): Promise<void> {
-    await $fetch(`/api/strokes/${toValue(sessionId)}/delete`, { method: 'POST' })
+    await $fetch(`/api/sessions/${toValue(sessionId)}`, { method: 'DELETE' })
   }
 
   return { waiting, failed, errored, startWaiting, stopWaiting, retryFromError, discard }

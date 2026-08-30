@@ -10,13 +10,48 @@ import type { Annotation } from './stroke';
 /** プロジェクトが本家に繋がっているか */
 export type ProjectConnection = 'active' | 'disconnected';
 
+/**
+ * プロジェクトが作り終わっているか。**一覧の行が持つのはこの2値だけである。**
+ *
+ * `ProjectConnection` とは別の軸である。承認で昇格した直後のプロジェクトは、まだ
+ * `.spec-workflow` を持たないので本家に登録されようがない。それを「未接続」と呼ぶと、
+ * 「繋がっていないだけで中身は在る」ものと区別がつかなくなる（specs/project/directory
+ * 「アクティブと未接続を判定して示す」）。
+ *
+ * 軸を分けておくと、既に `connection === 'active'` を見ている箇所——入場の可否・PID の
+ * 表示・承認件数の問い合わせ——はそのまま正しいままになる。生成中のものが `'active'` に
+ * なることはないためである（design.md D2）。
+ *
+ * **失敗の状態を持たない。** 失敗はモーダルで決着し、ユーザーがやり直すか破棄するかを
+ * 選ぶ。どちらを選んでも行は生成中に戻るか消えるので、失敗のまま居座る行が生まれない
+ * （specs/project/generation）。失敗を**知らせる**必要はあるが、それは配信の型
+ * （`ProjectCreationEvent`）が運ぶ。
+ */
+export type ProjectCreation = 'done' | 'in-progress';
+
+/**
+ * 生成の決着。**配信が運ぶ値で、行の状態ではない。**
+ *
+ * 行は `ProjectCreation` の2値しか持たないが、決着としては失敗も起きる。それを画面へ
+ * 伝えないとモーダルを出せないので、配信の型だけが `'failed'` を持つ。
+ */
+export type ProjectCreationOutcome = ProjectCreation | 'failed';
+
 /** 上層のプロジェクト一覧の1行 */
 export interface ProjectSummary {
-  /** 走査で見つかったディレクトリ名。表示名に使う */
+  /** 走査で見つかったディレクトリ名。表示名に使う。生成中は承認で確定した名前 */
   name: string;
-  /** `.spec-workflow` を持つディレクトリの絶対パス。一覧内で一意 */
+  /**
+   * `.spec-workflow` を持つディレクトリの絶対パス。一覧内で一意。
+   * 生成中は `.spec-workflow` がまだ無いので、保存先直下のディレクトリの絶対パスが入る。
+   */
   workflowRootPath: string;
   connection: ProjectConnection;
+  /**
+   * 作成の進み具合。`'done'` 以外のとき、`connection` は必ず `'disconnected'` で、
+   * `projectId` / `pid` / `lastModified` / `pendingApprovals` はすべて null になる。
+   */
+  creation: ProjectCreation;
   /**
    * 本家の projectId。アクティブなときだけ引ける。
    * 未接続では registry にエントリが無いため null になる（design.md 決定1）。
@@ -107,11 +142,24 @@ export interface Notification {
   targetId: string;
 }
 
-/** ブラウザ向け WebSocket が送るもの */
+/**
+ * 上層向け WebSocket が送るもの。
+ *
+ * **出来事の種類が増えても口は増やさず、ここに種別を足す**（specs/ws/delivery）。
+ *
+ * `snapshot` は接続の瞬間に流れる現在分で、それ以外は接続後に起きた出来事である。画面は
+ * この区別で「既に起きていたもの」を「今起きたもの」として扱わずに済む——トーストを出し
+ * 直さない（specs/notification-toast）、完了を祝い直さない（specs/project/generation）。
+ *
+ * 生成の現在分は `snapshot` に載せない。一覧の行の正は `GET /api/projects` の1つであり
+ * （design.md D3）、`snapshot` を受けた画面がそれを取り直せば、切れていた間に起きた変化も
+ * そこで揃う。祝いは `project-creation` を受けたときだけで、`snapshot` では出さない。
+ */
 export type BoardMessage =
   | { type: 'snapshot'; notifications: Notification[]; upstreamConnected: boolean }
   | { type: 'notification'; notification: Notification }
-  | { type: 'upstream-connection'; connected: boolean };
+  | { type: 'upstream-connection'; connected: boolean }
+  | { type: 'project-creation'; name: string; state: ProjectCreationOutcome };
 
 // --- 下層の画面が見る形 ---
 //

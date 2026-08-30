@@ -11,9 +11,16 @@ import { expect, test } from '@playwright/test';
  * 変わったときにテストだけが古い値で通り続ける。
  */
 
+/**
+ * openspec は worktree に無い。**メインの作業ツリーだけが実体を持ち**、全セッションが
+ * そこを共有している（`docs/agents/issue-tracker.md`）。worktree から走らせても読めるよう、
+ * 実体のある側を指す。
+ */
+const OPENSPEC_ROOT = '/opt/projects/stroke-board/openspec';
+
 const UPSTREAM_CSS = join(
-  process.cwd(),
-  'openspec/changes/archive/2026-08-20-steering-dashboard-portal/prototype/assets/spec-workflow.css',
+  OPENSPEC_ROOT,
+  'changes/archive/2026-08-20-steering-dashboard-portal/prototype/assets/spec-workflow.css',
 );
 
 /** 本家の `.dark` ブロックからトークンを読む */
@@ -180,8 +187,8 @@ test.describe('本家の design token に合っている', () => {
  * 変わったときにテストだけが古い形で通り続ける。
  */
 const PROTOTYPE_HTML = join(
-  process.cwd(),
-  'openspec/changes/archive/2026-08-20-steering-dashboard-portal/prototype/navigation.prototype.html',
+  OPENSPEC_ROOT,
+  'changes/archive/2026-08-20-steering-dashboard-portal/prototype/navigation.prototype.html',
 );
 
 function prototypeIconPaths(): Record<string, string> {
@@ -364,12 +371,12 @@ test.describe('表の中身が prototype と同じ様式になっている', () 
     expect(idle.fontSize).toBe('11px');
   });
 
-  test('プロジェクト一覧: PID と最終更新は 12px の secondary', async ({ page }) => {
+  test('プロジェクト一覧: 最終更新は 12px の secondary', async ({ page }) => {
     await page.goto('/projects');
 
     const row = page.getByTestId('project-row').filter({ hasText: 'alpha' });
 
-    for (const testId of ['project-pid', 'project-last-modified']) {
+    for (const testId of ['project-last-modified']) {
       const style = await row.getByTestId(testId).evaluate((element) => {
         const own = getComputedStyle(element);
         return { fontSize: own.fontSize, color: own.color };

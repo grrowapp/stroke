@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { Invocation } from '#shared/stroke'
-import { invokeAi, type AiRun } from './ai'
-import type { ClaudeLaunch } from './claude'
+import { invokeAi, type AiRun } from '../../../../server/utils/stroke/ai'
+import type { ClaudeLaunch } from '../../../../server/utils/stroke/claude'
 
 /**
  * invokeAi は設定を引かない（openspec/specs/agent/invocation）。見るのは、
@@ -13,7 +13,7 @@ import type { ClaudeLaunch } from './claude'
 
 const { runClaude } = vi.hoisted(() => ({ runClaude: vi.fn() }))
 
-vi.mock('./claude', async (importOriginal) => ({
+vi.mock('../../../../server/utils/stroke/claude', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./claude')>()),
   runClaude,
 }))

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { assertProjectName, promoteSessionToProject } from './project'
+import { assertProjectName, promoteSessionToProject, revertPromotion } from '../../../../server/utils/stroke/project'
 
 /**
  * 昇格は「同じ親の下での改名だけ」である（openspec/specs/project/generation）。
@@ -84,6 +84,24 @@ describe('promoteSessionToProject', () => {
     await expect(readFile(join(root, SESSION_ID, 'state.json'), 'utf8')).resolves.toContain(
       'proposed',
     )
+  })
+})
+
+describe('revertPromotion', () => {
+  it('改名を元へ戻す。中身はそのまま残る', async () => {
+    await promoteSessionToProject(root, SESSION_ID, 'my-project')
+
+    await revertPromotion(root, 'my-project', SESSION_ID)
+
+    // uuid の名前に戻り、中身も一緒に戻っている
+    await expect(
+      readFile(join(root, SESSION_ID, 'docs', 'proposal.md'), 'utf8'),
+    ).resolves.toBe('# proposal\n')
+    await expect(readFile(join(root, 'my-project', 'state.json'), 'utf8')).rejects.toThrow()
+  })
+
+  it('戻す先が無くても投げない。巻き戻しの失敗で元の失敗を覆い隠さない', async () => {
+    await expect(revertPromotion(root, 'not-there', SESSION_ID)).resolves.toBeUndefined()
   })
 })
 

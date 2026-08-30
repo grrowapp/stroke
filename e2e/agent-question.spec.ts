@@ -144,7 +144,7 @@ test.describe('問いの往復', () => {
 
   test.afterEach(async ({ request }) => {
     for (const sessionId of created) {
-      await request.post(`/api/strokes/${sessionId}/delete`).catch(() => undefined);
+      await request.delete(`/api/sessions/${sessionId}`).catch(() => undefined);
     }
     created = [];
   });
@@ -232,7 +232,8 @@ test.describe('問いの往復', () => {
     await expect(page.getByRole('dialog')).toBeVisible();
 
     // 背景を押しても閉じない
-    await page.locator('[data-slot="overlay"]').click({ position: { x: 4, y: 4 } });
+    // 画面2 そのものがモーダルなので、オーバーレイは2枚重なる。**最前面（問いの面）**を押す
+    await page.locator('[data-slot="overlay"]').last().click({ position: { x: 4, y: 4 } });
     await expect(page.getByRole('dialog')).toBeVisible();
     await expect(page.getByTestId('agent-question-text')).toHaveText(QUESTION.question);
   });
@@ -249,8 +250,9 @@ test.describe('問いの往復', () => {
     await page.getByTestId('agent-question-free').fill('自分の言葉で答える');
     await page.getByTestId('agent-question-submit').click();
 
-    // 次の問いが来ないまま待機が明けたら、この面は用済みになって閉じる
-    await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 15_000 });
+    // 次の問いが来ないまま待機が明けたら、この面は用済みになって閉じる。
+    // **画面2 そのものがモーダル**なので `dialog` は残る。閉じたことは問いの中身で見る
+    await expect(page.getByTestId('agent-question')).toHaveCount(0, { timeout: 15_000 });
     expect(page.url()).toContain(`/strokes/${sessionId}/proposal`);
   });
 
@@ -265,7 +267,8 @@ test.describe('問いの往復', () => {
 
     await page.getByTestId('agent-question-free').fill('前の問いへの書きかけ');
     await page.getByTestId('agent-question-submit').click();
-    await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 15_000 });
+    // 画面2 そのものがモーダルなので `dialog` は残る。問いの面が閉じたことは中身で見る
+    await expect(page.getByTestId('agent-question')).toHaveCount(0, { timeout: 15_000 });
 
     // 次の問いが届いたら、また同じ面で受ける
     await submitQuestion(request, sessionId, NEXT_QUESTION);

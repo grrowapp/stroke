@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { invokePath } from './invoke'
-import { shouldRetry } from './sweep'
+import { invokePath } from '../../../../server/utils/stroke/invoke'
+import { shouldRetry } from '../../../../server/utils/stroke/sweep'
 
 /**
  * 巡回は `failed` だけを拾う（openspec/specs/portal/batch）。

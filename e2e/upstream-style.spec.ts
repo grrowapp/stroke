@@ -29,9 +29,14 @@ const UPSTREAM_PATH = {
   close: 'M6 18L18 6M6 6l12 12',
 } as const;
 
+/**
+ * openspec は worktree に無い。**メインの作業ツリーだけが実体を持ち**、全セッションが
+ * そこを共有している（`docs/agents/issue-tracker.md`）。worktree から走らせても読めるよう、
+ * 実体のある側を指す。
+ */
 const UPSTREAM_CSS = join(
-  process.cwd(),
-  'openspec/changes/archive/2026-08-20-steering-dashboard-portal/prototype/assets/spec-workflow.css',
+  '/opt/projects/stroke-board/openspec',
+  'changes/archive/2026-08-20-steering-dashboard-portal/prototype/assets/spec-workflow.css',
 );
 
 /** 本家の CSS から1つのセレクタの宣言を読む */
