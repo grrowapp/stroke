@@ -90,9 +90,9 @@ export default defineNuxtConfig({
   typescript: { typeCheck: false, strict: true },
 
   // 起動の待ち受け。3000 はこのマシンで別のプロセスが使っているのでずらしてある。
-  // 3399 はストロークの `claude.apiBaseUrl` と揃える値（変えるなら両方揃えて変える）。
+  // 3599 はストロークの `claude.apiBaseUrl` と揃える値（変えるなら両方揃えて変える）。
   // 別マシンのブラウザから開くため、localhost ではなく全インタフェースで待つ
-  devServer: { host: '0.0.0.0', port: 3399 },
+  devServer: { host: '0.0.0.0', port: 3599 },
 
   hooks: {
     /**
@@ -233,10 +233,14 @@ export default defineNuxtConfig({
       // そのものを持つ（空白区切りの文字列を後から割らない）。
       //
       // `--add-dir` に渡すのはリポジトリのルートで、`.claude` や skills をパスに
-      // 含めない（ADR 0001）。1つ目が grilling / domain-modeling / write-steering-v2 と
-      // opsx コマンドの置き場、2つ目がセッション API スキル（assets/.claude/skills/）の
-      // 置き場。どちらもこのリポジトリの中にあるので、置き場所を直書きせずルートから
+      // 含めない（ADR 0001）。渡すのは grilling / domain-modeling / write-steering-v2 と
+      // opsx コマンドの置き場であるルートだけで、置き場所を直書きせずルートから
       // 導く（nuxt.config.ts はリポジトリルートに在る）。
+      //
+      // 操作系スキル（`assets/.claude/skills/` の get-* / question / proposal）の置き場は
+      // 渡さない。取得・提出は MCP ツールが担うので、スキル経由で真似る余地を残さない
+      // （provide-operations-via-mcp）。ファイル自体は HEAD に在るが（guidance 作成のため
+      // 残してあり、他は git 操作で復元されたついで）、ロードはさせない。
       //
       // `--setting-sources` に user を含めないのは、開発者個人の設定
       // （~/.claude/CLAUDE.md）をエンドユーザーのセッションへ持ち込まないためである。
@@ -257,7 +261,6 @@ export default defineNuxtConfig({
         '--setting-sources', SETTING_SOURCES_REQUIRED,
         '--model', 'sonnet',
         '--add-dir', import.meta.dirname,
-        '--add-dir', `${import.meta.dirname}/assets`,
         // curl / jq / printenv は落とした（取得・提出を MCP ツール以外で真似る余地を
         // 残さない・ユーザー指示 2026-08-27）。`Write` は develop 側の追加で、proposal を
         // `docs/proposal.md` に書くのに要るので残す
@@ -267,7 +270,7 @@ export default defineNuxtConfig({
 
       // エージェント向け endpoint の base URL。spawn 時に環境変数 STROKE_BASEURL として
       // 渡し、セッション API スキルがそこから接続先を解決する（prompt には載せない）
-      apiBaseUrl: 'http://127.0.0.1:3399',
+      apiBaseUrl: 'http://127.0.0.1:3599',
 
       // セッションの openspec/config.yaml に書くワークフロースキーマ名。実体は
       // user レベル（~/.local/share/openspec/schemas/）に配置されたものが解決される
@@ -303,7 +306,7 @@ export default defineNuxtConfig({
       //
       // 設定するとツールの呼び出しと結果まで残る（`--output-format stream-json`）。
       // 出力はセッションごとに1ファイルへ追記される
-      debugLogDir: '',
+      debugLogDir: '.stroke-check/debug-log',
     },
 
     // --- ストローク: セッションの openspec ルートを初期化する CLI とその引数

@@ -1,5 +1,7 @@
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { execFile } from 'node:child_process'
+import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { promisify } from 'node:util'
 
 // ランナー（`playwright test`）には載せないが、ブラウザを動かす口は `@playwright/test` が
 // 再エクスポートしているものを使う。`playwright` を直接指すと間接依存に頼ることになる
@@ -26,7 +28,12 @@ import nuxtConfig from '../nuxt.config'
  *   yarn check:stroke --policy first         先頭を選ぶ
  *   yarn check:stroke --rounds 20            上限を変える
  *   yarn check:stroke --overview ./foo.md    概要を差し替える
+ *   yarn check:stroke --send-back           proposal を1回差し戻す（指摘は haiku が書く）
+ *   yarn check:stroke --send-back '<指摘>'  指摘の文言を指定して差し戻す
+ *   yarn check:stroke --cleanup             この実行で作ったセッションを最後に片付ける
  */
+
+const execFileAsync = promisify(execFile)
 
 const PORT = nuxtConfig.devServer?.port ?? 3399
 const BASE = `http://127.0.0.1:${PORT}`
@@ -44,6 +51,14 @@ const DEBUG_LOG_DIR = claude?.debugLogDir ?? ''
  * 表示まで見届ける。
  */
 const ROUND_TIMEOUT_MS = 4 * 60 * 1000
+
+/**
+ * 変化が無いまま待ち続けたときに、画面を取り直す間隔。
+ *
+ * dev がモジュールを取り落とすと Vue が動かなくなり、サーバー側は進んでいるのに画面だけが
+ * 止まる。取り直せば現在の状態を拾い直せる（`sendBack`）。
+ */
+const RELOAD_INTERVAL_MS = 60 * 1000
 
 /** 投入する既定の概要。設計判断が既にいくつか入っていて、問いが立ちやすいもの */
 const DEFAULT_OVERVIEW = `## setai
@@ -101,6 +116,37 @@ const arg = (name: string): string | undefined => {
 const policyName = arg('policy') ?? 'recommended'
 const maxRounds = Number(arg('rounds') ?? 12)
 const seed = Number(arg('seed') ?? 1)
+
+/**
+ * proposal の着地後に差し戻すかどうか。`--send-back` を渡したときだけ差し戻す。
+ *
+ * 差し戻しは `get-send-back` の**成功経路**を通す唯一の手段である。差し戻しが無い間、
+ * このツールが返す 404（`no_send_back`）は正常動作であって成功結果ではない。
+ *
+ * **指摘の文言は実行前に決め打てない。** proposal の中身は実行してみるまで分からず、
+ * 固定文言では噛み合わない。噛み合わない指摘では、出し直された proposal が改善したのか
+ * どうかを見られない。そこで値なしのときは、着地した proposal を読ませて haiku に
+ * 指摘を書かせる（`draftSendBack`）。値を添えたときはその文言をそのまま使う
+ */
+/**
+ * 実行の最後に、この実行で作ったセッションを消すかどうか。
+ *
+ * **何度も回す道具なので、片付けまで手元で完結させる。** 残すと `projectShareRoot` に
+ * 溜まり続けるうえ、途中で止めたセッションは `phase` が `stroking` のまま残り、巡回
+ * （`server/plugins/01.retry-failed.ts`）に拾われて勝手に再キックされる。
+ *
+ * 消すのは**この実行が作った1本だけ**である。他の worktree や人が作ったものには触らない。
+ * 証跡（`.stroke-check/` の HTML と `debugLogDir` の生出力）は消さない。合否の根拠は
+ * そちらに残る。
+ */
+const cleanup = args.includes('--cleanup')
+
+const sendBackAt = args.indexOf('--send-back')
+const sendBackRequested = sendBackAt !== -1
+const nextOfSendBack = sendBackAt === -1 ? undefined : args[sendBackAt + 1]
+const sendBackGiven = nextOfSendBack !== undefined && !nextOfSendBack.startsWith('--')
+  ? nextOfSendBack
+  : undefined
 const overviewPath = arg('overview')
 const overview = overviewPath === undefined ? DEFAULT_OVERVIEW : readFileSync(overviewPath, 'utf8')
 
@@ -123,7 +169,7 @@ async function main(): Promise<void> {
 
   const browser = await chromium.launch()
   try {
-    const { rounds, landed, sessionId } = await run(browser, policy)
+    const { rounds, landed, sessionId, revised } = await run(browser, policy)
     const html = render({ rounds, landed, sessionId, logs: logNames().filter(n => !before.has(n)) })
     const out = join(process.cwd(), '.stroke-check', `${sessionId}.html`)
     mkdirSync(join(process.cwd(), '.stroke-check'), { recursive: true })
@@ -131,9 +177,16 @@ async function main(): Promise<void> {
 
     console.log(`\nセッション: ${sessionId}`)
     console.log(`往復: ${rounds.length} / 着地: ${landed ? 'proposal に到達' : `未着地（上限 ${maxRounds}）`}`)
+    if (revised !== null) {
+      console.log(`差し戻し: ${revised ? 'proposal が出し直された' : `出し直されないまま時間切れ（${ROUND_TIMEOUT_MS}ms）`}`)
+    }
     console.log(`記録: ${out}`)
 
-    if (!landed) process.exitCode = 1
+    if (cleanup) removeSession(sessionId)
+
+    // 差し戻しを頼んだのに出し直されなかったら、着地していても失敗として扱う。
+    // `get-send-back` の成功経路を見るのが目的なので、差し戻しが空振りしたら意味がない
+    if (!landed || revised === false) process.exitCode = 1
   } finally {
     await browser.close()
   }
@@ -143,11 +196,12 @@ async function run(browser: Browser, policy: Policy): Promise<{
   rounds: Round[]
   landed: boolean
   sessionId: string
+  /** 差し戻しの結果。`--send-back` を渡していなければ null */
+  revised: boolean | null
 }> {
   const page = await browser.newPage({ baseURL: BASE })
 
-  await page.goto('/strokes')
-  await page.getByTestId('stroke-modal').waitFor({ state: 'visible' })
+  await openStrokes(page)
 
   await page.getByRole('textbox').first().fill(overview)
 
@@ -177,7 +231,11 @@ async function run(browser: Browser, policy: Policy): Promise<{
   let previous: string | undefined
   for (let round = 1; round <= maxRounds; round++) {
     console.log(`  [${round}/${maxRounds}] 次を待つ`)
-    if (await waitForNext(page, previous) === 'proposal') return { rounds, landed: true, sessionId }
+    if (await waitForNext(page, previous) === 'proposal') {
+      if (!sendBackRequested) return { rounds, landed: true, sessionId, revised: null }
+      const revised = await sendBack(page, policy, rounds, sessionId)
+      return { rounds, landed: true, sessionId, revised }
+    }
     await settle(page)
     const answered = await answer(page, policy, round)
     rounds.push(answered)
@@ -185,7 +243,7 @@ async function run(browser: Browser, policy: Policy): Promise<{
     console.log(`  Q${round} ${answered.header}: ${answered.question} → ${answered.answer}`)
   }
 
-  return { rounds, landed: false, sessionId }
+  return { rounds, landed: false, sessionId, revised: null }
 }
 
 /**
@@ -243,6 +301,227 @@ async function waitForNext(page: Page, previous: string | undefined): Promise<'q
     `${ROUND_TIMEOUT_MS}ms 待っても次の問いも proposal も出なかった`
     + (failure === null ? '' : `（画面の表示: ${failure}）`),
   )
+}
+
+/**
+ * 自由記述の回答を haiku に書かせる。
+ *
+ * **定型文では意味がない。** 以前は「ポリシー free による自動回答（N 往復目）」という
+ * 中身の無い文字列を送っていた。口はあっても答えになっておらず、エージェントは
+ * 何も受け取れない。それでは選択肢を外した意味がなく、往復も積まれない。
+ *
+ * 選択肢から選ぶ限り、エージェントは答えが確定したと扱う。自由記述で「どれでもない」
+ * を返したときに、追加で問うのか、そのまま proposal へ行くのかを見るのがこのポリシーの
+ * 目的である（ユーザー指示 2026-08-29）。
+ */
+async function draftFreeAnswer(
+  header: string,
+  detail: string,
+  question: string,
+  options: { label: string, description: string, recommended: boolean }[],
+): Promise<string> {
+  const prompt = [
+    'あなたは開発の依頼主である。AI から次の問いを受けた。選択肢のどれも選ばず、自分の言葉で答えろ。',
+    '',
+    '- 150 文字以内の日本語。1段落',
+    '- 前置き・見出し・箇条書きを付けず、回答の本文だけを出す',
+    '- 選択肢のどれかをそのまま選ぶ答えにはしない。条件を足す、前提を問い返す、範囲を切り直すなど、',
+    '  選択肢に収まらない答えにする',
+    '- 具体的に答える。「お任せします」のような判断の放棄はしない',
+    '',
+    `見出し: ${header}`,
+    `背景: ${detail}`,
+    `問い: ${question}`,
+    '選択肢:',
+    ...options.map(o => `- ${o.label}: ${o.description}`),
+  ].join('\n')
+
+  console.log('    自由記述の回答を haiku に書かせている')
+  const { stdout } = await execFileAsync(
+    'claude',
+    ['-p', '--model', 'haiku', '--', prompt],
+    { timeout: 120_000, maxBuffer: 10 * 1024 * 1024 },
+  )
+
+  const drafted = stdout.trim()
+  if (drafted === '') throw new Error('haiku が自由記述の回答を返さなかった')
+  return drafted
+}
+
+/**
+ * この実行で作ったセッションを消す（`--cleanup`）。
+ *
+ * 消せなくても実行は落とさない。片付けは検証の結果とは別の関心で、ここで落とすと
+ * 合否の報告まで失う。消えなかったことは告げて、あとは人に委ねる。
+ *
+ * **承認まで進んだ場合は名前が変わる**（セッションディレクトリがプロジェクト名へ改名される）。
+ * その場合 uuid のディレクトリはもう無いので、消すものが無いという結果になる。
+ */
+function removeSession(sessionId: string): void {
+  const dir = join(PROJECTS_ROOT, sessionId)
+  try {
+    rmSync(dir, { recursive: true, force: true })
+    console.log(`片付け: ${dir} を消した`)
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    console.log(`片付け: ${dir} を消せなかった（${detail}）`)
+  }
+}
+
+/**
+ * 画面1（概要の入力）を開く。開けなければ開き直す。
+ *
+ * dev サーバーは依存を個別のモジュールとして配る。数が多く、途中で1本でも取り落とすと
+ * Vue アプリがマウントされず、画面が白いまま何も出ない（実測 2026-08-29:
+ * `net::ERR_NETWORK_CHANGED` と `Failed to fetch dynamically imported module: entry.js`。
+ * 同じ dev サーバーに3回開き直して3回目で出た）。
+ *
+ * **これは stroke-board の欠陥ではなく dev の配信の問題である。** 成果物の評価に持ち込まない
+ * よう、ここで吸収する。開き直しても出ないなら、そのときは環境として落とす。
+ */
+async function openStrokes(page: Page): Promise<void> {
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    await page.goto('/strokes')
+    const shown = await page.getByTestId('stroke-modal')
+      .waitFor({ state: 'visible', timeout: 30_000 })
+      .then(() => true)
+      .catch(() => false)
+    if (shown) return
+    console.log(`  画面1 が出ない（${attempt}/5）。開き直す`)
+  }
+  throw new Error('画面1（概要の入力）が5回開き直しても出なかった。dev サーバーの状態を疑う')
+}
+
+/**
+ * 着地した proposal を haiku に読ませて、差し戻しの指摘を書かせる。
+ *
+ * **ここで claude を直接呼ぶのは、人がやる仕事の代わりだからである。** 検証の原則
+ * 「操作はブラウザのみ」は、stroke の工程を動かす claude（invoke.ts が spawn する側）に
+ * かかる決まりで、その経路はここでは触らない。差し戻しの指摘を書くのは工程の外に居る
+ * 人間の役割であり、その代役をここで立てている。
+ *
+ * 読むのは着地した proposal の実物（`docs/proposal.md`）。画面の DOM から拾うより確実で、
+ * endpoint も叩かない。
+ *
+ * モデルは haiku。指摘を1つ書くだけの仕事に大きいモデルは要らない（ユーザー指示 2026-08-29）。
+ */
+async function draftSendBack(sessionId: string): Promise<string> {
+  const proposal = readFileSync(join(PROJECTS_ROOT, sessionId, 'docs', 'proposal.md'), 'utf8')
+
+  const prompt = [
+    '次の proposal をレビューし、差し戻す理由を1つだけ挙げろ。',
+    '',
+    '- 200 文字以内の日本語。1段落',
+    '- 前置き・見出し・箇条書きを付けず、指摘の本文だけを出す',
+    '- proposal の具体的な記述を指し、何をどう直すかが分かる形で書く',
+    '- 褒めない。直すべき点だけを書く',
+    '',
+    '--- proposal ---',
+    proposal,
+  ].join('\n')
+
+  console.log('  差し戻しの指摘を haiku に書かせている')
+  const { stdout } = await execFileAsync(
+    'claude',
+    ['-p', '--model', 'haiku', '--', prompt],
+    { timeout: 120_000, maxBuffer: 10 * 1024 * 1024 },
+  )
+
+  const drafted = stdout.trim()
+  if (drafted === '') throw new Error('haiku が差し戻しの指摘を返さなかった')
+  return drafted
+}
+
+/**
+ * proposal を1回差し戻して、出し直されるまで見る。
+ *
+ * **差し戻しは `get-send-back` の成功経路を通す唯一の手段である。** 差し戻しが無い間、
+ * このツールが返す 404（`no_send_back`）は正常動作であって成功結果ではない。
+ *
+ * 差し戻しには指摘が最低1件要る（`useProposalReview.sendBack`。0件だと画面が警告を出して
+ * 送らない）。本文の箇所に紐づく指摘は範囲選択の操作が要るので、箇所を持たない
+ * 「全体へのコメント」を1件付けて出す。
+ *
+ * 差し戻した後の応答は2通りある（`pages/strokes/[sessionId]/proposal.vue`）。
+ *
+ * - **問い返し**: 帯のボタンからモーダルを開いて答える。中身は画面1 と同じ
+ *   `AgentQuestion.vue` なので `answer` がそのまま使える
+ * - **出し直し**: 「差し戻しを受けて proposal が出し直されました」が出る
+ *
+ * 問い返しは何度でも来るので、出し直しに至るまで答え続ける。答えるたびに待ちの期限を
+ * 取り直す（1回の応答に要る時間は往復のたびに変わらない）。
+ */
+async function sendBack(
+  page: Page,
+  policy: Policy,
+  rounds: Round[],
+  sessionId: string,
+): Promise<boolean> {
+  // 着地の検知は「承認して作る」ボタンでも通る（URL を見ていない経路がある）。
+  // 指摘を付ける口が出るまで待ってから触る
+  const addComment = page.getByRole('button', { name: '＋ 全体へのコメント' })
+  await addComment.waitFor({ state: 'visible', timeout: 30_000 })
+
+  const comment = sendBackGiven ?? await draftSendBack(sessionId)
+  console.log(`  差し戻す: ${comment}`)
+  await addComment.click()
+  await page.getByPlaceholder('proposal 全体について').fill(comment)
+  await page.getByRole('button', { name: '付ける' }).click()
+
+  // ラベルは「差し戻す(件数)」。件数は付けた指摘の数で変わるので前方一致で掴む
+  await page.getByRole('button', { name: /^差し戻す\(/ }).click()
+
+  const followup = page.getByRole('button', { name: 'AI から質問があります' })
+  const revised = page.getByText('差し戻しを受けて proposal が出し直されました')
+
+  let deadline = Date.now() + ROUND_TIMEOUT_MS
+  let started = Date.now()
+  let notified = 0
+  let reloadedAt = Date.now()
+
+  while (Date.now() < deadline) {
+    if (await revised.count() > 0) { endProgress(); return true }
+
+    if (await followup.count() > 0) {
+      endProgress()
+      // 問い返しも AI の実行の途中で出る。答える前に終了を待たないと 409 を踏む（`settle`）
+      await settle(page)
+      await followup.click()
+      const round = rounds.length + 1
+      const answered = await answer(page, policy, round)
+      rounds.push(answered)
+      console.log(`  Q${round}（差し戻し後） ${answered.header}: ${answered.question} → ${answered.answer}`)
+      deadline = Date.now() + ROUND_TIMEOUT_MS
+      started = Date.now()
+      notified = 0
+      reloadedAt = Date.now()
+      continue
+    }
+
+    // **画面が固まると帯も出し直しの報せも出ない。** dev がモジュールを取り落とすと Vue が
+    // 動かなくなり、サーバー側は進んでいるのに画面だけが止まる（実測 2026-08-29: 3問目が
+    // `send-question` で提出済み・`state.json` にも入っているのに、帯が出ないまま時間切れ）。
+    // 一定時間なにも変わらなければ画面を取り直して、状態を見直す
+    if (Date.now() - reloadedAt > RELOAD_INTERVAL_MS) {
+      endProgress()
+      console.log('    変化が無い。画面を取り直す')
+      await page.reload()
+      reloadedAt = Date.now()
+      started = Date.now()
+      notified = 0
+      continue
+    }
+
+    const elapsed = Math.floor((Date.now() - started) / 1000)
+    if (elapsed > notified) {
+      notified = elapsed
+      progress(`${elapsed}秒 — 差し戻しを受けた AI の応答を待っている`)
+    }
+    await page.waitForTimeout(1000)
+  }
+
+  endProgress()
+  return false
 }
 
 /**
@@ -379,7 +658,7 @@ async function answer(page: Page, policy: Policy, round: number): Promise<Round>
 
   let answered: string
   if (choice === 'free') {
-    answered = `ポリシー ${policyName} による自動回答（${round} 往復目）`
+    answered = await draftFreeAnswer(header, detail, question, options)
     await page.getByTestId('agent-question-free').fill(answered)
   } else {
     answered = options[choice]?.label ?? ''
