@@ -225,13 +225,6 @@ export async function runClaude(options: ClaudeRunOptions): Promise<ClaudeRunRes
 }
 
 /**
- * 呼び出しの生出力を `<dir>/<YYYYMMDD-HHmmss-SSS>-<セッション uuid>.json` へ書き残す。
- *
- * 調査用の複製である。呼び出しの完了処理から切り離し（await しない）、mkdir・write の
- * どちらの失敗も結果へ反映しない。無音だと「設定したのにログが無い」調査が詰むので、
- * 警告だけ1行出す（openspec/specs/debug/logging・design.md）。
- */
-/**
  * デバッグログに書く中身を組み立てる。
  *
  * **書き出しのルールをここ1箇所に閉じ込める。** 出力形式（`--output-format`）を増やすとき
@@ -241,7 +234,7 @@ export async function runClaude(options: ClaudeRunOptions): Promise<ClaudeRunRes
  * 「生の stdout がそのまま1件」になる。加工して情報を捨てるより、まず生を残す。
  *
  * **末尾に改行を足さない。** 足すと生出力と1文字違いになり、書き残したものを元の出力と
- * 突き合わせられなくなる（`test/server/utils/stroke/claude.test.ts` が押さえている）。
+ * 突き合わせられなくなる。呼び出しの区切りとしての改行は `writeDebugLog` 側で付ける。
  */
 function formatDebugLog(events: string[]): string {
   return events.join('\n')

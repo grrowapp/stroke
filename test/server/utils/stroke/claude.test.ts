@@ -7,8 +7,9 @@ import { runClaude, type ClaudeLaunch } from '../../../../server/utils/stroke/cl
 
 /**
  * デバッグログ（openspec/specs/debug/logging）。見るのは、出力先を渡したときだけ
- * 生出力がファイルに残ること、呼び出しごとに1ファイルで上書きされないこと、
- * 失敗した呼び出しでも残ること、書けなくても呼び出しの結果が変わらないこと。
+ * 生出力がファイルに残ること、**セッションごとに1ファイルへ追記され過去の呼び出しを
+ * 失わないこと**、失敗した呼び出しでも残ること、書けなくても呼び出しの結果が
+ * 変わらないこと、そして**複数行の出力でも完了の検知が壊れないこと**。
  *
  * claude の代わりに `node -e` で子プロセスを立てる。`runClaude` が足すフラグ
  * （`-p` 以降）は `-e` のスクリプトへの位置引数として渡り、無視される。
@@ -126,6 +127,29 @@ describe('runClaude のデバッグログ', () => {
     expect(after2.split('\n').filter(line => line.startsWith('# '))).toHaveLength(2)
   })
 
+  it('書き残す中身は生出力と1文字も違わない（末尾に改行を足さない）', async () => {
+    const dir = await tempDir()
+    const logDir = join(dir, 'logs')
+
+    await runClaude({
+      sessionId: SESSION_ID,
+      launch: SUCCESS_LAUNCH,
+      cwd: dir,
+      prompt: 'PROMPT',
+      mode: 'new',
+      debugLogDir: logDir,
+      timeoutMs: TIMEOUT_MS,
+    })
+
+    const written = await waitForContent(join(logDir, `${SESSION_ID}.json`), 1)
+    const lines = written.split('\n')
+
+    // 見出し行1本 + 生出力1行 + 区切りの改行。中身に手を入れると突き合わせができなくなる
+    expect(lines[0]).toMatch(/^# \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}$/)
+    expect(lines[1]).toBe(ENVELOPE)
+    expect(written).toBe(`${lines[0]}\n${ENVELOPE}\n`)
+  })
+
   it('失敗した呼び出し（非ゼロ終了）でも出力が残る', async () => {
     const dir = await tempDir()
     const logDir = join(dir, 'logs')
@@ -155,10 +179,15 @@ describe('runClaude のデバッグログ', () => {
       `process.stdout.write(JSON.stringify(process.argv.slice(1)) + "\\n" + ${JSON.stringify(ENVELOPE)})`,
     )
 
-    await runClaude({
+    const result = await runClaude({
       sessionId: SESSION_ID, launch: echoArgs, cwd: dir, prompt: 'PROMPT', mode: 'new',
       debugLogDir: logDir, timeoutMs: TIMEOUT_MS,
     })
+
+    // **複数行の出力でも完了の検知が壊れないこと。** ここがこの形の要である——`stdout` を
+    // 最後の1塊だけにしたから `readEnvelope` を無変更で通せる。連結する実装へ戻すと、
+    // `stream-json` のとき `readEnvelope` は必ず null になり全呼び出しが失敗する
+    expect(result).toEqual({ ok: true, sessionId: SESSION_ID })
 
     const names = await waitForFiles(logDir, 1)
     const written = await readFile(join(logDir, names[0]!), 'utf8')

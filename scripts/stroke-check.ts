@@ -452,7 +452,7 @@ async function waitForNext(page: Page, previous: string | undefined): Promise<'q
   // 待っている間は無言にしない。AI の応答は数分かかることがあり、進んでいるのか
   // 止まっているのかが外から分からないと、待つ判断も切る判断もできない
   const started = Date.now()
-  const logs = logNames().length
+  const logs = logEntryCount()
   let notified = 0
 
   while (Date.now() < deadline) {
@@ -468,7 +468,7 @@ async function waitForNext(page: Page, previous: string | undefined): Promise<'q
       // claude の生出力が1本増える = 1回の呼び出しが終わった。増えていなければまだ実行中
       // 画面のエラー文言は 409 から回復しても残るので、現在の状態として出さない。
       // いま動いているかどうかは、claude の生出力が増えたかで見る
-      const done = logNames().length - logs
+      const done = logEntryCount() - logs
       progress(`${elapsed}秒 — ${done > 0 ? '応答は返った。次を待っている' : 'AI が応答を組み立てている'}`)
     }
 
@@ -679,7 +679,7 @@ async function waitForSteering(page: Page, projectName: string): Promise<boolean
 
   const available = page.getByTestId('steering-list').getByText('利用可')
   const deadline = Date.now() + ROUND_TIMEOUT_MS
-  const logs = logNames().length
+  const logs = logEntryCount()
   let started = Date.now()
   let notified = 0
   let reloadedAt = Date.now()
@@ -702,7 +702,7 @@ async function waitForSteering(page: Page, projectName: string): Promise<boolean
     const elapsed = Math.floor((Date.now() - started) / 1000)
     if (elapsed > notified) {
       notified = elapsed
-      const done = logNames().length - logs
+      const done = logEntryCount() - logs
       progress(
         `${elapsed}秒 — steering 文書 ${ready}/${STEERING_DOCUMENTS}`
         + `（${done > 0 ? '応答は返った' : 'AI が書いている'}）`,
@@ -895,13 +895,13 @@ async function settle(page: Page): Promise<void> {
     return
   }
 
-  const before = logNames().length
+  const before = logEntryCount()
   const deadline = Date.now() + ROUND_TIMEOUT_MS
   const started = Date.now()
   let notified = 0
 
   while (Date.now() < deadline) {
-    if (logNames().length > before) { endProgress(); return }
+    if (logEntryCount() > before) { endProgress(); return }
 
     const elapsed = Math.floor((Date.now() - started) / 1000)
     if (elapsed > notified) {
@@ -1067,6 +1067,31 @@ function logNames(): string[] {
   } catch {
     return []
   }
+}
+
+/**
+ * これまでに記録された claude の呼び出しの回数。
+ *
+ * **ファイル数では数えられない。** ログはセッションごとに1ファイルへ**追記**される
+ * （`adr0016-sub-update-debug-log-per-session`）ので、同じセッションの2回目以降は
+ * ファイルが増えない。ファイル数で見ていると、2往復目からは実行が終わっても気付けず、
+ * 必ず時間切れまで待つことになる（実測 2026-08-30: `settle` が毎回
+ * 「実行の終了を確認できないまま答える」に落ちていた）。
+ *
+ * 1回の呼び出しは `# <日時>` の見出し行1本に対応する。それを数える。
+ */
+function logEntryCount(): number {
+  if (DEBUG_LOG_DIR === '') return 0
+  let total = 0
+  for (const name of logNames()) {
+    try {
+      const text = readFileSync(join(DEBUG_LOG_DIR, name), 'utf8')
+      total += text.split('\n').filter(line => line.startsWith('# ')).length
+    } catch {
+      // 読めないファイルは数えない。数え漏らしても待ちが伸びるだけで、誤検知はしない
+    }
+  }
+  return total
 }
 
 /** セッションディレクトリのファイルを読む。無ければ空 */
