@@ -46,6 +46,22 @@ describe('send-question', () => {
     removeConnection(token);
   });
 
+  it('違反の一覧が付いた 400 の本文も、書き換えずにそのまま届ける', async () => {
+    // 受け口は違反を全件返す（openspec/specs/api/request-validation）。ツールが要約したり
+    // 切り詰めたりすると、送り手は何を直せばよいか分からないまま送り直すことになる
+    const token = issueConnectionToken();
+    registerConnection(token, { sessionId: 'session-1' });
+    const body = '問いの構造として読み取れない。'
+      + 'header: 話題タグは12字まで。（現在 13）'
+      + ' / options.0.description: 選択肢の説明は50字まで。（現在 51）';
+    $fetch.raw.mockRejectedValueOnce(fetchErrorWith(400, { message: body }));
+
+    const result = await sendQuestionHandler(QUESTION, { 'x-stroke-token': token });
+
+    expect(result).toEqual({ status: 400, errorCode: 'validation_error', error: body });
+    removeConnection(token);
+  });
+
   it('セッションが無いと 404 session_not_found として整形する', async () => {
     const token = issueConnectionToken();
     registerConnection(token, { sessionId: 'session-missing' });
