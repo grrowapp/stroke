@@ -112,9 +112,10 @@ const { projectShareRoot, claude } = config.runtimeConfig
 
 ### `claude.debugLogDir`
 
-呼び出しの生出力（`--output-format json` の stdout 全文）を書き残すディレクトリ（`openspec/specs/debug/logging`）。空なら書かない（**既定 = 無効**）。
+呼び出しの生出力を書き残すディレクトリ（`openspec/specs/debug/logging`）。空なら書かない（**既定 = 無効**）。
 
-- ファイルは呼び出しごとに1つ、`<YYYYMMDD-HHmmss-SSS>-<セッション uuid>.json`。上書きしない
+- ファイルは**セッションごとに1つ**、`<セッション uuid>.json`。呼び出しのたびに追記し、過去の記録を失わない。呼び出しの区切りは `# <日時>` の見出し行
+- 設定したときだけ `--output-format stream-json --verbose` で呼ぶ。`json` は最終結果1件しか出さず、`tool_use` / `tool_result` が残らないため。空のときは `--output-format json` のまま
 - 調査用の複製であり、書き出しの失敗は呼び出しの成否・セッションの状態・画面の挙動に影響しない（サーバーログへ警告1行のみ）
 - ローテーションは無い。調査が終わったら空へ戻し、残ったファイルは手で消す
 
