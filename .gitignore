@@ -50,3 +50,8 @@ workflow/openspec/changes/
 
 # openspec の store 登録マーカー。マシンローカルな台帳メタデータで、リポジトリの成果物ではない
 .openspec-store/
+
+# ralph-specum: アクティブ epic のポインタ（マシンローカルな作業状態）
+specs/.current-epic
+# ralph-specum: 状態ファイルのロック（マシンローカル）
+specs/**/.ralph-state.lock

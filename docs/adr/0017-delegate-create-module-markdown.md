@@ -13,6 +13,13 @@
 - `adr0017-sub-separate-approval-decision-from-promotion`
 - `adr0017-sub-update-docs-structure`
 
+あわせて、**親の範囲に残った作業そのものを4本へ分割する**。委譲（別の関心事へ渡す）ではなく分割（親の範囲を割る）なので、親は4本が全部終わるまで archive しない。
+
+- `adr0017-sub-create-position-port-preview`
+- `adr0017-sub-add-detection-assumptions`
+- `adr0017-sub-fix-normalization-offset`
+- `adr0017-sub-create-reference-mdc`
+
 ## 背景
 
 markdown を扱う実体が `nuxt.config.ts`（parse 設定）・`app/components/global/`（フェンスの振り分け）・`app/components/workspace/`（コードブロック・図・本文の器・直す面）・`app/assets/css/main.css`（見た目）に散っており、描画の入口も3箇所に割れていた。どこに閉じるのかを定めた spec が無く、次に markdown へ触る作業がどこを触ればよいのか参照元を辿らないと分からない。この状態を解くために Nuxt 4 標準の `modules/` を置き場として用意し、markdown の操作をそこへ切り出した。
@@ -161,17 +168,131 @@ markdown を扱う実体が `nuxt.config.ts`（parse 設定）・`app/components
   - `docs/specs/core/file-components.md` — `MarkdownPre` / `CodeBlock` / `MermaidDiagram` / `DocumentView` / `DocumentEditor` の行を落とす
   - `docs/specs/core/file-composables.md` — 移設分を落とす
   - `docs/specs/plan/structure-migration.md` — `MarkdownPre` の例外の行を解消済みに
-  - `test/app/components/workspace/markdown-*.test.ts` — 写し元がモジュールへ移ったので置き場を合わせる
 
 **対応内容** — 親 change の実装で生じた、構造の資料と実態の食い違いを直す。
 
 - `system-structure.md` のディレクトリ構造に `modules/` を加える。画面の階層に属さない自己完結の機能の置き場として定義する
 - `file-components.md` / `file-composables.md` の棚卸しから、モジュールへ移した分を落とす
 - `structure-migration.md` の「`global/MarkdownPre.vue` は規範の区切りに従えない唯一の例外」を解消済みとして更新する。Nuxt module の `addComponent({ global: true })` が同じ登録を行うため、置き場の制約は無くなった
-- `test/` の置き場を実態に合わせる。規範は「ソースの構造をそのまま写す」だが、写し元がモジュールへ移った
+- `test/` の置き場を実態に合わせる件は **`adr0017-sub-create-reference-mdc` が引き取った**。同じ移設が2つの change に載っていたため、資料化の側へ寄せた
 - **構造の規範が2つある状態を解く。** `openspec/specs/app-structure` は「`app/components/` と `app/composables/` の配下は階層ディレクトリ（`workspace/` / `shared/`）で分ける」と定め、`docs/specs/core/system-structure.md` は「`ui/` ＋機能単位で切る」と定める。どちらが正かを決め、もう一方をそれに従わせるか役割を分ける。親 change では前者に delta を当てたが、後者は手つかずである
 
-**振る舞いは変えない。** コードに手を入れるのは `test/` の置き場だけで、それも移動である。
+**振る舞いは変えない。** `test/` の移設を切り出した結果、この change が触るのは資料だけになった。
+
+## 分割の内訳
+
+上の5件は**別の関心事へ委譲**したものである。これとは別に、親 change 自身の残作業を**分割**した4件がある。委譲先ではなく親の範囲そのものなので、親は子が全部終わるまで archive しない。
+
+分割の区分は次の3つ。`資料化` は委譲の内訳と同じ定義を使う。
+
+- **口** — モジュールが外へ公開する口が増えるもの
+- **検知** — 振る舞いを変えず、踏んだら止まる状態を作るもの
+- **不具合** — 黙って壊れる経路を塞ぎ、振る舞いが直るもの
+
+### 口
+
+#### adr0017-sub-create-position-port-preview
+
+- **種別**: 口
+- **状態**: 未着手
+- **成果物**: 未作成
+- **触るファイル**: `modules/markdown/runtime/render/MarkdownView.vue`、`modules/markdown/runtime/position/types.ts`、`test/modules/markdown/runtime/render/`（新規）
+- **引き取る tasks**: 5.1
+
+**対応内容** — 整形された本文の面から位置の口を出す。`specs/markdown/module` の「描いた本文と生テキストの位置の対応を公開する」が「外から引ける形で公開しなければならない（SHALL）」と定めているが、`MarkdownView` は口を出しておらず、`createPreviewPositionPort` の呼び出し元は単体テストのみである（実測）。生テキストの面（`MarkdownSource.vue:77`）は既に `defineExpose({ … } satisfies PositionPort)` で出しており、整形された本文の面だけが揃っていない。
+
+5.1 は記帳漏れである。`keepPosition` は `MarkdownView.vue:118` の `parser-options` から既に渡っている。
+
+**解析の段には触れない。** `<MDC>` のスロットだけを差し替えている形から外れると、クライアントの再解析で shiki の色が SSR とずれ、アプリ全体のアイコンが消える（実測）。この単位で足すのは器の `ref` と `defineExpose` だけである。
+
+**完了判定** — 次をすべて満たしたとき完了とする。
+
+- `MarkdownView` が `PositionPort` を `defineExpose` で出し、器の要素そのものは外へ出さない
+- 本文が空のとき、口が `null` を返す
+- 口が消えたら落ちるテストが在る
+- 口が受け取る生テキストは「正規化後（CRLF → LF、front matter 除去後）」であることが明記されている
+- 5.1 が閉じている
+
+**親との関係** — 分割。親の Wave 0 であり、他の3件と `adr0017-sub-create-module-annotation` の前提になる。`design.md` が「`annotation-module` の着手前に対応が必要になる」と記していたのはこの穴である。
+
+### 検知
+
+#### adr0017-sub-add-detection-assumptions
+
+- **種別**: 検知
+- **状態**: 未着手
+- **成果物**: 未作成
+- **触るファイル**: `test/modules/markdown/runtime/position/*.test.ts`、`e2e/markdown-hydration.spec.ts`、`modules/markdown/runtime/position/types.ts` / `preview.ts` / `fence.ts`、`modules/markdown/runtime/render/MarkdownView.vue`（コメント）、`modules/markdown/index.ts`（コメント）
+- **引き取る tasks**: 6.1・6.2・6.3・6.4・6.5・6.6.2・6.9・6.10・6.14
+
+**対応内容** — 実装で崩れた前提7件を、踏んだら止まる状態にする。うち3件は**黙って壊れる**（症状が出ないまま誤った位置を返す、別の場所が壊れる）。資料に書くだけでは、読まなかった人が同じ穴に落ちる。
+
+6.10 は検知力の測定で見つかった穴である。テストはフェンスの幾何と text ノードの位置をよく固めているが、**AST の構造を何も固めていない**。出力が実際に変わったのに143本すべてが通過した変異が3件あった。
+
+6.14.2 は当環境でアイコン消失そのものが再現しない（`@nuxt/icon` のカスタムコレクションが 404）。再現環境の用意も完了条件に含める。
+
+**完了判定** — 次をすべて満たしたとき完了とする。
+
+- 黙って壊れる3件（6.1 / 6.2 / 6.3）それぞれに、踏んだら赤くなるテストが在る
+- 6.2.3 の3点が型で塞がっている
+- 6.10 の3件を実際に変異させて落ちることを確かめている
+- 6.14.2 について、再現環境を用意したか、再現しない前提で検知の設計を見直した結果が記録されている
+- 追加したテストを壊して落ちることを一件ずつ確かめている
+
+**親との関係** — 分割。`adr0017-sub-create-position-port-preview` の後続。6.1.1 と 6.4.2 が `MarkdownView` の形を固定するため、口が出そろってから書く。
+
+### 不具合
+
+#### adr0017-sub-fix-normalization-offset
+
+- **種別**: 不具合
+- **状態**: 未着手
+- **成果物**: 未作成
+- **触るファイル**: `app/pages/projects/[projectId]/approvals/[approvalId].vue`、`app/composables/useAnnotations.ts`、`modules/markdown/runtime/render/`、`e2e/fixtures/upstream-stub.mjs`、`e2e/approval-annotation.spec.ts`
+- **引き取る tasks**: 6.11
+
+**対応内容** — 本番の呼び出し側が、正規化していない生文字列を渡している。`approvals/[approvalId].vue:60` の `source` が `MarkdownView` にも注釈の基準にもそのまま渡っており、CRLF を含む文書が来ると、いま在る注釈機能が黙ってずれる。生ファイルを渡すと `null` には倒れず、**黙って別の場所を返す**（実測）。本家は `readFile` / `writeFile` で素通しするため、CRLF も front matter も含まれうる（実測）。
+
+**決めが2件ある。** 注釈のオフセットは本家へ送られて保存される。正規化した座標で保存すると、ディスク上の生ファイルとずれた値が残る。
+
+- 注釈のオフセットをどの座標で保存するか（生ファイル / 正規化後）。本家に保存された注釈を誰が読むかを調べてから決める
+- 正規化をどこで行うか（モジュールの内側 / 呼ぶ側）。「呼ぶ側が忘れずにやる」は、いま潰そうとしている黙って壊れる形そのものである
+
+**完了判定** — 次をすべて満たしたとき完了とする。
+
+- 保存座標が決まり、本家に保存された注釈を誰が読むかを調べた結果が根拠として残っている
+- 正規化を行う場所が決まり、「呼ぶ側が忘れずにやる」形になっていない
+- 生ファイルの座標で保存すると決めた場合、正規化後 ↔ 生ファイル の対応が在る
+- CRLF と front matter を含む文書で注釈が正しい位置に付くことを E2E で確かめている
+- `e2e/fixtures/upstream-stub.mjs` が CRLF と front matter の2件を返す
+
+**親との関係** — 分割。`adr0017-sub-create-position-port-preview` の後続。口の形が固まってから、口が受け取る座標の基準を決める。
+
+### 資料化
+
+#### adr0017-sub-create-reference-mdc
+
+- **種別**: 資料化
+- **状態**: 未着手
+- **成果物**: 未作成
+- **触るファイル**: `docs/specs/reference/mdc-observations.md`（新規）、`CLAUDE.md` の Docs 節、`docs/specs/reference/stroke-modules.md`、`test/app/components/workspace/markdown-*.test.ts`
+- **引き取る tasks**: 6.8・3.7
+
+**対応内容** — change が archive されても消えない記録を残す。`docs/specs/reference/mdc-observations.md` を `upstream-observations.md` と同じ「調べて分かった事実」の枠で新設する。決定ではないので ADR にしない。
+
+7件それぞれについて、どのテストが固定しているかを書く。踏んだときに落ちる先を示すためである。
+
+3.7（`test/app/components/workspace/markdown-roundtrip.test.ts` と `markdown-sanitize.test.ts` の移設）をここが引き取る。**`adr0017-sub-update-docs-structure` の「触るファイル」から `test/app/components/workspace/markdown-*.test.ts` の行を落とすこと。** 同じ移設が2つの change に載る。`markdown-fence-position.test.ts` も同じ移設の対象である（3.7 に項目が無いが、モジュールのコードを見ているのに `app/` の下に居る）。
+
+**完了判定** — 次をすべて満たしたとき完了とする。
+
+- `docs/specs/reference/mdc-observations.md` が在り、崩れた前提7件が事実として書かれている
+- 7件それぞれについて、どのテストが固定しているかが書かれている
+- `CLAUDE.md` の Docs 節と `stroke-modules.md` から辿れる
+- `test/` の markdown 系3本が、写し元と同じ構造の位置に居る
+- 移設は移動のみで、テストの中身と結果が変わっていない
+
+**親との関係** — 分割。`adr0017-sub-create-position-port-preview` の後続。6.8.2（どのテストが固定しているか）は `adr0017-sub-add-detection-assumptions` が加える検知の名前を突き合わせる必要があるため、その完了後に一度だけ確認する。
 
 ## 経緯の記録
 
@@ -188,3 +309,5 @@ markdown を扱う実体が `nuxt.config.ts`（parse 設定）・`app/components
 - 委譲先はいずれも個別に ticket を持つ。親 ticket への集約はしない
 - change ではなく資料へ入れたものが2件ある。change の命名規約（先頭に動詞、create / add / update / fix / remove、判定の軸）は `docs/agents/issue-tracker.md` と `docs/adr/0014-change-name-starts-with-verb.md` へ、用語（product / module / 機能）は `CONTEXT.md` へ置いた
 - 4件とも ticket に frontmatter（status / tags）が無い。他の ticket は大半が持っており、揃えるかどうかは別途の判断。本 ADR の `種別` はこの frontmatter に依存しない
+- 親 `create-module-markdown` は分割した4件が全部終わってから archive する。親の残タスクは4件が引き取ったので、親自身に開いた作業は無い
+- 分割した4件の ticket は `status` / `change` / `tags` の frontmatter を持つ（`docs/agents/issue-tracker.md` の規定どおり）。委譲した5件と揃っていない
