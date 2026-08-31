@@ -124,6 +124,19 @@ function mcpToolServerEntryOf(kind: 'stroke' | 'steering') {
   return config.mcpServers[MCP_SERVER_NAME]!;
 }
 
+/** 起動 args の `--allowedTools` の値。フラグが無ければ空にする（別の引数を見にいかない） */
+function allowedToolsOf(kind: 'stroke' | 'steering'): string[] {
+  const run = buildRun({
+    sessionId: 'session-1',
+    cwd: '/tmp/share/session-1',
+    kind,
+    retries: 0,
+    token: 'token-1',
+  });
+  const at = run.launch.args.indexOf('--allowedTools');
+  return at === -1 ? [] : run.launch.args[at + 1]!.split(' ');
+}
+
 function exposedToolsOf(kind: 'stroke' | 'steering'): string[] {
   return mcpToolServerEntryOf(kind).headers[MCP_TOOLS_HEADER]!.split(',');
 }
@@ -163,6 +176,16 @@ describe('buildRun の --mcp-config', () => {
     expect(Object.keys(mcpConfigOf('stroke').mcpServers)).toEqual([MCP_SERVER_NAME]);
   });
 
+  it('両工程とも自前 MCP のツールを --allowedTools に足す', () => {
+    // **肯定で見る。** 否定だけだと、`--allowedTools` を丸ごと落としても
+    // `indexOf` が -1 を返して別の引数を見にいき、テストが通ってしまう
+    // （変異試験で確認。santa-method レビュー指摘 9周目 2026-08-31）。
+    // これが落ちるということは、claude が MCP ツールを1本も呼べないということである
+    for (const kind of ['stroke', 'steering'] as const) {
+      expect(allowedToolsOf(kind)).toContain('mcp__stroke-board');
+    }
+  });
+
   it('submit-document は両工程で公開される', () => {
     expect(exposedToolsOf('stroke')).toContain('submit-document');
     expect(exposedToolsOf('steering')).toContain('submit-document');
@@ -190,16 +213,9 @@ describe('buildRun の --mcp-config', () => {
   });
 
   it('flontier 工程には本家 MCP を許可しない（配ってもいない）', () => {
-    const run = buildRun({
-      sessionId: 'session-1',
-      cwd: '/tmp/share/session-1',
-      kind: 'stroke',
-      retries: 0,
-      token: 'token-1',
-    });
-    const at = run.launch.args.indexOf('--allowedTools');
-
-    expect(run.launch.args[at + 1]!.split(' ')).not.toContain('mcp__specworkflow');
+    // `allowedToolsOf` はフラグが無ければ空を返すので、フラグごと落ちたときに
+    // 別の引数を見にいって否定が通ってしまうことがない
+    expect(allowedToolsOf('stroke')).not.toContain('mcp__specworkflow');
   });
 
   it('工程で分けるのはヘッダだけで、url と token の渡し方は変わらない', () => {

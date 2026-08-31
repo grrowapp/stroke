@@ -90,11 +90,19 @@ const STEERING_DOCUMENTS = 3
 /**
  * 直前の待ちに入った時点の生出力の本数。`settle` が「もう終わっているか」を見るのに使う。
  *
- * `waitForNext` が待ちに入るたびに更新する。**待ちの中で実行が終わったかどうか**は、
- * この基準からの増分でしか分からない——`settle` の呼び出し時点で数え直すと、既に
- * 終わっている実行を「まだ動いている」と読み違える。
+ * **待ちに入るものは必ず `beginRoundWait()` を通すこと。** 待ちの中で実行が終わったか
+ * どうかは、この基準からの増分でしか分からない——`settle` の呼び出し時点で数え直すと、
+ * 既に終わっている実行を「まだ動いている」と読み違える。逆に**基準が古いままだと、
+ * 前の実行が終わったことを次の実行の終わりと取り違えて素通りする**（`--send-back` を
+ * 併用したとき、差し戻しの待ちが基準を更新しないと `approve` の `settle` が確定的に
+ * 素通りしていた。santa-method レビュー指摘 9周目 2026-08-31）。
  */
 let roundStartLogs = 0
+
+/** 待ちに入る。`settle` が見る基準を取り直す */
+function beginRoundWait(): void {
+  roundStartLogs = logEntryCount()
+}
 
 /** 画面1 を開き直す上限。dev がモジュールを取り落とすと数回に1回は開けない（`openStrokes`） */
 const OPEN_ATTEMPTS = 5
@@ -462,7 +470,7 @@ async function waitForNext(page: Page, previous: string | undefined): Promise<'q
   // 止まっているのかが外から分からないと、待つ判断も切る判断もできない
   const started = Date.now()
   const logs = logEntryCount()
-  roundStartLogs = logs
+  beginRoundWait()
   let notified = 0
 
   while (Date.now() < deadline) {
@@ -710,12 +718,17 @@ async function waitForSteering(page: Page, projectName: string): Promise<boolean
 
   const deadline = Date.now() + ROUND_TIMEOUT_MS
   const logs = logEntryCount()
+  const submitted = submitDocumentCount()
   const started = Date.now()
   let notified = 0
 
   while (Date.now() < deadline) {
     const ready = steeringDocumentCount(projectName)
-    if (ready >= STEERING_DOCUMENTS) { endProgress(); return true }
+    // **文書が在るだけでは合格にしない。** 同じ数だけ `submit-document` が呼ばれて
+    // いること（＝ツールを通ったこと）まで見る。設定が空でログを数えられないときは
+    // この条件が満たせないので、その場合だけ文書の数で判定する
+    const throughTool = DEBUG_LOG_DIR === '' || submitDocumentCount() - submitted >= STEERING_DOCUMENTS
+    if (ready >= STEERING_DOCUMENTS && throughTool) { endProgress(); return true }
 
     const elapsed = Math.floor((Date.now() - started) / 1000)
     if (elapsed > notified) {
@@ -730,19 +743,55 @@ async function waitForSteering(page: Page, projectName: string): Promise<boolean
   }
 
   endProgress()
-  console.log(`  steering 文書は ${steeringDocumentCount(projectName)}/${STEERING_DOCUMENTS} で時間切れ`)
+  console.log(
+    `  steering 文書は ${steeringDocumentCount(projectName)}/${STEERING_DOCUMENTS} で時間切れ`
+    + `（submit-document は ${submitDocumentCount() - submitted} 回）`,
+  )
   return false
 }
 
 /**
- * 書かれた steering 文書の本数。
+ * 書かれた steering 文書の本数。**中身が空のものは数えない。**
  *
  * 置き場は本家が決めるもので（`.spec-workflow/steering/<name>.md`）、こちらの設定ではない。
- * 数えるだけで中身は見ない——中身の良し悪しはこの道具の判定範囲ではない。
+ * 中身の良し悪しは見ないが、**空ファイルを1本と数えると「置き場を作っただけ」で合格に
+ * なる**（santa-method レビュー指摘 9周目）。
  */
 function steeringDocumentCount(projectName: string): number {
   const dir = join(PROJECTS_ROOT, projectName, '.spec-workflow', 'steering')
-  return ['product', 'tech', 'structure'].filter(name => existsSync(join(dir, `${name}.md`))).length
+  return ['product', 'tech', 'structure'].filter((name) => {
+    const path = join(dir, `${name}.md`)
+    try {
+      return readFileSync(path, 'utf8').trim() !== ''
+    } catch {
+      return false
+    }
+  }).length
+}
+
+/**
+ * これまでに呼ばれた `submit-document` の回数（デバッグログ全体）。
+ *
+ * **文書が在ることだけでは、提出を経た証拠にならない。** steering の claude は
+ * `--allowedTools` に `Write` / `Edit` を持ち、cwd はそのプロジェクトなので、**ツールを
+ * 通さず3本を直接書ける**。それを合格にすると、`get-steering-guide` が名指しで避けている
+ * 故障（本家のやり方でファイルを直接書く）をそのまま見逃す（santa-method レビュー指摘
+ * 9周目 2026-08-31）。
+ *
+ * 置き場は `logEntryCount` と同じくデバッグログで、設定が空なら数えられない。
+ */
+function submitDocumentCount(): number {
+  if (DEBUG_LOG_DIR === '') return 0
+  let total = 0
+  for (const name of logNames()) {
+    try {
+      const text = readFileSync(join(DEBUG_LOG_DIR, name), 'utf8')
+      total += text.split('"name":"mcp__stroke-board__submit-document"').length - 1
+    } catch {
+      // 読めないファイルは数えない（`logEntryCount` と同じ）
+    }
+  }
+  return total
 }
 
 /**
@@ -753,16 +802,15 @@ function steeringDocumentCount(projectName: string): number {
  * 一覧そのものは空でも出るので、待つのは `steering-list` が見えるところまで。
  */
 async function openSteering(page: Page, url: string): Promise<void> {
-  for (let attempt = 1; attempt <= OPEN_ATTEMPTS; attempt++) {
-    const navigated = await page.goto(url).then(() => true).catch(() => false)
-    const shown = navigated && await page.getByTestId('steering-list')
-      .waitFor({ state: 'visible', timeout: 30_000 })
-      .then(() => true)
-      .catch(() => false)
-    if (shown) return
-    console.log(`  steering の一覧が出ない（${attempt}/${OPEN_ATTEMPTS}）。開き直す`)
-  }
-  throw new Error(`steering の一覧が ${OPEN_ATTEMPTS} 回開き直しても出なかった。dev サーバーの状態を疑う`)
+  // **開き直さない。** 判定はこの画面を見ないので（`waitForSteering`）、出ないときに
+  // 粘る意味が無い。本家が起動中のプロジェクトしか返さない以上、出ないほうが普通である。
+  // 5回 × 30 秒を回すと、表示のためだけに最大150秒を捨てる（santa-method レビュー指摘 9周目）
+  const navigated = await page.goto(url).then(() => true).catch(() => false)
+  const shown = navigated && await page.getByTestId('steering-list')
+    .waitFor({ state: 'visible', timeout: 10_000 })
+    .then(() => true)
+    .catch(() => false)
+  if (!shown) throw new Error('steering の一覧が出なかった')
 }
 
 /**
@@ -873,6 +921,10 @@ async function sendBack(
 
   const followup = page.getByRole('button', { name: 'AI から質問があります' })
   const revised = page.getByText('差し戻しを受けて proposal が出し直されました')
+
+  // 出し直しの実行はここから始まる。基準を取り直さないと、`approve` の `settle` が
+  // 「差し戻しの前の実行が終わっている」を根拠に素通りする
+  beginRoundWait()
 
   let deadline = Date.now() + ROUND_TIMEOUT_MS
   let started = Date.now()
@@ -1047,7 +1099,18 @@ async function answer(page: Page, policy: Policy, round: number): Promise<Round>
 
   const header = await text('agent-question-header')
   const detail = await text('agent-question-detail')
-  const question = await text('agent-question-text')
+  // **問いの本文は空で通さない。** ここが空だと `previous` が空になり、次の待ちが
+  // `text !== previous` で**同じ問いを「次が来た」と誤認する**（実測 2026-08-28 の
+  // 「同一の問いに6回答えた」故障の再発経路。santa-method レビュー指摘 9周目）。
+  // 読めなかっただけのことがあるので1度だけ読み直し、それでも空なら落とす
+  let question = await text('agent-question-text')
+  if (question === '') {
+    await page.waitForTimeout(2000)
+    question = await text('agent-question-text')
+  }
+  if (question === '') {
+    throw new Error('問いの本文を読めなかった。空のまま答えると、次の待ちが同じ問いを新しい問いと取り違える')
+  }
 
   const locators = await page.getByTestId('agent-question-option').all()
   const options = await Promise.all(locators.map(async (option) => {

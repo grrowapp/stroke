@@ -20,6 +20,25 @@ const REQUIRED_TOPICS: Array<[string, RegExp]> = [
   ['本家 MCP の役割', /approvals/],
 ];
 
+/**
+ * 手順が**節として**書かれていることを見る。
+ *
+ * 手掛かり語だけを見ていると、本文をキーワードの羅列に置き換えてもテストが通る
+ * （変異試験で確認。santa-method レビュー指摘 9周目 2026-08-31）。このツールの唯一の
+ * 成果物は本文なので、「実装を消しても通る」がそのまま当てはまってしまう。
+ *
+ * 節ごとに見出しがあり、その下に中身が続いていることまで見る。
+ */
+function sectionBodies(guide: string): Map<string, string> {
+  const bodies = new Map<string, string>();
+  const parts = guide.split(/^## /m).slice(1);
+  for (const part of parts) {
+    const nl = part.indexOf('\n');
+    bodies.set(part.slice(0, nl).trim(), part.slice(nl + 1).trim());
+  }
+  return bodies;
+}
+
 describe('get-steering-guide', () => {
   it('引数を1つも渡さない呼び出しを inputSchema が通す', () => {
     expect(acceptsEmptyArgs(getSteeringGuideTool.inputSchema)).toBe(true);
@@ -68,5 +87,26 @@ describe('get-steering-guide', () => {
 
   it('説明が「先に呼べ」と述べている', () => {
     expect(getSteeringGuideTool.description).toMatch(/先に/);
+  });
+
+  it('手順が節として書かれている（キーワードの羅列では通らない）', async () => {
+    const token = issueConnectionToken();
+    registerConnection(token, { projectPath: '/opt/projects/setai' });
+
+    const { guide } = await call({ 'x-stroke-token': token }) as { guide: string };
+    const bodies = sectionBodies(guide);
+
+    // 見出しが順に在り、それぞれに中身が続いている
+    const headings = [...bodies.keys()];
+    for (const required of ['状況を確認', '書く順序', '提出する', '終わりとみなす基準', 'うまくいかないとき', 'どこで工程が終わるか', 'やらないこと']) {
+      const found = headings.find(h => h.includes(required));
+      expect(found, `節「${required}」が無い`).toBeDefined();
+      expect((bodies.get(found!) ?? '').length, `節「${required}」の中身が薄い`).toBeGreaterThan(40);
+    }
+    // 節の並びが入れ替わっていない
+    const order = ['状況を確認', '書く順序', '提出する', '終わりとみなす基準', 'うまくいかないとき', 'どこで工程が終わるか', 'やらないこと'].map(r => headings.findIndex(h => h.includes(r)));
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+
+    removeConnection(token);
   });
 });
