@@ -71,3 +71,10 @@ specs/**/.ralph-state.lock
 # 生成物のコピーであって成果物ではない。一度 11,466 ファイル・307MB を履歴へ入れた
 # ことがあるので、名前で丸ごと落とす
 *.yarn-bak/
+
+# @nuxt/test-utils がテスト実行時に書く生成物。`server/mcp/tools/.nuxtrc` と同じもので、
+# ルート側も追跡しない
+/.nuxtrc
+
+# subagent のリンク解決結果。道具がマシンごとに書き直すロック
+.subagents.lock.json
