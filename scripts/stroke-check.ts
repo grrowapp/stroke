@@ -437,9 +437,12 @@ async function run(browser: Browser, policy: Policy): Promise<{
       const steered = approved === null ? null : await waitForSteering(page, approved)
       return { rounds, landed: true, sessionId, revised, approved, steered }
     }
-    await settle(page)
+    // 待ちに入った時点（`waitForNext`）を基準に、問いを出した実行の終わりを待つ
+    await settle(page, roundStartLogs)
     const answered = await answer(page, policy, round)
     rounds.push(answered)
+    // 答えたら次の実行が始まる。基準を取り直す
+    beginRoundWait()
     previous = answered.question
     console.log(`  Q${round} ${answered.header}: ${answered.question} → ${answered.answer}`)
   }
@@ -469,8 +472,8 @@ async function waitForNext(page: Page, previous: string | undefined): Promise<'q
   // 待っている間は無言にしない。AI の応答は数分かかることがあり、進んでいるのか
   // 止まっているのかが外から分からないと、待つ判断も切る判断もできない
   const started = Date.now()
-  const logs = logEntryCount()
   beginRoundWait()
+  const logs = roundStartLogs
   let notified = 0
 
   while (Date.now() < deadline) {
@@ -779,19 +782,50 @@ function steeringDocumentCount(projectName: string): number {
  * 9周目 2026-08-31）。
  *
  * 置き場は `logEntryCount` と同じくデバッグログで、設定が空なら数えられない。
+ *
+ * **`logEntryCount` と同じく、全セッションを横断した数である。** 別のセッションの
+ * **steering の**提出が同時に起これば増分に混ざる。道具は1度に1セッションしか作らないので
+ * 通常は起きないが、巡回が別のプロジェクトの steering を起こしている最中に走らせると
+ * 誤って通りうる。
+ *
+ * **数えられるのは終了した実行の分だけである。** 生出力はプロセスの close でしか
+ * フラッシュされない（`server/utils/stroke/claude.ts` の `child.on('close')`）ので、
+ * この判定は実質「文書3本 **かつ** steering の実行が終わっている」を見ている。
  */
 function submitDocumentCount(): number {
   if (DEBUG_LOG_DIR === '') return 0
   let total = 0
   for (const name of logNames()) {
     try {
-      const text = readFileSync(join(DEBUG_LOG_DIR, name), 'utf8')
-      total += text.split('"name":"mcp__stroke-board__submit-document"').length - 1
+      for (const line of readFileSync(join(DEBUG_LOG_DIR, name), 'utf8').split('\n')) {
+        if (!line.startsWith('{')) continue
+        let parsed: unknown
+        try { parsed = JSON.parse(line) } catch { continue }
+        total += steeringSubmissionsIn(parsed)
+      }
     } catch {
       // 読めないファイルは数えない（`logEntryCount` と同じ）
     }
   }
   return total
+}
+
+/**
+ * 生出力の1行に含まれる「steering 種別の `submit-document` の呼び出し」の数。
+ *
+ * **種別まで見る。** 名前だけで数えると flontier の proposal 提出も混ざり、別セッションの
+ * 往復が steering の合格条件を満たしてしまう（santa-method レビュー指摘 10周目 2026-08-31）。
+ */
+function steeringSubmissionsIn(entry: unknown): number {
+  const message = (entry as { message?: { content?: unknown } }).message
+  const content = message?.content
+  if (!Array.isArray(content)) return 0
+  return content.filter((block) => {
+    const b = block as { type?: string, name?: string, input?: { type?: string } }
+    return b.type === 'tool_use'
+      && b.name === 'mcp__stroke-board__submit-document'
+      && b.input?.type === 'steering'
+  }).length
 }
 
 /**
@@ -937,12 +971,17 @@ async function sendBack(
     if (await followup.count() > 0) {
       endProgress()
       // 問い返しも AI の実行の途中で出る。答える前に終了を待たないと 409 を踏む（`settle`）
-      await settle(page)
+      await settle(page, roundStartLogs)
       await followup.click()
       const round = rounds.length + 1
       const answered = await answer(page, policy, round)
       rounds.push(answered)
       console.log(`  Q${round}（差し戻し後） ${answered.header}: ${answered.question} → ${answered.answer}`)
+      // **答えたら新しい実行が始まる。ここで基準を取り直す。**
+      // 取り直さないと、`approve` の `settle` は「問い返しを出した実行が終わっている」を
+      // 根拠に素通りし、出し直しの実行が動いている足元でディレクトリを改名する
+      // （santa-method レビュー指摘 10周目 2026-08-31。9周目の修正はこの経路を外していた）
+      beginRoundWait()
       deadline = Date.now() + ROUND_TIMEOUT_MS
       started = Date.now()
       notified = 0
@@ -1103,9 +1142,12 @@ async function answer(page: Page, policy: Policy, round: number): Promise<Round>
   // `text !== previous` で**同じ問いを「次が来た」と誤認する**（実測 2026-08-28 の
   // 「同一の問いに6回答えた」故障の再発経路。santa-method レビュー指摘 9周目）。
   // 読めなかっただけのことがあるので1度だけ読み直し、それでも空なら落とす
+  // **待って読む。** 1回×2秒だけだと、モーダルの描画が間に合わないだけで実行全体が落ちる。
+  // この道具の他の待ちと同じく、期限まで粘ってから諦める
   let question = await text('agent-question-text')
-  if (question === '') {
-    await page.waitForTimeout(2000)
+  const readDeadline = Date.now() + 30_000
+  while (question === '' && Date.now() < readDeadline) {
+    await page.waitForTimeout(500)
     question = await text('agent-question-text')
   }
   if (question === '') {

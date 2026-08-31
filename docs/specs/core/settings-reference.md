@@ -73,7 +73,7 @@ const { projectShareRoot, claude } = config.runtimeConfig
 
 **同じポートが2箇所にある。** ここと `nuxt.config.ts` の `devServer.port` で、**変えるときは必ず両方を揃えて変える**。片方だけ変えると、起動した claude は開いていないポートへ MCP 接続を試みる。
 
-値を1つに固定して書かない。worktree を並走させるときはずらす必要があるからである。**ずらしているのは並走する worktree だけで、多くはそのまま 3399 を使っている**（実測 2026-08-31: 8本中7本が 3399、pre5 だけが 3599）。「固定値」ではなく「揃えるべき2箇所」として扱うこと。`devServer.port` はビルド設定でありストローク側設定ではないので、この資料の対象は `claude.apiBaseUrl` の側だけである（実体は `nuxt.config.ts`）。
+既定は **3399** で、並走させる worktree だけがずらす（実測 2026-08-31: `nuxt.config.ts` を持つチェックアウトのうち 3399 以外は pre5 の 3599 だけ）。**「固定値」ではなく「揃えるべき2箇所」として扱うこと。**`devServer.port` はビルド設定でありストローク側設定ではないので、この資料の対象は `claude.apiBaseUrl` の側だけである（実体は `nuxt.config.ts`）。
 
 ### `claude.firstPrompt` ・ `claude.continuePrompt` ・ `claude.steeringPrompt`
 

@@ -6,7 +6,7 @@ import { MCP_TOOLS_HEADER } from '../../../../server/utils/mcp/exposed-tools';
 
 /**
  * 起動が組み立てる `--mcp-config`（provide-operations-via-mcp）。見るのは、工程ごとに
- * 公開ツールが絞られること——自前 MCP サーバーは6ツールすべてを単一の `/mcp` に登録するので、
+ * 公開ツールが絞られること——自前 MCP サーバーはツールを1本残らず単一の `/mcp` に登録するので、
  * 絞らないと flontier の claude にも steering 専用のツールが見え、呼ばれて失敗する。
  *
  * あわせて `kick` の後始末（接続表への登録 → 実行終了で削除）も見る。token が消え残ると、
@@ -199,11 +199,8 @@ describe('buildRun の --mcp-config', () => {
       retries: 0,
       token: 'token-1',
     });
-    const at = run.launch.args.indexOf('--allowedTools');
-    const value = run.launch.args[at + 1]!;
-
-    expect(value.split(' ')).toContain('mcp__specworkflow');
-    expect(value.split(' ')).toContain('mcp__stroke-board');
+    expect(allowedToolsOf('steering')).toContain('mcp__specworkflow');
+    expect(allowedToolsOf('steering')).toContain('mcp__stroke-board');
     expect(run.launch.args.filter(arg => arg === '--allowedTools')).toHaveLength(1);
 
     // 本家 MCP は `--mcp-config` の mcpServers にも同じ名前で並ぶ（名前がずれると許可が効かない）

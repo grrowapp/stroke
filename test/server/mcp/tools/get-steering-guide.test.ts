@@ -10,16 +10,16 @@ const { issueConnectionToken, registerConnection, removeConnection } = await imp
 
 const call = (headers: Record<string, string>) => structuredResult(getSteeringGuideTool.handler({}, withHeaders(headers)));
 
-/** 手掛かり語で見る理由は `get-guide.test.ts` と同じ（specs `mcp/tools/steering-guide`）。 */
-const REQUIRED_TOPICS: Array<[string, RegExp]> = [
-  ['3文書と作る順序', /product → tech → structure/],
-  ['取得と提出の順序', /get-steering[\s\S]*submit-document/],
-  ['文書がまだ無いときの進め方', /exists: false/],
-  ['既に在る文書を上書きしてよいかの判断', /exists: true[\s\S]*上書き/],
-  ['1文書を終わりとみなす基準', /終わりとみなす基準/],
-  ['本家 MCP の役割', /approvals/],
+/** 節ごとに、その節へ入っていなければならない内容（`get-guide.test.ts` と同じ考え）。 */
+const REQUIRED: Array<[string, RegExp[]]> = [
+  ['状況を確認', [/get-steering/, /exists: false/, /exists: true/, /上書き/]],
+  ['書く順序', [/product → tech → structure/, /1本ずつ/]],
+  ['提出する', [/submit-document/, /type: "steering"/, /product/]],
+  ['終わりとみなす基準', [/書き終わり|終わりである/]],
+  ['うまくいかないとき', [/errorCode/, /project_not_registered/, /unreachable/, /直接書いて/]],
+  ['どこで工程が終わるか', [/3本/]],
+  ['やらないこと', [/直接読み書き/]],
 ];
-
 /**
  * 手順が**節として**書かれていることを見る。
  *
@@ -75,36 +75,37 @@ describe('get-steering-guide', () => {
     removeConnection(token);
   });
 
-  it.each(REQUIRED_TOPICS)('手順が「%s」に触れている', async (_topic, pattern) => {
-    const token = issueConnectionToken();
-    registerConnection(token, { projectPath: '/opt/projects/setai' });
-
-    const { guide } = await call({ 'x-stroke-token': token }) as { guide: string };
-
-    expect(guide).toMatch(pattern);
-    removeConnection(token);
-  });
-
   it('説明が「先に呼べ」と述べている', () => {
     expect(getSteeringGuideTool.description).toMatch(/先に/);
   });
 
-  it('手順が節として書かれている（キーワードの羅列では通らない）', async () => {
+  it('手順が節ごとに書かれ、それぞれの節に要る内容が入っている', async () => {
+    // **節をまたいだ部分一致では見ない。** 文書のどこかに語が在ればよい形にすると、
+    // 見出しを残したままキーワードの羅列に置き換えても通ってしまう（変異試験で実証。
+    // santa-method レビュー指摘 10周目 2026-08-31）。節ごとに、その節に要る語が
+    // **その節の中に**在ることと、文として書かれている（句点が2つ以上）ことを見る。
     const token = issueConnectionToken();
     registerConnection(token, { projectPath: '/opt/projects/setai' });
 
     const { guide } = await call({ 'x-stroke-token': token }) as { guide: string };
     const bodies = sectionBodies(guide);
-
-    // 見出しが順に在り、それぞれに中身が続いている
     const headings = [...bodies.keys()];
-    for (const required of ['状況を確認', '書く順序', '提出する', '終わりとみなす基準', 'うまくいかないとき', 'どこで工程が終わるか', 'やらないこと']) {
-      const found = headings.find(h => h.includes(required));
-      expect(found, `節「${required}」が無い`).toBeDefined();
-      expect((bodies.get(found!) ?? '').length, `節「${required}」の中身が薄い`).toBeGreaterThan(40);
+
+    for (const [section, patterns] of REQUIRED) {
+      const found = headings.find(h => h.includes(section));
+      expect(found, `節「${section}」が無い`).toBeDefined();
+      const body = bodies.get(found!) ?? '';
+      expect((body.match(/。/g) ?? []).length, `節「${section}」が文になっていない`).toBeGreaterThanOrEqual(1);
+      for (const pattern of patterns) {
+        expect(body, `節「${section}」に ${pattern} が無い`).toMatch(pattern);
+      }
     }
+
+    // 全体としても文で書かれている（節ごとの1つだけでは羅列を許してしまう）
+    expect((guide.match(/。/g) ?? []).length).toBeGreaterThanOrEqual(20);
+
     // 節の並びが入れ替わっていない
-    const order = ['状況を確認', '書く順序', '提出する', '終わりとみなす基準', 'うまくいかないとき', 'どこで工程が終わるか', 'やらないこと'].map(r => headings.findIndex(h => h.includes(r)));
+    const order = REQUIRED.map(([section]) => headings.findIndex(h => h.includes(section)));
     expect(order).toEqual([...order].sort((a, b) => a - b));
 
     removeConnection(token);

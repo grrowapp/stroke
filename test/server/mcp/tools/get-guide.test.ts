@@ -11,21 +11,20 @@ const { issueConnectionToken, registerConnection, removeConnection } = await imp
 const call = (headers: Record<string, string>) => structuredResult(getGuideTool.handler({}, withHeaders(headers)));
 
 /**
- * 手順の本文が spec の5項目を含むかは、**手掛かり語**で見る。本文の丸ごと一致で見ると
- * 言い回しを直すたびにテストが落ち、直すのはテストの期待値のほうになる——それでは
- * 何も守っていない（specs `mcp/tools/guide` の Requirement「手順は工程の全体と終わり方を
- * 含む」に対応する）。
+ * 節ごとに、その節へ入っていなければならない内容。
+ *
+ * 正の在りかを繰り返さない——上限の数値は `send-question` の `.describe()` が正なので、
+ * ここでは「どこに書いてあるか」を指していることだけを見る。
  */
-const REQUIRED_TOPICS: Array<[string, RegExp]> = [
-  ['状態の確認から提出までの順序', /get-overview[\s\S]*get-strokes[\s\S]*get-send-back[\s\S]*submit-document/],
-  ['問いを立てる単位（一度に1問）', /一度に1問/],
-  ['上限の在りか（数値は書き写さない）', /上限は `send-question` の引数の\s*\n?\s*説明に書いてある|上限は `send-question`/],
-  ['把握完了の判定', /把握完了/],
-  ['proposal を提出する条件と形式', /submit-document[\s\S]*type: "flontier"/],
-  ['差し戻しを受けたときの進め方', /差し戻し/],
-  ['openspec コマンドへ逸れさせない', /`openspec` コマンドを叩かない/],
+const REQUIRED: Array<[string, RegExp[]]> = [
+  ['状態を確認', [/get-overview/, /get-strokes/, /get-send-back/]],
+  ['問いを立てる', [/一度に1問/, /send-question/, /上限/]],
+  ['把握完了', [/問うのをやめて|proposal へ移る/]],
+  ['proposal を提出', [/submit-document/, /type: "flontier"/, /projectName/]],
+  ['差し戻しを受けたら', [/get-send-back/, /全文/]],
+  ['うまくいかないとき', [/errorCode/, /status/, /session_not_found/, /unauthorized/]],
+  ['やらないこと', [/openspec/]],
 ];
-
 /**
  * 手順が**節として**書かれていることを見る。
  *
@@ -88,16 +87,6 @@ describe('get-guide', () => {
     removeConnection(token);
   });
 
-  it.each(REQUIRED_TOPICS)('手順が「%s」に触れている', async (_topic, pattern) => {
-    const token = issueConnectionToken();
-    registerConnection(token, { sessionId: 'session-1' });
-
-    const { guide } = await call({ 'x-stroke-token': token }) as { guide: string };
-
-    expect(guide).toMatch(pattern);
-    removeConnection(token);
-  });
-
   it('上限の数値そのものは本文に書き写さない', async () => {
     // 正は send-question の inputSchema の `.describe()`。書き写すと2箇所になり、
     // 片方だけが古くなる（design.md の Risks）
@@ -119,22 +108,33 @@ describe('get-guide', () => {
     expect(getGuideTool.description).toMatch(/先に/);
   });
 
-  it('手順が節として書かれている（キーワードの羅列では通らない）', async () => {
+  it('手順が節ごとに書かれ、それぞれの節に要る内容が入っている', async () => {
+    // **節をまたいだ部分一致では見ない。** 文書のどこかに語が在ればよい形にすると、
+    // 見出しを残したままキーワードの羅列に置き換えても通ってしまう（変異試験で実証。
+    // santa-method レビュー指摘 10周目 2026-08-31）。節ごとに、その節に要る語が
+    // **その節の中に**在ることと、文として書かれている（句点が2つ以上）ことを見る。
     const token = issueConnectionToken();
     registerConnection(token, { sessionId: 'session-1' });
 
     const { guide } = await call({ 'x-stroke-token': token }) as { guide: string };
     const bodies = sectionBodies(guide);
-
-    // 見出しが順に在り、それぞれに中身が続いている
     const headings = [...bodies.keys()];
-    for (const required of ['状態を確認', '問いを立てる', '把握完了', 'proposal を提出', '差し戻しを受けたら', 'うまくいかないとき', 'やらないこと']) {
-      const found = headings.find(h => h.includes(required));
-      expect(found, `節「${required}」が無い`).toBeDefined();
-      expect((bodies.get(found!) ?? '').length, `節「${required}」の中身が薄い`).toBeGreaterThan(40);
+
+    for (const [section, patterns] of REQUIRED) {
+      const found = headings.find(h => h.includes(section));
+      expect(found, `節「${section}」が無い`).toBeDefined();
+      const body = bodies.get(found!) ?? '';
+      expect((body.match(/。/g) ?? []).length, `節「${section}」が文になっていない`).toBeGreaterThanOrEqual(1);
+      for (const pattern of patterns) {
+        expect(body, `節「${section}」に ${pattern} が無い`).toMatch(pattern);
+      }
     }
+
+    // 全体としても文で書かれている（節ごとの1つだけでは羅列を許してしまう）
+    expect((guide.match(/。/g) ?? []).length).toBeGreaterThanOrEqual(20);
+
     // 節の並びが入れ替わっていない
-    const order = ['状態を確認', '問いを立てる', '把握完了', 'proposal を提出', '差し戻しを受けたら', 'うまくいかないとき', 'やらないこと'].map(r => headings.findIndex(h => h.includes(r)));
+    const order = REQUIRED.map(([section]) => headings.findIndex(h => h.includes(section)));
     expect(order).toEqual([...order].sort((a, b) => a - b));
 
     removeConnection(token);

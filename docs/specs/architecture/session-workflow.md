@@ -75,7 +75,9 @@ server/mcp/tools/                                      MCP ツール8本（フ�
 
 ### openspec ルートの使い手
 
-**掘ったルートを使う者が、いまは居ない。** change を作っていた `openspec-ff-change` スキルは実体を持たず、定型からも外した。実測でも、完走したセッションの `openspec/changes` は空で、その実行の `tool_use` に `Bash` は0回だった。
+**掘ったルートを使う者が、いまは居ない。** change を作っていた `openspec-ff-change` スキルは実体を持たず、定型からも外した。実測（2026-08-31 の2実行）でも、`tool_use` は MCP ツールと claude 内部の `ToolSearch` だけで、`Bash` も `Skill` も0回だった。
+
+**`openspec instructions` を読ませることもできない。** change が無いルートでは `No changes found` で失敗する（instructions は change に紐づく）。案内ツールの本文で「`openspec` コマンドを叩かない」と塞いであるのは、失敗する道具を指すと無人の実行がそこを探り回って時間を使い切るためである（実測 2026-08-31: 21 turns・156 秒）。
 
 掘る側を据え置いてあるのは、案内を配り直して使い手が戻る余地を残すためである。openspec コマンドの実行は全て cwd = セッションディレクトリで、`--store` はどのコードパスからも使わない。
 
