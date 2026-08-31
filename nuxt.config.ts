@@ -376,7 +376,7 @@ export default defineNuxtConfig({
       //
       // 設定するとツールの呼び出しと結果まで残る（`--output-format stream-json`）。
       // 出力はセッションごとに1ファイルへ追記される
-      debugLogDir: '.stroke-check/debug-log',
+      debugLogDir: '',
     },
 
     // --- ストローク: セッションの openspec ルートを初期化する CLI とその引数
