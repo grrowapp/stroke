@@ -19,7 +19,6 @@
 - `adr0017-sub-add-detection-assumptions`
 - `adr0017-sub-fix-normalization-offset`
 - `adr0017-sub-create-reference-mdc`
-- `adr0017-sub-update-module-terminology`
 
 ## 背景
 
@@ -73,15 +72,20 @@ markdown を扱う実体が `nuxt.config.ts`（parse 設定）・`app/components
 - **種別**: 拡張
 - **状態**: 未着手（成果物が proposal のみ）
 - **成果物**: proposal のみ（design・specs・tasks 未作成）
-- **触るファイル**: 共通の編集 UI（`DocumentEditor`）と、それを載せる仕様書・承認・ステアリングの3画面
+- **触るファイル**: 共通の編集 UI（`modules/markdown/runtime/edit/MarkdownEditor.vue`。親 change が `app/components/workspace/DocumentEditor.vue` から移設済み）と、それを載せる仕様書・承認・ステアリングの3画面
 
-**対応内容** — マークダウン編集画面に全幅トグルを付ける。仕様書・承認・ステアリングの3画面で共通の編集 UI にトグルを置き、ON でサイドバーを隠してビューポート全幅で編集、OFF で元のレイアウトに戻す。
+**対応内容** — マークダウン編集画面に全幅トグルを付ける。仕様書・承認・ステアリングの3画面で共通の編集 UI にトグルを置き、ON でサイドバーを隠して広く編集、OFF で元のレイアウトに戻す。
+
+**「全幅」は雰囲気であって、厳密な寸法の要件ではない。** 左右に一定の余白が無いと読み書きしづらくなるので、左右の隙間はある程度あってよい（ユーザーの判断）。ビューポート幅ぴったりに寄せることを目的にしない。
+
+**ただし固定幅の指定はしない（MUST NOT）。** 余白を作るために編集領域へ固定の幅（`max-width` や px 指定の桁幅）を与えてはならない。幅はビューポートに追従して伸び縮みし、余白は相対的な padding として残す。「読みやすい行長に収める」ことを理由に固定幅へ寄せる案は却下する。
 
 境界は proposal で切られている。**ヘッダーは隠さない。** ストローク側の proposal 確認画面（注釈 UI）は対象外。
 
 **完了判定** — 次をすべて満たしたとき完了とする。
 
-- 編集 UI にトグルがあり、ON で編集領域がビューポート全幅になる
+- 編集 UI にトグルがあり、ON でサイドバーが隠れて編集領域が広がる（左右の余白は残ってよいが、固定幅は与えない）
+- 編集領域の幅がビューポートに追従する。ウィンドウを広げれば編集領域も広がる
 - OFF で元のレイアウトに戻る
 - ヘッダーは常に見えている
 - 適用先は仕様書・承認・ステアリングの3画面。注釈 UI には出ない
@@ -294,22 +298,6 @@ markdown を扱う実体が `nuxt.config.ts`（parse 設定）・`app/components
 - 移設は移動のみで、テストの中身と結果が変わっていない
 
 **親との関係** — 分割。`adr0017-sub-create-position-port-preview` の後続。6.8.2（どのテストが固定しているか）は `adr0017-sub-add-detection-assumptions` が加える検知の名前を突き合わせる必要があるため、その完了後に一度だけ確認する。
-
-### 資料化（続き）
-
-#### adr0017-sub-update-module-terminology
-
-- **種別**: 資料化
-- **状態**: 未着手
-- **成果物**: 未作成
-- **触るファイル**: `modules/markdown/` のコメント33箇所、`app/` 12箇所、本 ADR、`specs/_epics/create-module-markdown/epic.md`、親 change の artifact、子 change の artifact と ticket
-- **引き取る tasks**: 無し（親の tasks に項目が無い。grilling で生じた）
-
-**対応内容** — 「口」という語を落とし、普通の用語へ置き換える。同じ語が **alias / 公開コンポーネント / `defineExpose` の型 / 差し替え先** の4つに当てられており、「位置の口を出す」が何を足すことなのか読めない。新しいドメイン用語は立てず、`CONTEXT.md` にも定義を置かない。
-
-対象は **146箇所 / 29ファイル**（実測。`入口`・`出口` などの複合語12箇所は対象外）。**specs の Requirement 見出しを2本含む**ため、振る舞いを変えないまま規範文書の見出しが変わる。
-
-**親との関係** — 分割。`create-module-markdown` の grilling でユーザーが指摘した（「口とは？ その用語定義やめない？ 禁止」）。当時「別 change に切る」と言われたまま起票されずに落ちていたものを、後から起こした。`CONTEXT.md:52` と `MarkdownView.vue` / `types.ts` の分は `adr0017-sub-create-position-port-preview` が先に直している。
 
 ## 経緯の記録
 
