@@ -79,6 +79,7 @@ worktree = `git worktree` で切った作業ディレクトリ。それぞれが
 ### `docs/specs/api/`
 
 - `contract.md` — サーバ API の契約。画面・エージェントとサーバの境界
+- `mcp-tools.md` — MCP ツールの契約。claude プロセスとサーバの境界（ツール8本・結果の形・`errorCode`・工程ごとの公開・接続 token）
 
 ### `docs/specs/architecture/`
 

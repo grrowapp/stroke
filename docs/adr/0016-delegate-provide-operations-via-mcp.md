@@ -1,7 +1,12 @@
 # ADR-0016: provide-operations-via-mcp から切り出した change の委譲理由
 
-- **状態**: 採用
+- **状態**: 採用（一部は docs へ確定済み。**archive にはしない**——下の「確定した先」）
 - **日付**: 2026-08-29
+- **確定した先**:
+  - 提供方式・ツールの契約・結果の形・工程ごとの公開・接続 token → [docs/specs/api/mcp-tools.md](../specs/api/mcp-tools.md)
+  - 起動フラグ・定型・設定の一覧 → [docs/specs/core/settings-reference.md](../specs/core/settings-reference.md)
+  - 配線と置き場 → [docs/specs/architecture/session-workflow.md](../specs/architecture/session-workflow.md)
+- **確定していないもの**: `adr0016-sub-implement-mcp-operations` の結論（代行を確定した方式とする判断）は、まだ docs に落ちていない。**取りこぼす規約が残るので archive にしない**（CLAUDE.md「更新対応」）
 
 ## 決定
 

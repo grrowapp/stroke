@@ -32,11 +32,11 @@ const { projectShareRoot, claude } = config.runtimeConfig
 | キー | 既定値 |
 |---|---|
 | `projectShareRoot` | `/opt/projects` |
-| `claude.apiBaseUrl` | `http://127.0.0.1:3399` |
+| `claude.apiBaseUrl` | `http://127.0.0.1:<devServer.port>`（下の「ポートは2箇所にある」） |
 | `claude.workflowSchema` | `flontier-strokeflow` |
-| `claude.firstPrompt` | `/openspec-ff-change draft-proposal` ＋ 固定指示 |
-| `claude.continuePrompt` | 続きを促す1文 |
-| `claude.steeringPrompt` | `/write-steering-v2` ＋ 固定指示 |
+| `claude.firstPrompt` | `get-guide` を読ませる1文 |
+| `claude.continuePrompt` | `get-guide` を読み直させ、続きを促す1文 |
+| `claude.steeringPrompt` | `get-steering-guide` を読ませる1文 |
 | `claude.maxRetries` | `2` |
 | `claude.timeoutMs` | `180000` |
 | `claude.timeoutStepMs` | `0` |
@@ -67,17 +67,23 @@ const { projectShareRoot, claude } = config.runtimeConfig
 └── .spec-workflow-mcp/           本家のグローバル状態
 ```
 
-### `claude.steeringPrompt`
+### `claude.apiBaseUrl` — ポートは2箇所にある
 
-承認でプロジェクトへ昇格した直後に、steering 文書を作らせるために渡す定型（[ADR 0011](../../adr/0011-steering-stage-follows-approval.md)）。cwd は昇格先のプロジェクトで、`--mcp-config` は呼び出し側がそこから組み立てて足す。
+エージェント向け endpoint の base URL。実質的な用途は、起動ごとに組み立てる `--mcp-config` の url（`<apiBaseUrl>/mcp`）である。
 
-起動するスキル `write-steering-v2` はこのリポジトリの `.claude/skills/` に在り、`--add-dir` 経由でロードされる（[ADR 0001](../../adr/0001-claude-p-invocation.md)）。`write-steering`（v2 でない方）は対話インタビュー（`grill`）を含み、無人実行では進まないため使わない。
+**同じポートが2箇所にある。** ここと `nuxt.config.ts` の `devServer.port` で、**変えるときは必ず両方を揃えて変える**。片方だけ変えると、起動した claude は開いていないポートへ MCP 接続を試みる。
 
-```
-/write-steering-v2
+値を1つに固定して書かない。worktree を並走させるときは worktree ごとにずらすためで、実際に同じ値を使っている worktree は無い。`devServer.port` はビルド設定でありストローク側設定ではないので、この資料の対象は `claude.apiBaseUrl` の側だけである（実体は `nuxt.config.ts`）。
 
-スキルの指示に従って steering 文書を作成する。
-```
+### `claude.firstPrompt` ・ `claude.continuePrompt` ・ `claude.steeringPrompt`
+
+AI へ渡す定型。**手順の本文をここに書かない。** 手順は MCP の案内ツール（flontier は `get-guide`、steering は `get-steering-guide`）が返すもので、定型が持つのは「そのツールを読め」という指示だけである。
+
+本文を定型にも書くと、ツールの契約が変わったときに定型だけが古くなる。**実際にそれが起きた**——かつて `steeringPrompt` は `/write-steering-v2` を、`firstPrompt` は `/openspec-ff-change` を先頭に置いていたが、どちらもスキルの実体を持たず、`claude -p` は `Unknown command` で起動を終えていた（assistant のターンがゼロ。実測 2026-08-27 / 2026-08-30）。steering 工程が何もせず終わっていた直接の原因である。
+
+**定型が名前で指してよいのは、その起動で公開される MCP ツールだけとする。** 公開の一覧は `server/utils/mcp/exposed-tools.ts` にある。
+
+`steeringPrompt` は承認でプロジェクトへ昇格した直後に渡る（[ADR 0011](../../adr/0011-steering-stage-follows-approval.md)）。cwd は昇格先のプロジェクトで、`--mcp-config` は呼び出し側がそこから組み立てて足す。`write-steering`（v2 でない方）は対話インタビュー（`grill`）を含み、無人実行では進まないため使わない。
 
 ### `claude.maxRetries`
 
@@ -128,30 +134,37 @@ const { projectShareRoot, claude } = config.runtimeConfig
 | `claude.command` | `claude` |
 | `claude.args` | 下の JSON |
 
-`runtimeConfig.public` には置かない。画面はこの値を1つも読まず、`public` はブラウザへ配信される区画なので、置くとリポジトリの絶対パス（`--add-dir`）と許可ツールの一覧が外へ出る。
+`runtimeConfig.public` には置かない。画面はこの値を1つも読まず、`public` はブラウザへ配信される区画なので、置くと許可ツールの一覧が外へ出る。
 
 ```json
 {
   "command": "claude",
   "args": [
     "--setting-sources", "project",
-    "--model", "fable",
-    "--add-dir", "<リポジトリのルート>",
-    "--add-dir", "<リポジトリのルート>/assets",
-    "--allowedTools", "Bash Read Write Edit"
+    "--model", "sonnet",
+    "--allowedTools", "Skill Bash(openspec *) Read Edit Write",
+    "--disallowedTools", "Bash(cd *)",
+    "--strict-mcp-config"
   ]
 }
 ```
 
-`--setting-sources` から `project` を外してはならない（ADR 0001）。外すとスキルが一切ロードされない。
+**`--add-dir` を渡さない。** 作業場所はその実行の対象（セッションのディレクトリ、または昇格先のプロジェクト）だけとする。かつてリポジトリのルートを渡していたが、根拠に挙げていたスキルとコマンドは実在せず、実際に届いていたのは次の2つだけだった（実測 2026-08-30）。
 
-`-p` / `--output-format json` と、`--session-id` / `--resume` と会話 id、`--mcp-config`、`--` 以降の prompt は**呼び出しごとに決まる**ため、この定義には含まれない。呼び出し側が `args` の後ろに足す。
+- **他人のセッションの全文**。`claude.debugLogDir` をリポジトリ配下に置くと、`--output-format stream-json` で概要・問い・proposal がそのまま残る。セッション A の claude が B のログを読めた
+- **開発者の権限とプラグイン**。ルート配下の `.claude/settings.json` が `--setting-sources project` で効き、`Agent` や `Bash(claude *)` が渡っていた
+
+**`--strict-mcp-config` を外してはならない。** `--mcp-config` は「追加」であって「限定」ではないので、これが無いと開発者個人の MCP 設定が全部読み込まれる（実測 2026-08-30: 8サーバー・約80ツールが、許可されていないので呼べないまま実行に並んでいた）。
+
+`--setting-sources` から `project` を外してはならない（ADR 0001）。**ただし `--add-dir` を外した今、この指定は実効を持たない**——探索先は cwd だけで、そこに `.claude/` は無いのでロードされるスキルは0本である。案内を Skill として配り直したときに要る守りとして残してある。
+
+`-p` / `--output-format json` と、`--session-id` / `--resume` と会話 id、`--mcp-config`、**MCP ツール分の `--allowedTools`**（`mcp__stroke-board`。steering 工程では `mcp__specworkflow` も）、`--` 以降の prompt は**呼び出しごとに決まる**ため、この定義には含まれない。呼び出し側が `args` の後ろに足す。
 
 会話 id の与え方は用途で違う。
 
 | 用途 | 会話 id |
 |---|---|
-| ストローク | 自前採番の uuid（= セッションディレクトリ名）を `--session-id` で渡す。スキルが `${CLAUDE_SESSION_ID}` でセッション id を知る前提に効いている |
+| ストローク | 自前採番の uuid（= セッションディレクトリ名）を `--session-id` で渡す。**続きを開くのに要る**——次の起動が `--resume <id>` で同じ会話へ戻るには、こちら側が id を決めて覚えているしかない |
 | steering | **渡さない。** 対象のディレクトリ名はプロジェクト名で uuid ではなく、`--session-id` は uuid しか受け付けない（実測: `Invalid session ID. Must be a valid UUID.`）。初回は claude に採番させ、output stream の `session_id` を `state.json` の `runId` に覚えて次から `--resume` する |
 
 ## `app/app.config.ts`
@@ -179,7 +192,9 @@ const { projectShareRoot, claude } = config.runtimeConfig
 | 失敗した実行を起こし直す巡回の間隔 | `server/plugins/01.retry-failed.ts` |
 | ログの接頭辞 | `server/utils/stroke/log.ts` |
 
-`STROKE_BASEURL` は**こちらが読む設定ではなく、子プロセスへ渡す名前**である。セッション API スキルがこの名前で接続先を読む。
+`STROKE_BASEURL` は**こちらが読む設定ではなく、子プロセスへ渡す名前**である。かつてはセッション API スキルがこの名前で接続先を読んでいたが、**読み手はもう居ない**——操作系スキルは `--add-dir` を外したのでロードされず、`curl` / `printenv` も `--allowedTools` から落ちている。渡すのをやめるかどうかは別途判断する。
+
+いま子プロセスへ接続先が届く経路は `--mcp-config` の url（`<apiBaseUrl>/mcp`）である。
 
 ## ポータル側
 
