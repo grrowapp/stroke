@@ -12,12 +12,48 @@
  * 図の枠だけを「Loading diagram...」としてサーバとクライアントの初期描画で一致させ、
  * `onMounted` 以降に SVG へ差し替える。こうすると hydration は枠の状態どうしで揃い、
  * 本文は画面を開いた時点で読める（DocumentView の SSR 前提を壊さない）。
+ *
+ * **注釈の付いた図には生テキストを添える。** 図は絵なので、図の中のある字を指す位置が
+ * 画面上に無い。そこで `showSource` が立った図にだけ、もとになったフェンスの生テキストを
+ * 図の下に出す。絵と、指摘の対象の両方を見せるための足しであって、**図の置き換えではない**
+ * （図は消さない）。立てるかどうかを決めるのは外（`./source-shown.ts`）で、ここは知らない。
  */
-import { onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 
 import { useColorMode } from '#imports';
 
-const props = defineProps<{ code: string }>();
+import { SOURCE_END_ATTR, SOURCE_START_ATTR } from '../position/source-span';
+import type { SourceRange } from '../position/types';
+import { FENCE_SOURCE_ATTR } from './source-shown';
+
+const props = withDefaults(
+  defineProps<{
+    code: string;
+    /** 生テキストを添えるか。既定は添えない（図だけを出す） */
+    showSource?: boolean;
+    /** このフェンスが占める生テキストの範囲。添えた生テキストに印として付ける */
+    sourceRange?: SourceRange | null;
+  }>(),
+  { showSource: false, sourceRange: null },
+);
+
+/**
+ * 添えた生テキストに付ける印。
+ *
+ * 中身は `pre.props.code`（タブを開き、器の前置きを剥がした後の文字列）なので、位置の口は
+ * 文字数をそのまま数えられない。**そのための目印と材料**を属性で置いておく
+ * （`./source-shown.ts` の `FENCE_SOURCE_ATTR`）。範囲が分からなければ印も付けない。
+ */
+const sourceMarks = computed<Record<string, string | number>>(() => {
+  const marks: Record<string, string | number> = {};
+  const range = props.sourceRange;
+  if (!range) return marks;
+
+  marks[FENCE_SOURCE_ATTR] = '';
+  marks[SOURCE_START_ATTR] = range.start;
+  marks[SOURCE_END_ATTR] = range.end;
+  return marks;
+});
 
 /**
  * 本家 `hooks/useMDXEditorTheme.ts` の `mermaidThemeVariables` をそのまま写す。
@@ -111,6 +147,46 @@ watch([(): string => props.code, (): string => colorMode.value], draw);
   <!--
     成功。`sb-mermaid` は本家の `.mermaid-container` の写し。
     差し込むのは mermaid が組み立てた SVG で、本家も同じ（`dangerouslySetInnerHTML`）。
+
+    **生テキストを添えないときは、器を1つも増やさない。** 既定の見え方を1画素も変えない
+    ためで、下の枝と共通化しない（`.sb-mermaid` は `display:flex` なので、間に器を挟むと
+    SVG の伸び方が変わる）。
   -->
-  <div v-else class="sb-mermaid" data-testid="mermaid-diagram" v-html="svg" />
+  <div v-else-if="!props.showSource" class="sb-mermaid" data-testid="mermaid-diagram" v-html="svg" />
+
+  <!--
+    成功、かつ生テキストを添える。
+
+    **添えても本文の他の箇所が動かない。** 添えたものを図の枠の中へ絶対配置で収めるので、
+    枠の高さは図だけのときと同じままになる（外側の器は余白も枠線も持たないので、
+    `.sb-mermaid` の margin はそのまま外へ抜ける）。注釈が付いた瞬間に後ろの段落が
+    ずり下がると読めなくなるため、この形は要件である。
+
+    畳めるようにしてあるのは、生テキストが図の下側に重なるからである。既定は開いた状態
+    （注釈の指す字がすぐ見える）で、絵の全体を見たいときに畳む。
+  -->
+  <div v-else class="relative" data-testid="mermaid-with-source">
+    <div class="sb-mermaid" data-testid="mermaid-diagram" v-html="svg" />
+    <!--
+      `not-prose` を付けるのは、この `pre` に Tailwind Typography の `pre` の型
+      （面・余白・字送り）が当たらないようにするため。生テキストの面（`MarkdownSource.vue`）
+      と同じ見え方にしたいので、本文の型を通さない。
+    -->
+    <details
+      open
+      class="not-prose absolute inset-x-4 bottom-4 max-h-[60%] overflow-auto rounded-md border border-gray-700 bg-gray-900 shadow-lg"
+      data-testid="mermaid-source"
+    >
+      <summary class="cursor-pointer px-3 py-1 text-xs text-gray-400">Source</summary>
+      <!--
+        字は生テキストの面の写し（本家 `TextAnnotate` の実測: 0.875rem / 1.625 /
+        pre-wrap / break-word）。**1つの補間として出す**のも同じ理由で、要素を挟むと
+        text ノードが割れて位置の口が数え直しになる。
+      -->
+      <pre
+        v-bind="sourceMarks"
+        class="px-3 pb-3 font-mono text-[0.875rem]/[1.625] whitespace-pre-wrap text-gray-300 [word-break:break-word]"
+      >{{ props.code }}</pre>
+    </details>
+  </div>
 </template>

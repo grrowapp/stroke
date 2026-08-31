@@ -70,6 +70,15 @@ function seed() {
       // 保存された文書。本家はファイルに書くので、次の取得で保存後の内容が返る
       savedSpecDocuments: new Map(),
       savedSteeringDocuments: new Map(),
+      /*
+       * 承認対象の本文の仕込み（承認 id → 本文）。`request-approval` に `content` を
+       * 渡すと入る。本家はファイルを読むだけなので、ここは「そのファイルに何が書いて
+       * あるか」を試験ごとに決めるための置き場である。
+       *
+       * 承認の一覧に載せず別に持つのは、本家が返す承認の形に無いフィールドを足さない
+       * ため。足すとアプリが受け取る payload が本家と違うものになる。
+       */
+      approvalContents: new Map(),
       tasksBySpec: new Map([
         [
           'auth-spec',
@@ -177,6 +186,8 @@ function handleControl(rest, body) {
 
     case 'request-approval': {
       const project = projects.get(body.projectId);
+      // 本文の仕込み。渡さなければ既定の本文が返る（既存の試験はそのまま）
+      if (typeof body.content === 'string') project.approvalContents.set(body.id, body.content);
       project.approvals = [
         ...project.approvals,
         {
@@ -363,6 +374,14 @@ function handleApi(segments, respond, method = 'GET', body = null) {
       const saved = project.savedSpecDocuments.get(`${spec[1]}/${spec[2]}`);
       if (saved !== undefined) return respond(200, { content: saved });
     }
+
+    /*
+     * 仕込まれた本文。保存された文書より後に見るのは、承認画面から直した結果が
+     * 勝つ既存の振る舞いを変えないため。仕込みは「まだ誰も直していないファイルに
+     * 何が書いてあるか」を決めるものである。
+     */
+    const seeded = project.approvalContents.get(approval.id);
+    if (seeded !== undefined) return respond(200, { content: seeded });
 
     return respond(200, { content: `# ${approval.title}\n\n本文` });
   }

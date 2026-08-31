@@ -62,7 +62,13 @@ export const stub = {
   startTask: (projectId: string, taskId: string, specName = 'auth-spec') =>
     control('start-task', { projectId, specName, taskId }),
 
-  /** 承認依頼を立てる */
+  /**
+   * 承認依頼を立てる。
+   *
+   * `content` を渡すと、その承認の対象文書の中身になる（本家がファイルから読むものに
+   * あたる）。渡さなければ既定の本文が返る。改行の表現や前置きを持つ文書を試すために
+   * 仕込む口で、**アプリ側にテスト専用の抜け道は足していない**。
+   */
   requestApproval: (
     projectId: string,
     options: {
@@ -71,6 +77,7 @@ export const stub = {
       filePath: string;
       category: 'spec' | 'steering';
       categoryName: string;
+      content?: string;
     },
   ) => control('request-approval', { projectId, ...options }),
 

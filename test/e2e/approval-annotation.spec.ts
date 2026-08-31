@@ -275,3 +275,152 @@ test.describe('差し戻す', () => {
     expect(record.comments).toHaveLength(2);
   });
 });
+
+/**
+ * 外へ出るオフセットの基準。
+ *
+ * **本家へ渡すオフセットは、本家が持っている文書へそのまま当たらなければならない**
+ * （`openspec/specs/project/ui`）。整形して読むために内側で行う作り変え（CRLF を潰す・
+ * 前置きを落とす）の後の座標を送ってはならない。
+ *
+ * ここが崩れても画面には何も出ない。**本家のダッシュボードが別の場所を塗るだけ**である。
+ * だから値そのものを、本家が持っている本文へ当てて確かめる。
+ *
+ * **期待値を数値で書かない。** 送られたオフセットで本家の本文を切り、選んだ語と一致するかを
+ * 見る。本文を書き換えても壊れない。
+ */
+test.describe('本家へ渡るオフセットの基準', () => {
+  /** 改行の表現が CRLF の文書。マーカーは CRLF を4つ跨いだ先に置く */
+  const CRLF_CONTENT = [
+    '# 改行の表現が CRLF の文書',
+    '',
+    '一つめの段落。',
+    '',
+    '二つめの段落にモモンガが居る。',
+    '',
+  ].join('\r\n');
+
+  /** 先頭に前置きを持つ文書。前置きは本文より長い */
+  const FRONT_MATTER_CONTENT = [
+    '---',
+    'title: 前置きを持つ文書',
+    'status: draft',
+    'reviewers: [alpha, beta]',
+    '---',
+    '',
+    '# 本文の見出し',
+    '',
+    '本文にモモンガが居る。',
+    '',
+  ].join('\n');
+
+  /**
+   * 生テキストの面で語を探して選ぶ。
+   *
+   * **オフセットで指さない。** 指すと、こちらが数えた位置を面へ教えることになり、面が
+   * 自分で数えた位置と食い違っても分からない。DOM に出ている字の上で選び、**面が何番と
+   * 答えるか**を見る。
+   */
+  async function selectWord(page: Page, word: string): Promise<void> {
+    await page.evaluate((target) => {
+      const surface = document.querySelector('[data-testid="approval-annotate-source"]');
+      if (surface === null) throw new Error('注釈の面が出ていない');
+
+      for (const element of surface.querySelectorAll<HTMLElement>('[data-start]')) {
+        const text = element.firstChild;
+        if (text === null || text.nodeType !== Node.TEXT_NODE) continue;
+
+        const at = (text.textContent ?? '').indexOf(target);
+        if (at === -1) continue;
+
+        const selection = document.createRange();
+        selection.setStart(text, at);
+        selection.setEnd(text, at + target.length);
+
+        const current = window.getSelection();
+        if (current === null) throw new Error('選択を作れない');
+        current.removeAllRanges();
+        current.addRange(selection);
+
+        surface.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+        return;
+      }
+
+      throw new Error(`面に「${target}」が出ていない`);
+    }, word);
+  }
+
+  /** 差し戻して、本家へ届いた箇所つきの指摘を1件返す */
+  async function reviseWith(page: Page, word: string) {
+    await page.getByTestId('approval-mode-annotate').click();
+    await expect(page.getByTestId('approval-annotate-source')).toBeVisible();
+
+    await selectWord(page, word);
+    await addSelectionComment(page, `${word} を直してほしい`);
+    await expect(page.getByTestId('approval-comment-count')).toHaveText('1');
+
+    await page.getByTestId('approval-revision').click();
+    await expect(page).toHaveURL(new RegExp(`/projects/${ALPHA}/approvals$`));
+
+    const { lastApprovalAction } = await stub.stats();
+    const comments = lastApprovalAction?.comments as
+      | { type: string; selectedText?: string; startOffset?: number; endOffset?: number }[]
+      | null;
+
+    const selection = comments?.find((item) => item.type === 'selection');
+    expect(selection, '箇所つきの指摘が届いていない').toBeDefined();
+    return selection!;
+  }
+
+  async function openWith(page: Page, content: string): Promise<void> {
+    await resetBoard(page);
+    await stub.requestApproval(ALPHA, {
+      id: 'an1',
+      title: TITLE,
+      filePath: '.spec-workflow/steering/product.md',
+      category: 'steering',
+      categoryName: 'steering',
+      content,
+    });
+    await page.goto(APPROVAL);
+  }
+
+  test('CRLF を含む文書で、オフセットが本家の本文へそのまま当たる', async ({ page }) => {
+    await openWith(page, CRLF_CONTENT);
+
+    const selection = await reviseWith(page, 'モモンガ');
+
+    expect(selection.selectedText).toBe('モモンガ');
+    // 本家が持っているのは CRLF のままの文書。そこへ当てて同じ語を指すこと
+    expect(CRLF_CONTENT.slice(selection.startOffset, selection.endOffset)).toBe('モモンガ');
+  });
+
+  test('前置きを持つ文書で、オフセットが本家の本文へそのまま当たる', async ({ page }) => {
+    await openWith(page, FRONT_MATTER_CONTENT);
+
+    const selection = await reviseWith(page, 'モモンガ');
+
+    expect(selection.selectedText).toBe('モモンガ');
+    // 前置きを落とした後の座標を送ると、ここが前置きの中の字を指して落ちる
+    expect(FRONT_MATTER_CONTENT.slice(selection.startOffset, selection.endOffset)).toBe('モモンガ');
+  });
+
+  /**
+   * **承認の対象は文書ぜんたいである。** 位置合わせの都合で前置きを見えなくしてよい部分では
+   * ない（`openspec/specs/project/ui`「指摘を付けるために、対象文書の一部を隠してはならない」）。
+   */
+  test('前置きの中にも指摘を付けられる', async ({ page }) => {
+    await openWith(page, FRONT_MATTER_CONTENT);
+    await page.getByTestId('approval-mode-annotate').click();
+
+    // 面から取り除かれていないこと
+    await expect(page.getByTestId('approval-annotate-source')).toContainText('title: 前置きを持つ文書');
+
+    const selection = await reviseWith(page, '前置きを持つ文書');
+
+    expect(selection.selectedText).toBe('前置きを持つ文書');
+    expect(FRONT_MATTER_CONTENT.slice(selection.startOffset, selection.endOffset)).toBe(
+      '前置きを持つ文書',
+    );
+  });
+});

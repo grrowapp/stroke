@@ -2,7 +2,8 @@
 /** 下層 — 仕様書の文書本文。URL でこの1本を直接指せる */
 import { computed, createError, definePageMeta, useRoute } from '#imports';
 
-import DocumentEditor from '~/components/workspace/DocumentEditor.vue';
+import MarkdownEditor from '#markdown/edit/MarkdownEditor.vue';
+import EmptyState from '~/components/workspace/EmptyState.vue';
 import WorkspacePanel from '~/components/workspace/WorkspacePanel.vue';
 import { useBoardSocket } from '~/composables/useBoardSocket';
 import { saveSpecDocument, useProjectId, useSpecDocuments } from '~/composables/useProjectApi';
@@ -48,11 +49,18 @@ async function save(content: string): Promise<string | null> {
     :title="DOCUMENTS[documentKey as DocumentKey]"
     :subtitle="specName"
   >
-    <DocumentEditor
+    <MarkdownEditor
       :content="current?.content"
       :save="save"
       :can-save="upstreamConnected"
       testid="spec-document"
-    />
+    >
+      <!-- 未作成の文書に何を出すかは画面が決める（specs/document-editing） -->
+      <template #empty>
+        <EmptyState testid="document-missing" title="中身がありません">
+          この文書はまだ作られていません。
+        </EmptyState>
+      </template>
+    </MarkdownEditor>
   </WorkspacePanel>
 </template>

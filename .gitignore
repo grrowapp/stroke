@@ -61,3 +61,8 @@ workflow/openspec/changes/
 # @nuxt/test-utils がテスト実行時に書く生成物。ツール定義の置き場（ファイル名＝ツール名）に
 # 成果物でないファイルを残さない（provide-operations-via-mcp・santa-method レビュー指摘）
 server/mcp/tools/.nuxtrc
+
+# ralph-specum: アクティブ epic のポインタ（マシンローカルな作業状態）
+specs/.current-epic
+# ralph-specum: 状態ファイルのロック（マシンローカル）
+specs/**/.ralph-state.lock

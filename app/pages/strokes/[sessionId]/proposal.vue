@@ -2,6 +2,8 @@
 // 画面2(proposal 確認)。ui.md の採用案 = B(右パネル常設)。
 // 決める操作(差し戻す・承認)はビュー切替と同じ上部固定バーに集約する。
 // 差し戻し後の問い返しは画面1 へ戻さず、この画面の帯とモーダルで受ける。
+import MarkdownView from '#markdown/render/MarkdownView.vue'
+
 import type { Phase, SessionStatus, Stroke } from '#shared/stroke'
 
 // 器は `stroke` レイアウト（fullscreen の UModal・閉じ操作なし）。承認すると
@@ -149,13 +151,20 @@ const modes = [
       :class="approved ? '' : 'lg:grid-cols-[minmax(0,1fr)_400px]'"
     >
       <section class="min-w-0">
-        <!-- プレビュー: 整形。ここからは指摘を付けられない -->
-        <div
+        <!--
+          プレビュー: 整形。ここからは指摘を付けられない。
+
+          本文の型は markdown モジュールが持つ。`surface` を寝かせるのは、この画面が
+          自前の余白（`px-8 py-8`）を持つ別レイアウトで、本家写しの暗い矩形を重ねると
+          枠と余白が二重になるため。
+        -->
+        <MarkdownView
           v-if="shownMode === 'preview'"
-          class="prose prose-sm dark:prose-invert max-w-none px-8 py-8"
-        >
-          <MDC :value="proposal" />
-        </div>
+          :value="proposal"
+          :surface="false"
+          testid="proposal-preview"
+          class="px-8 py-8"
+        />
 
         <!-- 注釈: 生テキスト。指摘を付けられるのはこの面だけ -->
         <ReviewAnnotateSource
@@ -176,9 +185,12 @@ const modes = [
             @select="review.onSelect"
             @click-mark="review.editComment"
           />
-          <div class="prose prose-sm dark:prose-invert min-w-0 max-w-none px-6 py-6">
-            <MDC :value="proposal" />
-          </div>
+          <MarkdownView
+            :value="proposal"
+            :surface="false"
+            testid="proposal-rendered"
+            class="min-w-0 px-6 py-6"
+          />
         </div>
       </section>
 

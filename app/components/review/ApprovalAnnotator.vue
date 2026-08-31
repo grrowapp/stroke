@@ -21,6 +21,7 @@
 import { useMounted } from '@vueuse/core';
 import { computed, navigateTo, refreshNuxtData, ref } from '#imports';
 
+import MarkdownView from '#markdown/render/MarkdownView.vue';
 import AnnotateSource from '~/components/review/AnnotateSource.vue';
 import CommentCard from '~/components/review/CommentCard.vue';
 import CommentModal from '~/components/review/CommentModal.vue';
@@ -282,13 +283,8 @@ async function requestRevision(): Promise<void> {
               右は読むだけの整形。`DocumentView` を使うと `document-content` が
               プレビューのぶんと2つになるので、ここは素で描く
             -->
-            <!-- class 列は `DocumentView.vue` と同じ本家写し（`SideBySideView.tsx` も同じ並び） -->
-            <div
-              class="sb-markdown prose prose-sm sm:prose-base max-w-none dark:prose-invert prose-img:max-w-full prose-img:h-auto prose-headings:text-gray-900 dark:prose-headings:text-white prose-p:text-gray-700 dark:prose-p:text-gray-300 prose-strong:text-gray-900 dark:prose-strong:text-white prose-code:text-gray-800 dark:prose-code:text-gray-200 prose-code:bg-gray-100 dark:prose-code:bg-gray-800 prose-pre:bg-gray-50 dark:prose-pre:bg-gray-900 prose-blockquote:text-gray-700 dark:prose-blockquote:text-gray-300 prose-li:text-gray-700 dark:prose-li:text-gray-300 min-w-0"
-              data-testid="approval-rendered"
-            >
-              <MDC :value="source" />
-            </div>
+            <!-- 本文の型は markdown モジュールが持つ（本家写し。`SideBySideView.tsx` も同じ並び） -->
+            <MarkdownView :value="source" testid="approval-rendered" class="min-w-0" />
           </div>
         </div>
       </div>
