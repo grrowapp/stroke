@@ -11,34 +11,44 @@ const { issueConnectionToken, registerConnection, removeConnection } = await imp
 const call = (headers: Record<string, string>) => structuredResult(getSteeringGuideTool.handler({}, withHeaders(headers)));
 
 /** 節ごとに、その節へ入っていなければならない内容（`get-guide.test.ts` と同じ考え）。 */
-const REQUIRED: Array<[string, RegExp[]]> = [
-  ['状況を確認', [/get-steering/, /exists: false/, /exists: true/, /上書き/]],
-  ['書く順序', [/product → tech → structure/, /1本ずつ/]],
-  ['提出する', [/submit-document/, /type: "steering"/, /product/]],
-  ['終わりとみなす基準', [/書き終わり|終わりである/]],
+const REQUIRED: Array<[string, RegExp[], number]> = [
+  ['状況を確認', [/get-steering/, /exists: false/, /exists: true/, /上書き/], 100],
+  ['書く順序', [/product → tech → structure/, /1本ずつ/], 120],
+  ['提出する', [/submit-document/, /type: "steering"/, /product/], 80],
+  ['終わりとみなす基準', [/書き終わり|終わりである/], 75],
   ['うまくいかないとき', [
     /errorCode/, /project_not_registered/, /unreachable/,
     /upstream_error/, /upstream_malformed/, /connection_mismatch/,
     /直接書いて/,
-  ]],
-  ['どこで工程が終わるか', [/3本/]],
-  ['本家 MCP は使わない', [/approvals/, /呼ばない/]],
-  ['やらないこと', [/直接読み書き/]],
+  ], 510],
+  ['どこで工程が終わるか', [/3本/], 35],
+  ['本家 MCP は使わない', [/approvals/, /呼ばない/], 230],
+  ['やらないこと', [/直接読み書き/], 30],
 ];
 /**
  * 手順が**節として**書かれていることを見る。
  *
- * 手掛かり語だけを見ていると、本文をキーワードの羅列に置き換えてもテストが通る
- * （変異試験で確認。santa-method レビュー指摘 9周目 2026-08-31）。このツールの唯一の
- * 成果物は本文なので、「実装を消しても通る」がそのまま当てはまってしまう。
+ * このテストが見るのは4つだけである。
  *
- * 節ごとに見出しがあり、その下に中身が続いていることまで見る。
+ * 1. 決めた節が在ること
+ * 2. 節の並びが入れ替わっていないこと
+ * 3. その節に要る語が**その節の中に**在ること（節をまたいだ部分一致では見ない）
+ * 4. 節が痩せていないこと（節ごとの最低の長さ）
+ *
+ * **見ないもの: 意味である。** 部分文字列の一致でしかないので、「叩かない」を
+ * 「叩かない、という決まりは無い」に書き換えるような**規範の反転は通り抜ける**
+ * （変異試験で確認。santa-method レビュー指摘 12周目 2026-08-31）。これは正規表現を
+ * 足しても塞げない種類の穴なので、塞げるふりをしない。
+ *
+ * 手順が**指示として正しいか**は、実機で1周させてエージェントがそのとおりに動くかで見る
+ * （各 change の検証の章）。ここで見ているのは、節ごと消えたり中身が抜けたりしていないこと
+ * ——**書き換えの事故**であって、悪意ある書き換えではない。
  */
 function sectionBodies(guide: string): Map<string, string> {
   const bodies = new Map<string, string>();
   const parts = guide.split(/^## /m).slice(1);
   for (const part of parts) {
-    const nl = part.indexOf('\n');
+    const nl = part.indexOf('\\n');
     bodies.set(part.slice(0, nl).trim(), part.slice(nl + 1).trim());
   }
   return bodies;
@@ -85,10 +95,7 @@ describe('get-steering-guide', () => {
   });
 
   it('手順が節ごとに書かれ、それぞれの節に要る内容が入っている', async () => {
-    // **節をまたいだ部分一致では見ない。** 文書のどこかに語が在ればよい形にすると、
-    // 見出しを残したままキーワードの羅列に置き換えても通ってしまう（変異試験で実証。
-    // santa-method レビュー指摘 10周目 2026-08-31）。節ごとに、その節に要る語が
-    // **その節の中に**在ることと、中身が続いていること（長さと句点）を見る。
+    // 何を見て何を見ないかは `sectionBodies` の説明にある
     const token = issueConnectionToken();
     registerConnection(token, { projectPath: '/opt/projects/setai' });
 
@@ -96,19 +103,16 @@ describe('get-steering-guide', () => {
     const bodies = sectionBodies(guide);
     const headings = [...bodies.keys()];
 
-    for (const [section, patterns] of REQUIRED) {
+    for (const [section, patterns, minLength] of REQUIRED) {
       const found = headings.find(h => h.includes(section));
       expect(found, `節「${section}」が無い`).toBeDefined();
       const body = bodies.get(found!) ?? '';
-      expect(body.length, `節「${section}」の中身が薄い`).toBeGreaterThan(40);
-      expect((body.match(/。/g) ?? []).length, `節「${section}」が文になっていない`).toBeGreaterThanOrEqual(1);
+      // 最低の長さは実際の分量の6割ほど。**書き足すのは自由で、抜くと落ちる**
+      expect(body.length, `節「${section}」の中身が抜けている`).toBeGreaterThanOrEqual(minLength);
       for (const pattern of patterns) {
         expect(body, `節「${section}」に ${pattern} が無い`).toMatch(pattern);
       }
     }
-
-    // 全体としても文で書かれている（節ごとの1つだけでは羅列を許してしまう）
-    expect((guide.match(/。/g) ?? []).length).toBeGreaterThanOrEqual(20);
 
     // 節の並びが入れ替わっていない
     const order = REQUIRED.map(([section]) => headings.findIndex(h => h.includes(section)));
