@@ -78,7 +78,7 @@ async function takeFreePort(from: number): Promise<number> {
 /**
  * 決めた番号を環境変数へ控えて持ち回る。
  *
- * **この設定はワーカーでも読まれる。** `e2e/support.ts` などが `STUB_PORT` を import
+ * **この設定はワーカーでも読まれる。** `test/e2e/support.ts` などが `STUB_PORT` を import
  * するため、テストの実行プロセスごとにこのモジュールが評価し直される。空きを探す作りは
  * 評価のたびに違う番号を返すので、控えずに使うと webServer が握った番号とテストが
  * 見に行く番号がずれる（実測 2026-08-31: `TypeError: fetch failed` で 207 件が落ちた）。
@@ -216,7 +216,7 @@ mkdirSync(SPEC_WORKFLOW_HOME, { recursive: true });
 writeFileSync(REGISTRY_PATH, registryContent());
 
 export default defineConfig({
-  testDir: './e2e',
+  testDir: './test/e2e',
   testMatch: '**/*.spec.ts',
   fullyParallel: false,
   workers: 1,
@@ -227,7 +227,7 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: `node e2e/fixtures/upstream-stub.mjs ${STUB_PORT}`,
+      command: `node test/e2e/fixtures/upstream-stub.mjs ${STUB_PORT}`,
       url: `http://127.0.0.1:${STUB_PORT}/api/projects/list`,
       reuseExistingServer: false,
       stdout: 'pipe',
