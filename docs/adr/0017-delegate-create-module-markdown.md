@@ -15,10 +15,12 @@
 
 あわせて、**親の範囲に残った作業そのものを4本へ分割する**。委譲（別の関心事へ渡す）ではなく分割（親の範囲を割る）なので、親は4本が全部終わるまで archive しない。
 
-- `adr0017-sub-create-position-port-preview`
-- `adr0017-sub-add-detection-assumptions`
-- `adr0017-sub-fix-normalization-offset`
-- `adr0017-sub-create-reference-mdc`
+- `adr0017-sub-create-position-port-preview` — **完了**（archive 済み）
+- `adr0017-sub-add-detection-assumptions` — **完了**（archive 済み）
+- `adr0017-sub-fix-normalization-offset` — **完了**（archive 済み）
+- `adr0017-sub-create-reference-mdc` — **完了**（archive 済み）
+
+**分割した4本はすべて完了した。** 親 `create-module-markdown` の archive を止めるものは、親自身に残る最終検証（tasks 6.9）だけである。
 
 ## 背景
 
