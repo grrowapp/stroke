@@ -1,0 +1,57 @@
+{
+  "id": "approval_1788070756789_gbk8r00sw",
+  "title": "show-pending-project-in-list の ui.md",
+  "filePath": "openspec/changes/show-pending-project-in-list/ui.md",
+  "type": "document",
+  "status": "needs-revision",
+  "createdAt": "2026-08-30T06:19:16.789Z",
+  "category": "spec",
+  "categoryName": "show-pending-project-in-list",
+  "response": "Feedback Summary (3 comments):\n\nSpecific Text Comments:\n1. \"```\": 不要\n2. \"```\": 不要\n3. \"3分前 │──┐\": ズレ\n",
+  "annotations": "{\n  \"decision\": \"needs-revision\",\n  \"comments\": [\n    {\n      \"type\": \"selection\",\n      \"comment\": \"不要\",\n      \"timestamp\": \"2026-08-30T06:25:14.386Z\",\n      \"selectedText\": \"```\",\n      \"highlightColor\": {\n        \"bg\": \"rgba(255, 235, 59, 0.3)\",\n        \"border\": \"#FFEB3B\",\n        \"name\": \"#ffeb3b\"\n      },\n      \"id\": \"comment_1788071114386_wlr6pqrs0\",\n      \"startOffset\": 732,\n      \"endOffset\": 735\n    },\n    {\n      \"type\": \"selection\",\n      \"comment\": \"不要\",\n      \"timestamp\": \"2026-08-30T06:25:32.897Z\",\n      \"selectedText\": \"```\",\n      \"highlightColor\": {\n        \"bg\": \"rgba(255, 235, 59, 0.3)\",\n        \"border\": \"#FFEB3B\",\n        \"name\": \"#ffeb3b\"\n      },\n      \"id\": \"comment_1788071132897_ao8mkx9ko\",\n      \"startOffset\": 1071,\n      \"endOffset\": 1074\n    },\n    {\n      \"type\": \"selection\",\n      \"comment\": \"ズレ\",\n      \"timestamp\": \"2026-08-30T06:25:40.801Z\",\n      \"selectedText\": \"3分前 │──┐\",\n      \"highlightColor\": {\n        \"bg\": \"rgba(255, 235, 59, 0.3)\",\n        \"border\": \"#FFEB3B\",\n        \"name\": \"#ffeb3b\"\n      },\n      \"id\": \"comment_1788071140801_egxp7t9ye\",\n      \"startOffset\": 887,\n      \"endOffset\": 895\n    }\n  ],\n  \"summary\": \"Feedback Summary (3 comments):\\n\\nSpecific Text Comments:\\n1. \\\"```\\\": 不要\\n2. \\\"```\\\": 不要\\n3. \\\"3分前 │──┐\\\": ズレ\\n\",\n  \"timestamp\": \"2026-08-30T06:25:43.276Z\"\n}",
+  "respondedAt": "2026-08-30T06:25:43.316Z",
+  "comments": [
+    {
+      "type": "selection",
+      "comment": "不要",
+      "timestamp": "2026-08-30T06:25:14.386Z",
+      "selectedText": "```",
+      "highlightColor": {
+        "bg": "rgba(255, 235, 59, 0.3)",
+        "border": "#FFEB3B",
+        "name": "#ffeb3b"
+      },
+      "id": "comment_1788071114386_wlr6pqrs0",
+      "startOffset": 732,
+      "endOffset": 735
+    },
+    {
+      "type": "selection",
+      "comment": "不要",
+      "timestamp": "2026-08-30T06:25:32.897Z",
+      "selectedText": "```",
+      "highlightColor": {
+        "bg": "rgba(255, 235, 59, 0.3)",
+        "border": "#FFEB3B",
+        "name": "#ffeb3b"
+      },
+      "id": "comment_1788071132897_ao8mkx9ko",
+      "startOffset": 1071,
+      "endOffset": 1074
+    },
+    {
+      "type": "selection",
+      "comment": "ズレ",
+      "timestamp": "2026-08-30T06:25:40.801Z",
+      "selectedText": "3分前 │──┐",
+      "highlightColor": {
+        "bg": "rgba(255, 235, 59, 0.3)",
+        "border": "#FFEB3B",
+        "name": "#ffeb3b"
+      },
+      "id": "comment_1788071140801_egxp7t9ye",
+      "startOffset": 887,
+      "endOffset": 895
+    }
+  ]
+}

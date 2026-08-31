@@ -1,6 +1,6 @@
 {
   "filePath": ".spec-workflow/steering/tech.md",
-  "currentVersion": 8,
+  "currentVersion": 9,
   "snapshots": [
     {
       "version": 1,
@@ -65,6 +65,14 @@
       "trigger": "approved",
       "approvalId": "approval_1787768173259_hqifrddbu",
       "approvalTitle": "API Design Principles を1項目に畳む（規約1つ + 範囲・例外を同項目に）"
+    },
+    {
+      "version": 9,
+      "filename": "snapshot-009.json",
+      "timestamp": "2026-08-30T07:56:20.907Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787867225338_o51e3q1ac",
+      "approvalTitle": "tech.md — 通す門番の規約を追加（move-conventions-to-steering）"
     }
   ]
 }

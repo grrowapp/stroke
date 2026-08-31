@@ -1,0 +1,14 @@
+{
+  "filePath": "openspec/changes/show-pending-project-in-list/specs/project/generation/spec.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-29T16:41:01.419Z",
+      "trigger": "initial",
+      "approvalId": "approval_1788021659247_dy870sqdt",
+      "approvalTitle": "show-pending-project-in-list の project/generation delta"
+    }
+  ]
+}

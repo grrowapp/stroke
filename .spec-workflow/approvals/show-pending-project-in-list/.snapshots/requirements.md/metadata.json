@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/show-pending-project-in-list/requirements.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-29T16:51:23.867Z",
+      "trigger": "initial",
+      "approvalId": "approval_1788022283139_z5wxkbpqc",
+      "approvalTitle": "show-pending-project-in-list の requirements"
+    }
+  ]
+}

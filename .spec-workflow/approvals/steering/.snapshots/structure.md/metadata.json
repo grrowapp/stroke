@@ -1,6 +1,6 @@
 {
   "filePath": ".spec-workflow/steering/structure.md",
-  "currentVersion": 10,
+  "currentVersion": 11,
   "snapshots": [
     {
       "version": 1,
@@ -81,6 +81,14 @@
       "trigger": "approved",
       "approvalId": "approval_1787603887802_x8x5kkbsf",
       "approvalTitle": "steering structure — ファイル配置を置き場ごとの節に分け、ファイル×説明の表に（置き場列を除去）"
+    },
+    {
+      "version": 11,
+      "filename": "snapshot-011.json",
+      "timestamp": "2026-08-30T07:56:22.200Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787867221069_6crtyoyx5",
+      "approvalTitle": "structure.md — テストの置き場の規約を追加（move-conventions-to-steering）"
     }
   ]
 }
