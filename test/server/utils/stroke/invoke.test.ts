@@ -98,16 +98,19 @@ function exposedToolsOf(kind: 'stroke' | 'steering'): string[] {
 describe('buildRun の --mcp-config', () => {
   it('flontier 工程の起動は steering 用のツールを公開しない', () => {
     expect(exposedToolsOf('stroke')).toEqual([
+      'get-guide',
       'get-overview',
       'get-strokes',
       'get-send-back',
       'send-question',
       'submit-document',
     ]);
+    expect(exposedToolsOf('stroke')).not.toContain('get-steering-guide');
   });
 
   it('steering 工程の起動は flontier 専用のツールを公開しない', () => {
-    expect(exposedToolsOf('steering')).toEqual(['get-steering', 'submit-document']);
+    expect(exposedToolsOf('steering')).toEqual(['get-steering-guide', 'get-steering', 'submit-document']);
+    expect(exposedToolsOf('steering')).not.toContain('get-guide');
   });
 
   it('submit-document は両工程で公開される', () => {

@@ -319,16 +319,18 @@ export default defineNuxtConfig({
       // スキル自身が持つ。初回も最低限の固定指示だけ、継続は続きを促すだけ
       // （入力は prompt に載せず、エージェントが取得ツールで読む）
       //
-      // 取得・提出の操作は stroke-board の MCP ツールが担い、手順の案内はスキルが担う
-      // （provide-operations-via-mcp tasks 4.7 の役割分担）。ただし**案内スキルの起動
-      // （`/openspec-ff-change`）は prompt から外してある。**
-      // `/openspec-ff-change` は実体が無く（`.claude/skills/` にも assets にも openspec の
-      // スキーマにも存在しない）、prompt の先頭に置くと `Unknown command` で初回起動が
-      // 何もせず終わる（実測 2026-08-27: assistant のターンがゼロで
-      // 「プロセスは成功したが提出が届かない」になり、巡回の再起動が毎回拾っていた）。
-      // 案内スキルを用意し直す話は本 change の範囲外なので、起動だけを外した
-      firstPrompt: 'stroke-board の MCP ツールで内容を確認し、作業しろ',
-      continuePrompt: '続きを進めろ。状況は stroke-board の MCP ツールで確認してから判断しろ。',
+      // 取得・提出の操作も手順の案内も stroke-board の MCP ツールが担う。案内は
+      // `get-guide`（adr0016-sub-create-flontier-guidance-mcp-tool）で、手順の本文は
+      // `server/mcp/tools/get-guide.ts` の定数が正である。**prompt に手順そのものを
+      // 書かない**——本文が設定とコードの2箇所になり、片方だけが古くなる。
+      //
+      // かつては案内をスキルが担う分担で `/openspec-ff-change` を prompt の先頭に置いて
+      // いたが、**実体が無かった**（`.claude/skills/` にも assets にも openspec のスキーマ
+      // にも存在しない）。`Unknown command` で初回起動が何もせず終わる（実測 2026-08-27:
+      // assistant のターンがゼロで「プロセスは成功したが提出が届かない」になり、巡回の
+      // 再起動が毎回拾っていた）。実在するツールを指す形に置き換えたのがいまの定型である
+      firstPrompt: 'stroke-board の MCP ツール get-guide で進め方を読み、そのとおりに作業しろ。',
+      continuePrompt: '続きを進めろ。stroke-board の MCP ツール get-guide で進め方を読み直し、状況を確認してから判断しろ。',
 
       // 承認で昇格した直後に steering 文書を作らせる定型（ADR 0011）。cwd は昇格先の
       // プロジェクトで、--mcp-config は呼び出し側がそこから組み立てて足す。
@@ -340,11 +342,12 @@ export default defineNuxtConfig({
       // 5.2 の残り2ツール（get-steering / submit-document の steering 種別）が一度も
       // 呼ばれなかったのはこれによる（santa-method レビュー指摘 4周目 2026-08-30）。
       //
-      // 取得・提出は MCP ツールが担うので、案内スキルが無くても往復は成立する。案内を
-      // 配り直す話は別 change（`adr0016-sub-create-steering-guidance-mcp-tool`）。
+      // 取得・提出も案内も MCP ツールが担う。案内は `get-steering-guide`
+      // （adr0016-sub-create-steering-guidance-mcp-tool）で、手順の本文は
+      // `server/mcp/tools/get-steering-guide.ts` の定数が正である。
       // write-steering（v2 でない方）は対話インタビュー（grill）を含み、無人実行では
       // 進まないため使わない
-      steeringPrompt: 'stroke-board の MCP ツールで steering 文書の状況を確認し、product / tech / structure を作成しろ。',
+      steeringPrompt: 'stroke-board の MCP ツール get-steering-guide で進め方を読み、そのとおりに steering 文書を作成しろ。',
 
       // 失敗した実行を起こし直す回数の上限。上限に達したら起動せず invocation を
       // error（終端）にする。総待ち時間は下の2件と合わせて決まる

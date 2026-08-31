@@ -21,6 +21,7 @@ function toolsOf(phase: 'flontier' | 'steering'): string[] {
 describe('exposedToolsHeaderValue', () => {
   it('flontier 工程は steering 専用のツールを公開しない', () => {
     expect(toolsOf('flontier')).toEqual([
+      'get-guide',
       'get-overview',
       'get-strokes',
       'get-send-back',
@@ -28,13 +29,21 @@ describe('exposedToolsHeaderValue', () => {
       'submit-document',
     ]);
     expect(toolsOf('flontier')).not.toContain('get-steering');
+    expect(toolsOf('flontier')).not.toContain('get-steering-guide');
   });
 
   it('steering 工程は flontier 専用のツールを公開しない', () => {
-    expect(toolsOf('steering')).toEqual(['get-steering', 'submit-document']);
-    for (const tool of ['get-overview', 'get-strokes', 'get-send-back', 'send-question']) {
+    expect(toolsOf('steering')).toEqual(['get-steering-guide', 'get-steering', 'submit-document']);
+    for (const tool of ['get-guide', 'get-overview', 'get-strokes', 'get-send-back', 'send-question']) {
       expect(toolsOf('steering')).not.toContain(tool);
     }
+  });
+
+  it('案内のツールは工程ごとに別で、互いの工程には出ない', () => {
+    // 1本で工程を見分けて出し分ける形は採らない。工程の食い違いをツールの中で
+    // 判定して失敗を返す形は、get-steering で実測が破綻を示している（51回中48回が 500）
+    expect(toolsOf('flontier')).toContain('get-guide');
+    expect(toolsOf('steering')).toContain('get-steering-guide');
   });
 
   it('submit-document は種別引数で振り分けるので両工程に出る', () => {

@@ -24,10 +24,15 @@ export type McpToolPhase = 'flontier' | 'steering'
  * `name` を宣言していないので、ファイル名を変えたらここも変わる。
  *
  * `submit-document` は種別引数で振り分けるツールなので両方に出る。
+ *
+ * 案内のツール（`get-guide` / `get-steering-guide`）を先頭に置くのは、`tools/list` の
+ * 並びがこの順になるためである。「まずこれを呼べ」と description に書いてあるものが
+ * 一覧の末尾に出るより、先頭に出るほうが読み落としが減る。**並びは保証ではない**
+ * （呼ぶ順を決めるのは呼び手である）ので、順序に依存する判定を足さないこと。
  */
 const EXPOSED_TOOLS: Record<McpToolPhase, readonly string[]> = {
-  flontier: ['get-overview', 'get-strokes', 'get-send-back', 'send-question', 'submit-document'],
-  steering: ['get-steering', 'submit-document'],
+  flontier: ['get-guide', 'get-overview', 'get-strokes', 'get-send-back', 'send-question', 'submit-document'],
+  steering: ['get-steering-guide', 'get-steering', 'submit-document'],
 }
 
 /** `x-mcp-tools` に載せる値。モジュールは `,` で分割し、前後の空白を落とす。 */
