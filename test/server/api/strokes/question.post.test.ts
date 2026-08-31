@@ -57,8 +57,11 @@ describe('A5 POST /api/strokes/:id/question', () => {
 
     const body = await questionHandler(event as never);
 
-    expect(event.status).toBe(204);
-    expect(body).toBeNull();
+    // ハンドラは status を自分で持った Response を返す（`setResponseStatus` + 裸の null は
+    // h3 に捨てられる）。観測点は event ではなく返り値である
+    expect(body).toBeInstanceOf(Response);
+    expect((body as Response).status).toBe(204);
+    expect(await (body as Response).text()).toBe('');
   });
 
   it('受理した問いを state へ残す', async () => {
