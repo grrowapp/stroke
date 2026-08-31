@@ -11,6 +11,7 @@ import {
   UPSTREAM_MCP_SERVER_NAME,
   withMcpToolsAllowed,
 } from '../mcp/allowed-tools'
+import { readServerConfig } from '../config'
 import { issueConnectionToken, registerConnection, removeConnection } from '../mcp/connection-table'
 import { exposedToolsHeaderValue, MCP_TOOLS_HEADER, type McpToolPhase } from '../mcp/exposed-tools'
 
@@ -234,6 +235,22 @@ function mcpToolConfigFor(token: string, apiBaseUrl: string): string {
  *
  * `--mcp-config` は JSON 文字列を直接受け取れる（実機確認済み・design.md D7）。
  * 生成先のプロジェクトをそのままワークスペースとして渡す。
+ *
+ * **`SPEC_WORKFLOW_HOME` を渡す。これが無いと steering 工程は成立しない。**
+ * 本家 MCP は起動時に「どのプロジェクトが動いているか」の登録簿へ自分を書き込み、
+ * dashboard の `GET /api/projects/list` はその登録簿を読む。登録簿の場所は
+ * `SPEC_WORKFLOW_HOME` が決め、未設定なら `~/.spec-workflow-mcp` になる。
+ *
+ * dashboard は `/opt/projects/.spec-workflow-mcp` を見て動いているのに、claude が起こす
+ * 側は環境変数を継がず既定の場所へ書いていた。**別々の登録簿に書いて読んでいた**ので、
+ * 昇格したてのプロジェクトは何度起こしても一覧に現れず、`get-steering` /
+ * `submit-document`（steering）は `project_not_registered` を返し続けていた
+ * （実測 2026-08-31: 本家 MCP は `connected` で「Project registered」も出しているのに、
+ * dashboard の一覧にも `/opt/projects/.spec-workflow-mcp/activeProjects.json` にも
+ * 現れない。手で起こして突き合わせて確かめた）。
+ *
+ * 値は**ポータル側が読んでいるものと同じ1つ**を使う（`readServerConfig`）。ここで
+ * 別の解決規則を書くと、また読み手と書き手が割れる。
  */
 function mcpConfigFor(cwd: string, token: string, apiBaseUrl: string): string {
   return JSON.stringify({
@@ -242,6 +259,7 @@ function mcpConfigFor(cwd: string, token: string, apiBaseUrl: string): string {
         type: 'stdio',
         command: 'npx',
         args: ['-y', '@pimzino/spec-workflow-mcp@latest', cwd],
+        env: { SPEC_WORKFLOW_HOME: readServerConfig().specWorkflowHome },
       },
       [MCP_SERVER_NAME]: mcpToolServerEntry(token, apiBaseUrl, 'steering'),
     },

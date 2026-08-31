@@ -41,6 +41,19 @@ vi.mock('../../../../server/utils/stroke/config', () => ({
   },
 }));
 
+/**
+ * ポータル側の設定。`readServerConfig` は `useRuntimeConfig()` を通るので、Nitro の外では
+ * 解決できない。ここで見たいのは**その値が本家 MCP の `env` に載ること**だけである
+ */
+vi.mock('../../../../server/utils/config', () => ({
+  readServerConfig: () => ({
+    upstreamBaseUrl: 'http://example.test:5000',
+    projectsParentPath: '/tmp/share',
+    specWorkflowHome: '/tmp/share/.spec-workflow-mcp',
+    syncIntervalMs: 30000,
+  }),
+}));
+
 /** 実行そのものは差し替える。見たいのは `kick` の前後の後始末だけである */
 const ai = vi.hoisted(() => ({ invokeAi: vi.fn<(sessionId: string, run: unknown) => Promise<void>>() }));
 
@@ -72,8 +85,28 @@ function registered(token: string): ConnectionContext | null {
 const { buildRun, kick } = await import('../../../../server/utils/stroke/invoke');
 
 type McpConfig = {
-  mcpServers: Record<string, { url: string, headers: Record<string, string> }>,
+  mcpServers: Record<string, {
+    url?: string,
+    headers?: Record<string, string>,
+    command?: string,
+    args?: string[],
+    env?: Record<string, string>,
+  }>,
 };
+
+/** 起動 args から `--mcp-config` の JSON をまるごと取り出す。 */
+function mcpConfigOf(kind: 'stroke' | 'steering'): McpConfig {
+  const run = buildRun({
+    sessionId: 'session-1',
+    cwd: '/tmp/share/session-1',
+    kind,
+    retries: 0,
+    token: 'token-1',
+  });
+  const at = run.launch.args.indexOf('--mcp-config');
+  expect(at).not.toBe(-1);
+  return JSON.parse(run.launch.args[at + 1]!) as McpConfig;
+}
 
 /** 起動 args から `--mcp-config` の JSON を取り出し、自前 MCP サーバーのエントリを返す。 */
 function mcpToolServerEntryOf(kind: 'stroke' | 'steering') {
@@ -111,6 +144,23 @@ describe('buildRun の --mcp-config', () => {
   it('steering 工程の起動は flontier 専用のツールを公開しない', () => {
     expect(exposedToolsOf('steering')).toEqual(['get-steering-guide', 'get-steering', 'submit-document']);
     expect(exposedToolsOf('steering')).not.toContain('get-guide');
+  });
+
+  it('本家 MCP に SPEC_WORKFLOW_HOME を渡す（渡さないと steering 工程が成立しない）', () => {
+    // 本家 MCP は起動時に「動いているプロジェクト」の登録簿へ自分を書き、dashboard の
+    // 一覧はその登録簿を読む。場所を決めるのがこの環境変数で、未設定だと既定の
+    // `~/.spec-workflow-mcp` へ書く。**書き手と読み手が別の登録簿を見ていた**ので、
+    // 昇格したてのプロジェクトは一覧に現れず `project_not_registered` が返り続けていた
+    // （実測 2026-08-31）
+    const upstream = mcpConfigOf('steering').mcpServers['specworkflow']!;
+
+    expect(upstream.env).toEqual({ SPEC_WORKFLOW_HOME: '/tmp/share/.spec-workflow-mcp' });
+    // ポータルが読む値と同じ1つを使う。ここで別の解決規則を書くとまた割れる
+    expect(upstream.args).toEqual(['-y', '@pimzino/spec-workflow-mcp@latest', '/tmp/share/session-1']);
+  });
+
+  it('flontier 工程には本家 MCP を渡さない', () => {
+    expect(Object.keys(mcpConfigOf('stroke').mcpServers)).toEqual([MCP_SERVER_NAME]);
   });
 
   it('submit-document は両工程で公開される', () => {
