@@ -28,8 +28,8 @@ export type McpToolPhase = 'flontier' | 'steering'
  * 案内のツール（`get-guide` / `get-steering-guide`）を先頭に書いてあるのは**読みやすさの
  * ためだけ**である。`tools/list` の並びには効かない——モジュールはヘッダを `Set` に変換して
  * 含有判定にしか使わず、出力は `config.tools` の登録順のままになる
- * （`filter-tools-header.js`）。その登録順もファイルの走査順で、名前順ですらない。
- * **順序に意味を持たせないこと。** 「まず案内を呼べ」を伝えるのは description の役目である。
+ * （`filter-tools-header.js`）。**順序に意味を持たせないこと。**
+ * 「まず案内を呼べ」を伝えるのは description の役目である。
  */
 const EXPOSED_TOOLS: Record<McpToolPhase, readonly string[]> = {
   flontier: ['get-guide', 'get-overview', 'get-strokes', 'get-send-back', 'send-question', 'submit-document'],

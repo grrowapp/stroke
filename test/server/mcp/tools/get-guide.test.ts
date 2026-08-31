@@ -90,6 +90,8 @@ describe('get-guide', () => {
     // 正の表記は `.describe()` の「12文字以内」なので、**その表記で捕まえる**。
     // 「字」だけを見ていると、書き写しの最も起こりやすい形をすり抜ける
     expect(guide).not.toMatch(/12\s*(字|文字)|300\s*(字|文字)|20\s*(字|文字)|50\s*(字|文字)/);
+    // 上限は長さだけではない。件数（「1件以上5件以内」）も同じく `.describe()` が正である
+    expect(guide).not.toMatch(/\d\s*件(以上|以内|まで)/);
     removeConnection(token);
   });
 

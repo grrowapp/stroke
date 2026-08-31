@@ -87,7 +87,7 @@ ticket の tags が enhancement のもの。新しい口・選べる幅を増や
 
 **対応内容** — ワークフロースキーマ `flontier-strokeflow` の instruction を、スキル呼び出しから MCP ツールの利用指示へ書き換える。名前の一致に依存しない形にする。
 
-instruction は `/get-overview` `/get-strokes` `/get-send-back` というスラッシュコマンド形式で書かれているが、**指す実体はもう無い**。操作系スキルは `--add-dir` から外してありロードされない（親 change の tasks 4.9）。それでも往復が成立しているのは、**MCP ツール名がスキル名とたまたま一致しているため**である。実測 2026-08-29（セッション `d823166d-…`）では往復6回・proposal 提出・差し戻しからの出し直しまで通っており、現時点で実害は出ていない。ただしこれは偶然に依存しており、ツール名を変えた瞬間に壊れる。
+instruction は `/get-overview` `/get-strokes` `/get-send-back` というスラッシュコマンド形式で書かれているが、**指す実体はもう無い**。操作系スキルは `--add-dir` から外してありロードされず、その後**撤去した**（`adr0016-sub-switch-workflow-to-mcp-tools`）。それでも往復が成立しているのは、**MCP ツール名がスキル名とたまたま一致しているため**である。実測 2026-08-29（セッション `d823166d-…`）では往復6回・proposal 提出・差し戻しからの出し直しまで通っており、現時点で実害は出ていない。ただしこれは偶然に依存しており、ツール名を変えた瞬間に壊れる。
 
 **元の proposal から2項目を落とした**（2026-08-29 時点）。`--allowedTools` から取得系の許可を外す件は親 change の tasks 4.5 / 4.6 で**実施済み**（現在の値は `Skill Bash(openspec *) Read Edit Write` で、MCP 分は `server/utils/mcp/allowed-tools.ts` の `withMcpToolsAllowed` が `mcp__stroke-board` を追記する）。旧スキル一式の撤去は**不要**になった（ユーザー 2026-08-29「スキルを残したのは基本的には guidance の作成のため」。ロードさせない制御は `--add-dir` 側で行っている）。残るのは instruction の書き換えだけである。
 

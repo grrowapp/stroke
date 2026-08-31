@@ -28,7 +28,9 @@ import { defineConfig } from '@playwright/test';
 const PORT_SLOT: Record<string, number> = {
   base: 1,
   base2: 2,
-  // 3 は欠番。slot 3 の APP_PORT が dev サーバーの固定ポート 3399 と被るため（CLAUDE.md の Dev サーバー）
+  // 3 は欠番。slot 3 の APP_PORT が dev サーバーの既定ポート 3399 と被るため（CLAUDE.md の Dev サーバー）。
+  // **既定であって固定ではない。** 並走のために dev をずらした worktree では、そのポートが
+  // 別の slot の APP_PORT と衝突しうる（欠番表は 3399 しか避けていない）
   base4: 4,
   mvp: 5,
   base3: 6,

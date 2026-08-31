@@ -30,7 +30,9 @@ server/mcp/tools/                                      MCP ツール8本（フ�
 └── send-question.ts / submit-document.ts              提出
 ```
 
-`assets/.claude/skills/` の旧セッション API スキルは**撤去した**。`--add-dir` を渡さない以上 claude には届かず、代行先はすべて MCP ツールになっている。残してあるのは `template/` だけで、案内ツールの本文が挙げる「その文書に何を書くか」の出どころとして使う。
+`assets/.claude/skills/` の旧セッション API スキルは**撤去した**。`--add-dir` を渡さない以上 claude には届かず、代行先はすべて MCP ツールになっている。
+
+残っているのは `template/`（本家由来の文書の雛形）だけで、**いまこれを読む者も居ない**。撤去の対象は「代行先が MCP ツールになった操作系スキル」に限ったので範囲外として残しただけで、要否は判断していない。
 
 セッションに属するものは、セッションディレクトリ1箇所に収まる。**セッションと昇格した
 プロジェクトは同じ親（`projectShareRoot`）の下に並ぶ。** 承認はこの親の下での改名だけで
@@ -48,16 +50,26 @@ server/mcp/tools/                                      MCP ツール8本（フ�
 | 作業場所 | — | cwd だけ。`--add-dir` は渡さない |
 | steering の定型 | `runtimeConfig.claude.steeringPrompt` | 承認の直後、cwd＝生成先で起こすときに渡る |
 
-ストローク側の設定は**環境変数から読まない**。値は `nuxt.config.ts` と `app/app.config.ts` に
-書かれたものだけで、読み口は `server/utils/stroke/config.ts` の1本である。一覧は
-`docs/specs/core/settings-reference.md`。
+ストローク側の設定を**コードが環境変数から読むことはしない**。値は `nuxt.config.ts` と
+`app/app.config.ts` に書かれたものだけで、読み口は `server/utils/stroke/config.ts` の1本である。
+一覧は `docs/specs/core/settings-reference.md`。
 
-**例外が1つある。** steering 工程の `--mcp-config` に載せる `SPEC_WORKFLOW_HOME` は、
-ポータル側の `specWorkflowHome`（`server/utils/config.ts`）から取る。この値だけは環境変数
-`NUXT_SPEC_WORKFLOW_HOME` で上書きされうる（E2E がそうしている）。**同じ1つを使うことが
-目的**である——本家 MCP が登録簿を書く場所と、ポータルが登録簿を読む場所が割れると、
-昇格したプロジェクトが本家の一覧に現れず steering 工程が成立しない。ここで別の解決規則を
-書くと、また書き手と読み手が割れる。
+**「環境変数が効かない」という意味ではない。** 次の3つは事実として押さえておくこと。
+
+1. **`runtimeConfig` は全キーが `NUXT_*` で上書きされうる。** Nitro は `useRuntimeConfig()` の
+   たびに `applyEnv` をツリー全体へ掛ける（`nitropack/dist/runtime/internal/config.mjs`。
+   この worktree のビルド出力にも `envPrefix: "NUXT_"` が入る）。`NUXT_CLAUDE_COMMAND` も
+   `NUXT_CLAUDE_API_BASE_URL` も効く。**コードが読まないだけで、値は差し替えられる**
+2. **子プロセスは親の環境を丸ごと継ぐ。** `server/utils/stroke/claude.ts` が
+   `env: { ...process.env, STROKE_BASEURL: … }` で spawn する
+3. **steering 工程はポータル側の設定を2つ使う。** `--mcp-config` に載せる
+   `SPEC_WORKFLOW_HOME`（`specWorkflowHome`）と、本家 REST の宛先
+   `upstreamBaseUrl`（`server/utils/mcp/upstream-fetch.ts`）である。**どちらもずらすと
+   steering 工程が成立しない**——前者は本家 MCP が登録簿を書く場所とポータルが読む場所を
+   割り、後者は代行先そのものを失う
+
+`specWorkflowHome` をポータル側と共有しているのは、**書き手と読み手が同じ1つを見ることが
+目的**だからである。ここで別の解決規則を書くと、また割れる。
 
 セッション作成（`server/utils/stroke/session-core.ts`）は「ディレクトリ作成 → `openspec init --tools none` → `config.yaml` 上書き → 状態ファイル書き込み」。**サーバは change を作らない**。
 

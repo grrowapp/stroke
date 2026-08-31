@@ -45,9 +45,10 @@
 ## Dev サーバー
 
 - 起動・ビルドなどの実行は **package.json の scripts 経由**（`yarn dev` / `yarn build` / `yarn test` …）で行う。`node .output/server/index.mjs` のような直接起動をしない
-- ポートは **worktree ごとにずらす**（並走のため。3399 は develop 系の値で、固定ではない）。同じ値が2箇所にある — ストロークの `claude.apiBaseUrl`（正は `docs/specs/core/settings-reference.md`）と `nuxt.config.ts` の `devServer.port`（起動時のビルド設定でストローク側設定ではないため settings-reference の対象外。`nuxt.config.ts` が実体）。**変えるときは必ず両方を揃えて変える**——片方だけ変えると、起動した claude は開いていないポートへ MCP 接続を試みる
+- ポートの既定は **3399**（8本中7本の worktree がこの値）。**固定ではなく、並走させる worktree はずらす**（pre5 は 3599）。同じ値が2箇所にある — ストロークの `claude.apiBaseUrl`（正は `docs/specs/core/settings-reference.md`）と `nuxt.config.ts` の `devServer.port`（起動時のビルド設定でストローク側設定ではないため settings-reference の対象外。`nuxt.config.ts` が実体）。**変えるときは必ず両方を揃えて変える**——片方だけ変えると、起動した claude は開いていないポートへ MCP 接続を試みる
 - 3000 はこのマシンで別のプロセスが使用中。使わない。5000 は本家 spec-workflow の dashboard
-- E2E の PORT_SLOT（`playwright.config.ts`）は worktree のディレクトリ名から slot を引き、STUB_PORT と APP_PORT を決める。slot 3 は欠番（APP_PORT が dev の 3399 と被るため）。例: worktree `base3` は slot 6 → STUB 5699 / APP 3699
+- E2E の PORT_SLOT（`playwright.config.ts`）は worktree のディレクトリ名から slot を引き、STUB_PORT と APP_PORT を決める。slot 3 は欠番（APP_PORT が既定の dev ポート 3399 と被るため）。例: worktree `base3` は slot 6 → STUB 5699 / APP 3699
+  - **欠番表は 3399 しか避けていない。** dev をずらした worktree では、そのポートが別 slot の APP_PORT と衝突しうる（pre5 の 3599 は slot 5 の APP_PORT と同じ）。dev と E2E を同時に走らせるときは確かめること
 
 ## Worktree 運用
 

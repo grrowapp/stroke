@@ -73,7 +73,7 @@ const { projectShareRoot, claude } = config.runtimeConfig
 
 **同じポートが2箇所にある。** ここと `nuxt.config.ts` の `devServer.port` で、**変えるときは必ず両方を揃えて変える**。片方だけ変えると、起動した claude は開いていないポートへ MCP 接続を試みる。
 
-値を1つに固定して書かない。worktree を並走させるときは worktree ごとにずらすためで、実際に同じ値を使っている worktree は無い。`devServer.port` はビルド設定でありストローク側設定ではないので、この資料の対象は `claude.apiBaseUrl` の側だけである（実体は `nuxt.config.ts`）。
+値を1つに固定して書かない。worktree を並走させるときはずらす必要があるからである。**ずらしているのは並走する worktree だけで、多くはそのまま 3399 を使っている**（実測 2026-08-31: 8本中7本が 3399、pre5 だけが 3599）。「固定値」ではなく「揃えるべき2箇所」として扱うこと。`devServer.port` はビルド設定でありストローク側設定ではないので、この資料の対象は `claude.apiBaseUrl` の側だけである（実体は `nuxt.config.ts`）。
 
 ### `claude.firstPrompt` ・ `claude.continuePrompt` ・ `claude.steeringPrompt`
 
@@ -192,7 +192,7 @@ AI へ渡す定型。**手順の本文をここに書かない。** 手順は MC
 | 失敗した実行を起こし直す巡回の間隔 | `server/plugins/01.retry-failed.ts` |
 | ログの接頭辞 | `server/utils/stroke/log.ts` |
 
-`STROKE_BASEURL` は**こちらが読む設定ではなく、子プロセスへ渡す名前**である。かつてはセッション API スキルがこの名前で接続先を読んでいたが、**読み手はもう居ない**——操作系スキルは `--add-dir` を外したのでロードされず、`curl` / `printenv` も `--allowedTools` から落ちている。渡すのをやめるかどうかは別途判断する。
+`STROKE_BASEURL` は**こちらが読む設定ではなく、子プロセスへ渡す名前**である。かつてはセッション API スキルがこの名前で接続先を読んでいたが、**読み手はもう居ない**——操作系スキルは `--add-dir` を外したうえで撤去され、`curl` / `printenv` も `--allowedTools` から落ちている。渡すのをやめるかどうかは別途判断する。
 
 いま子プロセスへ接続先が届く経路は `--mcp-config` の url（`<apiBaseUrl>/mcp`）である。
 
@@ -200,6 +200,10 @@ AI へ渡す定型。**手順の本文をここに書かない。** 手順は MC
 
 `upstreamBaseUrl` / `specWorkflowHome` / `syncIntervalMs` の3件はこの資料に未統合で、現状は環境変数から読む。README の「設定（ポータル側）」を参照。一本化は別 change で行う。
 
+**ここに無い値でも、環境変数が効かないわけではない。** `runtimeConfig` は Nitro が `useRuntimeConfig()` のたびに `applyEnv` を掛けるので、**全キーが `NUXT_*` で上書きされうる**（`NUXT_CLAUDE_COMMAND` など）。この資料が定めているのは「**コードが環境変数を読みに行かない**」ことと「値の実体を `nuxt.config.ts` に置く」ことであって、外から差し替えられないことではない。差し替えられたときに何が起きるかは、各項目の説明が持つ。
+
 **ただし `specWorkflowHome` はポータル専用ではない。** steering 工程の起動が組み立てる `--mcp-config` に、本家 MCP 向けの環境変数 `SPEC_WORKFLOW_HOME` としてこの値が載る（`server/utils/stroke/invoke.ts` の `mcpConfigFor`）。本家 MCP はここで指した場所の登録簿へ「動いているプロジェクト」として自分を書き、ポータルは同じ場所を読む。**ずらすと書き手と読み手が割れ、昇格したプロジェクトが本家の一覧に現れず、steering 工程の取得・提出が `project_not_registered` で全滅する**（実測 2026-08-31）。`NUXT_SPEC_WORKFLOW_HOME` を変えるときは、本家 dashboard の `SPEC_WORKFLOW_HOME` と揃っていることを確かめること。
+
+`upstreamBaseUrl` も同じく steering 工程に効く。`get-steering` と `submit-document`（steering 種別）の代行先そのものなので、ずらせば工程は成立しない（`server/utils/mcp/upstream-fetch.ts`）。
 
 `projectsParentPath` は廃止した。ストローク側の保存先と同じ場所を指す必要があるため、上の `projectShareRoot` に畳んである。
