@@ -35,8 +35,9 @@
  */
 import { MDCRenderer } from '#components';
 import { useTemplateRef } from '#imports';
-import { provide } from 'vue';
+import { computed, provide } from 'vue';
 
+import { createSourceMapping } from '../position/normalize';
 import { createPreviewPositionPort } from '../position/preview';
 import { markSourcePosition } from '../position/source-span';
 import { SOURCE_SHOWN_KEY } from './source-shown';
@@ -82,8 +83,7 @@ const props = withDefaults(
  *
  * **props では届かない。** MDC は `components.map` の値を `resolveComponent` で引いて
  * `MarkdownFence` を自分で作るので、本文の器から props を渡す経路が無い。
- */
-/**
+ *
  * **降ろす前に解析側の座標へ写す。**
  *
  * 受け取る範囲は `props.value` を基準にしている（`../position/types.ts`）。一方、
@@ -93,10 +93,17 @@ const props = withDefaults(
  * **写せない範囲は落とす。推測で添えない**（`readFenceRange` が読めないときに図だけを
  * 出す既存の構えと同じ）。写像そのものが作れないときは全部落ちる。
  */
+/**
+ * **写像は本文にだけ従わせる。** 範囲と同じ `computed` に入れると、範囲が差し替わるたびに
+ * `parseFrontMatter` を含む写像づくりが走り直す。範囲を渡すのは注釈を持つ側なので、
+ * 指摘の増減のたびに解析が回ることになる。
+ */
+const mapping = computed(() => createSourceMapping(props.value ?? ''));
+
 const shownInParsed = computed<readonly SourceRange[]>(() => {
-  const mapping = createSourceMapping(props.value ?? '');
-  if (!mapping) return [];
-  return props.sourceShown.map((range) => mapping.toParsed(range)).filter((r) => r !== null);
+  const current = mapping.value;
+  if (!current) return [];
+  return props.sourceShown.map((range) => current.toParsed(range)).filter((r) => r !== null);
 });
 
 provide(SOURCE_SHOWN_KEY, () => shownInParsed.value);

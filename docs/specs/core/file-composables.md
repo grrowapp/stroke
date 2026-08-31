@@ -336,7 +336,11 @@ useAnnotations() → { comments, addSelection, addGeneral, update, remove, clear
 
 ハイライト5色の定義（`highlightColors`）を持っていて、`CommentModal.vue` が直接 import している。**composable が色の定義も兼ねている。**
 
-注釈は生テキストへの文字オフセット（`startOffset` / `endOffset`）と引用文字列で持つ。
+注釈は文字オフセット（`startOffset` / `endOffset`）と引用文字列で持つ。
+
+**基準は、本家から取得した文書の中身そのものである。** 整形して読むために内部で行う作り変え（CRLF を LF へ潰す・先頭の front matter を落とす）の後の文字列を基準にしてはならない。オフセットは本家へ送られて保存され、系の中で唯一それを文書へ当てる実装（本家ダッシュボードの SPA）は、正規化せずに読んだファイルへ当てる。基準がずれた値は「長さの範囲内で、開始が終了より前」という妥当性の判定を通ってしまうため、弾かれずに別の場所を指す。
+
+食い違いを吸収するのは markdown を描く面の内側であり、`useAnnotations` を呼ぶ側が渡す前に文字列を揃える手続きは持たない（`openspec/specs/markdown/module`「面は解析のための正規化を自分で吸収する」）。
 
 ### `useAgentQuestion.ts`（132行）
 
