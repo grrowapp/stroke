@@ -458,7 +458,11 @@ async function waitForNext(page: Page, previous: string | undefined): Promise<'q
   while (Date.now() < deadline) {
     if (page.url().includes('/proposal') || await proposal.count() > 0) { endProgress(); return 'proposal' }
     if (await question.count() > 0) {
-      const text = (await question.innerText()).trim()
+      // **`count()` の後に消えることがある。** 問いは待機に入ると画面から手放され
+      // （`useAgentQuestion` の決着）、その瞬間に読むと `innerText` が時間切れで落ちる
+      // （実測 2026-08-30: `locator.innerText: Timeout 30000ms exceeded`）。消えたのなら
+      // 待ち続ければよいだけなので、読めなかったことを失敗にしない
+      const text = (await question.innerText().catch(() => '')).trim()
       if (text !== '' && text !== previous) { endProgress(); return 'question' }
     }
 
@@ -675,7 +679,12 @@ async function approve(page: Page): Promise<string> {
  */
 async function waitForSteering(page: Page, projectName: string): Promise<boolean> {
   const url = `/projects/${projectName}/steering`
-  await page.goto(url)
+
+  // **入口の1回にも開き直しが要る。** 待ちのループには `RELOAD_INTERVAL_MS` の取り直しが
+  // 在るが、最初の `goto` が素通しだった。dev がモジュールを取り落とすと `load` が終わらず
+  // ここで落ち、**承認は通っているのに steering を一度も見られない**（実測 2026-08-30:
+  // `net::ERR_NETWORK_CHANGED`。承認まで到達した唯一の実行がここで止まった）
+  await openSteering(page, url)
 
   const available = page.getByTestId('steering-list').getByText('利用可')
   const deadline = Date.now() + ROUND_TIMEOUT_MS
@@ -692,7 +701,7 @@ async function waitForSteering(page: Page, projectName: string): Promise<boolean
     // 一覧は自動で追随しないので、取り直して読み直す
     if (Date.now() - reloadedAt > RELOAD_INTERVAL_MS) {
       endProgress()
-      await page.goto(url)
+      await openSteering(page, url)
       reloadedAt = Date.now()
       started = Date.now()
       notified = 0
@@ -714,6 +723,26 @@ async function waitForSteering(page: Page, projectName: string): Promise<boolean
   endProgress()
   console.log(`  steering 文書は ${await available.count()}/${STEERING_DOCUMENTS} で時間切れ`)
   return false
+}
+
+/**
+ * steering の一覧を開く。開けなければ開き直す。
+ *
+ * `openStrokes` と同じ事情である（dev がモジュールを取り落とすと `load` が終わらない）。
+ * ここで諦めると、承認まで通した実行の steering を一度も見られないまま落ちる。
+ * 一覧そのものは空でも出るので、待つのは `steering-list` が見えるところまで。
+ */
+async function openSteering(page: Page, url: string): Promise<void> {
+  for (let attempt = 1; attempt <= OPEN_ATTEMPTS; attempt++) {
+    const navigated = await page.goto(url).then(() => true).catch(() => false)
+    const shown = navigated && await page.getByTestId('steering-list')
+      .waitFor({ state: 'visible', timeout: 30_000 })
+      .then(() => true)
+      .catch(() => false)
+    if (shown) return
+    console.log(`  steering の一覧が出ない（${attempt}/${OPEN_ATTEMPTS}）。開き直す`)
+  }
+  throw new Error(`steering の一覧が ${OPEN_ATTEMPTS} 回開き直しても出なかった。dev サーバーの状態を疑う`)
 }
 
 /**
@@ -948,7 +977,8 @@ async function relaunch(page: Page, previous: string | undefined): Promise<void>
     if (await page.getByTestId('invocation-error').count() === 0) {
       const shown = page.getByTestId('agent-question-text')
       if (await shown.count() > 0) {
-        const text = (await shown.innerText()).trim()
+        // `count()` の後に消えることがある（`waitForNext` と同じ事情）
+        const text = (await shown.innerText().catch(() => '')).trim()
         if (text !== '' && text !== previous) { endProgress(); return }
       }
     }
@@ -979,7 +1009,7 @@ async function relaunch(page: Page, previous: string | undefined): Promise<void>
 async function launchFailure(page: Page): Promise<string | null> {
   for (const title of ['AI を起動できませんでした', '答えを送れませんでした', 'AI からの応答が得られませんでした']) {
     const shown = page.getByText(title, { exact: false })
-    if (await shown.count() > 0) return (await shown.first().innerText()).trim()
+    if (await shown.count() > 0) return (await shown.first().innerText().catch(() => '')).trim()
   }
   return null
 }
@@ -988,7 +1018,7 @@ async function launchFailure(page: Page): Promise<string | null> {
 async function answer(page: Page, policy: Policy, round: number): Promise<Round> {
   const text = async (id: string): Promise<string> => {
     const locator = page.getByTestId(id)
-    return await locator.count() > 0 ? (await locator.innerText()).trim() : ''
+    return await locator.count() > 0 ? (await locator.innerText().catch(() => '')).trim() : ''
   }
 
   const header = await text('agent-question-header')
