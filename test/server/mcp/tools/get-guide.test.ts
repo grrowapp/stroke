@@ -87,7 +87,9 @@ describe('get-guide', () => {
 
     const { guide } = await call({ 'x-stroke-token': token }) as { guide: string };
 
-    expect(guide).not.toMatch(/12字|300字|20字|50字/);
+    // 正の表記は `.describe()` の「12文字以内」なので、**その表記で捕まえる**。
+    // 「字」だけを見ていると、書き写しの最も起こりやすい形をすり抜ける
+    expect(guide).not.toMatch(/12\s*(字|文字)|300\s*(字|文字)|20\s*(字|文字)|50\s*(字|文字)/);
     removeConnection(token);
   });
 

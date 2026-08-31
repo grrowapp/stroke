@@ -131,7 +131,7 @@ export async function runClaude(options: ClaudeRunOptions): Promise<ClaudeRunRes
   return await new Promise<ClaudeRunResult>((resolve) => {
     // 接続先は prompt に載せず環境変数で渡す（design.md 決定7）。
     //
-    // **いまこの環境変数を読む者は居ない。** 読んでいた `assets/.claude/skills/` の
+    // **いまこの環境変数を読む者は居ない。** 読んでいた（撤去済みの）`assets/.claude/skills/` の
     // セッション API スキルは provide-operations-via-mcp tasks 4.9 で `--add-dir` から
     // 外れ、`printenv` も `--allowedTools` から落ちた。接続先が実際に子へ届くのは、
     // 呼び出し側が同じ `apiBaseUrl` から組み立てる `--mcp-config` の url の方である

@@ -259,9 +259,9 @@ export default defineNuxtConfig({
       //   `Edit` の deny は `/opt/projects/stroke-board/**` の絶対パスなので worktree には
       //   効かず、無人実行のエージェントがソースツリーへ書ける状態だった
       //
-      // 操作系スキル（`assets/.claude/skills/` の get-* / question / proposal）も同じく
-      // 届かなくなる。取得・提出は MCP ツールが担うので、スキル経由で真似る余地を残さない
-      // （provide-operations-via-mcp。santa-method レビュー指摘 5・6周目 2026-08-30）。
+      // 操作系スキルは同じく届かなくなり、その後**ファイルごと撤去した**
+      // （`adr0016-sub-switch-workflow-to-mcp-tools`）。取得・提出は MCP ツールが担うので、
+      // スキル経由で真似る余地を残さない。
       //
       // `--setting-sources` に user を含めないのは、開発者個人の設定
       // （~/.claude/CLAUDE.md）をエンドユーザーのセッションへ持ち込まないためである。
@@ -295,7 +295,7 @@ export default defineNuxtConfig({
         // `claude.ai Slack` / `Google Drive` / `Canva` など8本・約80ツールが、
         // `--allowedTools` に無いので**呼べないまま**エンドユーザーの実行に並んでいた。
         // 上の `--setting-sources` の注記（個人の設定を持ち込まない）と、工程ごとに
-        // 公開ツールを5本へ絞った意図（specs `mcp/server`「呼べないものを見せてから
+        // 公開ツールを工程ごとに絞った意図（specs `mcp/server`「呼べないものを見せてから
         // 失敗させない」）の両方を破っていた（santa-method レビュー指摘 5周目）
         '--strict-mcp-config',
       ],
@@ -307,8 +307,8 @@ export default defineNuxtConfig({
       //
       // spawn 時に環境変数 STROKE_BASEURL としても渡してはいる
       // （`server/utils/stroke/claude.ts`）が、**読み手はもう居ない**。これを読んでいた
-      // `assets/.claude/skills/` のセッション API スキルは provide-operations-via-mcp
-      // tasks 4.9 で `--add-dir` から外れ、curl / printenv も `--allowedTools` から落ちた
+      // セッション API スキルは `--add-dir` から外れたうえに撤去され、curl / printenv も
+      // `--allowedTools` から落ちた
       apiBaseUrl: 'http://127.0.0.1:3599',
 
       // セッションの openspec/config.yaml に書くワークフロースキーマ名。実体は
@@ -336,8 +336,9 @@ export default defineNuxtConfig({
       // プロジェクトで、--mcp-config は呼び出し側がそこから組み立てて足す。
       //
       // **`/write-steering-v2` の起動は外した。** firstPrompt の `/openspec-ff-change` と
-      // まったく同じで実体が無く（`.claude/skills/` は存在せず、`assets/.claude/skills/` の
-      // 10件にも無い）、prompt の先頭に置くと `Unknown command` で起動が assistant の
+      // まったく同じで実体が無く（`.claude/skills/` は存在せず、当時の
+      // `assets/.claude/skills/` の10件にも無かった）、prompt の先頭に置くと
+      // `Unknown command` で起動が assistant の
       // ターンをひとつも持たずに終わる。steering 工程が何もせず終わっていた直接の原因で、
       // 5.2 の残り2ツール（get-steering / submit-document の steering 種別）が一度も
       // 呼ばれなかったのはこれによる（santa-method レビュー指摘 4周目 2026-08-30）。

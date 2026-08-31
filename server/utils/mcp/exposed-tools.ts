@@ -1,7 +1,7 @@
 /**
  * 工程ごとに claude へ見せる MCP ツールを絞るための値。
  *
- * 自前 MCP サーバーは6ツールすべてを単一の `/mcp` に登録するので、何もしないと
+ * 自前 MCP サーバーはツールを1つ残らず単一の `/mcp` に登録するので、何もしないと
  * flontier 工程の claude の tools 一覧にも steering 専用のツールが載る。載れば呼ばれ、
  * 接続文脈が合わずに失敗する（実測: `.stroke-check/debug-log/` の 18 本で
  * `mcp__stroke-board__get-steering` が 51 回中 48 回失敗）。
@@ -25,10 +25,11 @@ export type McpToolPhase = 'flontier' | 'steering'
  *
  * `submit-document` は種別引数で振り分けるツールなので両方に出る。
  *
- * 案内のツール（`get-guide` / `get-steering-guide`）を先頭に置くのは、`tools/list` の
- * 並びがこの順になるためである。「まずこれを呼べ」と description に書いてあるものが
- * 一覧の末尾に出るより、先頭に出るほうが読み落としが減る。**並びは保証ではない**
- * （呼ぶ順を決めるのは呼び手である）ので、順序に依存する判定を足さないこと。
+ * 案内のツール（`get-guide` / `get-steering-guide`）を先頭に書いてあるのは**読みやすさの
+ * ためだけ**である。`tools/list` の並びには効かない——モジュールはヘッダを `Set` に変換して
+ * 含有判定にしか使わず、出力は `config.tools` の登録順のままになる
+ * （`filter-tools-header.js`）。その登録順もファイルの走査順で、名前順ですらない。
+ * **順序に意味を持たせないこと。** 「まず案内を呼べ」を伝えるのは description の役目である。
  */
 const EXPOSED_TOOLS: Record<McpToolPhase, readonly string[]> = {
   flontier: ['get-guide', 'get-overview', 'get-strokes', 'get-send-back', 'send-question', 'submit-document'],

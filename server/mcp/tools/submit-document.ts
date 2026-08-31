@@ -102,7 +102,7 @@ export default defineStrokeTool({
     type: z.string().optional().describe('種別。flontier / steering のいずれか。省くと 400 になる'),
     document: z.string().optional().describe('文書の本文そのもの。ファイルパスではない。省くと代行先が 400 で返す'),
     name: z.string().optional().describe('type が steering のときの文書名。product / tech / structure のいずれか'),
-    // 旧スキル（`assets/.claude/skills/proposal/SKILL.md`）は `/proposal '<filepath>'
+    // 撤去済みの旧スキル（`assets/.claude/skills/proposal/SKILL.md`）は `/proposal '<filepath>'
     // '<projectName>'` で候補を送っていた。ツールの引数に無いと常に `{ proposal }` だけが
     // 飛び、`state.projectName` が空のまま承認画面のプロジェクト名欄
     // （`app/composables/useProposalReview.ts`）が毎回空になる（santa-method レビュー指摘）。

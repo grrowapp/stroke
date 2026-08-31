@@ -200,4 +200,6 @@ AI へ渡す定型。**手順の本文をここに書かない。** 手順は MC
 
 `upstreamBaseUrl` / `specWorkflowHome` / `syncIntervalMs` の3件はこの資料に未統合で、現状は環境変数から読む。README の「設定（ポータル側）」を参照。一本化は別 change で行う。
 
+**ただし `specWorkflowHome` はポータル専用ではない。** steering 工程の起動が組み立てる `--mcp-config` に、本家 MCP 向けの環境変数 `SPEC_WORKFLOW_HOME` としてこの値が載る（`server/utils/stroke/invoke.ts` の `mcpConfigFor`）。本家 MCP はここで指した場所の登録簿へ「動いているプロジェクト」として自分を書き、ポータルは同じ場所を読む。**ずらすと書き手と読み手が割れ、昇格したプロジェクトが本家の一覧に現れず、steering 工程の取得・提出が `project_not_registered` で全滅する**（実測 2026-08-31）。`NUXT_SPEC_WORKFLOW_HOME` を変えるときは、本家 dashboard の `SPEC_WORKFLOW_HOME` と揃っていることを確かめること。
+
 `projectsParentPath` は廃止した。ストローク側の保存先と同じ場所を指す必要があるため、上の `projectShareRoot` に畳んである。

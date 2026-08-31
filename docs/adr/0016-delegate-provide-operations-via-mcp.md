@@ -107,7 +107,7 @@ instruction は `/get-overview` `/get-strokes` `/get-send-back` というスラ�
 
 **対応内容** — flontier 工程の手順をエージェントへ渡すツール `get-guide` を設ける。引数を取らず、`status` と `guide`（手順の本文）を返す。本文はセッションの状態に依存しない（状態は既存の取得ツールが返す）。説明（description）は、他のツールより先に呼ぶべきことを述べる。
 
-いま案内の実体は存在しない。ワークフロースキーマ `flontier-strokeflow` の instruction は `/get-overview` `/get-strokes` `/get-send-back` というスラッシュコマンド形式で**指す実体が無く**、エージェントは名前の一致で偶然 MCP ツールに当たっている。`assets/.claude/skills/guidance/SKILL.md` は残っているが、中身は旧スキル方式（`STROKE_BASEURL` と `CLAUDE_SESSION_ID` での解決）で MCP に対応せず、`--add-dir` から外したのでロードされない（親 change の tasks 4.9）。
+いま案内の実体は存在しない。ワークフロースキーマ `flontier-strokeflow` の instruction は `/get-overview` `/get-strokes` `/get-send-back` というスラッシュコマンド形式で**指す実体が無く**、エージェントは名前の一致で偶然 MCP ツールに当たっている。`assets/.claude/skills/guidance/SKILL.md` は旧スキル方式（`STROKE_BASEURL` と `CLAUDE_SESSION_ID` での解決）で MCP に対応せず、`--add-dir` から外したのでロードされなくなり、その後**撤去した**（`adr0016-sub-switch-workflow-to-mcp-tools`）。案内は MCP ツール（`get-guide` / `get-steering-guide`）が配る。
 
 **完了判定** — 次をすべて満たしたとき完了とする。
 

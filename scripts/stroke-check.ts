@@ -682,47 +682,40 @@ async function approve(page: Page): Promise<string> {
  * 承認後の steering 工程が着地するのを見届ける。
  *
  * **承認の導線は steering を見せない。** 承認すると画面は `/projects` へ移って流れが終わる
- * （ADR 0011: この後の steering はサーバーが裏で起こすので、ユーザーは待たない）。だが
- * ステアリング文書の一覧画面は在るので、そこを開いて文書が書かれるのを待つ。endpoint を
- * 直接叩かずに済む（specs「操作はブラウザから行う」）。
+ * （ADR 0011: この後の steering はサーバーが裏で起こすので、ユーザーは待たない）。
  *
- * 承認は**セッションディレクトリを `<projectName>` へ改名するだけ**なので、プロジェクトの
- * id は承認で使った名前そのものである（`docs/specs/api/contract.md` U10）。一覧を探さずに
- * 直接開ける。
+ * **着地の判定は書かれた文書そのもので行う。** `<projectName>/.spec-workflow/steering/` に
+ * product / tech / structure の3本が揃ったら着地とみなす。
  *
- * 一覧の各文書は「利用可」か「未作成」のバッジを持つ（`steering/index.vue`）。3本すべてが
- * 「利用可」になったら着地とみなす。
+ * ステアリング文書の一覧画面（`/projects/<name>/steering`）では判定しない。あの画面は
+ * 本家 dashboard の `GET /api/projects/:id/info` に依存し、本家は**起動中のプロジェクト
+ * しか返さない**（ADR-0006）。プロジェクトが本家の一覧に載るのは、そのプロジェクトを
+ * ワークスペースとする MCP サーバーが動いている間だけで、それは steering の claude が
+ * 動いている間だけである。**claude が終わった瞬間に画面は「未接続」に戻る。**
+ *
+ * つまり画面で判定すると、文書が3本揃った直後に判定できるかどうかが、claude の終了と
+ * 画面の再読み込みのどちらが先かという競争になる。実測（2026-08-31）でも、3本すべてが
+ * 書かれて `submit-document` が 3回とも 200 を返しているのに、一覧は5回開き直しても
+ * 出なかった。**成果物は書かれた文書である。文書を見る。**
+ *
+ * 一覧は開くだけ開いて、出れば人が見るための表示として使う。出なくても落とさない。
  */
 async function waitForSteering(page: Page, projectName: string): Promise<boolean> {
   const url = `/projects/${projectName}/steering`
 
-  // **入口の1回にも開き直しが要る。** 待ちのループには `RELOAD_INTERVAL_MS` の取り直しが
-  // 在るが、最初の `goto` が素通しだった。dev がモジュールを取り落とすと `load` が終わらず
-  // ここで落ち、**承認は通っているのに steering を一度も見られない**（実測 2026-08-30:
-  // `net::ERR_NETWORK_CHANGED`。承認まで到達した唯一の実行がここで止まった）
-  await openSteering(page, url)
+  // 一覧は**見せるためだけ**に開く。出なくても判定には要らないので落とさない
+  await openSteering(page, url).catch(() => {
+    console.log('  steering の一覧は出なかった（本家が起動中のプロジェクトしか返さないため）。文書で判定する')
+  })
 
-  const available = page.getByTestId('steering-list').getByText('利用可')
   const deadline = Date.now() + ROUND_TIMEOUT_MS
   const logs = logEntryCount()
-  let started = Date.now()
+  const started = Date.now()
   let notified = 0
-  let reloadedAt = Date.now()
 
   while (Date.now() < deadline) {
-    const ready = await available.count()
+    const ready = steeringDocumentCount(projectName)
     if (ready >= STEERING_DOCUMENTS) { endProgress(); return true }
-
-    // 画面が固まると文書が書かれても表示が変わらない（`sendBack` と同じ事情）。
-    // 一覧は自動で追随しないので、取り直して読み直す
-    if (Date.now() - reloadedAt > RELOAD_INTERVAL_MS) {
-      endProgress()
-      await openSteering(page, url)
-      reloadedAt = Date.now()
-      started = Date.now()
-      notified = 0
-      continue
-    }
 
     const elapsed = Math.floor((Date.now() - started) / 1000)
     if (elapsed > notified) {
@@ -737,8 +730,19 @@ async function waitForSteering(page: Page, projectName: string): Promise<boolean
   }
 
   endProgress()
-  console.log(`  steering 文書は ${await available.count()}/${STEERING_DOCUMENTS} で時間切れ`)
+  console.log(`  steering 文書は ${steeringDocumentCount(projectName)}/${STEERING_DOCUMENTS} で時間切れ`)
   return false
+}
+
+/**
+ * 書かれた steering 文書の本数。
+ *
+ * 置き場は本家が決めるもので（`.spec-workflow/steering/<name>.md`）、こちらの設定ではない。
+ * 数えるだけで中身は見ない——中身の良し悪しはこの道具の判定範囲ではない。
+ */
+function steeringDocumentCount(projectName: string): number {
+  const dir = join(PROJECTS_ROOT, projectName, '.spec-workflow', 'steering')
+  return ['product', 'tech', 'structure'].filter(name => existsSync(join(dir, `${name}.md`))).length
 }
 
 /**

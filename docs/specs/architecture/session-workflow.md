@@ -30,7 +30,7 @@ server/mcp/tools/                                      MCP ツール8本（フ�
 └── send-question.ts / submit-document.ts              提出
 ```
 
-`assets/.claude/skills/` の旧セッション API スキルはファイルとしては残っているが、**claude には届かない**——`--add-dir` を渡さないので置き場ごと見えない。
+`assets/.claude/skills/` の旧セッション API スキルは**撤去した**。`--add-dir` を渡さない以上 claude には届かず、代行先はすべて MCP ツールになっている。残してあるのは `template/` だけで、案内ツールの本文が挙げる「その文書に何を書くか」の出どころとして使う。
 
 セッションに属するものは、セッションディレクトリ1箇所に収まる。**セッションと昇格した
 プロジェクトは同じ親（`projectShareRoot`）の下に並ぶ。** 承認はこの親の下での改名だけで
@@ -48,9 +48,16 @@ server/mcp/tools/                                      MCP ツール8本（フ�
 | 作業場所 | — | cwd だけ。`--add-dir` は渡さない |
 | steering の定型 | `runtimeConfig.claude.steeringPrompt` | 承認の直後、cwd＝生成先で起こすときに渡る |
 
-設定は**環境変数から一切読まない**。値は `nuxt.config.ts` と `app/app.config.ts` に書かれた
-ものだけで、読み口は `server/utils/stroke/config.ts` の1本である。一覧は
+ストローク側の設定は**環境変数から読まない**。値は `nuxt.config.ts` と `app/app.config.ts` に
+書かれたものだけで、読み口は `server/utils/stroke/config.ts` の1本である。一覧は
 `docs/specs/core/settings-reference.md`。
+
+**例外が1つある。** steering 工程の `--mcp-config` に載せる `SPEC_WORKFLOW_HOME` は、
+ポータル側の `specWorkflowHome`（`server/utils/config.ts`）から取る。この値だけは環境変数
+`NUXT_SPEC_WORKFLOW_HOME` で上書きされうる（E2E がそうしている）。**同じ1つを使うことが
+目的**である——本家 MCP が登録簿を書く場所と、ポータルが登録簿を読む場所が割れると、
+昇格したプロジェクトが本家の一覧に現れず steering 工程が成立しない。ここで別の解決規則を
+書くと、また書き手と読み手が割れる。
 
 セッション作成（`server/utils/stroke/session-core.ts`）は「ディレクトリ作成 → `openspec init --tools none` → `config.yaml` 上書き → 状態ファイル書き込み」。**サーバは change を作らない**。
 
@@ -98,6 +105,7 @@ Claude Code 2.1.236 / openspec 1.9.0 で確認し、1.10.0 で以下を再確認
 - **`--store` 指定時は cwd 側（project）の schema が解決候補から除外される**。schema を store と cwd に分けて持つ構成は成立しない
 - `flontier-strokeflow` の `applyRequires` は `["stroke","proposal"]`（`apply:` ノード無しでも空にならない）
 - 登録簿に別ワークツリーを指す登録が残っていても、`--store` を使わない実行は登録簿を参照しない
+
 下の3件は claude 側の性質として確かめた事実だが、**いまの配線では使っていない**（`--add-dir` を渡さず、ロードされるスキルが0本のため）。案内を Skill として配り直すときに効いてくる。
 
 - `--add-dir` を複数渡すと、それぞれの `.claude/` からスキルもコマンドも読まれる
