@@ -6,7 +6,7 @@ stroke-board の構造の定義。**統合後のあるべき配置**を規範と
 - components の全数と規範への対応は `docs/specs/core/file-components.md`、composables は `docs/specs/core/file-composables.md`、server/utils は `docs/specs/core/server-structure.md`
 - データ取得・SSR の設計は `docs/specs/architecture/data-fetching.md`
 - 現状との差分（移行課題）は `docs/specs/plan/structure-migration.md`
-- コーディング規約（auto-import 不使用・テストなど）は steering が持つ
+- コーディング規約（命名・import の書き方・テストの置き場・通す門番・書き方の原則）は steering（`.spec-workflow/steering/` の `structure.md` / `tech.md`）が持つ。この資料は規約を持たず、参照だけを置く
 
 ---
 
@@ -39,7 +39,7 @@ base2/
 │   └── utils/                  関心単位で切る（§3 に一覧）
 ├── shared/                     画面とサーバーが共有する型（ドメイン別ファイル）
 ├── docs/                       specs（定義）/ adr / agents
-├── test/                       単体テスト。ソースの構造をそのまま写す（app/ server/ …）
+├── test/                       単体テスト（app/ server/ …）
 ├── e2e/                        Playwright
 ├── openspec/                   機能的 specs と change
 └── scripts/
@@ -52,7 +52,7 @@ base2/
 - **pages はただのルーティング。** ページは薄く保ち、画面の実体は components が持つ
 - **components は `ui/` ＋ 機能単位で切る。** 機能に属さない共通部品は `ui/`、機能の部品は機能のディレクトリ（notification / project / question / proposal / approval）。出自や画面グループの境界では切らない。部品が無い機能のディレクトリは作らない。全数の対応は `file-components.md`
 - **composables は関心単位の `useXxx` を平置き**にする。境界のディレクトリを作らない。全数の対応は `file-composables.md`
-- **単体テストはソースと同居させない。** `test/` にソースの構造をそのまま写した位置へ置く（`test/server/utils/control/notify.test.ts` ↔ `server/utils/control/notify.ts`）。テストが使う固定データも同じ場所（`__fixtures__/`）に置く。E2E は `e2e/`
+- テストの置き場の規約は steering（`.spec-workflow/steering/structure.md` の File Organization Principles）が持つ
 - レイアウトはシェルの形が変わる単位で持つ（横タブの `portal.vue` / 左サイドバーの `workspace.vue`）。プロジェクト間の移動は一覧を経由する
 - セッションへの入口はプロジェクト一覧の **作成** で、専用のトップページを持たない
 - データ取得の設計は `docs/specs/architecture/data-fetching.md`
@@ -91,5 +91,6 @@ base2/
 | `docs/specs/core/file-components.md` / `file-composables.md` / `server-structure.md` | 部品・composable・utils の全数と規範への対応 |
 | `docs/specs/architecture/data-fetching.md` | データ取得・SSR の設計 |
 | `docs/specs/plan/structure-migration.md` | 現状との差分（移行課題） |
+| `.spec-workflow/steering/structure.md` / `tech.md` | コーディング規約（命名・import・テストの置き場・通す門番・書き方の原則） |
 | `docs/adr/0002` / `0005`〜`0008` | 統合・本家の扱いの決定 |
 | `docs/agents/` | エージェント向けの運用 |

@@ -388,7 +388,11 @@ function unread(project: ProjectSummary): number | null {
               <span v-if="(unread(project) ?? 0) > 0" class="sb-badge">{{ unread(project) }}</span>
               <span v-else class="text-[var(--text-muted)]">—</span>
             </td>
-            <td class="text-[12px] text-[var(--text-secondary)]" data-testid="project-last-modified">
+            <!--
+              文字色はここで指定しない。行の状態によって沈めるのを `main.css` が持つため、
+              ユーティリティで色を当てると持ち主が2人になり、後勝ちで沈まなくなる。
+            -->
+            <td class="text-[12px]" data-testid="project-last-modified">
               {{ project.lastModified === null ? '—' : formatRelativeTime(project.lastModified) }}
             </td>
           </tr>

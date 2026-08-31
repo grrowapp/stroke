@@ -189,10 +189,41 @@ body {
     background: var(--surface-hover);
   }
 
-  /* 未接続の行。押せないことが見て分かる（specs/project-directory） */
+  /*
+   * 未接続の行。押せないことが見て分かる（specs/project/directory）。
+   *
+   * **状態の列（2列目）は弱めない。** 行を弱めるのは「その行に入れない」ことを示すため
+   * だが、状態はその理由そのものを名指している。理由まで一緒に沈めると、押せない行を前に
+   * して原因が読み取れなくなる。行全体に `opacity` を掛ける書き方はこの要件を満たさない
+   * （specs/project/directory・ui.md）。
+   */
   .sb-row-off {
-    opacity: 0.45;
     cursor: not-allowed;
+  }
+
+  .sb-row-off td:nth-child(1) > *,
+  .sb-row-off td:nth-child(3) > * {
+    opacity: 0.45;
+  }
+
+  /*
+   * 最終更新の基準の色。**ここが持ち主である。**
+   *
+   * 以前は `<td>` に Tailwind のユーティリティ（`text-[var(--text-secondary)]`）で
+   * 当てていたが、行の状態で沈める指定が `@layer components` にある一方、ユーティリティは
+   * より後のレイヤーに載るため、沈める側が必ず負けていた。1つの property に持ち主を
+   * 2人置かない。
+   */
+  .sb-table td:nth-child(4) {
+    color: var(--text-secondary);
+  }
+
+  /*
+   * 最終更新だけ弱め方が違う。日付は1色の文字で子要素を持たないため、`opacity` ではなく
+   * 文字色を地と混ぜて沈める。
+   */
+  .sb-row-off td:nth-child(4) {
+    color: color-mix(in srgb, var(--text-secondary) 45%, var(--surface-panel));
   }
 
   /*
@@ -214,9 +245,22 @@ body {
    * 名前と日付は**未接続の行と同じ薄さ**にする（specs/project/generation・ui.md）。
    * 生成中を「薄いだけの行」にしないため、薄くするのは中身だけで、地はそのまま残す
    * ——地は下の `td` の重ねが受け持つ。
+   *
+   * **弱めるのは文字色であって `opacity` ではない。** 名前セルはローダーと名前を1つの
+   * `span` に収めており、その親へ `opacity` を掛けるとローダーまで沈む。`opacity` は
+   * グループを作るので、子を親より濃くして戻すことができない。ローダーは
+   * `conic-gradient` の背景なので、文字色で弱めても影響を受けない。
+   *
+   * **状態の列（2列目）は弱めない。** 未接続の行と同じ理由である
+   * （specs/project/directory）。
    */
-  .sb-row-creating td > * {
-    opacity: 0.45;
+  .sb-row-creating td:nth-child(1),
+  .sb-row-creating td:nth-child(3) {
+    color: color-mix(in srgb, var(--text-primary) 45%, var(--surface-panel));
+  }
+
+  .sb-row-creating td:nth-child(4) {
+    color: color-mix(in srgb, var(--text-secondary) 45%, var(--surface-panel));
   }
 
   .sb-row-creating td {
@@ -426,13 +470,16 @@ body {
 
   /*
    * 動きを抑える設定に従う（specs/project/generation は「示す」ことを求めており、
-   * 動きそのものは求めていない）。明滅は止めて不透明度だけ残し、ローダーは回さずに
-   * 形だけ残す——止まった輪でも「まだ何かが続いている」ことは伝わる。
+   * 動きそのものは求めていない）。ローダーは回さずに形だけ残す——止まった輪でも
+   * 「まだ何かが続いている」ことは伝わる。
+   *
+   * **ここで行に `opacity` を掛けない。** 弱め方は動きの設定に関わらず同じで、上の
+   * 文字色による指定が常に効いている。ここで行ごと沈めると、動きを抑えている人にだけ
+   * 状態の列が読めなくなる（specs/project/directory）。
    */
   @media (prefers-reduced-motion: reduce) {
     .sb-row-creating {
       animation: none;
-      opacity: 0.45;
     }
 
     .sb-spinner {
@@ -454,28 +501,64 @@ body {
    * 緑で出している。両者は食い違っており、prototype の実物に合わせる。
    */
   .sb-chip {
-    display: inline-block;
-    /* 4状態で同じ形にする。灯るかどうかだけが違い、幅は揃える（ui.md） */
+    /*
+     * 基調色。アクティブはこれを差し替えるだけで、形はそのまま受け継ぐ。
+     * 3状態で同じ形にする。際立つかどうかだけが違い、幅は揃える（ui.md）。
+     */
+    --sb-chip-base: var(--text-faint);
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     min-width: 76px;
-    text-align: center;
     font-size: var(--text-xs);
     padding: 2px 8px;
     border-radius: 999px;
     font-weight: 600;
-    background: var(--surface-sunken);
-    color: var(--text-muted);
-    border: 1px solid var(--border-default);
+    /*
+     * 面は3段。中央（55%）をいちばん薄くし、下端で少し戻す。平坦なグラデーションでは
+     * なく、下辺で受けた光が戻る形にしている（ui.md）。
+     */
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--sb-chip-base) 12%, transparent) 0%,
+      color-mix(in srgb, var(--sb-chip-base) 4.8%, transparent) 55%,
+      color-mix(in srgb, var(--sb-chip-base) 8.4%, transparent) 100%
+    );
+    border: 1px solid color-mix(in srgb, var(--sb-chip-base) 30%, transparent);
+    color: color-mix(in srgb, var(--sb-chip-base) 90%, #fff);
+    /* 上辺の照り返しと下辺の落ち込み。ガラスの厚みはこの2枚で出る */
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, #fff 16%, transparent),
+      inset 0 -1px 0 color-mix(in srgb, #000 20%, transparent);
   }
 
   /*
-   * prototype の `.chipOn`。緑を 18% 敷く。
-   * prototype は border を宣言していないので枠幅は 0。色だけ透明にすると 1px ぶん
-   * 大きくなり、chipOff と並んだときに高さが揃わない。
+   * アクティブだけが際立つ。形は `.sb-chip` のまま、基調色を差し替えて濃さを上げる。
+   *
+   * 枠は消さずに残す（`border-width: 0` にしない）。枠を消すと既定のチップと 1px ぶん
+   * 高さが揃わなくなる。
+   *
+   * 外へのにじみが2枚あるのは、近い1枚だけだと縁が硬く見え、遠い1枚だけだと輪郭が
+   * ぼやけるためである。近くで縁を作り、遠くで空気を作る（ui.md）。
    */
   .sb-chip-on {
-    background: color-mix(in srgb, var(--status-success) 18%, transparent);
-    color: var(--status-success);
-    border-width: 0;
+    --sb-chip-base: var(--status-success);
+
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--sb-chip-base) 38%, transparent) 0%,
+      color-mix(in srgb, var(--sb-chip-base) 20%, transparent) 55%,
+      color-mix(in srgb, var(--sb-chip-base) 26%, transparent) 100%
+    );
+    border-color: color-mix(in srgb, var(--sb-chip-base) 55%, transparent);
+    color: color-mix(in srgb, var(--sb-chip-base) 55%, #fff);
+    text-shadow: 0 0 6px color-mix(in srgb, var(--sb-chip-base) 60%, transparent);
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, #fff 34%, transparent),
+      inset 0 -1px 0 color-mix(in srgb, #000 28%, transparent),
+      0 0 7px color-mix(in srgb, var(--sb-chip-base) 45%, transparent),
+      0 0 15px color-mix(in srgb, var(--sb-chip-base) 22%, transparent);
   }
 
   /* 件数バッジ。アクセントは indigo 1色に集約する */

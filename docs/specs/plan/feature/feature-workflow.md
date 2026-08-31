@@ -2,7 +2,7 @@
 
 feature（実装のタスクに繋がる文書の組）の定義。stroke-board は文書を **feature** と**仕様書**（システムをドキュメントとして記述し続けるもの）の2レーンで扱う。
 
-> **本書は正ではない。** feature レーンの正は [`docs/feature/overview.md`](../../feature/overview.md) であり、本書と食い違ったらあちらが勝つ。本書は承認前の草稿が残ったもので、構造の記述として参照する。
+> **本書は正ではない。** feature レーンの正は [`overview.md`](overview.md)（同じディレクトリ）であり、本書と食い違ったらあちらが勝つ。本書は承認前の草稿が残ったもので、構造の記述として参照する。
 
 確定の経緯は change `define-feature-workflow`（proposal・specs 4本・design を spec-workflow 上で承認済み、2026-08-26）。仕様書レーンは仮決めのみで、器は change `define-spec-document-workflow` にある。
 
@@ -37,7 +37,7 @@ openspec/specs/<階層パス>/spec.md          ← 確定した仕様の置き�
 
 ## 命名
 
-**本書のこの節が命名の正である**（[ADR-0013](../../adr/0013-feature-name-encodes-capability-path.md) は決定の経緯の記録）。命名は1つの**置換ルール**として定義する。
+**本書のこの節が命名の正である**（[ADR-0013](../../../adr/0013-feature-name-encodes-capability-path.md) は決定の経緯の記録）。命名は1つの**置換ルール**として定義する。
 
 - 階層パス（`/` 区切り）とフラット名は、`/` ↔ `__`（2重アンダーバー）の置換で相互変換する
   - `api/session` ↔ `api__session`
@@ -51,7 +51,7 @@ openspec/specs/<階層パス>/spec.md          ← 確定した仕様の置き�
 
 - feature は `.spec-workflow/specs/<spec名>/` 直下の proposal.md / requirements.md / design.md / tasks.md で構成される
 - 本家が spec として扱うのは requirements / design / tasks の3文書のみ。proposal.md は本家からは見えないが、置いてあっても害はない。stroke-board では feature の文書の種類として追加する予定
-- `.spec-workflow/specs/` 配下に入れ子ディレクトリを持たない。入れ子は本家の一覧に現れず、本家のファイル監視が親 spec に存在しない文書の更新イベントを飛ばす（実測 2026-08-26、[upstream-observations](../reference/upstream-observations.md)）。階層は入れ子ではなく `__` エンコードのフラット名で表す
+- `.spec-workflow/specs/` 配下に入れ子ディレクトリを持たない。入れ子は本家の一覧に現れず、本家のファイル監視が親 spec に存在しない文書の更新イベントを飛ばす（実測 2026-08-26、[upstream-observations](../../reference/upstream-observations.md)）。階層は入れ子ではなく `__` エンコードのフラット名で表す
 
 ## 工程
 

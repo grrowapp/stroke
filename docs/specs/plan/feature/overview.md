@@ -54,7 +54,7 @@ stroke が始まる口は複数ある。代表は2つで、網羅と挙動の定
 
 ## 命名
 
-**本書のこの節が命名の正である**（[ADR-0013](../adr/0013-feature-name-encodes-capability-path.md) は決定の経緯の記録）。命名は1つの**置換ルール**として定義する。
+**本書のこの節が命名の正である**（[ADR-0013](../../../adr/0013-feature-name-encodes-capability-path.md) は決定の経緯の記録）。命名は1つの**置換ルール**として定義する。
 
 - 階層パス（`/` 区切り）とフラット名は、`/` ↔ `__`（2重アンダーバー）の置換で相互変換する
   - `api/session` ↔ `api__session`
@@ -82,7 +82,7 @@ stroke が始まる口は複数ある。代表は2つで、網羅と挙動の定
 - feature は `.spec-workflow/specs/<spec名>/` 直下の proposal.md / requirements.md / design.md / tasks.md で構成される
 - 本家が spec として扱うのは requirements / design / tasks の3文書のみ。proposal.md は本家からは見えないが、置いてあっても害はない
 - stroke-board は配置時に change の proposal.md を feature へ置く。**capability が複数のときは、分解された feature 全てに同じ proposal.md を置き**、これを集合定義（この change が対象とする capability の全量）の拠り所とする
-- `.spec-workflow/specs/` 配下に入れ子ディレクトリを持たない。入れ子は本家の一覧に現れず、本家のファイル監視が親 spec に存在しない文書の更新イベントを飛ばす（実測 2026-08-26、[upstream-observations](../specs/reference/upstream-observations.md)）。階層は入れ子ではなく `__` エンコードのフラット名で表す
+- `.spec-workflow/specs/` 配下に入れ子ディレクトリを持たない。入れ子は本家の一覧に現れず、本家のファイル監視が親 spec に存在しない文書の更新イベントを飛ばす（実測 2026-08-26、[upstream-observations](../../reference/upstream-observations.md)）。階層は入れ子ではなく `__` エンコードのフラット名で表す
 
 ## 工程
 
@@ -93,16 +93,20 @@ stroke が始まる口は複数ある。代表は2つで、網羅と挙動の定
 
 ## 締め（本家 archive → openspec 標準ライフサイクル）
 
-feature 固有の sync 工程は**定義しない**。締めは既存の2つの機能の接合である。
+feature 固有の sync 工程は**定義しない**。締めは既存の2つの機能の接合であり、3段で進む。起点は **archive**（spec-workflow が元々持つ機能。実行の主体は規定しない）。
 
-- 起点は **archive**（spec-workflow が元々持つ機能。実行の主体は規定しない）
-- **戻す接合**: archive のとき、対応する change 内の **delta** `openspec/changes/<change名>/specs/<階層パス>/spec.md` へ、requirements.md の中身を戻す（proposal の後に作られた spec.md を更新する）。階層パスは spec 名に置換ルールを適用して得る（`api__session` → `specs/api/session/spec.md`）
-- **sync**: openspec 標準の sync が change 内の delta を**同じパス**の `openspec/specs/<階層パス>/spec.md` へ反映する。spec 名から配置先を計算する機能は openspec に無く、配置先は delta のパスだけで決まる
-- **archive**: openspec 標準の archive が change を片づけ、工程が終わる（openspec の `archive` コマンドは sync と片づけの両方を行う）
-- change の対象 capability が複数のときは、**すべての対象の戻す接合が揃ってから** sync → archive を実行する。揃ったかどうかは、stroke-board が **archive 操作の度に、capability に対する delta の充足チェック**を行って判定する
-- proposal 上に capability が複数定義されていた場合、spec-workflow への配置時に、**分解された feature 全てに同じ proposal.md を配置**する。これが集合定義（この change が対象とする capability の全量）の拠り所になる
-- 戻す接合は **delta 形式への変換をしない**。requirements.md は delta 形式（`## ADDED Requirements` 等 + Requirement / Scenario）を満たしており、sync がそのまま読める
-- 結果として `openspec/specs/` に入る spec.md は openspec の機能的 spec の形式（Requirement + Scenario）に適合する
+**1. 戻す接合。** archive のとき、対応する change 内の **delta** `openspec/changes/<change名>/specs/<階層パス>/spec.md` へ、requirements.md の中身を戻す（proposal の後に作られた spec.md を更新する）。階層パスは spec 名に置換ルールを適用して得る（`api__session` → `specs/api/session/spec.md`）。
+
+**2. sync。** openspec 標準の sync が change 内の delta を**同じパス**の `openspec/specs/<階層パス>/spec.md` へ反映する。spec 名から配置先を計算する機能は openspec に無く、配置先は delta のパスだけで決まる。
+
+**3. archive。** openspec 標準の archive が change を片づけ、工程が終わる（openspec の `archive` コマンドは sync と片づけの両方を行う）。
+
+3段に掛かる規定は4つ。
+
+- **複数 capability の待ち合わせ**: change の対象 capability が複数のときは、すべての対象の戻す接合が揃ってから sync → archive を実行する。揃ったかどうかは、stroke-board が archive 操作の度に、capability に対する delta の充足チェックを行って判定する
+- **proposal.md の配置**: proposal 上に capability が複数定義されていた場合、spec-workflow への配置時に、分解された feature 全てに同じ proposal.md を配置する。これが集合定義（この change が対象とする capability の全量）の拠り所になる
+- **delta 形式への変換**: しない。requirements.md は delta 形式（`## ADDED Requirements` 等 + Requirement / Scenario）を満たしており、sync がそのまま読める
+- **結果の形式**: `openspec/specs/` に入る spec.md は openspec の機能的 spec の形式（Requirement + Scenario）に適合する
 
 ### 本家操作との混在への対応（archive からの戻し）
 
@@ -112,9 +116,9 @@ feature 固有の sync 工程は**定義しない**。締めは既存の2つの�
 
 #### 突き合わせ（状態の判定）
 
-軸は**本家が返す specs の一覧**である。WS `spec-update` は `{specs, archivedSpecs}`（アクティブな器と archive 済みの器の全件一覧）を運ぶ（[upstream-observations](../specs/reference/upstream-observations.md)）。画面ロード時も同じ一覧を本家から取得する（ADR-0012 の流儀）。stroke-board は一覧を受け取るたびに、判定を全量やり直す。
+軸は**本家が返す specs の一覧**である。WS `spec-update` は `{specs, archivedSpecs}`（アクティブな器と archive 済みの器の全件一覧）を運ぶ（[upstream-observations](../../reference/upstream-observations.md)）。画面ロード時も同じ一覧を本家から取得する（ADR-0012 の流儀）。stroke-board は一覧を受け取るたびに、判定を全量やり直す。
 
-受け取った一覧の spec 名ごとに、openspec 側の2点を見る（spec 名からの逆変換はしない。[ADR-0005](../adr/0005-do-not-derive-from-upstream-data.md)）。
+受け取った一覧の spec 名ごとに、openspec 側の2点を見る（spec 名からの逆変換はしない。[ADR-0005](../../../adr/0005-do-not-derive-from-upstream-data.md)）。
 
 - **確定した仕様があるか** — `openspec/specs/<パス>/spec.md` がある（パス ↔ spec 名は置換ルール）
 - **update change があるか** — `openspec/changes/update-<spec名>/`（`archive/` 除く）がある（名前が対象を表す）

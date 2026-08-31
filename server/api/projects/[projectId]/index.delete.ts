@@ -27,7 +27,7 @@ import { deriveProjectId } from '../../../utils/upstream/project-id'
  * 引けないので、**保存先を走査して導出値と突き合わせる**。id から名前を復元する手段は
  * ハッシュの性質上これしかない。
  */
-export default defineEventHandler(async (event): Promise<null> => {
+export default defineEventHandler(async (event): Promise<Response> => {
   const projectId = getRouterParam(event, 'projectId')
   if (projectId === undefined || projectId === '') {
     throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'projectId が無い。' })
@@ -62,7 +62,7 @@ export default defineEventHandler(async (event): Promise<null> => {
     throw toHttp(error)
   }
 
-  return null
+  return new Response(null, { status: 204 })
 })
 
 /**

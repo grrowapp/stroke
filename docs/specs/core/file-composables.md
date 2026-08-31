@@ -31,9 +31,9 @@
 
 参照元25箇所の import パスも合わせて直した。
 
-平置き後も**明示 import を維持する**（auto-import は使わない。`nuxt.config` の `autoImport: false` 前提）。**この点は未実施** — `nuxt.config.ts` に `imports` の設定が無く、auto-import は既定で有効のまま。ストローク側は明示 import 無しで動いている。
+明示 import の規約は steering（`.spec-workflow/steering/structure.md` の Import Patterns）が持つ。**この点は未実施** — `nuxt.config.ts` に `imports` の設定が無く、auto-import は既定で有効のまま。ストローク側は明示 import 無しで動いている。
 
-単体テストはソースと同居させない。`test/app/composables/useRelativeTime.test.ts` にある。
+単体テストは `test/app/composables/useRelativeTime.test.ts` にある。
 
 `shared/useRelativeTime.ts` は `useXxx` を1つも export していない（中身は純関数 `formatRelativeTime` のみ）。規範の「関心単位の `useXxx` を平置き」に当てはまらないが、**規範のツリーに純関数の置き場が無い**ため、置き場の新設を含めて平置きと同じ change で決める。
 
@@ -55,7 +55,7 @@
 - 層の積み方と全体の構造は `docs/specs/core/system-structure.md`
 - 記述は実装から抽出した事実に限る
 
-**ポータル側は明示 import で参照する**（`~/composables/<階層>/<名前>`）。auto-import の廃止はポータル側の規約だが、ストローク側のコードがまだ依存しているため `nuxt.config.ts` では当面有効のまま（統一は `align-coding-conventions`）。
+**ポータル側は明示 import で参照する**（`~/composables/<階層>/<名前>`）。規約は steering が持つ（Import Patterns）。ストローク側のコードがまだ auto-import に依存しているため `nuxt.config.ts` では当面有効のまま（統一は `align-coding-conventions`）。
 
 ---
 

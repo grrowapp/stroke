@@ -15,12 +15,11 @@ import { writeInvocation } from '../../../utils/stroke/session-store'
  * `retries` は省略可。渡されたときだけ回数を上書きする（`error` からの再実行で 0 に
  * 戻すのに使う）。存在しない id は `requireSessionId` が 404 にする。
  */
-export default defineEventHandler(async (event): Promise<null> => {
+export default defineEventHandler(async (event): Promise<Response> => {
   const sessionId = await requireSessionId(event)
   const { invocation, retries } = parseBody(submissionBody, await readBody(event))
 
   await writeInvocation(sessionId, invocation, retries)
 
-  setResponseStatus(event, 200)
-  return null
+  return new Response(null, { status: 204 })
 })

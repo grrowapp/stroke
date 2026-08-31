@@ -20,6 +20,5 @@ export default defineEventHandler(async (event) => {
 
   await writeSendBack(sessionId, payload)
 
-  setResponseStatus(event, 200)
-  return null
+  return new Response(null, { status: 204 })
 })

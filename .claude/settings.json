@@ -23,7 +23,6 @@
       "Bash(git reset *)",
       "Bash(git * openspec*)",
       "Bash(awk *)",
-      "Bash(curl *)",
       "Bash(cd /opt/projects/*)",
       "Edit(/openspec/**)",
       "Read(/prompt/**)",

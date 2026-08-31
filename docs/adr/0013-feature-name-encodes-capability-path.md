@@ -24,5 +24,5 @@ openspec の specs は階層を持てるが、本家 spec-workflow の specs は
 ## 影響
 
 - feature の名前が一度使われ始めると、規則の変更には既存名の変換が要る。覆すのは難しい
-- 命名の定義の正は `docs/specs/feature/overview.md`。機能的 specs は change `define-feature-workflow` の sync で `openspec/specs/feature/` 配下に入る
+- 命名の定義の正は `docs/specs/plan/feature/overview.md`。機能的 specs は change `define-feature-workflow` の sync で `openspec/specs/feature/` 配下に入る
 - 依存 change（`create-feature` ほか）はこの規則への完全準拠で進める

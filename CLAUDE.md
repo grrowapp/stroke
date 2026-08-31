@@ -14,8 +14,8 @@
 - 起動・ビルドなどの実行は **package.json の scripts 経由**（`yarn dev` / `yarn build` / `yarn test` …）で行う。`node .output/server/index.mjs` のような直接起動をしない
 - ポートの既定は **3399**。**固定ではなく、並走させる worktree はずらす**（2026-08-31 時点で 3399 以外は pre5 の 3599 だけ）。同じ値が2箇所にある — ストロークの `claude.apiBaseUrl`（正は `docs/specs/core/settings-reference.md`）と `nuxt.config.ts` の `devServer.port`（起動時のビルド設定でストローク側設定ではないため settings-reference の対象外。`nuxt.config.ts` が実体）。**変えるときは必ず両方を揃えて変える**——片方だけ変えると、起動した claude は開いていないポートへ MCP 接続を試みる
 - 3000 はこのマシンで別のプロセスが使用中。使わない。5000 は本家 spec-workflow の dashboard
-- E2E の PORT_SLOT（`playwright.config.ts`）は worktree のディレクトリ名から slot を引き、STUB_PORT と APP_PORT を決める。slot 3 は欠番（APP_PORT が既定の dev ポート 3399 と被るため）。例: worktree `base3` は slot 6 → STUB 5699 / APP 3699
-  - **欠番表は 3399 しか避けていない。** dev をずらした worktree では、そのポートが別 slot の APP_PORT と衝突しうる（pre5 の 3599 は slot 5 の APP_PORT と同じ）。dev と E2E を同時に走らせるときは確かめること
+- E2E の STUB_PORT / APP_PORT（`playwright.config.ts`）は**実行のたびに 50000 から上へ空きを探して取る**（上限 60000）。固定値ではないので、worktree を並べて同時に `yarn test:e2e` を回してよい。どのポートを使ったかは Playwright の起動ログに出る
+  - dev サーバーのポートとは要件が違う。人がブラウザで繋ぎに行く dev は既定を決めて worktree ごとにずらすが、E2E は立てて捨てるだけなので空きを取る
 
 ## Worktree 運用
 
@@ -31,7 +31,7 @@ worktree = `git worktree` で切った作業ディレクトリ。それぞれが
 
 ## Docs
 
-`docs/` 配下の目録。`docs/specs/` は**定義としての specs** の置き場で、`core`（構造・入れ物・設定）/ `api`（契約）/ `architecture`（流れ）/ `reference`（調べた事実）/ `plan`（未確定の検討）で区分する。以下、`docs/specs/*` の5区分 → `docs/feature/` → `docs/agents/` の順に並べる。`docs/adr/` は決めの記録で、一覧は置かない。
+`docs/` 配下の目録。`docs/specs/` は**定義としての specs** の置き場で、`core`（構造・入れ物・設定）/ `api`（契約）/ `architecture`（流れ）/ `reference`（調べた事実）/ `plan`（未確定の検討）で区分する。以下、`docs/specs/*` の5区分 → `docs/agents/` の順に並べる。`docs/adr/` は決めの記録で、一覧は置かない。
 
 機能的 specs（Requirement + Scenario）は `openspec/specs/` にある（確定には入らない。扱いは `docs/agents/issue-tracker.md`「参照の方向」）。
 
@@ -53,7 +53,6 @@ worktree = `git worktree` で切った作業ディレクトリ。それぞれが
 ### `docs/specs/architecture/`
 
 - `session-workflow.md` — セッションのワークフロー定義（store・スキル・配線・実測で確定した制約）
-- `feature-workflow.md` — feature ワークフローの構造の記述（規定は `docs/feature/overview.md` が正）
 - `question-flow.md` — 問いの往復（誰がいつ何を送り、状態がどう動くか）を図で示す
 - `spec-screen-flow.md` — ポータル側: 仕様書画面の流れ
 - `data-fetching.md` — 画面のデータ取得と SSR の設計
@@ -65,6 +64,8 @@ worktree = `git worktree` で切った作業ディレクトリ。それぞれが
 
 ### `docs/specs/plan/`
 
+- `feature/overview.md` — feature のワークフロー定義（`__` 命名・器・工程・締め。2レーンのうち feature レーンの正）
+- `feature/feature-workflow.md` — 上の旧版。こちらも正を名乗っているが、食い違ったら `feature/overview.md` が勝つ。統合は change `adr0018-sub-update-feature-workflow` で行う
 - `artifact-extension-plan.md` — 拡張 artifact の検討資料（未決定）
 - `portal-stroke-entrance.md` — 入口の接合の対応方法（作成ボタン→ストローク概要入力。ADR-0009/0010 の確定先）
 - `portal-stroke-exit.md` — 出口の接合の対応方法（承認→steering 工程の自動開始。ADR-0011 の確定先）
@@ -73,10 +74,6 @@ worktree = `git worktree` で切った作業ディレクトリ。それぞれが
 - `next-agent-run.md` — エージェント実行の3区分への汎用化案（未着手）
 - `mainline-merge.md` — 旧 stroke-board-frontier 統合の道筋（change 一覧・依存・区分の基準・終了条件）
 - `structure-migration.md` — 構造の規範に対する現状の差分（移行課題）
-
-### `docs/feature/`
-
-- `overview.md` — feature のワークフロー定義（`__` 命名・器・工程・締め）。feature と仕様書の2レーンのうち **feature レーンの正**。`docs/specs/architecture/feature-workflow.md` と内容が重なるが、食い違ったら `overview.md` が勝つ（あちらも正を名乗っている。統合は change `adr0018-sub-update-feature-workflow` で行う）
 
 ### `docs/agents/`
 

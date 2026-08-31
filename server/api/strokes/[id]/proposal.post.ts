@@ -52,8 +52,5 @@ export default defineEventHandler(async (event) => {
   // 完了の合図ではなく「作業が行われた」ことの記録。invokeAi が起動の前後で比べる。
   notifySubmission(sessionId)
 
-  // 受理と記録で完結する口なので、本文を持たない 204 を返す
-  // （`docs/specs/api/contract.md` A7「output: 本文なし（204）」）。
-  setResponseStatus(event, 204)
-  return null
+  return new Response(null, { status: 204 })
 })

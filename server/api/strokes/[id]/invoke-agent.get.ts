@@ -71,5 +71,5 @@ export default defineEventHandler(async (event) => {
     .finally(() => endRun(sessionId))
 
   setResponseStatus(event, 200)
-  return null
+  return {}
 })
