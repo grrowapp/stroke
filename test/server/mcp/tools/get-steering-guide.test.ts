@@ -16,8 +16,13 @@ const REQUIRED: Array<[string, RegExp[]]> = [
   ['書く順序', [/product → tech → structure/, /1本ずつ/]],
   ['提出する', [/submit-document/, /type: "steering"/, /product/]],
   ['終わりとみなす基準', [/書き終わり|終わりである/]],
-  ['うまくいかないとき', [/errorCode/, /project_not_registered/, /unreachable/, /直接書いて/]],
+  ['うまくいかないとき', [
+    /errorCode/, /project_not_registered/, /unreachable/,
+    /upstream_error/, /upstream_malformed/, /connection_mismatch/,
+    /直接書いて/,
+  ]],
   ['どこで工程が終わるか', [/3本/]],
+  ['本家 MCP は使わない', [/approvals/, /呼ばない/]],
   ['やらないこと', [/直接読み書き/]],
 ];
 /**
@@ -83,7 +88,7 @@ describe('get-steering-guide', () => {
     // **節をまたいだ部分一致では見ない。** 文書のどこかに語が在ればよい形にすると、
     // 見出しを残したままキーワードの羅列に置き換えても通ってしまう（変異試験で実証。
     // santa-method レビュー指摘 10周目 2026-08-31）。節ごとに、その節に要る語が
-    // **その節の中に**在ることと、文として書かれている（句点が2つ以上）ことを見る。
+    // **その節の中に**在ることと、中身が続いていること（長さと句点）を見る。
     const token = issueConnectionToken();
     registerConnection(token, { projectPath: '/opt/projects/setai' });
 
@@ -95,6 +100,7 @@ describe('get-steering-guide', () => {
       const found = headings.find(h => h.includes(section));
       expect(found, `節「${section}」が無い`).toBeDefined();
       const body = bodies.get(found!) ?? '';
+      expect(body.length, `節「${section}」の中身が薄い`).toBeGreaterThan(40);
       expect((body.match(/。/g) ?? []).length, `節「${section}」が文になっていない`).toBeGreaterThanOrEqual(1);
       for (const pattern of patterns) {
         expect(body, `節「${section}」に ${pattern} が無い`).toMatch(pattern);

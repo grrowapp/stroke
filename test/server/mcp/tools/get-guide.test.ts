@@ -17,13 +17,20 @@ const call = (headers: Record<string, string>) => structuredResult(getGuideTool.
  * ここでは「どこに書いてあるか」を指していることだけを見る。
  */
 const REQUIRED: Array<[string, RegExp[]]> = [
-  ['状態を確認', [/get-overview/, /get-strokes/, /get-send-back/]],
-  ['問いを立てる', [/一度に1問/, /send-question/, /上限/]],
+  // **語が在るだけでは見ない。** 旧テストが見ていた具体性（読む順序・在りかを指すこと・
+  // 禁止の言い切り）を落とすと、その部分を骨抜きにしても通る（変異試験で実証。
+  // santa-method レビュー指摘 11周目 2026-08-31）
+  ['状態を確認', [/get-overview[\s\S]*get-strokes[\s\S]*get-send-back/]],
+  ['問いを立てる', [/一度に1問/, /send-question/, /上限は `send-question` の引数の/]],
   ['把握完了', [/問うのをやめて|proposal へ移る/]],
   ['proposal を提出', [/submit-document/, /type: "flontier"/, /projectName/]],
   ['差し戻しを受けたら', [/get-send-back/, /全文/]],
-  ['うまくいかないとき', [/errorCode/, /status/, /session_not_found/, /unauthorized/]],
-  ['やらないこと', [/openspec/]],
+  ['うまくいかないとき', [
+    /errorCode/, /status/,
+    /session_not_found/, /unauthorized/, /phase_conflict/, /connection_mismatch/,
+    /no_send_back/, /validation_error/,
+  ]],
+  ['やらないこと', [/`openspec` コマンドを叩かない/]],
 ];
 /**
  * 手順が**節として**書かれていることを見る。
@@ -112,7 +119,7 @@ describe('get-guide', () => {
     // **節をまたいだ部分一致では見ない。** 文書のどこかに語が在ればよい形にすると、
     // 見出しを残したままキーワードの羅列に置き換えても通ってしまう（変異試験で実証。
     // santa-method レビュー指摘 10周目 2026-08-31）。節ごとに、その節に要る語が
-    // **その節の中に**在ることと、文として書かれている（句点が2つ以上）ことを見る。
+    // **その節の中に**在ることと、中身が続いていること（長さと句点）を見る。
     const token = issueConnectionToken();
     registerConnection(token, { sessionId: 'session-1' });
 
@@ -124,6 +131,7 @@ describe('get-guide', () => {
       const found = headings.find(h => h.includes(section));
       expect(found, `節「${section}」が無い`).toBeDefined();
       const body = bodies.get(found!) ?? '';
+      expect(body.length, `節「${section}」の中身が薄い`).toBeGreaterThan(40);
       expect((body.match(/。/g) ?? []).length, `節「${section}」が文になっていない`).toBeGreaterThanOrEqual(1);
       for (const pattern of patterns) {
         expect(body, `節「${section}」に ${pattern} が無い`).toMatch(pattern);

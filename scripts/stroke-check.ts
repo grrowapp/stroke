@@ -441,8 +441,7 @@ async function run(browser: Browser, policy: Policy): Promise<{
     await settle(page, roundStartLogs)
     const answered = await answer(page, policy, round)
     rounds.push(answered)
-    // 答えたら次の実行が始まる。基準を取り直す
-    beginRoundWait()
+    // ここでは基準を取り直さない。次の反復の `waitForNext` が待ちに入るときに取る
     previous = answered.question
     console.log(`  Q${round} ${answered.header}: ${answered.question} → ${answered.answer}`)
   }
@@ -941,6 +940,12 @@ async function sendBack(
 ): Promise<boolean> {
   // 着地の検知は「承認して作る」ボタンでも通る（URL を見ていない経路がある）。
   // 指摘を付ける口が出るまで待ってから触る
+  // **proposal を出した実行の終了を待ってから触る。** 受理（`proposal.post.ts` の publish）は
+  // 実行の途中で飛ぶので、画面に proposal が出た時点ではまだ動いている。ここで待たないと、
+  // 続く `beginRoundWait()` の基準がその実行の終了行を含まず、`approve` の `settle` が
+  // 「終わっている」と誤読して素通りする（santa-method レビュー指摘 11周目 2026-08-31）
+  await settle(page, roundStartLogs)
+
   const addComment = page.getByRole('button', { name: '＋ 全体へのコメント' })
   await addComment.waitFor({ state: 'visible', timeout: 30_000 })
 
@@ -1029,7 +1034,7 @@ async function sendBack(
  * 終了は claude の生出力が1本増えたことで分かる（`debugLogDir`）。設定が空で数えられない
  * ときは、一定時間だけ置いて進む。
  */
-async function settle(page: Page, baseline?: number): Promise<void> {
+async function settle(page: Page, baseline: number): Promise<void> {
   if (DEBUG_LOG_DIR === '') {
     await page.waitForTimeout(5000)
     return
@@ -1038,7 +1043,7 @@ async function settle(page: Page, baseline?: number): Promise<void> {
   // **もう終わっているなら待たない。** 基準を渡されたときは、その時点から生出力が
   // 増えているかを見る。増えていれば実行は終わっており、ここで待つと何も起きないまま
   // `ROUND_TIMEOUT_MS`（4分）を丸ごと捨てる（実測 2026-08-31: `approve` の手前で毎回）
-  const before = baseline ?? logEntryCount()
+  const before = baseline
   if (logEntryCount() > before) return
   const deadline = Date.now() + ROUND_TIMEOUT_MS
   const started = Date.now()
