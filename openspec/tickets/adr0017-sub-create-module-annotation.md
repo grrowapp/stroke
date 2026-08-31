@@ -1,3 +1,10 @@
+---
+status: ready-for-agent
+change: adr0017-sub-create-module-annotation
+tags:
+  - enhancement
+---
+
 # adr0017-sub-create-module-annotation
 
 注釈を別のモジュールとして切り出し、整形された本文の面でも指摘を付けられるようにする。

@@ -1,3 +1,10 @@
+---
+status: ready-for-agent
+change: create-module-markdown
+tags:
+  - maintenance
+---
+
 # create-module-markdown
 
 Nuxt 4 標準の `modules/` を置き場としてパスに用意し、markdown の操作をそこへ切り出して疎結合にする。
@@ -49,3 +56,33 @@ markdown を扱う実体が `nuxt.config.ts`（parse 設定）・`app/components
 ### change ではなく資料へ入れたもの
 
 change の命名規約（先頭に動詞、create / add / update / fix / remove、判定の軸）は `docs/agents/issue-tracker.md` と `docs/adr/0014-change-name-starts-with-verb.md`、用語（product / module / 機能）は `CONTEXT.md` に置いた。
+
+---
+
+## 2026-08-30 時点の状況
+
+tasks 43/74。**親自身に開いた作業は無い。** 残り31件はすべて分割した子が引き取っており、親は子が全部終わるのを待つ状態にある（ADR-0017「分割の内訳」）。
+
+### 済んだこと（1〜5章）
+
+- `modules/markdown/` を新設し、`@nuxtjs/mdc` の登録・parse 設定・フェンスの振り分け・コードブロック・図・本文の面・編集の面・CSS 353行を閉じた
+- `nuxt.config.ts` から markdown 由来の記述が消え、`<MDC>` の直呼びが0件になった
+- 描いた本文と生テキストの位置の対応を実装した（`runtime/position/` の preview / plain / fence / source-span）
+
+### 分割した4本
+
+| change | tasks | 状態 |
+| --- | --- | --- |
+| `adr0017-sub-create-position-port-preview` | 18/18 | archive 済み。整形された本文の面から位置の対応を公開した |
+| `adr0017-sub-add-detection-assumptions` | 35/35 | archive 済み。崩れた前提7件を、踏んだら赤いテストで止まる状態にした |
+| `adr0017-sub-create-reference-mdc` | 39/40 | archive 済み。`docs/specs/reference/mdc-observations.md` を新設し、テストの置き場を写し元へ揃えた |
+| `adr0017-sub-fix-normalization-offset` | 43/44 | 実装は完了。座標の基準を「生ファイル」、正規化の場所を「面の内側」と決めた。残るは完了承認のみ |
+
+### 委譲した5本
+
+`adr0017-sub-create-module-annotation`（0/23）・`adr0017-sub-update-ui-approval-review`（0/26）・`adr0017-sub-update-docs-structure`（0/26）・`adr0017-sub-full-width-markdown-editor`（proposal のみ）・`adr0017-sub-separate-approval-decision-from-promotion`（未着手）。いずれも未着手。
+
+### 親を archive できる条件
+
+分割した4本が全部終わること。委譲した5本は別の関心事なので条件に含まれない。
+

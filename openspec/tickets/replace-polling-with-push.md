@@ -44,5 +44,5 @@ WS が push なのは、サーバーだけが AI の提出の瞬間を知って�
 
 ## 関連
 
-- `separate-composable-responsibilities` の ticket にある「差し戻しと問い返しの2種類の送信が同じ待機機構を**共有**していて、決着時にどちらの後始末をするかを `pendingAction` で分岐している」は**現状と合っていない**。`replace-handrolled-with-libraries` の AgentQuestion 再編で問い返しが `useAgentQuestion` 側へ移り、共有は解消済み。あちらの ticket も実測に合わせて直す必要がある
+- `pendingAction` が「差し戻しと問い返しの2種類の送信で待機機構を共有し、決着時の後始末を分岐する」ものだという記述が資料に残っていることがあるが、**現状と合っていない**。`replace-handrolled-with-libraries` の AgentQuestion 再編で問い返しが `useAgentQuestion` 側へ移り、共有は解消済み
 - `docs/specs/architecture/session-workflow.md` / `question-flow.md` に待機と失敗の扱いが書かれている場合、追随が要る

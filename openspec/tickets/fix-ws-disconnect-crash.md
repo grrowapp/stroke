@@ -1,8 +1,7 @@
 ---
 tags:
   - bug
-status: Doing
-order: 0.0
+status: ready-for-human
 ---
 
 # fix-ws-disconnect-crash

@@ -1,3 +1,10 @@
+---
+status: ready-for-human
+change: adr0017-sub-update-ui-approval-review
+tags:
+  - enhancement
+---
+
 # adr0017-sub-update-ui-approval-review
 
 承認まわりの画面を直す。ユーザーが実物を触って挙げた5点。
