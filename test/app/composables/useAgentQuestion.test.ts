@@ -21,9 +21,11 @@ vi.mock('ofetch', async (importOriginal) => ({
 
 // 自動 import は実体のファイルへ解決されるので、global の差し替えでは効かない。
 // W1 の購読はモジュールごと差し替える
-const { channel } = vi.hoisted(() => ({ channel: { value: null as unknown } }))
+// **本物の ref を入れる。** 素のオブジェクトだと `watch` が反応せず、次の問いが届いても
+// 決着が走らない（待機が終わらない）
+const { holder } = vi.hoisted(() => ({ holder: { current: null as unknown } }))
 vi.mock('../../../app/composables/useSessionChannel', () => ({
-  useSessionChannel: () => channel,
+  useSessionChannel: () => holder.current,
 }))
 
 function httpError(statusCode: number): Error & { statusCode: number } {
@@ -43,7 +45,7 @@ beforeEach(() => {
   vi.stubGlobal('watch', watch)
   vi.stubGlobal('toValue', toValue)
   fetchMock.mockReset()
-  channel.value = { ...QUESTION }
+  holder.current = ref<unknown>({ ...QUESTION })
 })
 
 afterEach(() => {
@@ -70,6 +72,34 @@ describe('useAgentQuestion.send', () => {
     expect(q.waiting.value).toBe(true)
     // 受理は通っているので数えは進む
     expect(q.answered.value).toBe(1)
+  })
+
+  it('待っている間に次の問いが届いたら、待機が終わり前の問いを抱えたままにしない', async () => {
+    // `specs/agent-question`「待っている間に次が返る」。**同じ問いを抱えたままにすると、
+    // ユーザーは二度答えることになり、`strokes.json` に回答が重複して記録される**
+    const { useWaitingRetry } = await import('../../../app/composables/useWaitingRetry')
+    vi.stubGlobal('useWaitingRetry', useWaitingRetry)
+    const { useAgentQuestion } = await import('../../../app/composables/useAgentQuestion')
+
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes('/invoke-agent')) throw httpError(409)
+      return null
+    })
+
+    const q = useAgentQuestion('session-1')
+    const first = q.question.value
+    await q.send({ kind: 'option', value: '同期で書く' })
+    expect(q.waiting.value).toBe(true)
+
+    // W1 が次の1問を配信する
+    ;(holder.current as { value: unknown }).value = { ...QUESTION, question: '次はどうするか' }
+    await nextTick()
+
+    // 待機は終わり、画面が抱えるのは**新しいほうの問い**である
+    expect(q.waiting.value).toBe(false)
+    expect(q.question.value).not.toBe(first)
+    expect((q.question.value as { question: string }).question).toBe('次はどうするか')
+    expect(q.error.value).toBeNull()
   })
 
   it('409 以外の起動失敗は、これまでどおり失敗として示す', async () => {
