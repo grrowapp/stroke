@@ -18,12 +18,13 @@
     "check": "yarn typecheck && yarn spec",
     "session": "tsx --env-file-if-exists=.env scripts/session.ts",
     "check:ws-disconnect": "tsx scripts/ws-disconnect-check.ts",
+    "check:stroke": "tsx scripts/stroke-check.ts",
     "test": "vitest run",
-    "test:live": "vitest run --config vitest.live.config.ts",
     "test:e2e": "playwright test"
   },
   "dependencies": {
     "@nuxt/ui": "^4.10.0",
+    "@nuxtjs/mcp-toolkit": "0.19.0",
     "@nuxtjs/mdc": "^0.23.1",
     "@vueuse/core": "^14.4.0",
     "canvas-confetti": "^1.9.4",

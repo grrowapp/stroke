@@ -1,11 +1,16 @@
 # ADR-0016: provide-operations-via-mcp から切り出した change の委譲理由
 
-- **状態**: 採用
+- **状態**: 採用（一部は docs へ確定済み。**archive にはしない**——下の「確定した先」）
 - **日付**: 2026-08-29
+- **確定した先**:
+  - 提供方式・ツールの契約・結果の形・工程ごとの公開・接続 token → [docs/specs/api/mcp-tools.md](../specs/api/mcp-tools.md)
+  - 起動フラグ・定型・設定の一覧 → [docs/specs/core/settings-reference.md](../specs/core/settings-reference.md)
+  - 配線と置き場 → [docs/specs/architecture/session-workflow.md](../specs/architecture/session-workflow.md)
+- **確定していないもの**: `adr0016-sub-implement-mcp-operations` の結論（代行を確定した方式とする判断）は、まだ docs に落ちていない。**取りこぼす規約が残るので archive にしない**（CLAUDE.md「更新対応」）
 
 ## 決定
 
-`provide-operations-via-mcp` の範囲を**現行操作の代行**（既存 REST への薄いプロキシ）に限り、そこに収まらないものを 9 本の change へ委譲する。委譲は2種に分ける。
+`provide-operations-via-mcp` の範囲を**現行操作の代行**（既存 REST への薄いプロキシ）に限り、そこに収まらないものを 10 本の change へ委譲する。委譲は3種に分ける。
 
 - **後続**（この change の完了後に着手する。範囲を意図的に切った先）
   - `adr0016-sub-implement-mcp-operations`
@@ -18,6 +23,8 @@
   - `adr0016-sub-define-request-validation-messages`
   - `adr0016-sub-update-debug-log-per-session`
   - `adr0016-sub-fix-busy-response-handling`
+- **併走**（前提でも後続でもない。この change の作業が明るみに出したが、完了を待つ関係にない）
+  - `adr0016-sub-add-timeout-to-config`
 
 前提のいずれかが未了のうちは、`provide-operations-via-mcp` は承認依頼へ進まない。
 
@@ -35,7 +42,7 @@
 
 ### 拡張
 
-ticket の tags が enhancement のもの。新しい口・選べる幅を増やす（7件）。
+ticket の tags が enhancement のもの。新しい口・選べる幅を増やす（8件）。
 
 #### adr0016-sub-implement-mcp-operations
 
@@ -80,7 +87,7 @@ ticket の tags が enhancement のもの。新しい口・選べる幅を増や
 
 **対応内容** — ワークフロースキーマ `flontier-strokeflow` の instruction を、スキル呼び出しから MCP ツールの利用指示へ書き換える。名前の一致に依存しない形にする。
 
-instruction は `/get-overview` `/get-strokes` `/get-send-back` というスラッシュコマンド形式で書かれているが、**指す実体はもう無い**。操作系スキルは `--add-dir` から外してありロードされない（親 change の tasks 4.9）。それでも往復が成立しているのは、**MCP ツール名がスキル名とたまたま一致しているため**である。実測 2026-08-29（セッション `d823166d-…`）では往復6回・proposal 提出・差し戻しからの出し直しまで通っており、現時点で実害は出ていない。ただしこれは偶然に依存しており、ツール名を変えた瞬間に壊れる。
+instruction は `/get-overview` `/get-strokes` `/get-send-back` というスラッシュコマンド形式で書かれているが、**指す実体はもう無い**。操作系スキルは `--add-dir` から外してありロードされず、その後**撤去した**（`adr0016-sub-switch-workflow-to-mcp-tools`）。それでも往復が成立しているのは、**MCP ツール名がスキル名とたまたま一致しているため**である。実測 2026-08-29（セッション `d823166d-…`）では往復6回・proposal 提出・差し戻しからの出し直しまで通っており、現時点で実害は出ていない。ただしこれは偶然に依存しており、ツール名を変えた瞬間に壊れる。
 
 **元の proposal から2項目を落とした**（2026-08-29 時点）。`--allowedTools` から取得系の許可を外す件は親 change の tasks 4.5 / 4.6 で**実施済み**（現在の値は `Skill Bash(openspec *) Read Edit Write` で、MCP 分は `server/utils/mcp/allowed-tools.ts` の `withMcpToolsAllowed` が `mcp__stroke-board` を追記する）。旧スキル一式の撤去は**不要**になった（ユーザー 2026-08-29「スキルを残したのは基本的には guidance の作成のため」。ロードさせない制御は `--add-dir` 側で行っている）。残るのは instruction の書き換えだけである。
 
@@ -100,7 +107,7 @@ instruction は `/get-overview` `/get-strokes` `/get-send-back` というスラ�
 
 **対応内容** — flontier 工程の手順をエージェントへ渡すツール `get-guide` を設ける。引数を取らず、`status` と `guide`（手順の本文）を返す。本文はセッションの状態に依存しない（状態は既存の取得ツールが返す）。説明（description）は、他のツールより先に呼ぶべきことを述べる。
 
-いま案内の実体は存在しない。ワークフロースキーマ `flontier-strokeflow` の instruction は `/get-overview` `/get-strokes` `/get-send-back` というスラッシュコマンド形式で**指す実体が無く**、エージェントは名前の一致で偶然 MCP ツールに当たっている。`assets/.claude/skills/guidance/SKILL.md` は残っているが、中身は旧スキル方式（`STROKE_BASEURL` と `CLAUDE_SESSION_ID` での解決）で MCP に対応せず、`--add-dir` から外したのでロードされない（親 change の tasks 4.9）。
+いま案内の実体は存在しない。ワークフロースキーマ `flontier-strokeflow` の instruction は `/get-overview` `/get-strokes` `/get-send-back` というスラッシュコマンド形式で**指す実体が無く**、エージェントは名前の一致で偶然 MCP ツールに当たっている。`assets/.claude/skills/guidance/SKILL.md` は旧スキル方式（`STROKE_BASEURL` と `CLAUDE_SESSION_ID` での解決）で MCP に対応せず、`--add-dir` から外したのでロードされなくなり、その後**撤去した**（`adr0016-sub-switch-workflow-to-mcp-tools`）。案内は MCP ツール（`get-guide` / `get-steering-guide`）が配る。
 
 **完了判定** — 次をすべて満たしたとき完了とする。
 
@@ -200,6 +207,41 @@ instruction は `/get-overview` `/get-strokes` `/get-send-back` というスラ�
 - メイン spec `openspec/specs/debug/logging/spec.md` の Requirement「中身は claude が `--output-format json` で stdout へ出した全文と一致する」が、この change の delta で MODIFY されている（現状は未 MODIFY で、このまま archive するとメイン spec に実装と矛盾した記述が残る）
 
 **親との関係** — 前提。親 change の5章の証跡（`tool_use` の抽出）がこのログ形式に依存する。なお archive を阻む問題が別にある。メイン spec `openspec/specs/debug/logging/spec.md` の Requirement が「中身は claude が `--output-format json` で stdout へ出した全文と一致する」のままで、この change の delta がその Requirement を MODIFY していない。このまま archive するとメイン spec に実装と矛盾した記述が残る。
+
+#### adr0016-sub-add-timeout-to-config
+
+- **状態**: ready-for-agent / enhancement
+- **成果物**: proposal / specs / design / tasks（2026-08-30 に実装まで完了。ui は画面を持たないため省略）
+- **触るファイル**:
+  - `server/utils/stroke/claude.ts` — `CLAUDE_TIMEOUT_MS` の廃止と、渡された値での打ち切り
+  - `server/utils/stroke/ai.ts` — リトライ回数から今回の長さを決めて渡す
+  - `nuxt.config.ts` — `runtimeConfig.claude` へ2件追加
+  - `docs/specs/core/settings-reference.md` — 式の改訂・表からの削除・新設定の記述
+
+**対応内容** — 設定を2件増やす。`claude.timeoutMs`（打ち切るまでの時間。`retries` が 0 のときの値）と `claude.timeoutStepMs`（同じターンでリトライを重ねる間、`retries` 1つにつき足す刻み）である。前者は `claude.ts` のハードコード定数を `runtimeConfig` へ昇格させて `maxRetries` と同じ場所に揃えるもの、後者は新規。
+
+```
+今回のタイムアウト = timeoutMs + timeoutStepMs × retries
+```
+
+**伸びるのは1つのターンの中だけである。** `retries` は `state.json` が持つ「そのターンでこれまでに起こし直した回数」で、`maxRetries` の上限に達すればそこで終わる。次のターンでは `retries` が 0 に戻り、タイムアウトも `timeoutMs` へ巻き戻る。上限に達して `error` で終わったターンの後でも同じで、ターンをまたいで積み上がらない。`timeoutStepMs` に `0` を入れれば現在と同じ固定の振る舞いになる。
+
+いまタイムアウトは `claude.ts:21` のハードコード定数で、同じ式（`総待ち時間 = (maxRetries + 1) × タイムアウト`）を作る `maxRetries` は `runtimeConfig` にある。**同じ式の因子が別の手続きに属しており**、片方は ADR-0004 の承認が要るのに、片方は定数を書き換えるだけで変えられる。
+
+さらに `settings-reference.md` が同じ資料の中で二枚舌になっている。タイムアウトを「設定ではないもの」の表（`:149`）に載せながら、設定の説明にその値を使っている（`:86`「既定の `2` では最大30分」）。
+
+**完了判定** — 次をすべて満たしたとき完了とする。
+
+- タイムアウトが `runtimeConfig.claude` から決まり、`CLAUDE_TIMEOUT_MS` の定数が無い
+- 同じターンでリトライを重ねる間だけタイムアウトが伸び、その刻みが設定から決まる
+- 次のターンでタイムアウトが `timeoutMs` へ巻き戻る（`error` で終わったターンの後も同じ）
+- `settings-reference.md` の総待ち時間の式が刻みを含む形になっている
+- 同資料の「設定ではないもの」の表からタイムアウトの行が落ちている
+- 上記の資料変更が ADR-0004 の手続き（change 起票 → ユーザー承認 → 資料編集 → コード追随）を経ている
+
+**親との関係** — 拡張。親 change の完了を待たない。ただし値の調整履歴は親 change の検証が作った。180 秒では初回が必ず時間切れになり10分へ延ばし（実測 2026-08-25、当時は claude がスキルをロードし `!` フェンスで curl を往復させていた）、操作が MCP ツールへ移って所要が減ったので3分へ戻した（実測 2026-08-28: 8回の呼び出しで 28.5〜64.7 秒）。**代行への移行が所要を変えたことが、この値を設定に出すべき理由を作っている。**
+
+なお現在の2つの記述（`claude.ts` の「設定ではない」、`settings-reference.md:86`）は `ccfb65b` / `494c156` の feat / chore コミットで入っており、ADR-0004 の手続きを経ていない。この change で手続きに載せ直す。
 
 ### バグ
 

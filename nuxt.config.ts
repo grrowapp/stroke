@@ -2,7 +2,19 @@ import { defineNuxtConfig } from 'nuxt/config';
 
 import { sbIcons, upstreamIcons } from './app/assets/icons';
 
-/** ADR 0001: ここを外すとスキルが一切ロードされない。 */
+/**
+ * ADR 0001 がスキルのロードに要ると定めた値。**ただし、いまはロードされるスキルが0本である。**
+ *
+ * `--add-dir` を丸ごと外した（下の args の注記）ので、project 設定の探索先はセッションの
+ * cwd（`/opt/projects/<uuid>`）だけになった。そこに `.claude/` は無いので、スキルも
+ * プロジェクト設定もロードされない——実測（2026-08-30・変更後の実行ログ3本）でも `Skill`
+ * の呼び出しは0回、`permission_denials` はすべて空で、`project` を残しても外しても結果は
+ * 変わらない。下の「`Skill` は空振りする」の注記と同じ状態を指している。
+ *
+ * それでも値は残し、`server/utils/readiness.ts` の起動時チェックで不在を落とし続ける。
+ * 案内スキルを配り直したときに要る守りであり、外す判断は本 change の範囲外である
+ * （santa-method レビュー指摘 7周目 2026-08-30）。
+ */
 const SETTING_SOURCES_REQUIRED = 'project';
 
 export default defineNuxtConfig({
@@ -20,8 +32,11 @@ export default defineNuxtConfig({
   // 「これも外に出せるのでは」と再検討しないこと。
   // ===========================================================================
 
-  // ビルド時: モジュールの解決とプラグインの生成がビルドで行われる
-  modules: ['@nuxt/ui', '@nuxtjs/mdc'],
+  // ビルド時: モジュールの解決とプラグインの生成がビルドで行われる。
+  // @nuxtjs/mcp-toolkit: stroke-board 自身が MCP サーバーになる（route は既定 `/mcp`、
+  // ツール定義の置き場 `dir` も既定 `server/mcp`）。0.x のため package.json でバージョンを
+  // 固定してある（provide-operations-via-mcp design.md）
+  modules: ['@nuxt/ui', '@nuxtjs/mdc', '@nuxtjs/mcp-toolkit'],
 
   // ビルド時: markdown の parse 設定はビルドで畳み込まれる。
   mdc: {
@@ -87,9 +102,9 @@ export default defineNuxtConfig({
   typescript: { typeCheck: false, strict: true },
 
   // 起動の待ち受け。3000 はこのマシンで別のプロセスが使っているのでずらしてある。
-  // 3399 はストロークの `claude.apiBaseUrl` と揃える値（変えるなら両方揃えて変える）。
+  // 3599 はストロークの `claude.apiBaseUrl` と揃える値（変えるなら両方揃えて変える）。
   // 別マシンのブラウザから開くため、localhost ではなく全インタフェースで待つ
-  devServer: { host: '0.0.0.0', port: 3399 },
+  devServer: { host: '0.0.0.0', port: 3599 },
 
   hooks: {
     /**
@@ -229,65 +244,144 @@ export default defineNuxtConfig({
       // 起動定義。`.mcp.json` の command / args の記述形式に倣い、分解済みの配列
       // そのものを持つ（空白区切りの文字列を後から割らない）。
       //
-      // `--add-dir` に渡すのはリポジトリのルートで、`.claude` や skills をパスに
-      // 含めない（ADR 0001）。1つ目が grilling / domain-modeling / write-steering-v2 と
-      // opsx コマンドの置き場、2つ目がセッション API スキル（assets/.claude/skills/）の
-      // 置き場。どちらもこのリポジトリの中にあるので、置き場所を直書きせずルートから
-      // 導く（nuxt.config.ts はリポジトリルートに在る）。
+      // **`--add-dir` を渡さない。** 作業場所はセッションのディレクトリ（cwd）だけでよい。
+      //
+      // かつてはリポジトリのルートを渡し、「grilling / domain-modeling / write-steering-v2 と
+      // opsx コマンドの置き場だから」を根拠にしていた。**その根拠は実在しなかった**——
+      // `.claude/skills/` は無く、実運用ログの `slash_commands` 67件にそれらは1件も現れない
+      // （実測 2026-08-30）。届いていたのは次の2つだけで、どちらも渡したくないものである。
+      //
+      // - **他人のセッションの全文**。`claude.debugLogDir` はリポジトリ配下にあり、
+      //   `--output-format stream-json` で概要・問い・proposal がそのまま残る。実測で、
+      //   セッション A の claude が B のログを `Read` で読めた（`permission_denials: []`）
+      // - **開発者の権限とプラグイン**。ルート配下の `.claude/settings.json` が
+      //   `--setting-sources project` で効き、`Agent` や `Bash(claude *)` が渡っていた。
+      //   `Edit` の deny は `/opt/projects/stroke-board/**` の絶対パスなので worktree には
+      //   効かず、無人実行のエージェントがソースツリーへ書ける状態だった
+      //
+      // 操作系スキルは同じく届かなくなり、その後**ファイルごと撤去した**
+      // （`adr0016-sub-switch-workflow-to-mcp-tools`）。取得・提出は MCP ツールが担うので、
+      // スキル経由で真似る余地を残さない。
       //
       // `--setting-sources` に user を含めないのは、開発者個人の設定
       // （~/.claude/CLAUDE.md）をエンドユーザーのセッションへ持ち込まないためである。
-      // project を外すとスキルが一切ロードされない（ADR 0001）。
+      // `project` は残してあるが、`--add-dir` が無い今、探索先の cwd に `.claude/` は
+      // 無いのでロードされるスキルは0本である（冒頭の `SETTING_SOURCES_REQUIRED`）。
       //
-      // AI に許すツールは Skill Bash Read Write Edit。取得・提出は endpoint への HTTP 発行
-      // （Bash で curl）で行い、proposal.md / stroke.md は AI 自身が書いてパスで渡す。
+      // 取得・提出の操作は stroke-board の MCP ツールが担う（provide-operations-via-mcp）。
+      // その分の `--allowedTools`（`mcp__stroke-board`）は呼び出しごとに決まるのでここには
+      // 入れず、`server/utils/mcp/allowed-tools.ts` が値へ足す。
       //
-      // **`Skill` を外してはならない。** セッション API スキルの curl は
-      // `${CLAUDE_SESSION_ID}` でセッション id を解決するが、この変数が値を持つのは
-      // **スキルの `!` フェンスの中だけ**である（実測 2026-08-25: Bash ツールから
-      // `printenv` すると空、フェンスからは `--session-id` の値が取れる）。
-      // `Skill` が無いと claude はスキルを起動できず、Bash で curl を真似ようとして
-      // 空の id を掴み、提出に至らないままタイムアウトする。
+      // `Skill` は役割分担（操作系＝MCP ツール / 案内・手順＝Skill）の受け皿として残して
+      // ある。**ただし現時点で prompt が指す案内スキルは1つも無い。** `/openspec-ff-change`
+      // も `/write-steering-v2` も実体が無く、どちらも prompt から外した（下の3定型は
+      // スラッシュコマンドを持たない）。案内を配り直すまで `Skill` は空振りする
+      // （change の tasks「案内スキルの実体が無い」）。
       //
       // `-p` / `--output-format json`、`--session-id` / `--resume` とセッション id、
-      // `--mcp-config`、`--` 以降の prompt は呼び出しごとに決まるのでここには入れず、
-      // 呼び出し側が args の後ろに足す
+      // `--mcp-config`、MCP ツール分の `--allowedTools`、`--` 以降の prompt は
+      // 呼び出しごとに決まるのでここには入れず、呼び出し側が args の後ろに足す
       command: 'claude',
       args: [
         '--setting-sources', SETTING_SOURCES_REQUIRED,
         '--model', 'sonnet',
-        '--add-dir', import.meta.dirname,
-        '--add-dir', `${import.meta.dirname}/assets`,
-        '--allowedTools', 'Skill Bash(openspec *) Bash(curl -X POST *) Bash(jq -n *) Bash(printenv *) Read Edit Write',
+        // curl / jq / printenv は落とした（取得・提出を MCP ツール以外で真似る余地を
+        // 残さない・ユーザー指示 2026-08-27）。`Write` は develop 側の追加で、proposal を
+        // `docs/proposal.md` に書くのに要るので残す
+        '--allowedTools', 'Skill Bash(openspec *) Read Edit Write',
         '--disallowedTools', 'Bash(cd *)',
+        // `--mcp-config` は「追加」であって「限定」ではない。これが無いと開発者個人の
+        // MCP 設定が全部読み込まれる——実測（2026-08-30・デバッグログ全23本）で
+        // `claude.ai Slack` / `Google Drive` / `Canva` など8本・約80ツールが、
+        // `--allowedTools` に無いので**呼べないまま**エンドユーザーの実行に並んでいた。
+        // 上の `--setting-sources` の注記（個人の設定を持ち込まない）と、工程ごとに
+        // 公開ツールを工程ごとに絞った意図（specs `mcp/server`「呼べないものを見せてから
+        // 失敗させない」）の両方を破っていた（santa-method レビュー指摘 5周目）
+        '--strict-mcp-config',
       ],
 
-      // エージェント向け endpoint の base URL。spawn 時に環境変数 STROKE_BASEURL として
-      // 渡し、セッション API スキルがそこから接続先を解決する（prompt には載せない）
-      apiBaseUrl: 'http://127.0.0.1:3399',
+      // エージェント向け endpoint の base URL。prompt には載せない（design.md 決定7）。
+      //
+      // いまの実質的な用途は、起動ごとに組み立てる `--mcp-config` の url
+      // （`${apiBaseUrl}/mcp`）である（`server/utils/stroke/invoke.ts`）。
+      //
+      // spawn 時に環境変数 STROKE_BASEURL としても渡してはいる
+      // （`server/utils/stroke/claude.ts`）が、**読み手はもう居ない**。これを読んでいた
+      // セッション API スキルは `--add-dir` から外れたうえに撤去され、curl / printenv も
+      // `--allowedTools` から落ちた
+      apiBaseUrl: 'http://127.0.0.1:3599',
 
       // セッションの openspec/config.yaml に書くワークフロースキーマ名。実体は
       // user レベル（~/.local/share/openspec/schemas/）に配置されたものが解決される
       workflowSchema: 'flontier-strokeflow',
 
       // AI へ渡す定型。指示の本文はコードに持たない（specs/agent/invocation）。従う手順は
-      // スキル自身が持つ。初回はスキル起動＋最低限の固定指示、継続は続きを促すだけ
-      // （入力は prompt に載せず、エージェントが取得スキルで読む）
-      firstPrompt: '/openspec-ff-change \n\n取得スキルで内容を確認しスキルに従って作業しろ',
-      continuePrompt: '続きを進めろ。状況は取得スキルで確認してから判断しろ。',
+      // スキル自身が持つ。初回も最低限の固定指示だけ、継続は続きを促すだけ
+      // （入力は prompt に載せず、エージェントが取得ツールで読む）
+      //
+      // 取得・提出の操作も手順の案内も stroke-board の MCP ツールが担う。案内は
+      // `get-guide`（adr0016-sub-create-flontier-guidance-mcp-tool）で、手順の本文は
+      // `server/mcp/tools/get-guide.ts` の定数が正である。**prompt に手順そのものを
+      // 書かない**——本文が設定とコードの2箇所になり、片方だけが古くなる。
+      //
+      // かつては案内をスキルが担う分担で `/openspec-ff-change` を prompt の先頭に置いて
+      // いたが、**実体が無かった**（`.claude/skills/` にも assets にも openspec のスキーマ
+      // にも存在しない）。`Unknown command` で初回起動が何もせず終わる（実測 2026-08-27:
+      // assistant のターンがゼロで「プロセスは成功したが提出が届かない」になり、巡回の
+      // 再起動が毎回拾っていた）。実在するツールを指す形に置き換えたのがいまの定型である
+      firstPrompt: 'stroke-board の MCP ツール get-guide で進め方を読み、そのとおりに作業しろ。',
+      continuePrompt: '続きを進めろ。stroke-board の MCP ツール get-guide で進め方を読み直し、状況を確認してから判断しろ。',
 
       // 承認で昇格した直後に steering 文書を作らせる定型（ADR 0011）。cwd は昇格先の
       // プロジェクトで、--mcp-config は呼び出し側がそこから組み立てて足す。
+      //
+      // **`/write-steering-v2` の起動は外した。** firstPrompt の `/openspec-ff-change` と
+      // まったく同じで実体が無く（`.claude/skills/` は存在せず、当時の
+      // `assets/.claude/skills/` の10件にも無かった）、prompt の先頭に置くと
+      // `Unknown command` で起動が assistant の
+      // ターンをひとつも持たずに終わる。steering 工程が何もせず終わっていた直接の原因で、
+      // 5.2 の残り2ツール（get-steering / submit-document の steering 種別）が一度も
+      // 呼ばれなかったのはこれによる（santa-method レビュー指摘 4周目 2026-08-30）。
+      //
+      // 取得・提出も案内も MCP ツールが担う。案内は `get-steering-guide`
+      // （adr0016-sub-create-steering-guidance-mcp-tool）で、手順の本文は
+      // `server/mcp/tools/get-steering-guide.ts` の定数が正である。
       // write-steering（v2 でない方）は対話インタビュー（grill）を含み、無人実行では
       // 進まないため使わない
-      steeringPrompt: '/write-steering-v2\n\nスキルの指示に従って steering 文書を作成する。',
+      steeringPrompt: 'stroke-board の MCP ツール get-steering-guide で進め方を読み、そのとおりに steering 文書を作成しろ。',
 
       // 失敗した実行を起こし直す回数の上限。上限に達したら起動せず invocation を
-      // error（終端）にする。総待ち時間は「(回数 + 1) × タイムアウト」で決まる
+      // error（終端）にする。総待ち時間は下の2件と合わせて決まる
       maxRetries: 2,
 
-      // 呼び出しの生出力（--output-format json の stdout 全文）を書き残すディレクトリ。
-      // 空なら書かない（既定 = 無効）。調査用の複製で、呼び出しの成否には影響しない
+      // 1回の起動を打ち切るまでの時間。
+      //
+      //   その起動のタイムアウト = timeoutMs + timeoutStepMs × これまでに起こし直した回数
+      //
+      // 初回のキックは「起こし直し」ではないので回数は 0、つまり timeoutMs そのもの。
+      // 伸びるのはひと続きの起こし直しの中だけで、回数が 0 に戻れば timeoutMs へ戻る。
+      //
+      // timeoutMs の 3分は実測から置いた値である。180 秒では初回が必ず時間切れになり
+      // 10分へ延ばしたが（実測 2026-08-25。当時は claude がスキルをロードし `!` フェンスの
+      // 中で curl を往復させていた）、操作が MCP ツールへ移って所要が減ったので戻した
+      // （実測 2026-08-28: 8回の呼び出しで 28.5〜64.7 秒、turns は 4〜15）。
+      //
+      // timeoutStepMs の既定 0 は「伸ばさない」。どれだけ伸ばすのが妥当かの実測がまだ
+      // 無いので、刻みは箱だけ用意して既定では効かせない
+      timeoutMs: 180000,
+      timeoutStepMs: 0,
+
+      // 呼び出しの生出力を書き残すディレクトリ。**空文字なら書かない（既定）。**
+      // 調査用の複製で、呼び出しの成否には影響しない。
+      //
+      // 設定するとツールの呼び出しと結果まで残る（`--output-format stream-json`）。
+      // 出力はセッションごとに1ファイルへ追記される。**有効のまま置かないこと**——
+      // 概要・問い・proposal の全文がローテーション無しで溜まる。調査が終わったら空へ戻し、
+      // 残ったファイルは手で消す（`docs/specs/core/settings-reference.md`）。
+      //
+      // **空のあいだは `yarn check:stroke` の判定が鈍る。** `settle` は実行の終了を数えられず
+      // 5秒固定の待ちに落ち、steering の着地判定は `submit-document` の回数を数えられないので
+      // 文書の有無だけで判定する（`scripts/stroke-check.ts`）
       debugLogDir: '',
     },
 

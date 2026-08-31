@@ -1,0 +1,288 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { MCP_SERVER_NAME } from '../../../../server/utils/mcp/allowed-tools';
+import { resolveConnection, type ConnectionContext } from '../../../../server/utils/mcp/connection-table';
+import { MCP_TOOLS_HEADER } from '../../../../server/utils/mcp/exposed-tools';
+
+/**
+ * 起動が組み立てる `--mcp-config`（provide-operations-via-mcp）。見るのは、工程ごとに
+ * 公開ツールが絞られること——自前 MCP サーバーはツールを1本残らず単一の `/mcp` に登録するので、
+ * 絞らないと flontier の claude にも steering 専用のツールが見え、呼ばれて失敗する。
+ *
+ * あわせて `kick` の後始末（接続表への登録 → 実行終了で削除）も見る。token が消え残ると、
+ * 終わった起動の token でツールを呼べてしまう（specs `server/session-management`
+ * 「実行の終了（正常・異常とも）で無効になる」）。
+ */
+
+/** `readStrokeConfig` を throw させる細工。`buildRun` が同期的に落ちる経路を作るのに使う */
+const config = vi.hoisted(() => ({ broken: false }));
+
+vi.mock('../../../../server/utils/stroke/config', () => ({
+  readStrokeConfig: () => {
+    if (config.broken) throw new Error('設定を読めない');
+    return {
+      projectShareRoot: '/tmp/share',
+      claude: {
+        command: 'claude',
+        args: ['--setting-sources', 'project'],
+        apiBaseUrl: 'http://example.test:3399',
+        workflowSchema: 'flontier-strokeflow',
+        firstPrompt: 'first',
+        continuePrompt: 'continue',
+        steeringPrompt: 'steering',
+        maxRetries: 2,
+        timeoutMs: 1000,
+        timeoutStepMs: 0,
+        debugLogDir: '',
+      },
+      openspec: { bin: 'openspec', initArgs: 'init --yes' },
+      wsPathPattern: '/ws/{channel}',
+    };
+  },
+}));
+
+/**
+ * ポータル側の設定。`readServerConfig` は `useRuntimeConfig()` を通るので、Nitro の外では
+ * 解決できない。ここで見たいのは**その値が本家 MCP の `env` に載ること**だけである
+ */
+vi.mock('../../../../server/utils/config', () => ({
+  readServerConfig: () => ({
+    upstreamBaseUrl: 'http://example.test:5000',
+    projectsParentPath: '/tmp/share',
+    specWorkflowHome: '/tmp/share/.spec-workflow-mcp',
+    syncIntervalMs: 30000,
+  }),
+}));
+
+/** 実行そのものは差し替える。見たいのは `kick` の前後の後始末だけである */
+const ai = vi.hoisted(() => ({ invokeAi: vi.fn<(sessionId: string, run: unknown) => Promise<void>>() }));
+
+vi.mock('../../../../server/utils/stroke/ai', () => ({ invokeAi: ai.invokeAi }));
+
+/**
+ * 接続表の token は `randomBytes` から作られる（`server/utils/mcp/connection-table.ts`）。
+ * `kick` が発行した token を外から知りたいので、乱数だけを予測可能な値に差し替える。
+ * 呼ぶたびに違う値になる性質（起動ごとに別の token）は保つ。
+ */
+const random = vi.hoisted(() => ({ issued: 0 }));
+
+vi.mock('node:crypto', async (importOriginal) => ({
+  ...await importOriginal<typeof import('node:crypto')>(),
+  randomBytes: (size: number) => Buffer.alloc(size, ++random.issued),
+}));
+
+/** 直前に発行された token。`kick` を呼んだ後に読む */
+function issuedToken(): string {
+  return Buffer.alloc(32, random.issued).toString('hex');
+}
+
+/** 接続表に載っていれば文脈を、載っていなければ null を返す（401 は ok:false の結果で来る） */
+function registered(token: string): ConnectionContext | null {
+  const resolved = resolveConnection({ 'x-stroke-token': token });
+  return resolved.ok ? resolved.context : null;
+}
+
+const { buildRun, kick } = await import('../../../../server/utils/stroke/invoke');
+
+type McpConfig = {
+  mcpServers: Record<string, {
+    url?: string,
+    headers?: Record<string, string>,
+    command?: string,
+    args?: string[],
+    env?: Record<string, string>,
+  }>,
+};
+
+/** 起動 args から `--mcp-config` の JSON をまるごと取り出す。 */
+function mcpConfigOf(kind: 'stroke' | 'steering'): McpConfig {
+  const run = buildRun({
+    sessionId: 'session-1',
+    cwd: '/tmp/share/session-1',
+    kind,
+    retries: 0,
+    token: 'token-1',
+  });
+  const at = run.launch.args.indexOf('--mcp-config');
+  expect(at).not.toBe(-1);
+  return JSON.parse(run.launch.args[at + 1]!) as McpConfig;
+}
+
+/** 起動 args から `--mcp-config` の JSON を取り出し、自前 MCP サーバーのエントリを返す。 */
+function mcpToolServerEntryOf(kind: 'stroke' | 'steering') {
+  const run = buildRun({
+    sessionId: 'session-1',
+    cwd: '/tmp/share/session-1',
+    kind,
+    retries: 0,
+    token: 'token-1',
+  });
+  const at = run.launch.args.indexOf('--mcp-config');
+  expect(at).not.toBe(-1);
+
+  const config = JSON.parse(run.launch.args[at + 1]!) as McpConfig;
+  return config.mcpServers[MCP_SERVER_NAME]!;
+}
+
+/** 起動 args の `--allowedTools` の値。フラグが無ければ空にする（別の引数を見にいかない） */
+function allowedToolsOf(kind: 'stroke' | 'steering'): string[] {
+  const run = buildRun({
+    sessionId: 'session-1',
+    cwd: '/tmp/share/session-1',
+    kind,
+    retries: 0,
+    token: 'token-1',
+  });
+  const at = run.launch.args.indexOf('--allowedTools');
+  return at === -1 ? [] : run.launch.args[at + 1]!.split(' ');
+}
+
+function exposedToolsOf(kind: 'stroke' | 'steering'): string[] {
+  return mcpToolServerEntryOf(kind).headers[MCP_TOOLS_HEADER]!.split(',');
+}
+
+describe('buildRun の --mcp-config', () => {
+  it('flontier 工程の起動は steering 用のツールを公開しない', () => {
+    expect(exposedToolsOf('stroke')).toEqual([
+      'get-guide',
+      'get-overview',
+      'get-strokes',
+      'get-send-back',
+      'send-question',
+      'submit-document',
+    ]);
+    expect(exposedToolsOf('stroke')).not.toContain('get-steering-guide');
+  });
+
+  it('steering 工程の起動は flontier 専用のツールを公開しない', () => {
+    expect(exposedToolsOf('steering')).toEqual(['get-steering-guide', 'get-steering', 'submit-document']);
+    expect(exposedToolsOf('steering')).not.toContain('get-guide');
+  });
+
+  it('本家 MCP に SPEC_WORKFLOW_HOME を渡す（渡さないと steering 工程が成立しない）', () => {
+    // 本家 MCP は起動時に「動いているプロジェクト」の登録簿へ自分を書き、dashboard の
+    // 一覧はその登録簿を読む。場所を決めるのがこの環境変数で、未設定だと既定の
+    // `~/.spec-workflow-mcp` へ書く。**書き手と読み手が別の登録簿を見ていた**ので、
+    // 昇格したてのプロジェクトは一覧に現れず `project_not_registered` が返り続けていた
+    // （実測 2026-08-31）
+    const upstream = mcpConfigOf('steering').mcpServers['specworkflow']!;
+
+    expect(upstream.env).toEqual({ SPEC_WORKFLOW_HOME: '/tmp/share/.spec-workflow-mcp' });
+    // ポータルが読む値と同じ1つを使う。ここで別の解決規則を書くとまた割れる
+    expect(upstream.args).toEqual(['-y', '@pimzino/spec-workflow-mcp@latest', '/tmp/share/session-1']);
+  });
+
+  it('flontier 工程には本家 MCP を渡さない', () => {
+    expect(Object.keys(mcpConfigOf('stroke').mcpServers)).toEqual([MCP_SERVER_NAME]);
+  });
+
+  it('両工程とも自前 MCP のツールを --allowedTools に足す', () => {
+    // **肯定で見る。** 否定だけだと、`--allowedTools` を丸ごと落としても
+    // `indexOf` が -1 を返して別の引数を見にいき、テストが通ってしまう
+    // （変異試験で確認。santa-method レビュー指摘 9周目 2026-08-31）。
+    // これが落ちるということは、claude が MCP ツールを1本も呼べないということである
+    for (const kind of ['stroke', 'steering'] as const) {
+      expect(allowedToolsOf(kind)).toContain('mcp__stroke-board');
+    }
+  });
+
+  it('submit-document は両工程で公開される', () => {
+    expect(exposedToolsOf('stroke')).toContain('submit-document');
+    expect(exposedToolsOf('steering')).toContain('submit-document');
+  });
+
+  it('steering 工程は本家 MCP も --allowedTools に載せる（配るだけで呼べない状態にしない）', () => {
+    const run = buildRun({
+      sessionId: 'session-1',
+      cwd: '/tmp/share/session-1',
+      kind: 'steering',
+      retries: 0,
+      token: 'token-1',
+    });
+    expect(allowedToolsOf('steering')).toContain('mcp__specworkflow');
+    expect(allowedToolsOf('steering')).toContain('mcp__stroke-board');
+    expect(run.launch.args.filter(arg => arg === '--allowedTools')).toHaveLength(1);
+
+    // 本家 MCP は `--mcp-config` の mcpServers にも同じ名前で並ぶ（名前がずれると許可が効かない）
+    const configAt = run.launch.args.indexOf('--mcp-config');
+    const config = JSON.parse(run.launch.args[configAt + 1]!) as { mcpServers: Record<string, unknown> };
+    expect(Object.keys(config.mcpServers)).toContain('specworkflow');
+  });
+
+  it('flontier 工程には本家 MCP を許可しない（配ってもいない）', () => {
+    // `allowedToolsOf` はフラグが無ければ空を返すので、フラグごと落ちたときに
+    // 別の引数を見にいって否定が通ってしまうことがない
+    expect(allowedToolsOf('stroke')).not.toContain('mcp__specworkflow');
+  });
+
+  it('工程で分けるのはヘッダだけで、url と token の渡し方は変わらない', () => {
+    for (const kind of ['stroke', 'steering'] as const) {
+      const entry = mcpToolServerEntryOf(kind);
+      expect(entry.url).toBe('http://example.test:3399/mcp');
+      expect(entry.headers['x-stroke-token']).toBe('token-1');
+    }
+  });
+});
+
+describe('kick の接続表の後始末', () => {
+  beforeEach(() => {
+    config.broken = false;
+    ai.invokeAi.mockReset();
+    ai.invokeAi.mockResolvedValue(undefined);
+  });
+
+  it('実行中はエントリが残る（消すのが早すぎない）', async () => {
+    let finish = (): void => {};
+    ai.invokeAi.mockImplementationOnce(async () => await new Promise<void>((resolve) => { finish = resolve; }));
+
+    const running = kick({ sessionId: 'session-1', cwd: '/tmp/share/session-1', kind: 'stroke', retries: 0 });
+    const token = issuedToken();
+
+    // 起動が走っている間は、その token でツールを呼べなければならない
+    expect(registered(token)).toEqual({ sessionId: 'session-1' });
+
+    finish();
+    await running;
+    expect(registered(token)).toBeNull();
+  });
+
+  it('steering の起動は projectPath の文脈で登録される', async () => {
+    let finish = (): void => {};
+    ai.invokeAi.mockImplementationOnce(async () => await new Promise<void>((resolve) => { finish = resolve; }));
+
+    const running = kick({ sessionId: 'project-a', cwd: '/opt/projects/project-a', kind: 'steering', retries: 0 });
+    const token = issuedToken();
+
+    expect(registered(token)).toEqual({ projectPath: '/opt/projects/project-a' });
+
+    finish();
+    await running;
+    expect(registered(token)).toBeNull();
+  });
+
+  it('正常終了でエントリが消える', async () => {
+    await kick({ sessionId: 'session-1', cwd: '/tmp/share/session-1', kind: 'stroke', retries: 0 });
+
+    expect(registered(issuedToken())).toBeNull();
+  });
+
+  it('異常終了（invokeAi の reject）でもエントリが消える', async () => {
+    ai.invokeAi.mockRejectedValueOnce(new Error('起動できない'));
+
+    await expect(kick({ sessionId: 'session-1', cwd: '/tmp/share/session-1', kind: 'stroke', retries: 0 }))
+      .rejects.toThrow('起動できない');
+    expect(registered(issuedToken())).toBeNull();
+  });
+
+  it('buildRun が同期的に throw してもエントリが消え、reject した promise が返る', async () => {
+    config.broken = true;
+
+    // 素の throw ではなく reject で返る（呼び出し元の `.catch()/.finally()` が付く）
+    const kicked = kick({ sessionId: 'session-1', cwd: '/tmp/share/session-1', kind: 'stroke', retries: 0 });
+    const token = issuedToken();
+
+    await expect(kicked).rejects.toThrow('設定を読めない');
+    expect(ai.invokeAi).not.toHaveBeenCalled();
+    expect(registered(token)).toBeNull();
+  });
+});

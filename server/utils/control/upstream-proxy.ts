@@ -20,6 +20,11 @@ export function upstreamClient(): UpstreamRestClient {
  * - 未設定 / 繋がらない → 503。本家が動いていないだけで stroke-board の不具合ではない
  * - 無かった → 404。対象が削除・アーカイブされている場合がある（specs/project-workspace）
  * - 形が違った → 502。本家の形が変わった。黙って通さない
+ *
+ * `error-response`（本家が 404 以外のエラー応答を返した）は、これまで `unreachable` に
+ * 畳まれていて 503 になっていた。畳むのをやめても**画面向けの写像は変えない**——ここは
+ * 画面が見せる文言と結び付いており、区別を要求しているのは MCP ツール側だけである
+ * （`server/utils/mcp/upstream-failure.ts` が本家の状態コードを保持する）。
  */
 export function toHttpError(failure: UpstreamFailure): ReturnType<typeof createError> {
   switch (failure.kind) {
@@ -31,6 +36,7 @@ export function toHttpError(failure: UpstreamFailure): ReturnType<typeof createE
       });
 
     case 'unreachable':
+    case 'error-response':
       return createError({
         statusCode: 503,
         statusMessage: 'upstream-unreachable',

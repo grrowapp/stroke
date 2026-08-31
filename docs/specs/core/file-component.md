@@ -173,8 +173,6 @@ withDefaults(
 )
 ```
 
-読むだけ。**編集も承認も置かない**（`specs/project-workspace`）。
-
 `content` が空なら `missing` の文言を `EmptyState` で出す。
 
 markdown は md4x で描く。md4x は WASM を読み込むまで描けないため `await init()` してから描画する。SSR でも本文を出す（画面を開いた時点で読める）ためで、Nuxt のページは Suspense の下にあるので `await` できる。

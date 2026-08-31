@@ -2,8 +2,18 @@ import type { Invocation, SessionSummary } from '#shared/stroke'
 import { invokeAi, type AiRun } from './ai'
 import { readStrokeConfig } from './config'
 import { initSessionOpenspec } from './openspec'
-import { readState, writeState } from './session-store'
+import { readState, sessionExists, writeState } from './session-store'
 import { submissionCount } from './submission-signal'
+import {
+  MCP_SERVER_ALLOWED_TOOL,
+  MCP_SERVER_NAME,
+  UPSTREAM_MCP_ALLOWED_TOOL,
+  UPSTREAM_MCP_SERVER_NAME,
+  withMcpToolsAllowed,
+} from '../mcp/allowed-tools'
+import { readServerConfig } from '../config'
+import { issueConnectionToken, registerConnection, removeConnection } from '../mcp/connection-table'
+import { exposedToolsHeaderValue, MCP_TOOLS_HEADER, type McpToolPhase } from '../mcp/exposed-tools'
 
 /**
  * 起動の材料を設定から組み立てる端。
@@ -82,6 +92,7 @@ function conversationWriter(sessionId: string) {
  * @param kind       ストロークの往復か、承認後の steering か
  * @param retries    これまでに起こし直した回数
  * @param runId      steering の会話 id。まだ無ければ undefined
+ * @param token      この起動の接続表 token（provide-operations-via-mcp design.md「接続の担保」）
  */
 export function buildRun(options: {
   sessionId: string
@@ -89,8 +100,9 @@ export function buildRun(options: {
   kind: RunKind
   retries: number
   runId?: string
+  token: string
 }): AiRun {
-  const { sessionId, cwd, kind, retries, runId } = options
+  const { sessionId, cwd, kind, retries, runId, token } = options
   const { claude, openspec } = readStrokeConfig()
 
   // 空 = 無効。無効を undefined へ写すのは設定を引いた端のここで行う
@@ -103,7 +115,17 @@ export function buildRun(options: {
         command: claude.command,
         // 本家 spec-workflow の MCP を与えて起こす（ADR 0011）。設定にも持たず、
         // ファイルも作らず、cwd から組み立てて args に足す（design.md D7）。
-        args: [...claude.args, '--mcp-config', mcpConfigFor(cwd)],
+        // 自前 MCP サーバー（provide-operations-via-mcp）も同じ --mcp-config に並べる
+        // （既存フラグ・本家 MCP の並びは変えない）。
+        // MCP ツールは --allowedTools に載っていないと呼べないため、同じく呼び出し
+        // ごとにここで足す（tasks 4.5）。**本家 MCP の分も足す**——配るだけでは
+        // 一覧に出るのに1つも呼べず、「呼べないものを見せてから失敗させない」
+        // （specs `mcp/server`）を破る（santa-method レビュー指摘 4周目 2026-08-30）。
+        args: [
+          ...withMcpToolsAllowed(claude.args, [MCP_SERVER_ALLOWED_TOOL, UPSTREAM_MCP_ALLOWED_TOOL]),
+          '--mcp-config',
+          mcpConfigFor(cwd, token, claude.apiBaseUrl),
+        ],
         apiBaseUrl: claude.apiBaseUrl,
       },
       cwd,
@@ -112,6 +134,8 @@ export function buildRun(options: {
       prompts: { first: claude.steeringPrompt, continue: claude.steeringPrompt },
       maxRetries: claude.maxRetries,
       retries,
+      timeoutMs: claude.timeoutMs,
+      timeoutStepMs: claude.timeoutStepMs,
       // 会話 id は自前採番しない。対象のディレクトリ名はプロジェクト名で uuid ではなく、
       // `--session-id` は uuid しか受け付けない（実測）。初回は claude に採番させる
       conversationId: runId,
@@ -126,7 +150,13 @@ export function buildRun(options: {
   return {
     launch: {
       command: claude.command,
-      args: claude.args,
+      // 自前 MCP サーバー（provide-operations-via-mcp）を足す。既存フラグの並びは変えない。
+      // MCP ツールは --allowedTools に載っていないと呼べないため、同じくここで足す（tasks 4.5）。
+      args: [
+        ...withMcpToolsAllowed(claude.args),
+        '--mcp-config',
+        mcpToolConfigFor(token, claude.apiBaseUrl),
+      ],
       apiBaseUrl: claude.apiBaseUrl,
     },
     cwd,
@@ -134,8 +164,15 @@ export function buildRun(options: {
     prompts: { first: claude.firstPrompt, continue: claude.continuePrompt },
     maxRetries: claude.maxRetries,
     retries,
-    // ストロークは uuid を自前採番して使う。スキルが `${CLAUDE_SESSION_ID}` でセッション
-    // id を知る前提（docs/specs/architecture/session-workflow.md）に効いている
+    timeoutMs: claude.timeoutMs,
+    timeoutStepMs: claude.timeoutStepMs,
+    // ストロークは uuid を自前採番して使う。**続きを開くのに要るからである**——次の起動が
+    // `--resume <id>` で同じ会話へ戻るには、こちら側が id を決めて覚えているしかない。
+    //
+    // かつては「スキルが `${CLAUDE_SESSION_ID}` でセッション id を知る前提」を理由に
+    // 書いていたが、**その読み手はもう居ない**（`claude.ts` の `STROKE_BASEURL` と同じ）。
+    // セッション id を子へ渡しているのは、上の `--mcp-config` に載る接続表の token
+    // （`x-stroke-token`）の方である（santa-method レビュー指摘 7周目 2026-08-30）
     conversationId: sessionId,
     // 実体の揃ったセッション（ディレクトリ・openspec ルート・スキーマ設定済み）として
     // 一覧に載っていれば、初回の起動を済ませている = 続き先が在る。
@@ -151,29 +188,99 @@ export function buildRun(options: {
       bin: openspec.bin,
       initArgs: openspec.initArgs,
       schemaName: claude.workflowSchema,
+      // 実在の判定を渡す端はここ。消えたセッションのために掘らせない（openspec.ts）
+      sessionExists: () => sessionExists(sessionId),
     }),
   }
 }
 
 /**
- * 本家 `spec-workflow-mcp` を起こす `--mcp-config` の中身。
+ * 自前 MCP サーバー（provide-operations-via-mcp）を起こす `--mcp-config` の1エントリ。
  *
- * `--mcp-config` は JSON 文字列を直接受け取れる（実機確認済み・design.md D7）。
- * 生成先のプロジェクトをそのままワークスペースとして渡す。
+ * url は `runtimeConfig.claude.apiBaseUrl` から組み立てる（design.md「MCP の url は
+ * 既存設定から組み立てる」。新しい設定は増やさない）。token はこの起動専用の一時値
+ * （接続表 `server/utils/mcp/connection-table.ts`）。
+ *
+ * 工程は url ではなくヘッダで分ける。`x-mcp-tools` に載せた名前のツールだけが claude の
+ * tools 一覧に載るので、その工程で呼べないツールは初めから見えない
+ * （`server/utils/mcp/exposed-tools.ts`）。
  */
-function mcpConfigFor(cwd: string): string {
+function mcpToolServerEntry(
+  token: string,
+  apiBaseUrl: string,
+  phase: McpToolPhase,
+): Record<string, unknown> {
+  return {
+    type: 'http',
+    url: `${apiBaseUrl}/mcp`,
+    headers: {
+      'x-stroke-token': token,
+      [MCP_TOOLS_HEADER]: exposedToolsHeaderValue(phase),
+    },
+  }
+}
+
+/** flontier 工程の `--mcp-config`。自前 MCP サーバーのみを持つ。 */
+function mcpToolConfigFor(token: string, apiBaseUrl: string): string {
   return JSON.stringify({
     mcpServers: {
-      specworkflow: {
-        type: 'stdio',
-        command: 'npx',
-        args: ['-y', '@pimzino/spec-workflow-mcp@latest', cwd],
-      },
+      [MCP_SERVER_NAME]: mcpToolServerEntry(token, apiBaseUrl, 'flontier'),
     },
   })
 }
 
-/** 材料を組み立てて起こす。結果は待たない。 */
+/**
+ * steering 工程の `--mcp-config`。本家 `spec-workflow-mcp` と自前 MCP サーバーを並べる
+ * （既存フラグ・本家 MCP の並びは変えない）。
+ *
+ * `--mcp-config` は JSON 文字列を直接受け取れる（実機確認済み・design.md D7）。
+ * 生成先のプロジェクトをそのままワークスペースとして渡す。
+ *
+ * **`SPEC_WORKFLOW_HOME` を渡す。これが無いと steering 工程は成立しない。**
+ * 本家 MCP は起動時に「どのプロジェクトが動いているか」の登録簿へ自分を書き込み、
+ * dashboard の `GET /api/projects/list` はその登録簿を読む。登録簿の場所は
+ * `SPEC_WORKFLOW_HOME` が決め、未設定なら `~/.spec-workflow-mcp` になる。
+ *
+ * dashboard は `/opt/projects/.spec-workflow-mcp` を見て動いているのに、claude が起こす
+ * 側は環境変数を継がず既定の場所へ書いていた。**別々の登録簿に書いて読んでいた**ので、
+ * 昇格したてのプロジェクトは何度起こしても一覧に現れず、`get-steering` /
+ * `submit-document`（steering）は `project_not_registered` を返し続けていた
+ * （実測 2026-08-31: 本家 MCP は `connected` で「Project registered」も出しているのに、
+ * dashboard の一覧にも `/opt/projects/.spec-workflow-mcp/activeProjects.json` にも
+ * 現れない。手で起こして突き合わせて確かめた）。
+ *
+ * 値は**ポータル側が読んでいるものと同じ1つ**を使う（`readServerConfig`）。ここで
+ * 別の解決規則を書くと、また読み手と書き手が割れる。
+ */
+function mcpConfigFor(cwd: string, token: string, apiBaseUrl: string): string {
+  return JSON.stringify({
+    mcpServers: {
+      [UPSTREAM_MCP_SERVER_NAME]: {
+        type: 'stdio',
+        command: 'npx',
+        args: ['-y', '@pimzino/spec-workflow-mcp@latest', cwd],
+        env: { SPEC_WORKFLOW_HOME: readServerConfig().specWorkflowHome },
+      },
+      [MCP_SERVER_NAME]: mcpToolServerEntry(token, apiBaseUrl, 'steering'),
+    },
+  })
+}
+
+/**
+ * 材料を組み立てて起こす。結果は待たない。
+ *
+ * spawn 直前に接続表 token を発行・登録し（provide-operations-via-mcp design.md「接続の
+ * 担保」）、実行終了時（正常・異常とも）に削除する。**`buildRun` が同期的に throw する
+ * 経路も含める。**`invokeAi` の引数として評価される `buildRun(...)` が例外を投げると
+ * `invokeAi` 自体が呼ばれず `.finally` がどの promise にもアタッチされないため、
+ * その経路は別途 catch して削除する（santa-method レビュー指摘）。
+ *
+ * **この関数自身は同期的に throw しない。** `kick` は `async` 宣言ではない通常関数のため、
+ * catch 節で素の `throw` をすると呼び出し式の評価中に同期的に例外が飛び、呼び出し元
+ * （`invoke-agent.get.ts`）の `.catch()/.finally()` が一切アタッチされないまま素通りする
+ * （busy ガード解除・エラーログがどちらも実行されなくなる。santa-method レビュー指摘）。
+ * 常に `Promise` を返す契約を保つため `Promise.reject` で包む。
+ */
 export function kick(options: {
   sessionId: string
   cwd: string
@@ -181,5 +288,19 @@ export function kick(options: {
   retries: number
   runId?: string
 }): Promise<void> {
-  return invokeAi(options.sessionId, buildRun(options))
+  const token = issueConnectionToken()
+  registerConnection(
+    token,
+    options.kind === 'steering' ? { projectPath: options.cwd } : { sessionId: options.sessionId },
+  )
+
+  let run: AiRun
+  try {
+    run = buildRun({ ...options, token })
+  } catch (error) {
+    removeConnection(token)
+    return Promise.reject(error)
+  }
+
+  return invokeAi(options.sessionId, run).finally(() => removeConnection(token))
 }

@@ -8,8 +8,10 @@ import { defineConfig } from '@playwright/test';
  *
  * 承認依頼やタスクの状態を動かすには本家へ書き込む必要があるが、stroke-board は
  * `.spec-workflow/` に書き込まないと決めている（docs/adr/0001）。テストのためにその線を
- * 越えない。代わりに実測した形と同じペイロードを返すスタブを使い、スタブが実物と
- * ずれていないことは `yarn test:live` が本物に対して確かめる。
+ * 越えない。代わりに実測した形と同じペイロードを返すスタブを使う。
+ *
+ * **スタブが実物とずれていないことを確かめる手立ては、いま無い。** 本家へ実接続する
+ * テストを持っていたが撤去した。ずれに気付く仕組みは別途要る。
  */
 
 /**
@@ -26,7 +28,9 @@ import { defineConfig } from '@playwright/test';
 const PORT_SLOT: Record<string, number> = {
   base: 1,
   base2: 2,
-  // 3 は欠番。slot 3 の APP_PORT が dev サーバーの固定ポート 3399 と被るため（CLAUDE.md の Dev サーバー）
+  // 3 は欠番。slot 3 の APP_PORT が dev サーバーの既定ポート 3399 と被るため（CLAUDE.md の Dev サーバー）。
+  // **既定であって固定ではない。** 並走のために dev をずらした worktree では、そのポートが
+  // 別の slot の APP_PORT と衝突しうる（欠番表は 3399 しか避けていない）
   base4: 4,
   mvp: 5,
   base3: 6,
@@ -110,7 +114,7 @@ mkdirSync(SPEC_WORKFLOW_HOME, { recursive: true });
 writeFileSync(REGISTRY_PATH, registryContent());
 
 export default defineConfig({
-  testDir: './e2e',
+  testDir: './test/e2e',
   testMatch: '**/*.spec.ts',
   fullyParallel: false,
   workers: 1,
@@ -121,7 +125,7 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: `node e2e/fixtures/upstream-stub.mjs ${STUB_PORT}`,
+      command: `node test/e2e/fixtures/upstream-stub.mjs ${STUB_PORT}`,
       url: `http://127.0.0.1:${STUB_PORT}/api/projects/list`,
       reuseExistingServer: false,
       stdout: 'pipe',

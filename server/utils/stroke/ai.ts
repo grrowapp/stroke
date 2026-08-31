@@ -22,11 +22,17 @@ export interface AiRun {
   maxRetries: number
   /** これまでに起こし直した回数。`state.json` 側が持つ */
   retries: number
+  /** 起こし直していない起動を打ち切るまでの時間。`runtimeConfig.claude.timeoutMs` */
+  timeoutMs: number
+  /** 起こし直し1回ぶんの刻み。`0` なら伸ばさない。`runtimeConfig.claude.timeoutStepMs` */
+  timeoutStepMs: number
   /**
    * 会話の続け先。**あるかどうかが初回/継続の判定そのものである。**
    *
-   * - ストローク: 自前採番の uuid。スキルが `${CLAUDE_SESSION_ID}` でセッション id を
-   *   知る前提（docs/specs/architecture/session-workflow.md）に効くので必ず渡す。
+   * - ストローク: 自前採番の uuid。**`--resume` で同じ会話へ戻るために必ず渡す**
+   *   （id を決めて覚えているのは呼び出し側だけである）。かつて理由に挙げていた
+   *   「スキルが `${CLAUDE_SESSION_ID}` で知る」は読み手がもう居ない
+   *   （santa-method レビュー指摘 7周目 2026-08-30）。
    *   初回か継続かは `hasConversation` が決める
    * - steering: 初回は `undefined`（claude に採番させる）。走った後に `remember` で
    *   受け取った id が次回の続き先になる
@@ -72,7 +78,7 @@ export interface AiRun {
  */
 export async function invokeAi(sessionId: string, run: AiRun): Promise<void> {
   const {
-    launch, cwd, debugLogDir, prompts, maxRetries, retries,
+    launch, cwd, debugLogDir, prompts, maxRetries, retries, timeoutMs, timeoutStepMs,
     conversationId, hasConversation, setInvocation, remember, prepare, didWork,
   } = run
 
@@ -84,6 +90,15 @@ export async function invokeAi(sessionId: string, run: AiRun): Promise<void> {
     await setInvocation('error')
     return
   }
+
+  // 打ち切りまでの長さは**上限判定と同じ `retries`** から決める。初回のキックは 0 なので
+  // 刻みが乗らず、`timeoutMs` そのものになる。ここで `retries + 1` を見ると初回から
+  // 伸びてしまうので、上限判定の隣に置いて解釈を1箇所に閉じている
+  // （openspec/specs/agent/invocation・design.md Decision 2）。
+  //
+  // 伸びるのはひと続きの起こし直しの中だけである。完了とユーザーの再実行が `retries` を
+  // 0 に戻すので、次の連なりは再び `timeoutMs` から始まる。
+  const timeout = timeoutMs + timeoutStepMs * retries
 
   await setInvocation('running', retries + 1)
 
@@ -107,7 +122,7 @@ export async function invokeAi(sessionId: string, run: AiRun): Promise<void> {
   // **1回の呼び出しで起こすのは1回だけである。** 起こし直しは巡回（`failed` を拾って
   // U13 を叩く）が担い、回数は `state.json` が持つ。ここで内側にもループを持つと、
   // 巡回の回数と掛け算になって総起動回数が上限の意味から外れる。
-  const result = await runClaude({ sessionId: conversationId, launch, cwd, prompt, mode, debugLogDir })
+  const result = await runClaude({ sessionId: conversationId, launch, cwd, prompt, mode, debugLogDir, timeoutMs: timeout })
 
   if (result.ok) {
     // 会話 id は作業の成否に関わらず覚える。次のキックはこの続きから始める。

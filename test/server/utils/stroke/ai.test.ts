@@ -39,6 +39,10 @@ function makeRun(overrides: Partial<AiRun> = {}): {
     prompts: { first: 'FIRST', continue: 'CONTINUE' },
     maxRetries: 2,
     retries: 0,
+    // **本番の既定値を置かない。** 見るのは「渡した値がそのまま素通しされるか」なので、
+    // 既定と同じ値を使うと、実装が設定を無視して既定へ戻っても気付けない
+    timeoutMs: 60000,
+    timeoutStepMs: 0,
     hasConversation: async () => false,
     setInvocation: async (invocation, retries) => {
       calls.push({ invocation, retries })
@@ -69,7 +73,41 @@ describe('invokeAi', () => {
       cwd: '/opt/projects/my-project',
       prompt: 'FIRST',
       mode: 'new',
+      timeoutMs: 60000,
     })
+  })
+
+  it('起こし直していない起動には刻みを乗せない', async () => {
+    runClaude.mockResolvedValue({ ok: true, sessionId: 'abc' })
+
+    // `retries` は「これまでに起こし直した回数」。初回のキックは 0 なので基準の長さそのもの
+    const { run } = makeRun({ retries: 0, timeoutMs: 90000, timeoutStepMs: 30000 })
+    await invokeAi(SESSION_ID, run)
+
+    expect(runClaude).toHaveBeenCalledWith(expect.objectContaining({ timeoutMs: 90000 }))
+  })
+
+  it('起こし直した回数のぶんだけ刻みを足した長さで起動する', async () => {
+    runClaude.mockResolvedValue({ ok: true, sessionId: 'abc' })
+
+    const { run } = makeRun({ retries: 1, timeoutMs: 90000, timeoutStepMs: 30000 })
+    await invokeAi(SESSION_ID, run)
+    expect(runClaude).toHaveBeenCalledWith(expect.objectContaining({ timeoutMs: 120000 }))
+
+    runClaude.mockClear()
+
+    const { run: run2 } = makeRun({ retries: 2, timeoutMs: 90000, timeoutStepMs: 30000 })
+    await invokeAi(SESSION_ID, run2)
+    expect(runClaude).toHaveBeenCalledWith(expect.objectContaining({ timeoutMs: 150000 }))
+  })
+
+  it('刻みが 0 なら回数によらず基準の長さで起動する', async () => {
+    runClaude.mockResolvedValue({ ok: true, sessionId: 'abc' })
+
+    const { run } = makeRun({ retries: 2, maxRetries: 5, timeoutMs: 90000, timeoutStepMs: 0 })
+    await invokeAi(SESSION_ID, run)
+
+    expect(runClaude).toHaveBeenCalledWith(expect.objectContaining({ timeoutMs: 90000 }))
   })
 
   it('続き先が在れば継続として、続きを促す定型で起動する', async () => {
