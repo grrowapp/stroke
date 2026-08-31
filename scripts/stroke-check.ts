@@ -87,6 +87,15 @@ const APPROVE_NAME_ATTEMPTS = 5
 /** steering 文書の本数（product / tech / structure）。3本揃ったら着地とみなす */
 const STEERING_DOCUMENTS = 3
 
+/**
+ * 直前の待ちに入った時点の生出力の本数。`settle` が「もう終わっているか」を見るのに使う。
+ *
+ * `waitForNext` が待ちに入るたびに更新する。**待ちの中で実行が終わったかどうか**は、
+ * この基準からの増分でしか分からない——`settle` の呼び出し時点で数え直すと、既に
+ * 終わっている実行を「まだ動いている」と読み違える。
+ */
+let roundStartLogs = 0
+
 /** 画面1 を開き直す上限。dev がモジュールを取り落とすと数回に1回は開けない（`openStrokes`） */
 const OPEN_ATTEMPTS = 5
 
@@ -453,6 +462,7 @@ async function waitForNext(page: Page, previous: string | undefined): Promise<'q
   // 止まっているのかが外から分からないと、待つ判断も切る判断もできない
   const started = Date.now()
   const logs = logEntryCount()
+  roundStartLogs = logs
   let notified = 0
 
   while (Date.now() < deadline) {
@@ -609,9 +619,15 @@ function fallbackProjectName(): string {
  * @returns 承認で確定したプロジェクト名
  */
 async function approve(page: Page): Promise<string> {
-  // 承認が通るのは `phase` が `proposed` のときだけで、AI の実行中は 409 で弾かれる
-  // （`settle` と同じ理由。機械が即座に押すと必ず当たる）
-  await settle(page)
+  // **承認そのものに busy ガードは無い**（`approve.post.ts`「busy ガードは U7・U9 のみ。
+  // 承認はエージェントの呼び出しを起動しないため対象にしない」）。それでも実行の終わりを
+  // 待つのは、承認がセッションディレクトリを**改名する**からである。まだ動いている claude の
+  // cwd を足元から動かすことになる。
+  //
+  // 基準は**この待ちに入った時点**（`waitForNext` が控えた本数）にする。`settle` の中で
+  // 数え直すと、proposal を出した実行が既に終わっていても「増えていない」と見えて、
+  // 4分を丸ごと捨てる（実測 2026-08-31）
+  await settle(page, roundStartLogs)
 
   await page.getByRole('button', { name: '承認して作る' }).click()
 
@@ -918,13 +934,17 @@ async function sendBack(
  * 終了は claude の生出力が1本増えたことで分かる（`debugLogDir`）。設定が空で数えられない
  * ときは、一定時間だけ置いて進む。
  */
-async function settle(page: Page): Promise<void> {
+async function settle(page: Page, baseline?: number): Promise<void> {
   if (DEBUG_LOG_DIR === '') {
     await page.waitForTimeout(5000)
     return
   }
 
-  const before = logEntryCount()
+  // **もう終わっているなら待たない。** 基準を渡されたときは、その時点から生出力が
+  // 増えているかを見る。増えていれば実行は終わっており、ここで待つと何も起きないまま
+  // `ROUND_TIMEOUT_MS`（4分）を丸ごと捨てる（実測 2026-08-31: `approve` の手前で毎回）
+  const before = baseline ?? logEntryCount()
+  if (logEntryCount() > before) return
   const deadline = Date.now() + ROUND_TIMEOUT_MS
   const started = Date.now()
   let notified = 0
