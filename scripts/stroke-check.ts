@@ -305,6 +305,16 @@ async function main(): Promise<void> {
     fail(`回答ポリシー ${policyName} は無い（${Object.keys(policies).join(' / ')}）`)
   }
 
+  // **デバッグログが無いと、承認まで進める判定が2つとも鈍る。** 黙って弱い判定に落ちると、
+  // 通ったのか見られていないだけなのかが報告から分からない。使う前に言う
+  if (approveRequested && DEBUG_LOG_DIR === '') {
+    console.log('  注意: claude.debugLogDir が空なので、次の2つが効かない')
+    console.log('    - 実行の終了を数えられないので、承認の手前の待ちが5秒固定になる')
+    console.log('      （まだ動いている claude の作業場所を承認が改名しうる）')
+    console.log('    - steering の着地を文書の有無だけで判定する')
+    console.log('      （ツールを通さず直接書かれたものと区別できない）')
+  }
+
   const before = new Set(logNames())
 
   // **`handleSIGINT: false` を外さない。** Playwright は既定で自前の SIGINT ハンドラを入れ、
