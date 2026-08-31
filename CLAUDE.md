@@ -14,7 +14,7 @@
 - 起動・ビルドなどの実行は **package.json の scripts 経由**（`yarn dev` / `yarn build` / `yarn test` …）で行う。`node .output/server/index.mjs` のような直接起動をしない
 - ポートは **3399 固定**。同じ値が2箇所にある — ストロークの `claude.apiBaseUrl`（正は `docs/specs/core/settings-reference.md`）と `nuxt.config.ts` の `devServer.port`（起動時のビルド設定でストローク側設定ではないため settings-reference の対象外。`nuxt.config.ts` が実体）。変えるときは必ず両方を変える
 - 3000 はこのマシンで別のプロセスが使用中。使わない
-- E2E の PORT_SLOT（`playwright.config.ts`）は worktree のディレクトリ名から slot を引き、STUB_PORT と APP_PORT を決める。slot 3 は欠番（APP_PORT が dev の 3399 と被るため）。例: worktree `base3` は slot 6 → STUB 5699 / APP 3699
+- E2E の STUB_PORT / APP_PORT（`playwright.config.ts`）は**実行のたびに 50000 から上へ空きを探して取る**（上限 60000）。固定値ではないので、worktree を並べて同時に `yarn test:e2e` を回してよい。どのポートを使ったかは Playwright の起動ログに出る
 
 ## Worktree 運用
 

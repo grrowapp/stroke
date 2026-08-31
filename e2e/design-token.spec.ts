@@ -18,6 +18,35 @@ import { expect, test } from '@playwright/test';
  */
 const OPENSPEC_ROOT = '/opt/projects/stroke-board/openspec';
 
+/**
+ * `box-shadow` が**外へ**光を漏らしているか。
+ *
+ * `inset` の影は面の内側で厚みを作るためのもので、際立ちには当たらない。外向きの影が
+ * 1枚でもあれば「際立っている」と見なす。影の色や広がりは `ui.md` が持つので、ここでは
+ * 有無だけを見る。
+ */
+function hasOuterGlow(boxShadow: string): boolean {
+  if (boxShadow === 'none') return false;
+
+  // 影は `,` 区切りだが色関数の中にも `,` が入るため、括弧の外の `,` だけで割る
+  const layers: string[] = [];
+  let depth = 0;
+  let current = '';
+  for (const ch of boxShadow) {
+    if (ch === '(') depth += 1;
+    if (ch === ')') depth -= 1;
+    if (ch === ',' && depth === 0) {
+      layers.push(current);
+      current = '';
+      continue;
+    }
+    current += ch;
+  }
+  layers.push(current);
+
+  return layers.some((layer) => !layer.includes('inset'));
+}
+
 const UPSTREAM_CSS = join(
   OPENSPEC_ROOT,
   'changes/archive/2026-08-20-steering-dashboard-portal/prototype/assets/spec-workflow.css',
@@ -154,15 +183,44 @@ test.describe('本家の design token に合っている', () => {
     expect(style.cellBackground).toBe('rgb(30, 41, 59)');
   });
 
-  test('未接続の行は不透明度で押せないことを示す', async ({ page }) => {
+  /**
+   * かつては行全体に `opacity` を掛けていたが、それでは状態の列まで沈み、押せない理由が
+   * 読めなくなる。`specs/project/directory` は「行を弱めるとき状態の列を弱めてはならない」
+   * と定め、行全体に一律の弱め方を掛ける実装はこの要件を満たさないとしている。
+   *
+   * したがって見るのは行の `opacity` ではなく、**弱めた列と弱めていない列の差**である。
+   */
+  test('未接続の行は、状態以外を弱めて押せないことを示す', async ({ page }) => {
     await page.goto('/projects');
 
-    const opacity = await page
-      .getByTestId('project-row')
-      .filter({ hasText: 'idle-project' })
-      .evaluate((row) => getComputedStyle(row).opacity);
+    const row = page.getByTestId('project-row').filter({ hasText: 'idle-project' });
 
-    expect(Number(opacity)).toBeLessThan(1);
+    const cells = await row.evaluate((element) => {
+      const tds = [...element.querySelectorAll('td')];
+      return tds.map((td) => ({
+        // 名前と未処理の通知は子要素を弱める。状態は弱めない
+        childOpacity: td.firstElementChild
+          ? Number(getComputedStyle(td.firstElementChild).opacity)
+          : null,
+        color: getComputedStyle(td).color,
+      }));
+    });
+
+    const [name, state, unread, lastModified] = cells;
+
+    // 押せないことは、名前と未処理の通知を弱めて示す
+    expect(name?.childOpacity, '名前は弱める').toBeLessThan(1);
+    expect(unread?.childOpacity, '未処理の通知は弱める').toBeLessThan(1);
+
+    // 状態の列は弱めない。押せない理由がここに出ている
+    expect(state?.childOpacity, '状態は弱めない').toBe(1);
+
+    // 最終更新は子を持たないので、文字色を地と混ぜて沈める
+    const active = page.getByTestId('project-row').filter({ hasText: 'alpha' });
+    const activeLastModified = await active.evaluate(
+      (element) => getComputedStyle(element.querySelectorAll('td')[3]!).color,
+    );
+    expect(lastModified?.color, '最終更新は沈める').not.toBe(activeLastModified);
   });
 
   test('下層の選択中の項目は本家のアクティブ表現になっている', async ({ page }) => {
@@ -336,39 +394,45 @@ test.describe('アイコンは prototype のものを使っている', () => {
 });
 
 test.describe('表の中身が prototype と同じ様式になっている', () => {
-  test('プロジェクト一覧: アクティブは緑のチップ、未接続は無彩色', async ({ page }) => {
+  /**
+   * 見た目の実値は固定しない。色の混ぜ方は `ui.md` と prototype が持っており、詰め直す
+   * たびにテストが落ちるのでは、テストが値の写しになってしまう。ここで確かめるのは
+   * specs/project/directory が要求する**関係**である——3状態が同じ形と同じ幅で並ぶこと、
+   * 際立つのはアクティブだけであること。
+   */
+  test('プロジェクト一覧: 3状態は同じ形で並び、際立つのはアクティブだけ', async ({ page }) => {
     await page.goto('/projects');
 
-    const active = await page
-      .getByTestId('project-row')
-      .filter({ hasText: 'alpha' })
-      .locator('.sb-chip')
-      .evaluate((element) => {
-        const style = getComputedStyle(element);
-        return {
-          color: style.color,
-          fontSize: style.fontSize,
-          // prototype の chipOn は border を宣言していないので枠幅 0
-          borderWidth: style.borderTopWidth,
-          background: style.backgroundColor,
-        };
-      });
+    const read = (name: string) =>
+      page
+        .getByTestId('project-row')
+        .filter({ hasText: name })
+        .locator('.sb-chip')
+        .evaluate((element) => {
+          const style = getComputedStyle(element);
+          return {
+            color: style.color,
+            fontSize: style.fontSize,
+            minWidth: style.minWidth,
+            borderWidth: style.borderTopWidth,
+            boxShadow: style.boxShadow,
+          };
+        });
 
-    const idle = await page
-      .getByTestId('project-row')
-      .filter({ hasText: 'idle-project' })
-      .locator('.sb-chip')
-      .evaluate((element) => {
-        const style = getComputedStyle(element);
-        return { color: style.color, fontSize: style.fontSize };
-      });
+    const active = await read('alpha');
+    const idle = await read('idle-project');
 
-    // prototype の chipOn は --status-success(#22c55e)、chipOff は --text-muted(#94a3b8)
-    expect(active.color).toBe('rgb(34, 197, 94)');
+    // 同じ形・同じ幅で並ぶ。枠幅が揃っていないと高さがずれる
+    expect(active.minWidth).toBe('76px');
+    expect(idle.minWidth).toBe(active.minWidth);
+    expect(idle.borderWidth).toBe(active.borderWidth);
     expect(active.fontSize).toBe('11px');
-    expect(active.borderWidth).toBe('0px');
-    expect(idle.color).toBe('rgb(148, 163, 184)');
-    expect(idle.fontSize).toBe('11px');
+    expect(idle.fontSize).toBe(active.fontSize);
+
+    // 際立つのはアクティブだけ。外へ光を漏らすのはアクティブに限る
+    expect(active.color).not.toBe(idle.color);
+    expect(hasOuterGlow(active.boxShadow), 'アクティブは外へにじむ').toBe(true);
+    expect(hasOuterGlow(idle.boxShadow), '未接続は外へにじまない').toBe(false);
   });
 
   test('プロジェクト一覧: 最終更新は 12px の secondary', async ({ page }) => {
