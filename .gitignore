@@ -66,3 +66,8 @@ server/mcp/tools/.nuxtrc
 specs/.current-epic
 # ralph-specum: 状態ファイルのロック（マシンローカル）
 specs/**/.ralph-state.lock
+
+# yarn の移行が残すバックアップ（node_modules.yarn-bak / .nuxt.yarn-bak）。
+# 生成物のコピーであって成果物ではない。一度 11,466 ファイル・307MB を履歴へ入れた
+# ことがあるので、名前で丸ごと落とす
+*.yarn-bak/
