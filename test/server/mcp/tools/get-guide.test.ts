@@ -23,7 +23,7 @@ const REQUIRED_TOPICS: Array<[string, RegExp]> = [
   ['把握完了の判定', /把握完了/],
   ['proposal を提出する条件と形式', /submit-document[\s\S]*type: "flontier"/],
   ['差し戻しを受けたときの進め方', /差し戻し/],
-  ['いま作る段はワークフロー定義から読む', /openspec instructions/],
+  ['openspec コマンドへ逸れさせない', /`openspec` コマンドを叩かない/],
 ];
 
 describe('get-guide', () => {
