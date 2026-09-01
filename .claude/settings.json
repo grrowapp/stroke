@@ -19,6 +19,8 @@
     "deny": [
       "Bash(sed *)",
       "Bash(git -C *)",
+      "Bash(git push * develop)",
+      "Bash(git push * develop *)",
       "Bash(git merge *)",
       "Bash(git sparse-checkout *)",
       "Bash(git config *sparseCheckout*)",
