@@ -204,7 +204,7 @@ export default defineNuxtConfig({
     //
     // 昇格したプロジェクトが一覧に現れるのは、両者がこの1つの値を見ているからである。
     // 2つの設定に分けると、食い違ったときに承認したプロジェクトが一覧から消える
-    projectShareRoot: '/opt/projects',
+    projectShareRoot: '/opt/public',
 
     // --- ポータル: 本家に触るために要る2つ。読み方は server/utils/config.ts に閉じる
     upstreamBaseUrl: 'http://192.168.1.204:5000',
@@ -284,7 +284,7 @@ export default defineNuxtConfig({
       // （`server/utils/stroke/claude.ts`）が、**読み手はもう居ない**。これを読んでいた
       // セッション API スキルは `--add-dir` から外れたうえに撤去され、curl / printenv も
       // `--allowedTools` から落ちた
-      apiBaseUrl: 'http://127.0.0.1:3599',
+      apiBaseUrl: 'http://127.0.0.1:5100',
 
       // セッションの openspec/config.yaml に書くワークフロースキーマ名。実体は
       // user レベル（~/.local/share/openspec/schemas/）に配置されたものが解決される
