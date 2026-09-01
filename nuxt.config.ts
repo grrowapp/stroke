@@ -284,7 +284,7 @@ export default defineNuxtConfig({
       // （`server/utils/stroke/claude.ts`）が、**読み手はもう居ない**。これを読んでいた
       // セッション API スキルは `--add-dir` から外れたうえに撤去され、curl / printenv も
       // `--allowedTools` から落ちた
-      apiBaseUrl: 'http://127.0.0.1:5100',
+      apiBaseUrl: 'http://127.0.0.1:5200',
 
       // セッションの openspec/config.yaml に書くワークフロースキーマ名。実体は
       // user レベル（~/.local/share/openspec/schemas/）に配置されたものが解決される
