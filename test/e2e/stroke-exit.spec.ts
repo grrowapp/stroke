@@ -39,6 +39,49 @@ test.describe('承認して一覧へ戻る', () => {
     await rm(join(PROJECTS_PARENT, SEEDED_PROJECT_NAME), { recursive: true, force: true });
   });
 
+  /**
+   * 承認の判断・昇格・起動は別々の段である（openspec/specs/api/session/approve・
+   * api/session/promote）。判断だけを送って止めると**プロジェクトは作られず**、判断は
+   * 昇格の前なら取り下げられる。画面の承認（次のテスト）はこの3段を順に踏む。
+   */
+  test('承認の判断だけではプロジェクトにならず、昇格の前なら取り下げられる', async ({ request }) => {
+    const approve = `/api/strokes/${SEEDED_SESSION_ID}/approve`;
+
+    // 段1: 判断を記録する。ディレクトリは改名されず、phase も動かない
+    const decided = await request.post(approve, { data: { projectName: SEEDED_PROJECT_NAME } });
+    expect(decided.status()).toBe(204);
+    expect(existsSync(join(PROJECTS_PARENT, SEEDED_SESSION_ID))).toBe(true);
+    expect(existsSync(join(PROJECTS_PARENT, SEEDED_PROJECT_NAME))).toBe(false);
+    const status = (await (await request.get(`/api/strokes/${SEEDED_SESSION_ID}`)).json()) as { phase: string };
+    expect(status.phase).toBe('proposed');
+
+    // プロジェクト一覧には生成中としても現れない
+    const { directory } = (await (await request.get('/api/projects')).json()) as {
+      directory: { status: string; projects?: Array<{ name: string }> };
+    };
+    expect(directory.status).toBe('ok');
+    expect((directory.projects ?? []).some((project) => project.name === SEEDED_PROJECT_NAME)).toBe(false);
+
+    // 重ねて判断は下せない。記録されている判断はそのまま
+    const again = await request.post(approve, { data: { projectName: 'another-name' } });
+    expect(again.status()).toBe(409);
+
+    // 取り下げる。proposal も往復の記録も残る
+    const cancelled = await request.delete(approve);
+    expect(cancelled.status()).toBe(204);
+    expect(existsSync(join(PROJECTS_PARENT, SEEDED_SESSION_ID, 'docs', 'proposal.md'))).toBe(true);
+    expect(existsSync(join(PROJECTS_PARENT, SEEDED_SESSION_ID, 'strokes.json'))).toBe(true);
+
+    // 判断が無ければ昇格は受理されない。承認が唯一の引き金
+    const refused = await request.post(`/api/strokes/${SEEDED_SESSION_ID}/promote`);
+    expect(refused.status()).toBe(409);
+    expect(existsSync(join(PROJECTS_PARENT, SEEDED_PROJECT_NAME))).toBe(false);
+
+    // 取り消しは GET では到達しない（メソッドで振り分ける）
+    const read = await request.get(approve);
+    expect(read.ok(), 'GET が受理された').toBeFalsy();
+  });
+
   test('承認するとモーダルが閉じて一覧へ戻り、セッションはプロジェクトへ昇格する', async ({ page }) => {
     await page.goto(`/strokes/${SEEDED_SESSION_ID}/proposal`);
 
@@ -59,6 +102,11 @@ test.describe('承認して一覧へ戻る', () => {
     await expect(page).toHaveURL(/\/projects$/);
     await expect(page.getByTestId('stroke-modal')).toHaveCount(0);
     await expect(page.getByTestId('projects-table')).toBeVisible();
+
+    // 画面は判断（U10）→ 昇格（U14）→ 起動（U13）を順に踏む。判断だけで止まると一覧へは
+    // 戻れてもプロジェクトは無い（上のテスト）ので、昇格まで済んだことをここで見る
+    expect(existsSync(join(PROJECTS_PARENT, SEEDED_PROJECT_NAME))).toBe(true);
+    expect(existsSync(join(PROJECTS_PARENT, SEEDED_SESSION_ID))).toBe(false);
   });
 
   test('昇格したプロジェクトは U11 で消せない', async ({ request }) => {
