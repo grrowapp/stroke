@@ -59,11 +59,13 @@ openspec/
 
 ## ticket の起票
 
-change の起票と同時に `openspec/tickets/` に **ticket** を作る。
+change の起票と同時に `openspec/tickets/` に **ticket** を作る。**同時の起票は必須**である。
 
+- **どちらか単独の起票を厳禁とする** — `openspec/changes/<change-id>/` だけを作って ticket を作らない、`openspec/tickets/<change-id>.md` だけを作って change を作らない、そのいずれも認めない
 - ファイル名は change-id + `.md`（例: change `view-openspec-changes` → `openspec/tickets/view-openspec-changes.md`）。
 - 中身は frontmatter（`status` 必須・`change` 必須・`tags` 任意・`triage` 任意）＋本文の概要
-- `status` の値は `docs/agents/ticket-labels.md` による。値は change の artifact 構成から決まる（判定は同ファイル「判定」）
+- `status` の値は `docs/agents/ticket-labels.md` による
+- `tags` は artifact の作成記録。artifact を作成したタイミングで、スキーマで `generates` が設定されたその artifact の `id` を追記する
 - `triage` は `/triage` スキルが付けるラベルの置き場。値の対応は `docs/agents/triage-labels.md`。自分で起票した ticket は `/triage` の対象外なので、通常は空でよい
 
 ### 適用範囲と片づけ
@@ -72,7 +74,6 @@ change の起票と同時に `openspec/tickets/` に **ticket** を作る。
 
 - change との1対1はそれ以降に起票する change に掛かる。それ以前の ticket 無し change に遡って作らない
 - change を archive したら同名 ticket を `openspec/tickets/.archive/` へ移す
-- **change に先行する ticket（バックログ）は認める。** 対応する change が無いことを理由に ticket を消さない。削除するのは、起票の取り消しとユーザーが判断したときだけである
 
 ## artifact
 
