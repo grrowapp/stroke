@@ -33,8 +33,9 @@ export type RunKind = 'stroke' | 'steering'
  * （実測: E2E の 3199 で `fetch failed`）。Nitro の `$fetch` は相対パスをアプリ内部で
  * 解決するので、ホストもポートも知らなくてよい。
  *
- * 承認処理（初回の steering）と巡回（再キック）がこれを使う。endpoint を経由するのは、
- * busy ガードと前提チェック（503）を通すためである。
+ * 巡回（再キック）がこれを使う。初回の steering は昇格の成功を見た画面が U13 を叩き、
+ * 昇格の受け口（U14）は起動を要求しない。endpoint を経由するのは、busy ガードと
+ * 前提チェック（503）を通すためである。
  */
 export function invokePath(sessionId: string, cwd: string): string {
   return `/api/strokes/${encodeURIComponent(sessionId)}/invoke-agent?cwd=${encodeURIComponent(cwd)}`

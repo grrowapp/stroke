@@ -1,7 +1,8 @@
 ---
-status: ready-for-agent
 tags:
   - enhancement
+status: Tasks
+order: 0.0
 ---
 
 # align-settings-conventions

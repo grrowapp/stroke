@@ -1,7 +1,7 @@
 ---
 tags:
   - bug
-status: ready-for-agent
+status: Open
 order: 0.0
 ---
 

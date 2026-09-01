@@ -1,7 +1,8 @@
 ---
-status: ready-for-agent
 tags:
   - chore
+status: Open
+order: -6.0
 ---
 
 # stabilize-dev-module-delivery

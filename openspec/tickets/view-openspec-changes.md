@@ -1,7 +1,7 @@
 ---
-status: needs-info
 tags:
   - enhancement
+status: Proposal
 ---
 
 # view-openspec-changes

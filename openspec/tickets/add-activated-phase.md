@@ -1,5 +1,5 @@
 ---
-status: ready-for-agent
+status: Tasks
 tags:
   - bug
 change: add-activated-phase
@@ -54,5 +54,5 @@ change: add-activated-phase
 - phase の値の集合が4箇所にばら撒かれている（`shared/stroke.ts` の型 / `handler/phase.ts` の `readPhase` / `session-store.ts` の zod / `creationOutcomeOf`）。**値を足す前に1箇所へ閉じる。** イコール比較を各所へ足していく形は取らない
 - `handler/phase.ts` のコメントが既に「`approved` の先に何か足す」ことを想定している。`isBeforeApproval` / `isAfterApproval` で入口は1つになったが、値の集合は残ったまま
 - **`activated` の位置が未決。** 「`proposed` の次」という指示があるが、`approved` との前後関係が2通り読める。着手前に確認する
-- 承認 endpoint が3つの仕事を1回でやっている件（`adr0017-sub-separate-approval-decision-from-promotion`）とは別。段の分割はこちらでは扱わない
+- 承認 endpoint が3つの仕事を1回でやっている件（`separate-approval-decision-from-promotion`）とは別。段の分割はこちらでは扱わない
 - 画面側（クラッカー・モーダル・やり直す・破棄する）は既に実装済みで、動く。**足りないのは判定の層だけ**

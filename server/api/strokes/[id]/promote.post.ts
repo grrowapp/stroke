@@ -1,0 +1,111 @@
+import { broadcastProjectCreation } from '../../../utils/control/board'
+import { readStrokeConfig } from '../../../utils/stroke/config'
+import { conflict } from '../../../utils/stroke/conflict'
+import { submissionPath } from '../../../utils/stroke/invoke'
+import { LOG_PREFIX } from '../../../utils/stroke/log'
+import { assertNameAvailable, promoteSessionToProject, revertPromotion } from '../../../utils/stroke/project'
+import { requireSessionId } from '../../../utils/stroke/session-param'
+import { readState, writeState } from '../../../utils/stroke/session-store'
+import { forgetSubmissions } from '../../../utils/stroke/submission-signal'
+
+/**
+ * U14: 判断のあるセッションをプロジェクトへ昇格させる（openspec/specs/api/session/promote）。
+ *
+ * 承認（U10）・昇格（ここ）・steering の起動（U13）の真ん中の段。**判断を下すことも、
+ * 起動を要求することも受け持たない。**
+ *
+ * **記録された判断が無ければ受理しない。** 承認はプロジェクト生成の唯一の引き金であり、
+ * その関係はここで守られる。分岐ではなく責務の不成立である（ADR-0014 補足1）——
+ * 「判断のあるセッションを昇格させる」が責務で、判断が無ければそれが成立しない。
+ *
+ * **本文を取らない。** 名前は判断が持つ。引数で受けると判断と違う名前で昇格できてしまう。
+ *
+ * 昇格はセッションディレクトリの改名だけである（openspec/specs/project/generation）。
+ * 順序は「衝突確認 → 改名 → `phase` を書く」で、書き込みが失敗したら改名を戻す。
+ * どの時点で失敗しても、セッションは元の名前・`proposed`・**判断はそのまま**で残り、
+ * 同じ判断のまま昇格だけをやり直せる。逆順（`phase` を書いてから改名）にすると、書いた
+ * 直後に落ちたときに **uuid のままで `approved`** のディレクトリが残り、一覧に「生成中」
+ * として出てしまう。
+ *
+ * ## 昇格の完了時点で `invocation` を `failed` にする
+ *
+ * ここは起動を要求しない。起動の要求が一度も届かなかったとき（要求した側が応答を受け取る
+ * 前に離脱した等）に、系が自力で起こし直せる形で残す必要がある。巡回
+ * （`server/plugins/01.retry-failed.ts`）は `failed` **だけ**を拾い、そこへ条件を足すことは
+ * 禁じられている（openspec/specs/portal/batch）ので、まだ起動が済んでいないことを巡回が
+ * 既に拾う値で表す。
+ *
+ * **失敗していないのに `failed` と書く。** 系はこの値を既に「起こし直す対象」の意味で
+ * 使っている——`01.retry-failed.ts` の初回の刈り取りは、前のプロセスの残骸として残った
+ * `running` を「失敗したから」ではなく「誰も起こし直さないから」`failed` へ倒している。
+ * 同じ用法で、書き方も同じ（A8 への POST）に揃える。
+ *
+ * **`writeState` で直に書かず、A8 を通す。** `invocation` の書き込みは A8 を通してのみ行う
+ * （openspec/specs/agent/invocation）。書き込み口を1つに保つための規定で、書き込みに
+ * 付随する上層への合図の判定（`writeInvocation`）もそこにしか無い。**応答を返す前に待ち切る**
+ * ——昇格の応答を見た側が続けて叩く U13 に追い越されない。
+ *
+ * A8 が失敗しても昇格は巻き戻さない（後始末は段ごとに閉じる）。`idle` のまま残ると巡回が
+ * 拾わないので、そのときは要求する側のキックだけが起動の道になる。
+ */
+export default defineEventHandler(async (event) => {
+  const sessionId = await requireSessionId(event)
+
+  const state = await readState(sessionId)
+  if (state.phase === 'approved') {
+    throw conflict('phase', 'このセッションは既に昇格している。')
+  }
+  if (state.phase !== 'proposed' || state.decision === undefined) {
+    throw conflict('phase', '承認の判断が記録されていない。先に承認すること。')
+  }
+  const { projectName } = state.decision
+
+  const shareRoot = readStrokeConfig().projectShareRoot
+
+  // 衝突確認は改名の**前**に通す。既にあれば何も動かさずに 409 で、セッションは
+  // `proposed`・判断つきのまま残る。
+  await assertNameAvailable(shareRoot, projectName)
+
+  // **改名してから phase を書く。** 巻き戻しは対称で、書き込みに失敗したら改名を戻すだけ。
+  await promoteSessionToProject(shareRoot, sessionId, projectName)
+
+  // 昇格後も steering の実行が起こるので、`invocation` を持たせて引き継ぐ
+  // （openspec/specs/agent/invocation）。回数は新しい用途なので 0 から数え直す。
+  // **状態を作る書き込みであって遷移ではない**ので `idle` を置く。遷移（→ `failed`）は
+  // この後 A8 を通す。書き込み先は**改名後の場所**である。
+  try {
+    await writeState(projectName, {
+      phase: 'approved',
+      projectName,
+      invocation: 'idle',
+      retries: 0,
+    })
+  } catch (error) {
+    // 昇格を確定させない。改名を戻して、セッションを元の名前・`proposed`・判断つきのまま残す。
+    await revertPromotion(shareRoot, projectName, sessionId)
+    throw error
+  }
+
+  // **昇格した瞬間に上層へ知らせる。** 昇格を要求した本人はこの直後に一覧へ戻る。開いたままの
+  // 一覧にも生成中の行が出るようにする（specs/project/generation「生成の進行は、開いている
+  // 一覧へ届く」）。判断の記録（U10）では配信しない——その時点でプロジェクトはまだ無い。
+  // 配信は接続中のブラウザへ送るだけで、失敗しても昇格の成否に関わらない。
+  broadcastProjectCreation(projectName, 'in-progress')
+
+  // 昇格した時点で旧 id の提出の記録は用済み。以後この id は二度と来ない。
+  forgetSubmissions(sessionId)
+
+  // 起動の段を巡回へ引き渡す（上の doc「昇格の完了時点で `invocation` を `failed` にする」）。
+  // path は相対。自分自身を叩くのに外向けの設定値で URL を組むと、待ち受けを変えた瞬間に
+  // 届かなくなる（`invoke.ts`）。
+  try {
+    await $fetch(submissionPath(projectName), {
+      method: 'POST',
+      body: { invocation: 'failed' },
+    })
+  } catch (error) {
+    console.error(`${LOG_PREFIX} 起動の段の引き渡しに失敗（昇格は残す）: ${projectName}`, error)
+  }
+
+  return new Response(null, { status: 204 })
+})

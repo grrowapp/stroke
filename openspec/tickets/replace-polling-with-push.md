@@ -1,3 +1,8 @@
+---
+status: Tasks
+change: replace-polling-with-push
+---
+
 # replace-polling-with-push
 
 ストローク側の待機を、3秒ポーリングから WS の push に寄せる。**`useWaitingRetry` のポーリングを無くすことを前提に置く。**

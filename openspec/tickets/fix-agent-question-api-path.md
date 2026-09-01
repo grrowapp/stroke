@@ -1,7 +1,8 @@
 ---
-status: ready-for-agent
 tags:
   - bug
+status: Open
+order: -1.0
 ---
 
 # fix-agent-question-api-path

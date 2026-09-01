@@ -1,7 +1,7 @@
 ---
-status: ready-for-agent
 tags:
   - enhancement
+status: Proposal
 ---
 
 # scope-storage-requirements

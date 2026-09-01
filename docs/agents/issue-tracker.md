@@ -59,41 +59,27 @@ openspec/
 
 ## ticket の起票
 
-change の起票と同時に `openspec/tickets/` に **ticket** を作る。
+change の起票と同時に `openspec/tickets/` に **ticket** を作る。**同時の起票は必須**である。
 
+- **どちらか単独の起票を厳禁とする** — `openspec/changes/<change-id>/` だけを作って ticket を作らない、`openspec/tickets/<change-id>.md` だけを作って change を作らない、そのいずれも認めない
 - ファイル名は change-id + `.md`（例: change `view-openspec-changes` → `openspec/tickets/view-openspec-changes.md`）。
-- 中身は frontmatter（`status` 必須・`change` 必須・`tags` 任意）＋本文の概要
-- `status` の値は `docs/agents/triage-labels.md` の5つ（2026-08-29 時点で `Doing` / `Todo` の混入が5件ある。見つけたら5つのいずれかに直す）
+- 中身は frontmatter（`status` 必須・`change` 必須・`tags` 任意・`triage` 任意）＋本文の概要
+- `status` の値は `docs/agents/ticket-labels.md` による
+- artifact を作成したタイミングで、スキーマで `generates` が設定されたその artifact の `id` を`tags`に追記する
+- **`openspec apply` またはスキルなどで同等の指示がはいったら、`tags `に`<ブランチ名>/<セッション ID>` を追記する。作業が完了しても消さない事。作業担当者が変わった場合は、新たに同様のルールで追記する
 
-### 適用範囲と片づけ
+  ```yaml
+  tags:
+    - proposal
+    - tasks
+    - create-module-annotation/31a5f942-f4e1-4620-9eb7-4d1409d4151f
+    - create-module-annotation/94cf0176-0a93-4b92-9ec3-a1af20009bf5
+  ```
 
-本規約の採用は **2026-08-28**。
-
-- change との1対1はそれ以降に起票する change に掛かる。それ以前の ticket 無し change に遡って作らない
+- `triage` は `/triage` スキルが付けるラベルの置き場。値の対応は `docs/agents/triage-labels.md`
 - change を archive したら同名 ticket を `openspec/tickets/.archive/` へ移す
-- **change に先行する ticket（バックログ）は認める。** 対応する change が無いことを理由に ticket を消さない。削除するのは、起票の取り消しとユーザーが判断したときだけである
 
 ## artifact
-
-### 順序と依存
-
-`proposal → specs → ui → design → tasks` の順に作る。依存関係はスキーマの `requires` が持つ（`tasks` の `requires` は `[specs, design]`）。`ui` と `design` は条件付きで、**省いても tasks は作れる** — `requires` は生成順の助言であって CLI は強制しない（実測: requires を満たさない change が実在する）。
-
-### 各 artifact が持つもの
-
-- **proposal** — なぜこの変更が要るか。`Why` / `What Changes` / `Capabilities` / `Impact`
-- **specs** — 何を満たすか。capability ごとに1ファイル
-- **ui** — 画面をどうするか。画面を持つ change のみ。`/prototype` で変種を出して選んだ結果を記録する
-- **design** — どう作るか。作る条件は下記
-- **tasks** — 実装チェックリスト。`## <番号>. <見出し>` でグループ化し、各タスクを `- [ ] <グループ番号>.<連番> 説明` の形にする。この形でないと進捗が追跡されない。`openspec/config.yaml` の `rules` により、santa-method レビューとユーザー完了承認のタスクを必ず含める
-
-design を作る条件は次のいずれか。いずれも無ければ省略する。
-
-- (a) 横断的な変更・新しいアーキテクチャパターン・新しい依存・データモデルの変更
-- (b) セキュリティ / 性能 / 移行の複雑さ、技術判断を先に要する曖昧さ
-- (c) 上位資料への整合反映（[更新対応](#更新対応)）
-
-(a)(b) はスキーマの design instruction の要約で、全量はそちらが持つ。**(c) は本書がこの repo 向けに足す条件**でスキーマには無い。
 
 ## 参照の方向
 
@@ -136,7 +122,6 @@ specs  ×  specs    禁止
 
 - ticket と change の対応はファイル名（= change-id）と、ticket内には対応changesを必ず入れる
 - ticket は change と並走する記録である
-- 一覧の起点として ticket から change の artifact へ**辿る**のは可
 
 ## 更新対応
 
@@ -163,19 +148,21 @@ ADR の内容がユーザーとの会話を経て docs に確定したら、次�
 取って代わられた場合: - **状態**: archive（2026-08-29。取って代わられ済み。現行は <docs path> の「<節名>」）
 ```
 
-## フォルダの新規作成
-
-### repo 直下
+## repo 直下のフォルダの扱い
 
 repo 直下への新規フォルダ作成は、**エージェントの自己判断では行わない**。直下のフォルダが増殖するのを禁じる。作ってよいのは次のいずれかに当たるときだけ。
 
-1. **初期化・新規プロジェクトの立ち上げ**など、フォルダ構成そのものを作る工程にいる
+1. **ユーザーが初期化・新規プロジェクトの立ち上げを指示した** — 自分で「その工程にいる」と判断するのではなく、指示があること
 2. **スキル・エージェントのプロンプト定義に、そのフォルダを作る指示がある**
-3. **判断・決定のルールがドキュメント側に先行して存在し、そこで指定されたフォルダがまだ無い** — `docs/` や `docs/specs/` のように、プロジェクトの成長の過程でルールが先に決まり、置き場が後から要るようになった場合
+3. **docs に規定があり、そこで指定されたフォルダがまだ無い** — `docs/` や `test/` のように、規定が先に決まり、置き場が後から要るようになった場合
 
-3 で作ったときは、**作成判断の根拠にしたものと、作成したフォルダ名をユーザーへ簡潔に報告する**（例:「`docs/agents/issue-tracker.md`「〜」の規定により `docs/specs/api/` を作成」）。
+3 の根拠にできるのは **docs（`docs/adr/` を除く）だけ**である。ADR・specs・ticket・change の artifact・steering は根拠にしない（[参照の方向](#参照の方向)の逆流禁止）。
+
+3 で作ったときは、**作成判断の根拠にしたものと、作成したフォルダ名を、作成した直後の応答でユーザーへ簡潔に報告する**（例:「`docs/specs/core/system-structure.md`「ディレクトリ構造」の規定により `test/` を作成」）。
 
 どれにも当たらないなら作らない。置き場が無いと感じたら、既存のフォルダへ収めるか、ユーザーに確認する。
+
+repo 直下の構成そのものの規範は [`docs/specs/core/system-structure.md`](../specs/core/system-structure.md) が持つ。**直下にフォルダを足したら、同ファイルのディレクトリ構造へ整合反映する**（[更新対応](#更新対応)
 
 ## 過去の記録
 

@@ -40,21 +40,48 @@ function shareRoot(): string {
  * **`invocation` と `retries` は3つの phase すべてが持つ。** 承認で昇格したプロジェクトでも
  * steering の実行が起こるため、実行の記録は `approved` でも要る
  * （openspec/specs/agent/invocation「phase が `approved` の対象も `invocation` を持つ」）。
+ *
+ * **承認の判断は `proposed` の中で持つ（`decision`）。** 判断は局面ではなく、局面の中の印である
+ * ——判断が下りてもセッションはセッションのままで、昇格（改名と `approved` の書き込み）は
+ * 別の段（U14）が行う（openspec/specs/api/session/approve・api/session/promote）。
+ * `phase` の値は増やさない。
  */
+
+/** 承認の判断。proposal を読んだユーザーが確定した名前を持つ。 */
+export interface ApprovalDecision {
+  projectName: string
+}
+
+/** `stroking` / `proposed` が共通で持つもの。 */
+interface ActiveFields {
+  /** 今ユーザーが答えるべき問い。エージェントの提出（A5）で更新される。まだ無ければ null */
+  currentQuestion: Question | null
+  /** AI が提案した kebab-case のプロジェクト名候補。取れないことがある */
+  projectName?: string
+  invocation: Invocation
+  /** 起こし直した回数。上限判定は invokeAi が行う。省略は 0 と同じ */
+  retries?: number
+}
+
+/**
+ * proposal が出ている局面。判断を持てるのはこの分岐だけである。
+ *
+ * 判断を書く・消す口（`withDecision` / `withoutDecision`）はこの型で受けてこの型を返す。
+ * `phase` を別の値へ動かす書き方は型で通らない——「判断の記録は `phase` を動かさない」
+ * （openspec/specs/project/generation）を、新しい制約ではなく既にある分岐で表す。
+ */
+export interface ProposedState extends ActiveFields {
+  phase: 'proposed'
+  /** 記録された承認の判断。無ければ判断は下りていない */
+  decision?: ApprovalDecision
+}
+
 export type SessionState =
-  | {
-      phase: 'stroking' | 'proposed'
-      /** 今ユーザーが答えるべき問い。エージェントの提出（A5）で更新される。まだ無ければ null */
-      currentQuestion: Question | null
-      /** AI が提案した kebab-case のプロジェクト名候補。取れないことがある */
-      projectName?: string
-      invocation: Invocation
-      /** 起こし直した回数。上限判定は invokeAi が行う。省略は 0 と同じ */
-      retries?: number
-    }
+  | (ActiveFields & { phase: 'stroking' })
+  | ProposedState
   | {
       phase: 'approved'
-      /** 承認時に確定した名前 */
+      /** 承認の判断で確定し、昇格の改名に使った名前 */
       projectName: string
       invocation: Invocation
       retries?: number
@@ -80,9 +107,16 @@ const activeStateFields = {
   retries: retriesSchema,
 }
 
+/** 承認の判断。名前はユーザーが確定したもので、空は判断として成立しない。 */
+const decisionSchema = z.object({ projectName: projectNameSchema })
+
 const stateSchema = z.discriminatedUnion('phase', [
   z.object({ phase: z.literal('stroking'), ...activeStateFields }),
-  z.object({ phase: z.literal('proposed'), ...activeStateFields }),
+  // `decision` は任意。持たない既存の `state.json` は「判断なし」として読める。
+  // zod は未知のキーを strip するので、この行を知らない旧実装が読んで書き戻すと
+  // `decision` は黙って消える（実測 2026-09-01・zod 4.4.3）。消えても proposal も
+  // 往復の記録も無事で、承認からやり直せる（design.md Migration Plan）
+  z.object({ phase: z.literal('proposed'), ...activeStateFields, decision: decisionSchema.optional() }),
   z.object({
     phase: z.literal('approved'),
     projectName: projectNameSchema,
@@ -211,6 +245,33 @@ export function creationOutcomeOf(
 
 export async function writeState(sessionId: string, state: SessionState): Promise<void> {
   await writeAtomic(sessionId, SESSION_FILES.state, `${JSON.stringify(state, null, 2)}\n`)
+}
+
+/**
+ * 記録された承認の判断。`proposed` 以外は判断を持ちえないので undefined。
+ *
+ * 判断の有無 = `decision` の有無である。判断を表す別の値を `phase` に持たない
+ * （openspec/specs/api/session/approve「判断が記録されているセッションは、まだセッションである」）。
+ */
+export function decisionOf(state: SessionState): ApprovalDecision | undefined {
+  return state.phase === 'proposed' ? state.decision : undefined
+}
+
+/**
+ * 判断を記録した状態を作る。**`phase` は `proposed` のまま**——受けるのも返すのも
+ * `ProposedState` で、別の局面へ動かす書き方は型で通らない。
+ *
+ * 保存はしない。呼び出し側が `writeState` で書く（判断の前提——proposal の有無・名前の
+ * 衝突・重ねての判断——は受け口（U10）が見る）。
+ */
+export function withDecision(state: ProposedState, decision: ApprovalDecision): ProposedState {
+  return { ...state, decision }
+}
+
+/** 判断を取り下げた状態を作る。`phase` は `proposed` のまま。判断が無ければ同じ形が返る。 */
+export function withoutDecision(state: ProposedState): ProposedState {
+  const { decision: _dropped, ...rest } = state
+  return rest
 }
 
 /** U1 で投稿された概要。A1 が読む。 */

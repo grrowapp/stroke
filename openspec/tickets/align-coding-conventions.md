@@ -1,5 +1,5 @@
 ---
-status: ready-for-agent
+status: Proposal
 tags:
   - enhancement
 ---

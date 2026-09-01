@@ -7,7 +7,7 @@
     "node": "^22.19.0 || ^24.11.0 || >=26.0.0"
   },
   "scripts": {
-    "dev": "nuxt dev",
+    "dev": "nuxt dev --port 3100",
     "build": "nuxt build",
     "clean": "rm -rf .output .nuxt node_modules/.vite node_modules/.cache .e2e-tmp test-results",
     "preview": "nuxt preview",

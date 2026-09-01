@@ -8,6 +8,7 @@ import type {
   HighlightColor,
   Phase,
   ProposalMessage,
+  SessionStatus,
   Stroke,
 } from '#shared/stroke'
 import { useAnnotations } from '~/composables/useAnnotations'
@@ -345,7 +346,7 @@ export function useProposalReview(
    * 昇格に失敗した対象の名前。null なら何も出ていない。
    *
    * 改名はシステムの動作で、ユーザーの決定ではない。だから**決定をやり直させない**——
-   * 確定した名前はここに残っており、「やり直す」はそれで実行だけを再試行する。
+   * 確定した名前は判断としてサーバに記録されており、「やり直す」は昇格の段だけを再試行する。
    */
   const promotionFailed = ref<string | null>(null)
   /** 知らせる面に出している間の名前。引いたらモーダルへ渡す */
@@ -357,13 +358,29 @@ export function useProposalReview(
     promotionNotice.value = null
   }
 
-  /** やり直す — 同じ名前で承認をもう一度実行する。ユーザーに名前を聞き直さない */
+  /**
+   * やり直す — 昇格（U14）だけをもう一度要求する。承認の判断は記録されたままなので下し直さず、
+   * ユーザーに名前を聞き直さない（specs/api/session/promote「昇格だけをやり直す」）。
+   */
   async function retryPromotion(): Promise<void> {
+    const name = promotionFailed.value ?? projectName.value.trim()
     promotionFailed.value = null
-    await approve()
+    if (busy.value) return
+    approveBusy.value = true
+    try {
+      await promote(name)
+    } finally {
+      approveBusy.value = false
+    }
   }
 
-  /** 破棄する — セッションを消して一覧へ戻る。まだプロジェクトになっていない */
+  /**
+   * 破棄する — セッションを消して一覧へ戻る。まだプロジェクトになっていない。
+   *
+   * 判断が記録されていても U11 は受理する（判断は phase を動かさないので `proposed` のまま）。
+   * 判断だけを戻す `DELETE .../approve` とは別の道で、ここでは判断を取り消してから消す形にしない
+   * ——破棄はセッションごと消すことである。
+   */
   async function discardSession(): Promise<void> {
     promotionFailed.value = null
     try {
@@ -375,6 +392,14 @@ export function useProposalReview(
     await navigateTo('/projects')
   }
 
+  /**
+   * 承認 — **U10（判断）→ U14（昇格）→ U13（起動）**の3段を順に叩く。受理と起動が分かれて
+   * いるのは差し戻し（`sendBack`）と同じ作法で、承認だけがそこから外れていた。
+   *
+   * 承認モーダルで確定した後は昇格へ自動で続け、今の体験（承認 → 一覧へ戻る）を変えない。
+   * 判断と昇格が別の呼び出しになったことで、間に取り消し（`DELETE .../approve`）を挟める形は
+   * API として在る。面のどこに出すかは後続に委ねる。
+   */
   async function approve(): Promise<void> {
     if (busy.value || approveBlocked.value) return
     if (phase.value !== 'proposed') return
@@ -382,34 +407,88 @@ export function useProposalReview(
     const name = projectName.value.trim()
     approveBusy.value = true
     try {
-      await $fetch(`${base.value}/approve`, { method: 'POST', body: { projectName: name } })
-      phase.value = 'approved'
-      approveOpen.value = false
-      notice.value = null
-      // 承認で流れは終わる。モーダルごと閉じて一覧へ戻る（ADR 0011: この後の steering は
-      // サーバーが裏で起こすので、ユーザーは待たない）。
-      await navigateTo('/projects')
+      // 段1: 判断を記録する。**残っている判断があれば取り下げてから下す**——重ねて判断を
+      // 下すことは受理されず（specs/api/session/approve）、承認と昇格の間で画面が落ちた
+      // セッションを開き直したときに残っている判断は、いま確定した名前で置き換える。
+      // 判断が無ければ取り下げは何も変えない
+      try {
+        await $fetch(`${base.value}/approve`, { method: 'DELETE' })
+        await $fetch(`${base.value}/approve`, { method: 'POST', body: { projectName: name } })
+      } catch (error) {
+        // サーバは 409 を3つの意味で返す(名前の衝突 / AI が実行中 / phase 不整合)。
+        // 名前を変えるまで承認を止めるのは、衝突と分かったときだけにする。
+        // 400（名前に使えない文字）と 409 の残り（phase 不整合・実行中）は判断そのものが
+        // 成立しないので、器に載せず「別の名前で再度承認できる」状態に留める
+        if (statusOf(error) === 409 && reasonOf(error) === 'name-conflict') {
+          conflictName.value = name
+        } else {
+          warn('承認できませんでした', messageOf(error))
+        }
+        return
+      }
+
+      // 段2・段3。判断の失敗と昇格の失敗は器が違うので、ここで分けている
+      await promote(name)
+    } finally {
+      approveBusy.value = false
+    }
+  }
+
+  /**
+   * 段2: 昇格（U14）を要求し、成功したら段3: 起動（U13）を要求して一覧へ戻る。
+   *
+   * 名前は送らない。昇格はサーバに記録された判断の名前で行われる（specs/api/session/promote）。
+   * `name` は失敗の器に出すためだけに持つ。
+   */
+  async function promote(name: string): Promise<void> {
+    try {
+      await $fetch(`${base.value}/promote`, { method: 'POST' })
     } catch (error) {
-      // サーバは 409 を3つの意味で返す(名前の衝突 / AI が実行中 / phase 不整合)。
-      // 名前を変えるまで承認を止めるのは、衝突と分かったときだけにする。
       const status = statusOf(error)
 
       if (status === 409 && reasonOf(error) === 'name-conflict') {
+        // 判断の後に同じ名前が保存先に現れた。同じ判断のままでは昇格できないので、判断を
+        // 取り下げて別の名前を確定させる（specs/project/generation「判断を取り下げて別の
+        // 名前で改めて承認できる」）
+        await $fetch(`${base.value}/approve`, { method: 'DELETE' }).catch(() => undefined)
         conflictName.value = name
       } else if (status === 500) {
-        // **昇格の実行が失敗した**（改名の I/O・`phase` の書き込み）。決定は下りているので、
-        // 決着と同じ器で次を選ばせる（specs/project/generation）。この時点ではプロジェクトが
-        // 無く phase は `proposed` なので、破棄はセッション側、やり直すは同じ名前での再実行になる
+        // **昇格の実行が失敗した**（改名の I/O・`phase` の書き込み）。判断は記録されたまま
+        // 残っているので、決着と同じ器で次を選ばせる（specs/project/generation）。この時点では
+        // プロジェクトが無く phase は `proposed` なので、破棄はセッション側、やり直すは昇格だけの
+        // 再要求になる
         promotionNotice.value = name
       } else {
-        // **決定のやり直しが要るもの**は器に載せない。400（環境が名前を受け付けない）は
-        // 同じ名前で再試行しても必ずまた落ちるので、spec が求めるとおり
-        // 「別の名前で再度承認できる」状態に留める（specs/project/generation）。
-        // 409 の残り（phase 不整合・実行中）は承認そのものが成立しない
-        warn('承認できませんでした', messageOf(error))
+        warn('プロジェクトを作れませんでした', messageOf(error))
       }
-    } finally {
-      approveBusy.value = false
+      return
+    }
+
+    phase.value = 'approved'
+    approveOpen.value = false
+    notice.value = null
+
+    // 段3: steering を起こす（ADR 0011: 承認の次の工程は自動で始まる。ユーザーは待たない）。
+    // 対象の id は昇格後のディレクトリ名（= プロジェクト名）で、cwd は U2 が返す path を
+    // そのまま添える（endpoint に導出させない・design.md D5）。
+    //
+    // 届かなくても昇格は巻き戻らない。昇格の受け口が `invocation` を `failed` にしてあるので、
+    // 起動の段だけが巡回のやり直しの対象として残る（specs/api/session/promote）。409 は
+    // 巡回が先に起こした busy で、これも失敗ではない。だからここでは知らせない
+    await kickSteering(name)
+
+    // モーダルごと閉じて一覧へ戻る
+    await navigateTo('/projects')
+  }
+
+  /** 段3の実体。失敗は起動の段に留め、昇格の結果にも画面の流れにも影響させない。 */
+  async function kickSteering(name: string): Promise<void> {
+    const target = `/api/strokes/${encodeURIComponent(name)}`
+    try {
+      const status = await $fetch<SessionStatus>(target)
+      await $fetch(`${target}/invoke-agent`, { query: { cwd: status.path } })
+    } catch (error) {
+      console.warn(`steering の起動要求が届かなかった（巡回が拾う）: ${name}`, error)
     }
   }
 
