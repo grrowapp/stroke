@@ -280,11 +280,10 @@ test.describe('操作の帯とデータの領域が本家と同じに分かれ�
      */
     expect(await surface('approval-document')).toEqual(expected);
 
+    // 面は2つ（プレビュー / 生テキスト）。並べる面は無い（specs/project/ui）
     await page.getByTestId('approval-mode-annotate').click();
     expect(await surface('approval-body')).toEqual(expected);
-
-    await page.getByTestId('approval-mode-side-by-side').click();
-    expect(await surface('approval-body')).toEqual(expected);
+    await expect(page.getByTestId('approval-mode-side-by-side')).toHaveCount(0);
   });
 
   /**
