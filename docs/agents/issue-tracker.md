@@ -65,37 +65,21 @@ change の起票と同時に `openspec/tickets/` に **ticket** を作る。**�
 - ファイル名は change-id + `.md`（例: change `view-openspec-changes` → `openspec/tickets/view-openspec-changes.md`）。
 - 中身は frontmatter（`status` 必須・`change` 必須・`tags` 任意・`triage` 任意）＋本文の概要
 - `status` の値は `docs/agents/ticket-labels.md` による
-- `tags` は artifact の作成記録。artifact を作成したタイミングで、スキーマで `generates` が設定されたその artifact の `id` を追記する
-- `triage` は `/triage` スキルが付けるラベルの置き場。値の対応は `docs/agents/triage-labels.md`。自分で起票した ticket は `/triage` の対象外なので、通常は空でよい
+- artifact を作成したタイミングで、スキーマで `generates` が設定されたその artifact の `id` を`tags`に追記する
+- **`openspec apply` またはスキルなどで同等の指示がはいったら、`tags `に`<ブランチ名>/<セッション ID>` を追記する。作業が完了しても消さない事。作業担当者が変わった場合は、新たに同様のルールで追記する
 
-### 適用範囲と片づけ
+  ```yaml
+  tags:
+    - proposal
+    - tasks
+    - create-module-annotation/31a5f942-f4e1-4620-9eb7-4d1409d4151f
+    - create-module-annotation/94cf0176-0a93-4b92-9ec3-a1af20009bf5
+  ```
 
-本規約の採用は **2026-08-28**。
-
-- change との1対1はそれ以降に起票する change に掛かる。それ以前の ticket 無し change に遡って作らない
+- `triage` は `/triage` スキルが付けるラベルの置き場。値の対応は `docs/agents/triage-labels.md`
 - change を archive したら同名 ticket を `openspec/tickets/.archive/` へ移す
 
 ## artifact
-
-### 順序と依存
-
-`proposal → specs → ui → design → tasks` の順に作る。依存関係はスキーマの `requires` が持つ（`tasks` の `requires` は `[specs, design]`）。`ui` と `design` は条件付きで、**省いても tasks は作れる** — `requires` は生成順の助言であって CLI は強制しない（実測: requires を満たさない change が実在する）。
-
-### 各 artifact が持つもの
-
-- **proposal** — なぜこの変更が要るか。`Why` / `What Changes` / `Capabilities` / `Impact`
-- **specs** — 何を満たすか。capability ごとに1ファイル
-- **ui** — 画面をどうするか。画面を持つ change のみ。`/prototype` で変種を出して選んだ結果を記録する
-- **design** — どう作るか。作る条件は下記
-- **tasks** — 実装チェックリスト。`## <番号>. <見出し>` でグループ化し、各タスクを `- [ ] <グループ番号>.<連番> 説明` の形にする。この形でないと進捗が追跡されない。`openspec/config.yaml` の `rules` により、santa-method レビューとユーザー完了承認のタスクを必ず含める
-
-design を作る条件は次のいずれか。いずれも無ければ省略する。
-
-- (a) 横断的な変更・新しいアーキテクチャパターン・新しい依存・データモデルの変更
-- (b) セキュリティ / 性能 / 移行の複雑さ、技術判断を先に要する曖昧さ
-- (c) 上位資料への整合反映（[更新対応](#更新対応)）
-
-(a)(b) はスキーマの design instruction の要約で、全量はそちらが持つ。**(c) は本書がこの repo 向けに足す条件**でスキーマには無い。
 
 ## 参照の方向
 
@@ -138,7 +122,6 @@ specs  ×  specs    禁止
 
 - ticket と change の対応はファイル名（= change-id）と、ticket内には対応changesを必ず入れる
 - ticket は change と並走する記録である
-- 一覧の起点として ticket から change の artifact へ**辿る**のは可
 
 ## 更新対応
 
@@ -179,7 +162,7 @@ repo 直下への新規フォルダ作成は、**エージェントの自己判�
 
 どれにも当たらないなら作らない。置き場が無いと感じたら、既存のフォルダへ収めるか、ユーザーに確認する。
 
-repo 直下の構成そのものの規範は [`docs/specs/core/system-structure.md`](../specs/core/system-structure.md) が持つ。**直下にフォルダを足したら、同ファイルのディレクトリ構造へ整合反映する**（[更新対応](#更新対応)）。
+repo 直下の構成そのものの規範は [`docs/specs/core/system-structure.md`](../specs/core/system-structure.md) が持つ。**直下にフォルダを足したら、同ファイルのディレクトリ構造へ整合反映する**（[更新対応](#更新対応)
 
 ## 過去の記録
 

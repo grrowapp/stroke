@@ -45,9 +45,16 @@ rules:
 operations:
   apply:
     guidance:
-      - 全タスクを終えたら、その change の成果物を commit すること。tasks に
-        commit の項目が無い場合も、実装が未コミットのまま完了としない。
-        commit しないのは、ユーザーが明示的にそう指示したときだけとする
+      - apply の最初に `openspec/tickets/<change-id>.md` の `status` を
+        `Doing` へ書き換える。**`status` が `Doing` でない状態で tasks の
+        チェックボックスを付けてはならない。**。規定は
+        `docs/agents/ticket-labels.md`「Doing」
+
+      - `openspec/tickets/<change-id>.md` の `tags` へ既に同じ物がある場合を除き
+        `<ブランチ名>/<セッション ID>` を追記する。`tags` は追記のみで、
+        作業が完了しても既存の項目を消さない。担当が変わったら同じ形式で
+        さらに追記する。規定は `docs/agents/issue-tracker.md`「ticket の起票」
+
   archive:
     guidance:
       - archive の前に、その change の成果物が commit 済みであることを確かめる。
