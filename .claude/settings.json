@@ -20,6 +20,8 @@
       "Bash(sed *)",
       "Bash(git -C *)",
       "Bash(git merge *)",
+      "Bash(git sparse-checkout *)",
+      "Bash(git config *sparseCheckout*)",
       "Bash(git reset *)",
       "Bash(git * openspec*)",
       "Bash(awk *)",
