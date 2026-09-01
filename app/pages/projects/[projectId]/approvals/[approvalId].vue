@@ -20,8 +20,6 @@
 import { computed, definePageMeta, useRoute } from '#imports';
 
 import ApprovalAnnotator from '~/components/review/ApprovalAnnotator.vue';
-// PROTOTYPE — throwaway（adr0017-sub-full-width-markdown-editor の ui.md 用）
-import PrototypeSwitcher from '~/components/prototype/PrototypeSwitcher.vue';
 import MarkdownEditor from '#markdown/edit/MarkdownEditor.vue';
 import MarkdownView from '#markdown/render/MarkdownView.vue';
 import EmptyState from '~/components/workspace/EmptyState.vue';
@@ -136,8 +134,5 @@ const CATEGORY: Record<string, string> = { spec: '仕様', steering: 'ステア�
         </div>
       </template>
     </ApprovalAnnotator>
-
-    <!-- PROTOTYPE — throwaway。案を切り替える浮きバー -->
-    <PrototypeSwitcher />
   </WorkspacePanel>
 </template>

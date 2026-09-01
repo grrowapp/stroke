@@ -13,12 +13,10 @@
  *
  * プロジェクト切替の口はここに置かない。別のプロジェクトへ移るときは上層を経由する。
  */
-import { computed, useFetch, useRoute } from '#imports';
+import { computed, useCookie, useFetch, useRoute } from '#imports';
 
 import EmptyState from '~/components/workspace/EmptyState.vue';
 import { useBoardSocket } from '~/composables/useBoardSocket';
-// PROTOTYPE — throwaway
-import { usePrototypePanels } from '~/composables/usePrototypePanels';
 
 const route = useRoute();
 const projectId = computed(() => String(route.params.projectId ?? ''));
@@ -63,11 +61,19 @@ function linkOf(to: string): string {
  *
  * 見た目と挙動を本家に合わせるのが最優先なので、保存先だけをサーバでも読める cookie に
  * 替える。キーの名前と値（真偽値）は本家のまま。
- *
- * PROTOTYPE — throwaway。cookie の読み書きは `usePrototypePanels` へ寄せた。
- * 左の開閉は右の指摘の一覧と連動しない（左を閉じても右は出たまま）。
  */
-const { leftCollapsed: collapsed, toggleLeft: toggleCollapsed } = usePrototypePanels();
+const collapsedStore = useCookie<boolean>('spec-workflow-sidebar-collapsed', {
+  default: () => false,
+  // 畳んだ状態は端末の好みで、期限を切る理由が無い（本家の localStorage も消えない）
+  maxAge: 60 * 60 * 24 * 365,
+  sameSite: 'lax',
+});
+
+const collapsed = computed(() => collapsedStore.value === true);
+
+function toggleCollapsed(): void {
+  collapsedStore.value = !collapsed.value;
+}
 </script>
 
 <template>

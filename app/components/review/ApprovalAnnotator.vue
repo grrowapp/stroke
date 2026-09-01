@@ -27,71 +27,8 @@ import CommentCard from '~/components/review/CommentCard.vue';
 import CommentModal from '~/components/review/CommentModal.vue';
 import { useAnnotations } from '~/composables/useAnnotations';
 import { pendingApprovalsKey, respondToApproval } from '~/composables/useProjectApi';
-// PROTOTYPE — throwaway（adr0017-sub-full-width-markdown-editor の ui.md 用）
-import { usePrototypePanels } from '~/composables/usePrototypePanels';
 
 import type { Annotation, HighlightColor } from '#shared/stroke';
-
-/* PROTOTYPE — 右の指摘の一覧をしまう／戻す */
-const { rightTucked, tuckRight, untuckRight } = usePrototypePanels();
-
-/*
- * PROTOTYPE — コメント欄そのものを掴んで左右へ引く。
- *
- * 掴む所を1箇所に絞らない。パネルのどこを掴んでも幅が指に追従し、放した位置で
- * 開くか引っ込むかが決まる。中のボタンや入力の上から始めた場合は掴まない
- * （押せなくなるため）。動かさずに放したときは何もしない＝ただのクリックを潰さない。
- */
-const asideEl = ref<HTMLElement | null>(null);
-const dragging = ref(false);
-const dragWidth = ref<number | null>(null);
-
-const TUCKED_WIDTH = 44;
-/** この幅より動かして初めて「掴んだ」とみなす。クリックと区別する */
-const DRAG_SLOP = 6;
-
-let startX = 0;
-let baseWidth = 0;
-let openWidth = 0;
-let moved = false;
-
-function onDragMove(event: PointerEvent): void {
-  const dx = event.clientX - startX;
-  if (Math.abs(dx) > DRAG_SLOP) moved = true;
-  dragWidth.value = Math.min(openWidth, Math.max(TUCKED_WIDTH, baseWidth - dx));
-}
-
-function onDragEnd(): void {
-  window.removeEventListener('pointermove', onDragMove);
-  const width = dragWidth.value;
-  dragging.value = false;
-  dragWidth.value = null;
-  if (!moved || width === null) return;
-  // 放した位置が開いた幅の半分より狭ければしまう
-  if (width < openWidth / 2) tuckRight();
-  else untuckRight();
-}
-
-function onDragStart(event: PointerEvent): void {
-  /*
-   * 開いているときは、中のボタンや入力の上から掴まない（押せなくなる）。
-   * 引っ込んだ帯には他の操作が無いので、帯そのものからも掴める。
-   */
-  const target = event.target as HTMLElement | null;
-  if (!rightTucked.value && target?.closest('button, a, textarea, input, select')) return;
-  const el = asideEl.value;
-  const row = el?.parentElement;
-  if (!el || !row) return;
-
-  startX = event.clientX;
-  baseWidth = el.getBoundingClientRect().width;
-  openWidth = Math.round(row.getBoundingClientRect().width / 3);
-  moved = false;
-  dragging.value = true;
-
-  window.addEventListener('pointermove', onDragMove);
-  window.addEventListener('pointerup', onDragEnd, { once: true });
-}
 
 const props = defineProps<{
   /** 対象文書の生テキスト。注釈のオフセットはこの文字列に対して付く */
@@ -302,12 +239,8 @@ async function requestRevision(): Promise<void> {
       </button>
     </div>
 
-    <!--
-      PROTOTYPE — grid（1:2 固定）から flex へ替え、右の一覧の幅を可変にした。
-      引っ込めても幅を 0 にせず、つまみ幅だけ残す。真ん中の面に固定幅は与えない。
-    -->
-    <div class="flex gap-4">
-      <div class="min-w-0 flex-1">
+    <div class="grid gap-4 lg:grid-cols-3">
+      <div class="min-w-0 lg:col-span-2">
         <!--
           プレビュー。中身は呼ぶ側が決める（承認画面は編集できる文書をここに置く）。
           面を切り替えても外さない: 外すと編集の直しかけが黙って消える
@@ -356,79 +289,11 @@ async function requestRevision(): Promise<void> {
         </div>
       </div>
 
-      <!--
-        PROTOTYPE — 引っ込んだときのつまみ。3案で残すものが違う。
-          a: 縦書きで「コメント」と件数
-          b: 掴むところだけ（‹ の丸）。しまう口と同じ位置に出る
-          c: 見出しの絵と件数バッジ（見出し帯が細くなって残る形）
-        どれもワンクリックで右だけ戻す。左には触らない。
-      -->
-      <!--
-        指摘の一覧。どの面でも出す（本家も出したままにする）。
-
-        PROTOTYPE — 要素を入れ替えず、この1枚の幅だけを変えてスライドさせる。
-        引っ込んでもつまみ幅は残し、その中に何のつまみかを出す。
-      -->
+      <!-- 指摘の一覧。どの面でも出す（本家も出したままにする） -->
       <aside
-        ref="asideEl"
-        class="relative flex min-w-0 shrink-0 select-none flex-col rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-panel)]"
-        :class="[
-          rightTucked ? 'w-11' : 'w-1/3',
-          dragging ? 'cursor-grabbing' : 'cursor-grab transition-[width] duration-300 ease-out',
-        ]"
-        :style="dragWidth === null ? undefined : { width: `${dragWidth}px` }"
+        class="flex min-w-0 flex-col rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-panel)]"
         data-testid="approval-comments"
-        @pointerdown="onDragStart"
       >
-        <!--
-          PROTOTYPE — 開閉の口。**開いていても引っ込んでいても同じ場所**に出す。
-          `aside` の右辺は常に画面端に張り付いていて動かないので、右上角に置けば座標が変わらない。
-          押せることが分かるように hover と押下で面の色を変える。
-        -->
-        <!--
-          パネルの境界に貼り付くつまみ。`aside` はビューポートより高くなるので、
-          要素の中央（top-1/2）に置くと画面外へ落ちる。スクロールに追従させて
-          常に画面の中ほどに出す。
-        -->
-        <button
-          type="button"
-          class="group absolute inset-y-0 right-0 z-20 w-5 cursor-pointer rounded-r-[var(--radius-lg)] transition-colors hover:bg-[color-mix(in_srgb,var(--accent-primary)_35%,transparent)] active:bg-[var(--accent-primary)]"
-          :aria-label="rightTucked ? 'コメントの一覧を出す' : 'コメントの一覧をしまう'"
-          :title="rightTucked ? 'コメントの一覧を出す' : 'コメントの一覧をしまう'"
-          data-testid="approval-comments-toggle"
-          @click="rightTucked ? untuckRight() : tuckRight()"
-        >
-          <!--
-            掴む目印は境界の全高に渡すレール。どの高さでも目の前に在るので、
-            縦に長い本文をスクロールしていても掴む所を探しに戻らなくてよい。
-          -->
-          <span
-            class="absolute inset-y-2 left-1/2 w-1 -translate-x-1/2 rounded-full bg-[var(--border-default)] transition-colors group-hover:bg-[var(--accent-primary)]"
-          />
-        </button>
-
-        <!--
-          PROTOTYPE — 引っ込んだときに残すもの。何のつまみかが読める。
-          帯のどこを押しても開く（真ん中でも端でも当たる）。
-        -->
-        <button
-          v-if="rightTucked"
-          type="button"
-          class="flex h-full w-full cursor-pointer flex-col items-center bg-[var(--surface-inset)] py-4 text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
-          aria-label="コメントの一覧を出す"
-          data-testid="approval-comments-handle"
-          @click="untuckRight"
-        >
-          <!-- 帯は本文と同じ高さまで伸びる。中身を上端に置くと、スクロールした先で何も見えない -->
-          <span class="sticky top-[40vh] flex flex-col items-center gap-3">
-            <span class="rounded-full bg-[var(--accent-primary)] px-1.5 text-[10px] text-white">
-              {{ comments.length }}
-            </span>
-            <span class="text-xs tracking-widest" style="writing-mode: vertical-rl">コメント</span>
-          </span>
-        </button>
-
-        <template v-else>
         <!--
           指摘の見出し帯。本家は `p-3 sm:p-4 border-b bg-[var(--surface-inset)] rounded-t-lg`
           で、パネルの中で一段沈んだ帯になる（実測: 余白 12px / 面 #0f172a）。
@@ -443,21 +308,6 @@ async function requestRevision(): Promise<void> {
             <span>
               コメント（<span data-testid="approval-comment-count">{{ comments.length }}</span>）
             </span>
-
-            <!--
-              PROTOTYPE — 畳むボタン。左サイドバーの `sidebar-collapse` と同じ作りで、
-              帯の中の右端に置く。右端のレールは補助で、主の口はこちら。
-            -->
-            <button
-              type="button"
-              class="ml-auto flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-[var(--radius-lg)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-inset)] hover:text-[var(--text-primary)] active:bg-[var(--accent-primary)] active:text-white"
-              aria-label="コメントの一覧をしまう"
-              title="コメントの一覧をしまう"
-              data-testid="approval-comments-tuck"
-              @click="tuckRight"
-            >
-              <UIcon name="upstream:chevron-double-left" class="block size-5 rotate-180" />
-            </button>
           </h4>
 
           <p v-if="!annotatable" class="text-xs text-[var(--text-muted)]">
@@ -523,7 +373,6 @@ async function requestRevision(): Promise<void> {
             {{ failure }}
           </p>
         </div>
-        </template>
       </aside>
     </div>
 
