@@ -140,9 +140,17 @@ test.describe('未作成の文書', () => {
   });
 });
 
-test.describe('承認依頼から対象文書を直す', () => {
+/**
+ * 承認画面は読んで判断し指摘を付ける場で、編集はできない（本家 `ApprovalsAnnotator` と同じ。
+ * ユーザー決定 2026-09-01）。直すのはその文書自身の画面で、上の describe が見ている。
+ */
+test.describe('承認画面には編集の口が無い', () => {
   test.beforeEach(async ({ page }) => {
     await resetBoard(page);
+  });
+
+  test('対象が編集できる6本のいずれであっても、読むだけで編集の口は出ない', async ({ page }) => {
+    // 6本のうち、ステアリングと仕様書から1本ずつ
     await stub.requestApproval(ALPHA, {
       id: 'r1',
       title: 'ステアリング: product.md の承認',
@@ -150,48 +158,25 @@ test.describe('承認依頼から対象文書を直す', () => {
       category: 'steering',
       categoryName: 'steering',
     });
-  });
-
-  test('レビューするを押すと、まず本文が整形して出る', async ({ page }) => {
-    await page.goto(`/projects/${ALPHA}/approvals`);
-    await page.getByTestId('record-open').click();
-
-    await expect(page).toHaveURL(new RegExp(`/projects/${ALPHA}/approvals/r1$`));
-
-    // 承認は読んで判断する場。いきなり生テキストの入力欄にしない
-    await expect(page.getByTestId('document-content')).toBeVisible();
-    await expect(page.getByTestId('document-input')).toHaveCount(0);
-
-    // 直すときは編集へ入れる
-    await expect(page.getByTestId('document-edit')).toBeVisible();
-  });
-
-  test('承認画面で直すと、その文書の画面にも反映される', async ({ page }) => {
-    await page.goto(`/projects/${ALPHA}/approvals/r1`);
-
-    await page.getByTestId('document-edit').click();
-    await page.getByTestId('document-input').fill('# 承認画面から直した');
-    await page.getByTestId('document-save').click();
-    await expect(page.getByTestId('document-saved')).toBeVisible();
-
-    // 同じ実体なので、ステアリングの画面から見ても変わっている
-    await page.goto(`/projects/${ALPHA}/steering/product`);
-    await expect(page.getByText('承認画面から直した')).toBeVisible();
-  });
-
-  test('編集できない文書を指す承認依頼は読むだけになる', async ({ page }) => {
     await stub.requestApproval(ALPHA, {
       id: 'r2',
-      title: '知らない文書の承認',
-      filePath: '.spec-workflow/specs/auth-spec/unknown.md',
+      title: '仕様書: requirements.md の承認',
+      filePath: '.spec-workflow/specs/auth-spec/requirements.md',
       category: 'spec',
       categoryName: 'spec',
     });
 
-    await page.goto(`/projects/${ALPHA}/approvals/r2`);
+    for (const id of ['r1', 'r2']) {
+      await page.goto(`/projects/${ALPHA}/approvals/${id}`);
 
-    await expect(page.getByTestId('document-input')).toHaveCount(0);
-    await expect(page.getByTestId('document-edit')).toHaveCount(0);
+      // 整形した本文は出る
+      await expect(page.getByTestId('document-content')).toBeVisible();
+
+      // 編集の口も入力欄も無い
+      await expect(page.getByTestId('document-edit')).toHaveCount(0);
+      await expect(page.getByTestId('document-input')).toHaveCount(0);
+      await expect(page.getByTestId('document-save')).toHaveCount(0);
+    }
   });
 });
 

@@ -7,12 +7,10 @@
  * 面と指摘の扱いは `ReviewApprovalAnnotator` が持ち、ここは対象文書の取得と、
  * プレビューに何を置くかだけを決める。
  *
- * 対象文書はここで直せる。承認依頼が来た文書を読んで直したくなる場面はまさにこの画面で、
- * 別の画面へ移り直させない（specs/document-editing）。開いている実体は仕様書や
- * ステアリングの画面で開くものと同じファイルである。
- *
- * 編集はプレビューの面に置く。本家も整形して読む面（`MDXEditorWrapper`）がそのまま
- * 編集の口を兼ねており、生テキストの面は指摘を付けるためだけにある。
+ * **承認画面では編集しない。** 本家の承認画面（`ApprovalsAnnotator`）は読んで判断し指摘を
+ * 付ける場で、編集の口を持たない（ユーザー決定 2026-09-01・specs/document-editing）。
+ * 直すのはその文書自身の画面（仕様書・ステアリング）で行う。編集が無いのは承認画面だけで、
+ * 仕様書・ステアリングの6本の編集は変えていない。
  *
  * 承認・却下はここに置かない。それは承認一覧の `ApprovalCard` が持つ。差し戻しだけを
  * ここに置くのは、それが運ぶ指摘がこの画面にしか無いためである。
@@ -20,17 +18,11 @@
 import { computed, definePageMeta, useRoute } from '#imports';
 
 import ApprovalAnnotator from '~/components/review/ApprovalAnnotator.vue';
-import MarkdownEditor from '#markdown/edit/MarkdownEditor.vue';
 import MarkdownView from '#markdown/render/MarkdownView.vue';
 import EmptyState from '~/components/workspace/EmptyState.vue';
 import WorkspacePanel from '~/components/workspace/WorkspacePanel.vue';
 import { useBoardSocket } from '~/composables/useBoardSocket';
-import {
-  saveTargetOf,
-  useApprovalContent,
-  useProjectId,
-  usePendingApprovals,
-} from '~/composables/useProjectApi';
+import { useApprovalContent, useProjectId, usePendingApprovals } from '~/composables/useProjectApi';
 
 definePageMeta({ layout: 'workspace' });
 
@@ -39,7 +31,7 @@ const projectId = useProjectId();
 const approvalId = computed(() => String(route.params.approvalId ?? ''));
 
 const { data: pending } = await usePendingApprovals(projectId);
-const { data: document, refresh } = await useApprovalContent(projectId, approvalId);
+const { data: document } = await useApprovalContent(projectId, approvalId);
 
 const approval = computed(() =>
   (pending.value ?? []).find((item) => item.id === approvalId.value) ?? null,
@@ -47,25 +39,8 @@ const approval = computed(() =>
 
 const { upstreamConnected } = useBoardSocket();
 
-/**
- * 対象文書の保存先。`filePath` から導く。
- *
- * 編集を許していない文書を指している承認依頼もありうる。そのときは読むだけになる。
- */
-const target = computed(() =>
-  approval.value === null ? null : saveTargetOf(approval.value.filePath),
-);
-
 /** 注釈のオフセットが指す生テキスト。保存されている中身そのもの */
 const source = computed(() => document.value?.content ?? '');
-
-async function save(content: string): Promise<string | null> {
-  if (target.value === null) return 'この文書は編集できません。';
-
-  const failure = await target.value.save(projectId.value, content);
-  if (failure === null) await refresh();
-  return failure;
-}
 
 const CATEGORY: Record<string, string> = { spec: '仕様', steering: 'ステアリング' };
 </script>
@@ -106,24 +81,15 @@ const CATEGORY: Record<string, string> = { spec: '仕様', steering: 'ステア�
     >
       <!--
         整形して読む面。承認から来た人は読んで判断するので、開いた直後はこれが出る。
-        直したくなったらこの場で編集に入れる（別の画面へ移らせない）。
+        読むだけで、編集の口は無い。
       -->
       <template #preview>
         <!--
-          `framed` を立てるのは、本家の承認画面が注釈の面と同じく本文を
+          枠（`sb-panel`）を持つのは、本家の承認画面が注釈の面と同じく本文を
           `bg-panel border rounded-lg` の中に置くため（`ApprovalsAnnotator.tsx` の
-          左列）。仕様書・ステアリングの画面はパネル1枚なので立てない。
+          左列）。仕様書・ステアリングの画面はパネル1枚なので枠を重ねない。
         -->
-        <MarkdownEditor
-          v-if="target !== null"
-          :content="document?.content"
-          :save="save"
-          :can-save="upstreamConnected"
-          framed
-          testid="approval-document"
-        />
-        <!-- 直せない文書は読むだけ。枠は `MarkdownEditor` が持つものと同じ -->
-        <div v-else class="sb-panel">
+        <div class="sb-panel" data-testid="approval-document">
           <MarkdownView :value="document?.content">
             <template #empty>
               <EmptyState testid="document-missing" title="中身がありません">
