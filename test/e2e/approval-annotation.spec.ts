@@ -115,16 +115,274 @@ test.describe('承認画面の3つの面', () => {
     await expect(page.getByTestId('approval-rendered').locator('h1')).toHaveText(TITLE);
   });
 
-  test('面を切り替えても編集の直しかけは消えない', async ({ page }) => {
+});
+
+/**
+ * 右の指摘の一覧（コメント欄）はしまえる（specs/project/ui「承認画面の指摘の一覧はしまえる」）。
+ *
+ * しまうと 44px のつまみだけが残り、空いた幅は本文が取る。開閉の口は4つ
+ * （掴んで引く / 見出し帯のボタン / しまった帯のクリック / 右辺の不可視のレール）。
+ * 左のナビとは連動せず、コメント欄の幅は左の状態で変わらない。しまった状態は保存しない。
+ */
+test.describe('コメント欄をしまう', () => {
+  const TUCKED = '44px';
+
+  const widthOf = (page: Page, testId: string): Promise<number> =>
+    page.getByTestId(testId).evaluate((element) => element.getBoundingClientRect().width);
+
+  test.beforeEach(async ({ page }) => {
+    await resetBoard(page);
+    await stub.requestApproval(ALPHA, {
+      id: 'an1',
+      title: TITLE,
+      filePath: '.spec-workflow/steering/product.md',
+      category: 'steering',
+      categoryName: 'steering',
+    });
     await page.goto(APPROVAL);
+    await expect(page.getByTestId('approval-comments')).toHaveAttribute('data-tucked', 'false');
+  });
 
-    await page.getByTestId('document-edit').click();
-    await page.getByTestId('document-input').fill('# 直しかけ');
+  test('見出し帯のボタンでしまうと 44px のつまみだけが残り、本文がその分だけ広がる', async ({
+    page,
+  }) => {
+    const comments = page.getByTestId('approval-comments');
+    const before = await widthOf(page, 'approval-main');
+    const open = await widthOf(page, 'approval-comments');
 
+    await page.getByTestId('approval-comments-tuck').click();
+
+    await expect(comments).toHaveAttribute('data-tucked', 'true');
+    await expect(comments).toHaveCSS('width', TUCKED);
+    await expect(page.getByTestId('approval-comments-handle')).toBeVisible();
+
+    // 一覧の中身（見出し・差し戻し）は畳まれている
+    await expect(page.getByTestId('approval-revision')).toHaveCount(0);
+
+    // 空いた幅は本文が取る
+    const after = await widthOf(page, 'approval-main');
+    expect(Math.round(after - before)).toBe(Math.round(open - 44));
+  });
+
+  test('つまみを押すと一覧だけが元の幅で戻り、左のナビは動かない', async ({ page }) => {
+    const comments = page.getByTestId('approval-comments');
+    const sidebar = page.getByTestId('workspace-sidebar');
+    const open = await widthOf(page, 'approval-comments');
+
+    await page.getByTestId('approval-comments-tuck').click();
+    await expect(comments).toHaveCSS('width', TUCKED);
+    // 一覧をしまっても左は動かない
+    await expect(sidebar).toHaveAttribute('data-collapsed', 'false');
+    await expect(sidebar).toHaveCSS('width', '256px');
+
+    await page.getByTestId('approval-comments-handle').click();
+
+    await expect(comments).toHaveAttribute('data-tucked', 'false');
+    await expect(comments).toHaveCSS('width', `${Math.round(open)}px`);
+    await expect(page.getByTestId('approval-revision')).toBeVisible();
+    await expect(sidebar).toHaveAttribute('data-collapsed', 'false');
+  });
+
+  test('右辺のレールは押せるが、見た目を持たず hover でも光らない', async ({ page }) => {
+    const comments = page.getByTestId('approval-comments');
+    const rail = page.getByTestId('approval-comments-toggle');
+
+    const look = () =>
+      rail.evaluate((element) => {
+        const own = getComputedStyle(element);
+        return {
+          background: own.backgroundColor,
+          borderWidth: own.borderTopWidth,
+          children: element.childElementCount,
+          width: Math.round(element.getBoundingClientRect().width),
+          height: Math.round(element.getBoundingClientRect().height),
+          asideHeight: Math.round(element.parentElement!.getBoundingClientRect().height),
+        };
+      });
+
+    const idle = await look();
+    expect(idle.background).toBe('rgba(0, 0, 0, 0)');
+    expect(idle.borderWidth).toBe('0px');
+    expect(idle.children).toBe(0);
+    // 右辺に沿った 20px 幅の全高
+    expect(idle.width).toBe(20);
+    // `inset-y-0` は枠（1px）の内側に張り付く
+    expect(Math.abs(idle.height - idle.asideHeight)).toBeLessThanOrEqual(2);
+
+    await rail.hover();
+    expect((await look()).background).toBe('rgba(0, 0, 0, 0)');
+
+    await rail.click();
+    await expect(comments).toHaveCSS('width', TUCKED);
+    expect((await look()).background).toBe('rgba(0, 0, 0, 0)');
+
+    await rail.click();
+    await expect(comments).toHaveAttribute('data-tucked', 'false');
+  });
+
+  test('掴んで右へ引き、半分より狭い位置で放すとしまう', async ({ page }) => {
+    const comments = page.getByTestId('approval-comments');
+    const box = (await comments.boundingBox())!;
+
+    // ボタンや入力の上ではない所（空の一覧の文言）から掴む
+    const grip = (await page.getByTestId('approval-comments-empty').boundingBox())!;
+    const x = grip.x + grip.width / 2;
+    const y = grip.y + grip.height / 2;
+
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + box.width * 0.7, y, { steps: 10 });
+
+    // 幅が指に追従している
+    const dragging = await widthOf(page, 'approval-comments');
+    expect(dragging).toBeLessThan(box.width / 2);
+    expect(dragging).toBeGreaterThanOrEqual(44);
+
+    await page.mouse.up();
+
+    await expect(comments).toHaveAttribute('data-tucked', 'true');
+    await expect(comments).toHaveCSS('width', TUCKED);
+  });
+
+  test('掴んで少しだけ引いて放しても開いたまま。動かさずに放しても何も起きない', async ({
+    page,
+  }) => {
+    const comments = page.getByTestId('approval-comments');
+    const open = await widthOf(page, 'approval-comments');
+
+    const grip = (await page.getByTestId('approval-comments-empty').boundingBox())!;
+    const x = grip.x + grip.width / 2;
+    const y = grip.y + grip.height / 2;
+
+    // 半分より広い位置で放す → 開いたまま、幅も元どおり
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + 40, y, { steps: 5 });
+    await page.mouse.up();
+
+    await expect(comments).toHaveAttribute('data-tucked', 'false');
+    await expect(comments).toHaveCSS('width', `${Math.round(open)}px`);
+
+    // 動かさずに放す（ただのクリック）→ 何も起きない
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.up();
+
+    await expect(comments).toHaveAttribute('data-tucked', 'false');
+    await expect(comments).toHaveCSS('width', `${Math.round(open)}px`);
+  });
+
+  test('しまった帯を掴んで左へ引くと開く', async ({ page }) => {
+    const comments = page.getByTestId('approval-comments');
+    const open = await widthOf(page, 'approval-comments');
+
+    await page.getByTestId('approval-comments-tuck').click();
+    await expect(comments).toHaveCSS('width', TUCKED);
+
+    const handle = (await page.getByTestId('approval-comments-handle').boundingBox())!;
+    const x = handle.x + handle.width / 2;
+    const y = handle.y + 100;
+
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x - open, y, { steps: 10 });
+    await page.mouse.up();
+
+    await expect(comments).toHaveAttribute('data-tucked', 'false');
+    await expect(comments).toHaveCSS('width', `${Math.round(open)}px`);
+    // 放した直後の click でもう一度切り替わらない
+    await page.waitForTimeout(400);
+    await expect(comments).toHaveAttribute('data-tucked', 'false');
+  });
+
+  test('左のナビを畳んでも一覧は出たままで幅も変わらず、空いた幅は本文だけが取る', async ({
+    page,
+  }) => {
+    const comments = page.getByTestId('approval-comments');
+    const sidebar = page.getByTestId('workspace-sidebar');
+
+    const open = await widthOf(page, 'approval-comments');
+    const mainBefore = await widthOf(page, 'approval-main');
+
+    await page.getByTestId('sidebar-collapse').click();
+    await expect(sidebar).toHaveCSS('width', '64px');
+
+    await expect(comments).toHaveAttribute('data-tucked', 'false');
+    await expect(comments).toHaveCSS('width', `${Math.round(open)}px`);
+
+    // 本文は左が空けた 192px（256 − 64）だけ広がる
+    const mainAfter = await widthOf(page, 'approval-main');
+    expect(Math.round(mainAfter - mainBefore)).toBe(256 - 64);
+
+    // 左を開き直しても一覧の幅は変わらない
+    await page.getByTestId('sidebar-collapse').click();
+    await expect(sidebar).toHaveCSS('width', '256px');
+    await expect(comments).toHaveCSS('width', `${Math.round(open)}px`);
+  });
+
+  test('左を畳んだ状態で開いても、一覧は左が開いているときと同じ幅になる', async ({ page }) => {
+    const comments = page.getByTestId('approval-comments');
+    const open = await widthOf(page, 'approval-comments');
+
+    await page.getByTestId('sidebar-collapse').click();
+    await expect(page.getByTestId('workspace-sidebar')).toHaveCSS('width', '64px');
+
+    await page.reload();
+    await expect(page.getByTestId('workspace-sidebar')).toHaveAttribute('data-collapsed', 'true');
+    await expect(comments).toHaveCSS('width', `${Math.round(open)}px`);
+  });
+
+  test('本文に固定幅は無く、ビューポートに追従する', async ({ page }) => {
+    const wide = await widthOf(page, 'approval-main');
+
+    await page.setViewportSize({ width: 1600, height: 720 });
+    const wider = await widthOf(page, 'approval-main');
+    expect(wider).toBeGreaterThan(wide);
+
+    await page.setViewportSize({ width: 1100, height: 720 });
+    const narrower = await widthOf(page, 'approval-main');
+    expect(narrower).toBeLessThan(wide);
+  });
+
+  test('しまった状態は保存されず、開き直すと一覧は出ている', async ({ page }) => {
+    const comments = page.getByTestId('approval-comments');
+
+    /** ブラウザに残るもの。しまう前後で増えないことを見る */
+    const stored = async () => ({
+      cookies: (await page.context().cookies()).map((cookie) => cookie.name).sort(),
+      local: await page.evaluate(() => Object.keys(localStorage).sort()),
+      session: await page.evaluate(() => Object.keys(sessionStorage).sort()),
+    });
+    const before = await stored();
+
+    await page.getByTestId('approval-comments-tuck').click();
+    await expect(comments).toHaveCSS('width', TUCKED);
+
+    // URL に含めない
+    await expect(page).toHaveURL(new RegExp(`${APPROVAL}$`));
+    // cookie / localStorage / sessionStorage にも書かない
+    expect(await stored()).toEqual(before);
+
+    await page.reload();
+    await expect(comments).toHaveAttribute('data-tucked', 'false');
+    await expect(page.getByTestId('approval-comments-handle')).toHaveCount(0);
+    await expect(page.getByTestId('approval-revision')).toBeVisible();
+  });
+
+  test('しまっている間も、ヘッダーの戻る導線とプロジェクト表示、面の切替は見える', async ({
+    page,
+  }) => {
+    await page.getByTestId('approval-comments-tuck').click();
+    await expect(page.getByTestId('approval-comments')).toHaveCSS('width', TUCKED);
+
+    await expect(page.getByTestId('back-to-portal')).toBeVisible();
+    await expect(page.getByTestId('workspace-project-name')).toBeVisible();
+    await expect(page.getByTestId('approval-modes')).toBeVisible();
+
+    // 面の切替はしまっている間も効く
     await page.getByTestId('approval-mode-annotate').click();
-    await page.getByTestId('approval-mode-preview').click();
-
-    await expect(page.getByTestId('document-input')).toHaveValue('# 直しかけ');
+    await expect(page.getByTestId('approval-annotate-source')).toBeVisible();
+    await expect(page.getByTestId('approval-comments')).toHaveCSS('width', TUCKED);
   });
 });
 
