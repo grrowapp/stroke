@@ -1,9 +1,10 @@
 <script setup lang="ts">
 // コメント1件のカード。種別・色・ID・引用の全文・コメント本文を持ち、編集 / 消すの口を備える。
+// 本文へのコメントには、本文の上のその範囲へ辿る口（`locate`）も備える。
 import type { Annotation } from '#shared/stroke'
 
 defineProps<{ comment: Annotation }>()
-const emit = defineEmits<{ edit: [id: string]; remove: [id: string] }>()
+const emit = defineEmits<{ edit: [id: string]; remove: [id: string]; locate: [id: string] }>()
 </script>
 
 <template>
@@ -23,6 +24,13 @@ const emit = defineEmits<{ edit: [id: string]; remove: [id: string] }>()
         </span>
       </div>
       <div class="flex items-center gap-1">
+        <button
+          v-if="comment.type === 'selection'"
+          type="button"
+          class="rounded px-1.5 py-1 text-xs text-muted hover:text-primary"
+          data-testid="comment-locate"
+          @click="emit('locate', comment.id)"
+        >本文へ</button>
         <button
           type="button"
           class="rounded px-1.5 py-1 text-xs text-muted hover:text-primary"

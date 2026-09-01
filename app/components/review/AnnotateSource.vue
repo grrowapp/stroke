@@ -1,140 +1,248 @@
 <script setup lang="ts">
-// 生の Markdown に注釈を付ける面。注釈を付けられるのはこの面だけ。
-// 選択範囲は本文全体での文字オフセット（start / end）で持つ。
-// レンダリング後の HTML ではなく生テキストに対して付けるため、
-// 同じ語が本文に何度現れても、選んだ箇所だけがハイライトされる。
-import type { Annotation, HighlightColor } from '#shared/stroke'
+// 注釈の面。位置の口（`PositionPort`）を出す面を1つ受け取り、その上に注釈を塗る。
+//
+// **本文をどう描くかは知らない。** 生テキストの面（`MarkdownSource`）も整形された本文の面
+// （`MarkdownView`）も同じ形で位置の口を出すので、ここに面の分岐は無い。面はスロットで
+// 受け取り、口は `port` で受け取る。どちらの面に載っているかは呼ぶ側だけが知っている。
+//
+// 選択範囲は本文全体での文字オフセット（start / end）で持つ。レンダリング後の HTML では
+// なく生テキストに対して付けるため、同じ語が本文に何度現れても、選んだ箇所だけが残る。
+//
+// 塗りは `useAnnotationHighlight`（CSS Custom Highlight API）。本文の要素を作らないので、
+// 強調・リンク・見出しを跨いだ選択にも付き、注釈の有無で本文の改行位置も折り返しも動かない。
+//
+// 塗られた範囲は要素ではないので、クリックの当たり判定が無い。本文 → 一覧は、この器に置いた
+// クリックの座標から文字位置を引く（`caretPositionFromPoint` / `caretRangeFromPoint` の両方を
+// 見る。ブラウザによってどちらが在るかが違う）。一覧 → 本文は位置の口（`toDomRange`）で引き、
+// 座標を使わない。
+import { useTextSelection } from '@vueuse/core'
+import { computed, onBeforeUnmount, onMounted, useTemplateRef, watch } from 'vue'
 
-const props = defineProps<{ source: string; comments: Annotation[] }>()
+import {
+  commentIdAt,
+  isValidSourceRange,
+  selectionRangesOf,
+  sourceShownOf,
+  useAnnotationHighlight,
+} from '~/composables/useAnnotationHighlight'
+
+import type { PositionPort, SourceRange } from '#markdown/position/types'
+import type { Annotation } from '#shared/stroke'
+
+const props = defineProps<{
+  /** 面に渡した生テキスト。注釈のオフセットはこの文字列に対して付く */
+  source: string
+  comments: Annotation[]
+  /**
+   * 面が出している位置の口。面の `ref` をそのまま渡す（`MarkdownView` / `MarkdownSource` は
+   * `defineExpose` で `PositionPort` を名乗る）。面がまだ描かれていなければ `null`
+   */
+  port?: PositionPort | null
+}>()
+
 const emit = defineEmits<{
   select: [payload: { text: string; start: number; end: number }]
   clickMark: [id: string]
 }>()
 
-interface Mark {
-  id: string
-  comment: string
-  color: HighlightColor
-}
+defineSlots<{
+  /**
+   * 面。`sourceShown` は図に生テキストを添えたい範囲で、整形された本文の面
+   * （`MarkdownView`）の同名の prop へそのまま渡す。生テキストの面では使わない
+   */
+  default(props: { sourceShown: SourceRange[] }): unknown
+}>()
 
-interface Segment {
-  text: string
-  start: number
-  /** この断片を覆うコメント。後ろほど前面（後から付けた方）。空なら素の断片 */
-  marks: Mark[]
-  /** 描画に使う値。marks が空なら付かない */
-  paint?: {
-    /** クリックで編集に入る対象。最前面のコメント */
-    id: string
-    title: string
-    bg: string
-    /** 覆っているコメントの数だけ下線を積む */
-    shadow: string
-  }
-}
+const root = useTemplateRef<HTMLElement>('root')
+
+/** 位置を持つ注釈のうち、範囲が妥当なもの。付けた順 */
+const selections = computed(() => selectionRangesOf(props.comments, props.source.length))
 
 /**
- * 本文を注釈の境界で切り、各断片にそこを覆うコメントを持たせる。
+ * 図に生テキストを添えたい範囲。位置を持つ注釈の範囲そのもの（design 決定7）。
  *
- * 範囲が重なっても本文はどの文字も1回だけ描かれ、`data-start` は実表示と一致する。
- * 覆っているコメントは下線を1本ずつ重ねて出すため、完全に飲み込まれた範囲も
- * 同一範囲の2件目も、必ず本文上に現れる。
+ * 図に付いたかどうかで選ばない。図と重なるかは markdown の側が見る。基準は取得したままの
+ * 文字列で、揃える手続きをここに持たない（面が内側で写像を通す）。
  */
-const segments = computed<Segment[]>(() => {
-  const source = props.source
-  const clamp = (n: number): number => Math.min(Math.max(n, 0), source.length)
+const sourceShown = computed<SourceRange[]>(() => sourceShownOf(props.comments, props.source.length))
 
-  const selections = props.comments
-    .filter((c) => c.type === 'selection')
-    .map((c) => ({
-      id: c.id,
-      comment: c.comment,
-      color: c.highlightColor,
-      start: clamp(c.startOffset),
-      end: clamp(c.endOffset),
-    }))
-    .filter((s) => s.start < s.end)
+// --- 塗り
 
-  const bounds = [...new Set([0, source.length, ...selections.flatMap((s) => [s.start, s.end])])]
-    .sort((a, b) => a - b)
-
-  const out: Segment[] = []
-  for (let i = 0; i < bounds.length - 1; i++) {
-    const from = bounds[i]
-    const to = bounds[i + 1]
-    if (from === undefined || to === undefined || from >= to) continue
-
-    // この断片を覆うコメント。配列の並びがそのまま重なりの順（後ろが前面）。
-    const marks: Mark[] = selections
-      .filter((s) => s.start <= from && to <= s.end)
-      .map((s) => ({ id: s.id, comment: s.comment, color: s.color }))
-
-    const front = marks[marks.length - 1]
-    out.push({
-      text: source.slice(from, to),
-      start: from,
-      marks,
-      ...(front
-        ? {
-            paint: {
-              id: front.id,
-              title: marks.map((m) => m.comment).join('\n'),
-              bg: front.color.bg,
-              // 前面から順に、内側（下端）へ 2px ずつ線を積む
-              shadow: marks
-                .slice()
-                .reverse()
-                .map((m, depth) => `inset 0 -${(depth + 1) * 2}px 0 ${m.color.border}`)
-                .join(', '),
-            },
-          }
-        : {}),
-    })
-  }
-  return out
+const highlight = useAnnotationHighlight({
+  port: () => props.port,
+  source: () => props.source,
+  comments: () => props.comments,
 })
 
-// 断片内の位置を、本文全体でのオフセットに直す
-function offsetOf(node: Node, offsetInNode: number): number | null {
-  let el: HTMLElement | null =
-    node.nodeType === Node.TEXT_NODE ? node.parentElement : (node as HTMLElement)
-  while (el && el.dataset.start === undefined) el = el.parentElement
-  if (!el || el.dataset.start === undefined) return null
-  return Number(el.dataset.start) + offsetInNode
+/**
+ * DOM が変わったら塗り直す。整形された本文は解析の完了と図の描画の完了で中身が
+ * 入れ替わるので、注釈が変わらなくても `Range` は古くなる。塗りは DOM を書き換えないので、
+ * ここから塗りへ戻るループは起きない。
+ */
+let observer: MutationObserver | null = null
+let scheduled = false
+
+function schedulePaint(): void {
+  if (scheduled) return
+  scheduled = true
+  const run = (): void => {
+    scheduled = false
+    highlight.paint()
+  }
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run)
+  else run()
+}
+
+onMounted(() => {
+  highlight.paint()
+  const el = root.value
+  if (!el || typeof MutationObserver !== 'function') return
+  observer = new MutationObserver(schedulePaint)
+  observer.observe(el, { childList: true, subtree: true, characterData: true })
+})
+
+// 注釈・本文・口のどれが変わっても作り直す。`Highlight` を保持しない（R1）
+watch([selections, () => props.source, () => props.port], () => highlight.paint(), { flush: 'post' })
+
+onBeforeUnmount(() => {
+  observer?.disconnect()
+  observer = null
+  highlight.clear()
+})
+
+// --- 選択 → 注釈
+
+/**
+ * 選択の追跡。`selectionchange` を追う VueUse の `useTextSelection`（design 決定4）。
+ *
+ * 読むのは `selection`（生の `Selection`。生きているオブジェクトなので、読んだ瞬間の
+ * 選択が取れる）。`ranges` は `selectionchange` が届いてから更新される computed で、
+ * ダブルクリックの語の選択などでは mouseup の時点でまだ古いことがある。
+ */
+const { selection } = useTextSelection()
+
+/** 選択を確定した直後の click を、色を押した操作と取り違えないための印 */
+let justSelected = false
+
+function currentRange(): Range | null {
+  const sel = selection.value
+  if (!sel || sel.isCollapsed || sel.rangeCount === 0) return null
+  const range = sel.getRangeAt(0)
+  const el = root.value
+  if (!el || !el.contains(range.commonAncestorContainer)) return null
+  return range
 }
 
 function onMouseUp(): void {
-  const sel = window.getSelection()
-  if (!sel || sel.isCollapsed || !sel.anchorNode || !sel.focusNode) return
-  const a = offsetOf(sel.anchorNode, sel.anchorOffset)
-  const b = offsetOf(sel.focusNode, sel.focusOffset)
-  if (a == null || b == null) return
-  const start = Math.min(a, b)
-  const end = Math.max(a, b)
-  if (!props.source.slice(start, end).trim()) return
-  emit('select', { text: props.source.slice(start, end), start, end })
-  sel.removeAllRanges()
+  const range = currentRange()
+  if (!range) return
+  justSelected = true
+
+  const port = props.port
+  if (!port) return
+  const position = port.toSourceRange(range)
+  if (!isValidSourceRange(position, props.source.length)) return
+
+  const text = props.source.slice(position.start, position.end)
+  // 空白だけの選択は捨てる（振る舞いは以前と同じ）
+  if (!text.trim()) return
+
+  emit('select', { text, start: position.start, end: position.end })
+  selection.value?.removeAllRanges()
 }
+
+// --- 本文の色 → 一覧のコメント
+
+/**
+ * 座標の下の1文字を指す `Range`。引けなければ `null`。
+ *
+ * `caretPositionFromPoint`（標準）と `caretRangeFromPoint`（WebKit 系）の**両方を見る**。
+ * 片方しか見ない実装にしない（R4）。返るのは字と字の間（キャレット）なので、その右隣の
+ * 1文字（無ければ左隣）を範囲にする。位置の口は幅0の範囲を「重ならない」と見て `null` を
+ * 返すことがあるためである。
+ */
+function characterRangeAt(x: number, y: number): Range | null {
+  const doc = root.value?.ownerDocument
+  if (!doc) return null
+
+  let node: Node | null = null
+  let offset = 0
+
+  if (typeof doc.caretPositionFromPoint === 'function') {
+    const caret = doc.caretPositionFromPoint(x, y)
+    if (!caret) return null
+    node = caret.offsetNode
+    offset = caret.offset
+  } else if (typeof doc.caretRangeFromPoint === 'function') {
+    const caret = doc.caretRangeFromPoint(x, y)
+    if (!caret) return null
+    node = caret.startContainer
+    offset = caret.startOffset
+  } else {
+    return null
+  }
+
+  if (!node || node.nodeType !== Node.TEXT_NODE) return null
+  const length = (node as Text).data.length
+  if (length === 0) return null
+
+  const range = doc.createRange()
+  if (offset < length) {
+    range.setStart(node, offset)
+    range.setEnd(node, offset + 1)
+  } else {
+    range.setStart(node, length - 1)
+    range.setEnd(node, length)
+  }
+  return range
+}
+
+function onClick(event: MouseEvent): void {
+  if (justSelected) {
+    justSelected = false
+    return
+  }
+  const port = props.port
+  if (!port) return
+
+  const range = characterRangeAt(event.clientX, event.clientY)
+  if (!range) return
+  const position = port.toSourceRange(range)
+  if (!position) return
+
+  const id = commentIdAt(selections.value, position.start)
+  if (id !== null) emit('clickMark', id)
+}
+
+// --- 一覧のコメント → 本文の範囲
+
+/**
+ * id のコメントが指す範囲を本文の上で示す。位置の口（`toDomRange`）で引き、**座標を使わない**
+ * （design 決定5）。範囲まで画面を寄せ、しばらくの間だけ目立たせる。
+ *
+ * 引けなければ `false`（面が描かれていない・その位置が面に出ていない）。
+ */
+function reveal(id: string): boolean {
+  const port = props.port
+  const found = selections.value.find((s) => s.id === id)
+  if (!port || !found) return false
+
+  const range = port.toDomRange({ start: found.start, end: found.end })
+  if (!range) return false
+
+  const node = range.startContainer
+  const el = node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement
+  if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'center' })
+
+  highlight.focus(range)
+  return true
+}
+
+defineExpose({ reveal })
 </script>
 
 <template>
-  <!--
-    字と余白は本家の実測。本家は `TextAnnotate` に inline style を渡している
-    （`ApprovalsAnnotator.tsx` の `renderTextAnnotate`）:
-      font-size 0.875rem（= 14px。`--text-sm` の 12px ではない）/ line-height 1.625 /
-      white-space pre-wrap / word-break break-word
-    箱の余白は `p-3 sm:p-4` だが、本家自身の素のクラス `.p-3` が Tailwind の
-    レスポンシブ指定を打ち消すので実測は常に 12px（承認カードと同じ現象）。
-  -->
-  <pre
-    class="whitespace-pre-wrap p-3 font-mono text-[0.875rem]/[1.625] [word-break:break-word]"
-    @mouseup="onMouseUp"
-  ><template v-for="(seg, i) in segments" :key="i"><mark
-      v-if="seg.paint"
-      :data-start="seg.start"
-      class="cursor-pointer rounded-sm px-0.5"
-      :style="{ backgroundColor: seg.paint.bg, boxShadow: seg.paint.shadow }"
-      :title="seg.paint.title"
-      @click="emit('clickMark', seg.paint.id)"
-    >{{ seg.text }}</mark><span v-else :data-start="seg.start">{{ seg.text }}</span></template></pre>
+  <div ref="root" @mouseup="onMouseUp" @click="onClick">
+    <slot :source-shown="sourceShown" />
+  </div>
 </template>

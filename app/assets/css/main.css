@@ -1228,3 +1228,73 @@ body {
     background: var(--status-success);
   }
 }
+
+/*
+ * 注釈の塗り（CSS Custom Highlight API）。
+ *
+ * 塗る側は `app/composables/useAnnotationHighlight.ts`。色ごとに1つの `Highlight` を
+ * `sb-annotation-<色名>` の名で `CSS.highlights` に登録し、ここで見た目を当てる。
+ * `::highlight()` は inline style を受け取れないので、色の実値はここに置くほかない。
+ * 値は `useAnnotations` の `highlightColors`（本家へ渡る保存形が使う実値）と同じ。
+ * **片方だけ変えないこと。**
+ *
+ * 効くプロパティは限られる（実測 Chromium 151、2026-09-01）: 背景色・文字色・下線の類・
+ * 文字の影。枠・余白・`box-shadow` は効かない。以前の「下線を 2px ずつ積む」重なりの
+ * 表し方はここでは組めないので、重なりは下の1本（`sb-annotation-overlap`）で出す。
+ *
+ * `@layer` の外に置く。`::highlight()` は要素のスタイルではなく、Tailwind のユーティリティと
+ * 競合しない。
+ */
+::highlight(sb-annotation-yellow) {
+  background-color: rgba(255, 235, 59, 0.35);
+  text-decoration: underline;
+  text-decoration-color: #fbc02d;
+  text-decoration-skip-ink: none;
+}
+
+::highlight(sb-annotation-green) {
+  background-color: rgba(76, 175, 80, 0.3);
+  text-decoration: underline;
+  text-decoration-color: #388e3c;
+  text-decoration-skip-ink: none;
+}
+
+::highlight(sb-annotation-blue) {
+  background-color: rgba(33, 150, 243, 0.28);
+  text-decoration: underline;
+  text-decoration-color: #1976d2;
+  text-decoration-skip-ink: none;
+}
+
+::highlight(sb-annotation-pink) {
+  background-color: rgba(233, 30, 99, 0.25);
+  text-decoration: underline;
+  text-decoration-color: #c2185b;
+  text-decoration-skip-ink: none;
+}
+
+::highlight(sb-annotation-orange) {
+  background-color: rgba(255, 152, 0, 0.3);
+  text-decoration: underline;
+  text-decoration-color: #f57c00;
+  text-decoration-skip-ink: none;
+}
+
+/*
+ * 2件以上に覆われている範囲。色ごとの塗りとは別に1本だけ持ち、二重線で示す。
+ * 同一範囲・同色の2件目は背景では判別できないので、これが要る。半透明の背景は重なった分だけ
+ * 濃くもなるが、それは色が違うときにしか効かない。
+ */
+::highlight(sb-annotation-overlap) {
+  text-decoration: underline double;
+  text-decoration-color: var(--text-primary);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-skip-ink: none;
+}
+
+/* 一覧から辿ったコメントの範囲。しばらくの間だけ、色の上から強く塗る */
+::highlight(sb-annotation-focus) {
+  background-color: var(--accent-primary);
+  color: #fff;
+}
