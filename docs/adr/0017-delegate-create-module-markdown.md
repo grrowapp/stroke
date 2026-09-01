@@ -7,11 +7,17 @@
 
 `create-module-markdown` の範囲を **markdown を1つのモジュールに閉じ、外から見える口を絞ること**に限り、そこに収まらないものを5本の change へ委譲する。
 
-- `adr0017-sub-create-module-annotation`
-- `adr0017-sub-full-width-markdown-editor`
-- `adr0017-sub-update-ui-approval-review`
-- `adr0017-sub-separate-approval-decision-from-promotion`
-- `adr0017-sub-update-docs-structure`
+**委譲した5本は独立した change として扱う。** 親の範囲を割ったものではなく別の関心事なので、親の archive 条件に含まれず、着手の順も親に縛られない。したがって change-id に親の子であることを示す接頭辞を持たせない（2026-08-31 にユーザーの決定で `adr0017-sub-` を外した。改名前の名前は本 ADR の履歴と archive 済み change の記述に残る）。
+
+| change | 委譲前の名前 |
+| --- | --- |
+| `create-module-annotation` | `adr0017-sub-create-module-annotation` |
+| `add-full-width-markdown-editor` | `adr0017-sub-full-width-markdown-editor` |
+| `update-ui-approval-review` | `adr0017-sub-update-ui-approval-review` |
+| `separate-approval-decision-from-promotion` | `adr0017-sub-separate-approval-decision-from-promotion` |
+| `update-docs-structure` | `adr0017-sub-update-docs-structure` |
+
+**この5本が `create-module-markdown` から委譲されたという経緯は、本 ADR が唯一の記録である。** change-id からその手がかりが消えたので、由来を辿るときはここを見ること。
 
 あわせて、**親の範囲に残った作業そのものを4本へ分割する**。委譲（別の関心事へ渡す）ではなく分割（親の範囲を割る）なので、親は4本が全部終わるまで archive しない。
 
@@ -47,7 +53,7 @@ markdown を扱う実体が `nuxt.config.ts`（parse 設定）・`app/components
 
 利用者にとってできること、または選べる幅が変わるもの（4件）。
 
-#### adr0017-sub-create-module-annotation
+#### create-module-annotation
 
 - **種別**: 拡張
 - **状態**: 未着手（tasks 0/23）
@@ -69,7 +75,7 @@ markdown を扱う実体が `nuxt.config.ts`（parse 設定）・`app/components
 
 **親との関係** — 後続。親 change は markdown を扱う実体をモジュールに閉じ、「描いた本文と生テキストの位置の対応」を口として公開するところまでを持つ。この change はその口の利用者として注釈の側を扱う。したがって親の口が確定してから着手する。
 
-#### adr0017-sub-full-width-markdown-editor
+#### add-full-width-markdown-editor
 
 - **種別**: 拡張
 - **状態**: 未着手（成果物が proposal のみ）
@@ -94,7 +100,7 @@ markdown を扱う実体が `nuxt.config.ts`（parse 設定）・`app/components
 
 **親との関係** — 後続。markdown を扱う実体をモジュールに閉じた後、その編集面の見せ方を変える。着手前に `replace-handrolled-with-libraries`（archive 済み）が同じ編集 UI を部分置換していることを確認すること。競合するのは同一コンポーネントの内部だけで、外から見た振る舞いは独立している。
 
-#### adr0017-sub-update-ui-approval-review
+#### update-ui-approval-review
 
 - **種別**: 拡張
 - **状態**: 未着手（tasks 0/26）
@@ -129,7 +135,7 @@ markdown を扱う実体が `nuxt.config.ts`（parse 設定）・`app/components
 
 **親との関係** — 後続。markdown の切り出しとは独立した画面の改善であり、親の delta に混ぜると何を直したのかが読めなくなるため分けた。
 
-#### adr0017-sub-separate-approval-decision-from-promotion
+#### separate-approval-decision-from-promotion
 
 - **種別**: 拡張
 - **状態**: 未着手（成果物が `.openspec.yaml` のみ）
@@ -165,7 +171,7 @@ markdown を扱う実体が `nuxt.config.ts`（parse 設定）・`app/components
 
 振る舞いを変えず、実装を文書へ写すもの（1件）。
 
-#### adr0017-sub-update-docs-structure
+#### update-docs-structure
 
 - **種別**: 資料化
 - **状態**: 未着手（tasks 0/26）
