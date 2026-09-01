@@ -102,6 +102,7 @@ worktree = `git worktree` で切った作業ディレクトリ。それぞれが
 ### `docs/agents/`
 
 - `issue-tracker.md` — OpenSpec 運用（change-id 命名・ticket 起票・参照の方向・artifact・更新対応・ブランチ）。**規定の正**
-- `triage-labels.md` — triage の5ラベル
+- `ticket-labels.md` — ticket の `status` 語彙（change の artifact 構成から決まる）
+- `triage-labels.md` — `/triage` スキルの canonical 5役と、ticket の `triage:` に書く文字列の対応表
 - `domain.md` — CONTEXT.md と ADR の運用
 - `subagents.md` — subagent の使い分け

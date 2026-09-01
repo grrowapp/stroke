@@ -1,16 +1,17 @@
 # ADR-0016: provide-operations-via-mcp から切り出した change の委譲理由
 
-- **状態**: 採用（一部は docs へ確定済み。**archive にはしない**——下の「確定した先」）
+- **状態**: 採用（一部は docs へ確定済み。**archive にはしない**——下の「確定していないもの」）
 - **日付**: 2026-08-29
 - **確定した先**:
   - 提供方式・ツールの契約・結果の形・工程ごとの公開・接続 token → [docs/specs/api/mcp-tools.md](../specs/api/mcp-tools.md)
   - 起動フラグ・定型・設定の一覧 → [docs/specs/core/settings-reference.md](../specs/core/settings-reference.md)
   - 配線と置き場 → [docs/specs/architecture/session-workflow.md](../specs/architecture/session-workflow.md)
-- **確定していないもの**: `adr0016-sub-implement-mcp-operations` の結論（代行を確定した方式とする判断）は、まだ docs に落ちていない。**取りこぼす規約が残るので archive にしない**（CLAUDE.md「更新対応」）
+  - 代行を確定した方式とする判断 → [docs/specs/api/mcp-tools.md](../specs/api/mcp-tools.md)「提供の形」「代行するもの」（`adr0016-sub-implement-mcp-operations` の結論。暫定・第一段という書きぶりは docs から消えている）
+- **確定していないもの**: 2026-09-01 に足した後続3本（`fix-upstream-mcp-allowance` / `fix-direct-write-allowance` / `fix-project-id-lookup`）の委譲理由は、まだ docs に落ちていない。**取りこぼす規約が残るので archive にしない**（CLAUDE.md「更新対応」）
 
 ## 決定
 
-`provide-operations-via-mcp` の範囲を**現行操作の代行**（既存 REST への薄いプロキシ）に限り、そこに収まらないものを 10 本の change へ委譲する。委譲は3種に分ける。
+`provide-operations-via-mcp` の範囲を**現行操作の代行**（既存 REST への薄いプロキシ）に限り、そこに収まらないものを 13 本の change へ委譲する。委譲は3種に分ける。
 
 - **後続**（この change の完了後に着手する。範囲を意図的に切った先）
   - `adr0016-sub-implement-mcp-operations`
@@ -18,6 +19,9 @@
   - `adr0016-sub-document-mcp-operations`
   - `adr0016-sub-create-flontier-guidance-mcp-tool`
   - `adr0016-sub-create-steering-guidance-mcp-tool`
+  - `adr0016-sub-fix-upstream-mcp-allowance`（2026-09-01 追加）
+  - `adr0016-sub-fix-direct-write-allowance`（2026-09-01 追加）
+  - `adr0016-sub-fix-project-id-lookup`（2026-09-01 追加）
 - **前提**（この change の検証・承認がそれ無しには成立しない。tasks 6章に明記）
   - `adr0016-sub-add-stroke-check-approval-option`
   - `adr0016-sub-define-request-validation-messages`
@@ -245,7 +249,7 @@ instruction は `/get-overview` `/get-strokes` `/get-send-back` というスラ�
 
 ### バグ
 
-ticket の tags が bug のもの。あるべき振る舞いに戻す（1件）。
+ticket の tags が bug のもの。あるべき振る舞いに戻す（4件）。
 
 #### adr0016-sub-fix-busy-response-handling
 
@@ -264,6 +268,60 @@ ticket の tags が bug のもの。あるべき振る舞いに戻す（1件）�
 **対処** — 前の応答をまだ待っていることが分かったとき、画面はそれを失敗として示さず待機として示す。待機に入る扱いを、起動を要求できた場合とまだ待っている場合の両方で通す（今は前者だけ）。散っている3箇所を1つに揃える。409 を返す側は正しいので触らない。
 
 **親との関係** — 前提。画面が 409 から回復できないと往復が止まり、親 change の検証が完走しない。
+
+#### adr0016-sub-fix-upstream-mcp-allowance
+
+- **状態**: needs-triage / bug
+- **成果物**: proposal のみ（specs・design・tasks 未作成）
+- **触るファイル**:
+  - `server/utils/mcp/allowed-tools.ts` — `mcp__specworkflow` を許可へ足している箇所
+  - `server/mcp/tools/get-steering-guide.ts` / `get-guide.ts` — 「呼ぶな」と述べている節
+  - `docs/specs/api/mcp-tools.md` — 整合反映（ADR-0004 の手続き）
+
+**問題** — 本家 MCP のツールは `--allowedTools` に載っていて呼べるのに、案内は「この工程では1つも呼ばない」「`approvals` も呼ぶな」と書いている。守っているのは案内の散文だけである。
+
+**原因** — 許可へ足した理由は「配るだけでは一覧に出るのに1つも呼べず、『呼べないものを見せてから失敗させない』を破る」（親 change 6.2 の4周目）。一方、本家 MCP を起こす目的は起動時の登録簿への自己登録だけで、ツール呼び出しは1つも要らない。stdio の本家 MCP には `x-mcp-tools` のような絞りが無いので、「構造で塞ぐ」と「見せてから失敗させない」は両立しない。
+
+**対処** — どちらへ倒すかを design で決め、選んだ側を `docs/specs/api/mcp-tools.md` の「操作の入口はこれだけである」と整合させる。
+
+**親との関係** — 後続。親 change の santa-method レビュー 9周目（2026-08-31）が見つけた。当初は範囲外として記録したが、**範囲外の扱いは不正だった**（ユーザー指摘 2026-09-01）。案内2本の change（`create-flontier-guidance-mcp-tool` / `create-steering-guidance-mcp-tool`）が確定させた文言に掛かるので、それらの完了後に着手する。
+
+#### adr0016-sub-fix-direct-write-allowance
+
+- **状態**: needs-triage / bug
+- **成果物**: proposal のみ（specs・design・tasks 未作成）
+- **触るファイル**:
+  - `nuxt.config.ts` — `allowedTools` の値と、事実と違うコメント
+  - `docs/specs/core/settings-reference.md` — 起動フラグの記述（ADR-0004 の手続き）
+
+**問題** — `--allowedTools` の `Write` / `Edit` が、MCP ツールを通さず文書を直接書く経路を残している。`docs/specs/api/mcp-tools.md` の「操作の入口はこれだけである。ファイルの直読み・直書きも、コマンドによる代行も採らない」を迂回できる。
+
+**原因** — 要否を確かめずに残っている。`nuxt.config.ts` のコメントは「`Write` は proposal を `docs/proposal.md` に書くのに要る」と説明するが、proposal を書くのは受理した A7 である。**ただし `Write` が入った実際の理由は別で**、コミット `1ce89cfc`（2026-08-26）が示すとおりワークフロー定義の `generates`（`stroke.md` / `proposal.md`）の新規作成である。その要求は schema.yaml にいまも残っている。
+
+**起票時に「直近3実行のいずれも `Write` / `Edit` を1度も使っていない」と書いたが、取り下げた**（2026-09-01）。根拠にしたデバッグログは削除済みで再現できず、逆に `Write` で書かれた下書きの実物が2本残っている（`/opt/projects/5d34fd6b-…/proposal.md` ほか、2026-08-30）。ただし `get-guide` 導入前の実行なので現構成の証拠にはならない。
+
+**対処** — `claude.debugLogDir` を一時設定して1周させ、道具ごとの使用回数を実測する。要らないなら許可から外して1周通ることを確認し、要るなら何に要るかを根拠付きでコメントに書き直す。**手順が求める書き出しを残したまま道具だけを外さない**（schema.yaml は `adr0016-sub-switch-workflow-to-mcp-tools` の担当）。
+
+**親との関係** — 後続。親 change の santa-method レビュー 9周目（2026-08-31）が見つけた。当初は範囲外として記録したが、**範囲外の扱いは不正だった**（ユーザー指摘 2026-09-01）。
+
+#### adr0016-sub-fix-project-id-lookup
+
+- **状態**: needs-triage / bug
+- **成果物**: proposal のみ（specs・design・tasks 未作成）
+- **触るファイル**:
+  - `server/utils/mcp/resolve-project-id.ts` — 照合の仕方
+  - `docs/specs/reference/upstream-observations.md` — 本家の正規化についての事実を記録
+  - `docs/specs/api/mcp-tools.md` — `errorCode` を足す場合の整合反映（ADR-0004 の手続き）
+
+**問題** — projectId の引き当てが、本家がパスをどう正規化するかに暗黙で依存している。`projectShareRoot` が git リポジトリの内側へ動いた瞬間、steering 工程が静かに壊れる。失敗は `project_not_registered` として出るので、登録はあるのに「登録されていない」と読める。
+
+**原因** — `resolve-project-id.ts` は接続表の `projectPath` と本家の一覧の `projectPath` を `resolve()` で突き合わせるが、**本家は渡されたパスを `git rev-parse --show-toplevel` で解決してから登録する**（本家 2.2.5 の `core/git-utils.js`。親 change の santa-method レビュー 8周目にレビュアーB が読んで確認）。いまは `projectShareRoot` が `/opt/projects` で git リポジトリではないため一致している（実測 2026-08-31、`setai-3` が引き当てられた）。登録簿には既に食い違う形の例が在る（`agent-messanger` は `projectPath` と `workflowRootPath` が違う）。
+
+**対処** — `projectPath` の一致だけに頼らず、**一致または祖先（最深優先）**で照合する。引き当てられなかったときに「登録されていない」と「登録はあるが照合が外れた」を区別できるようにする（`errorCode` は増やさず `error` の本文で区別する。表は「これ以外を足してはならない」で閉じている）。
+
+**起票時に書いた「本家が持つ別の手掛かり（`workflowRootPath` など）も見る」は取り下げた**（2026-09-01）。`GET /api/projects/list` は `workflowRootPath` を返さず、登録簿を直読みしても `SPEC_WORKFLOW_SHARED_ROOT` / `resolveGitRoot` で決まる値なので起動 cwd との一致も祖先関係も保証されない。**`agent-messanger` の食い違いの機序も git ではなかった**——当該ディレクトリに `.git` は無く、同ディレクトリの `.mcp.json` が `SPEC_WORKFLOW_SHARED_ROOT` を渡している（`git-utils.js` が env を最優先で返す）。食い違う登録が在るという事実は正しいが、原因の説明は誤りだった。
+
+**親との関係** — 後続。親 change の santa-method レビュー 8・9周目（2026-08-31）が見つけた。当初は範囲外として記録したが、**範囲外の扱いは不正だった**（ユーザー指摘 2026-09-01）。
 
 ### 資料化
 
