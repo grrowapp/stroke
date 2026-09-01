@@ -12,8 +12,12 @@ import type {
 } from '#shared/stroke'
 import { useAnnotations } from '~/composables/useAnnotations'
 
-/** 本文の見せ方。注釈を付けられるのは生テキストの面だけ。 */
-export type ViewMode = 'preview' | 'annotate' | 'side-by-side'
+/**
+ * 本文の見せ方。整形されたプレビューと生テキストの2つで、どちらでも指摘を付けられる。
+ * 両方を並べる面は無い（読む面と指摘する面が別だったことに由来する面で、どちらでも
+ * 付けられるなら要らない。specs/stroke/frontier）。
+ */
+export type ViewMode = 'preview' | 'annotate'
 
 /** 差し戻しのあと、この画面で何が起きたか。 */
 export type ReviewNotice = 'revised' | null
@@ -108,7 +112,9 @@ export function useProposalReview(
     },
   })
 
-  const viewMode = ref<ViewMode>('annotate')
+  // 開いたときは整形して読む面にする。読む面のまま指摘を付けられるので、生テキストから
+  // 始める理由が無くなった（承認画面も `preview` で開く。本家も `mode="view"` で開く）
+  const viewMode = ref<ViewMode>('preview')
   const notice = ref<ReviewNotice>(null)
 
   // 本文へのコメント用モーダル
@@ -289,7 +295,7 @@ export function useProposalReview(
     if (!a.comments.value.length) {
       warn(
         '差し戻せません',
-        'コメントが1件もありません。注釈ビューで本文を選んでコメントを付けるか、「全体へのコメント」を足してから差し戻してください。',
+        'コメントが1件もありません。本文を選んでコメントを付けるか、「全体へのコメント」を足してから差し戻してください。',
       )
       return
     }
