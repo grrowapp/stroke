@@ -10,7 +10,7 @@ base2/
 ├── server/
 ├── shared/
 ├── docs/
-├── e2e/
+├── test/
 ├── openspec/
 ├── scripts/
 ├── nuxt.config.ts
@@ -83,7 +83,7 @@ base2/
 - 外に出すものはファイル末尾でまとめてエクスポートし、それ以外はファイル内に留める
 - **単体テストはソースと同居させない。** `test/` にソースの構造をそのまま写した位置へ置く（`test/server/utils/control/notify.test.ts` ↔ `server/utils/control/notify.ts`）
 - テストが使う固定データは、そのテストと同じ位置の `__fixtures__/` に置く
-- E2E は `e2e/` に置く
+- E2E は `test/e2e/` に置く。単体テストと同じ `test/` の下で、`playwright.config.ts` の `testDir` がここを指す
 
 ## Code Organization Principles
 

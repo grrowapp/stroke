@@ -39,8 +39,7 @@ base2/
 │   └── utils/                  関心単位で切る（§3 に一覧）
 ├── shared/                     画面とサーバーが共有する型（ドメイン別ファイル）
 ├── docs/                       specs（定義）/ adr / agents
-├── test/                       単体テスト（app/ server/ …）
-├── e2e/                        Playwright
+├── test/                       テスト（単体は app/ server/ … を写す。e2e/ は Playwright）
 ├── openspec/                   機能的 specs と change
 └── scripts/
 ```
@@ -52,7 +51,7 @@ base2/
 - **pages はただのルーティング。** ページは薄く保ち、画面の実体は components が持つ
 - **components は `ui/` ＋ 機能単位で切る。** 機能に属さない共通部品は `ui/`、機能の部品は機能のディレクトリ（notification / project / question / proposal / approval）。出自や画面グループの境界では切らない。部品が無い機能のディレクトリは作らない。全数の対応は `file-components.md`
 - **composables は関心単位の `useXxx` を平置き**にする。境界のディレクトリを作らない。全数の対応は `file-composables.md`
-- テストの置き場の規約は steering（`.spec-workflow/steering/structure.md` の File Organization Principles）が持つ
+- **テストは `test/` の下に置く。** 単体は `app/` `server/` `modules/` `shared/` の構造をそのまま写し、E2E は `test/e2e/`（`playwright.config.ts` の `testDir` がここを指す）
 - レイアウトはシェルの形が変わる単位で持つ（横タブの `portal.vue` / 左サイドバーの `workspace.vue`）。プロジェクト間の移動は一覧を経由する
 - セッションへの入口はプロジェクト一覧の **作成** で、専用のトップページを持たない
 - データ取得の設計は `docs/specs/architecture/data-fetching.md`

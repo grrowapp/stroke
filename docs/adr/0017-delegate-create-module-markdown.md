@@ -242,7 +242,7 @@ markdown を扱う実体が `nuxt.config.ts`（parse 設定）・`app/components
 - **種別**: 検知
 - **状態**: 未着手
 - **成果物**: 未作成
-- **触るファイル**: `test/modules/markdown/runtime/position/*.test.ts`、`e2e/markdown-hydration.spec.ts`、`modules/markdown/runtime/position/types.ts` / `preview.ts` / `fence.ts`、`modules/markdown/runtime/render/MarkdownView.vue`（コメント）、`modules/markdown/index.ts`（コメント）
+- **触るファイル**: `test/modules/markdown/runtime/position/*.test.ts`、`test/e2e/markdown-hydration.spec.ts`、`modules/markdown/runtime/position/types.ts` / `preview.ts` / `fence.ts`、`modules/markdown/runtime/render/MarkdownView.vue`（コメント）、`modules/markdown/index.ts`（コメント）
 - **引き取る tasks**: 6.1・6.2・6.3・6.4・6.5・6.6.2・6.9・6.10・6.14
 
 **対応内容** — 実装で崩れた前提7件を、踏んだら止まる状態にする。うち3件は**黙って壊れる**（症状が出ないまま誤った位置を返す、別の場所が壊れる）。資料に書くだけでは、読まなかった人が同じ穴に落ちる。
@@ -268,7 +268,7 @@ markdown を扱う実体が `nuxt.config.ts`（parse 設定）・`app/components
 - **種別**: 不具合
 - **状態**: 未着手
 - **成果物**: 未作成
-- **触るファイル**: `app/pages/projects/[projectId]/approvals/[approvalId].vue`、`app/composables/useAnnotations.ts`、`modules/markdown/runtime/render/`、`e2e/fixtures/upstream-stub.mjs`、`e2e/approval-annotation.spec.ts`
+- **触るファイル**: `app/pages/projects/[projectId]/approvals/[approvalId].vue`、`app/composables/useAnnotations.ts`、`modules/markdown/runtime/render/`、`test/e2e/fixtures/upstream-stub.mjs`、`test/e2e/approval-annotation.spec.ts`
 - **引き取る tasks**: 6.11
 
 **対応内容** — 本番の呼び出し側が、正規化していない生文字列を渡している。`approvals/[approvalId].vue:60` の `source` が `MarkdownView` にも注釈の基準にもそのまま渡っており、CRLF を含む文書が来ると、いま在る注釈機能が黙ってずれる。生ファイルを渡すと `null` には倒れず、**黙って別の場所を返す**（実測）。本家は `readFile` / `writeFile` で素通しするため、CRLF も front matter も含まれうる（実測）。
@@ -284,7 +284,7 @@ markdown を扱う実体が `nuxt.config.ts`（parse 設定）・`app/components
 - 正規化を行う場所が決まり、「呼ぶ側が忘れずにやる」形になっていない
 - 生ファイルの座標で保存すると決めた場合、正規化後 ↔ 生ファイル の対応が在る
 - CRLF と front matter を含む文書で注釈が正しい位置に付くことを E2E で確かめている
-- `e2e/fixtures/upstream-stub.mjs` が CRLF と front matter の2件を返す
+- `test/e2e/fixtures/upstream-stub.mjs` が CRLF と front matter の2件を返す
 
 **親との関係** — 分割。`adr0017-sub-create-position-port-preview` の後続。口の形が固まってから、口が受け取る座標の基準を決める。
 
