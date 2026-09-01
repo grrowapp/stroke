@@ -1,5 +1,16 @@
 # CLAUDE.md
 
+## 前提
+
+**`develop` は各 worktree の親ブランチであり、合流点である。その実体はリポジトリ本体
+（`.git` をディレクトリとして持つ側）に展開されている。以下「親」はこのディレクトリを指す。**
+
+`openspec/`・`.spec-workflow/` は**運用と管理の資料**。親に有るものが唯一の正
+
+- **`openspec/`・`.spec-workflow/` は親だけが持つ**
+- **worktree に `sparseCheckout = true` を設定し、`openspec/`・`.spec-workflow/` を除外する**
+- **`openspec/`・`.spec-workflow/` への読み書きは親の実体へ向ける**
+
 ## Agent skills
 
 ### Issue tracker
