@@ -62,10 +62,14 @@ workflow/openspec/changes/
 # 成果物でないファイルを残さない（provide-operations-via-mcp・santa-method レビュー指摘）
 server/mcp/tools/.nuxtrc
 
-# ralph-specum: アクティブ epic のポインタ（マシンローカルな作業状態）
-specs/.current-epic
-# ralph-specum: 状態ファイルのロック（マシンローカル）
-specs/**/.ralph-state.lock
+# ralph-specum が repo 直下に作る作業台。分解の途中で使うだけで、リポジトリの成果物ではない。
+#
+# 資料の置き場は `docs/` と `openspec/` に限る（CLAUDE.md の Docs 節、docs/agents/issue-tracker.md）。
+# repo 直下 `specs/` はどちらの規約にも属さないので、丸ごと追跡しない。
+#
+# 残す価値のあるものは分解が終わった時点で移すこと。`create-module-markdown` の分解では、
+# epic.md にしか無かった「触らないと決めた契約」2件を ADR-0017 へ移してから消した（2026-09-01）。
+specs/
 
 # yarn の移行が残すバックアップ（node_modules.yarn-bak / .nuxt.yarn-bak）。
 # 生成物のコピーであって成果物ではない。一度 11,466 ファイル・307MB を履歴へ入れた

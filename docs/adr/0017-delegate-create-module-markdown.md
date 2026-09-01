@@ -307,6 +307,19 @@ markdown を扱う実体が `nuxt.config.ts`（parse 設定）・`app/components
 
 **親との関係** — 分割。`adr0017-sub-create-position-port-preview` の後続。6.8.2（どのテストが固定しているか）は `adr0017-sub-add-detection-assumptions` が加える検知の名前を突き合わせる必要があるため、その完了後に一度だけ確認する。
 
+## 触らないと決めた契約
+
+分解の作業台（ralph の epic）に、**どの change でも変えないと決めた契約**が2つ書かれていた。作業台は役目を終えて消したが、この2つは change の artifact にも specs にも書かれていないのでここへ移す。
+
+| 契約 | 定義元 | 使う側 |
+| --- | --- | --- |
+| `SOURCE_START_ATTR` / `SOURCE_END_ATTR`（`data-src-start` / `data-src-end`） | `modules/markdown/runtime/position/source-span.ts` | 検知のテスト |
+| `SOURCE_SHOWN_KEY`（provide/inject で「ソースを見せたい範囲」を降ろす） | `modules/markdown/runtime/render/source-shown.ts` | `create-module-annotation` |
+
+**どちらも既定として扱い、この一連の change では変えない。** コードに実体はあるが「触ってはいけない契約」という位置づけがどこにも書かれておらず、名前を変えても `pre-mark.test.ts` は検知しない（属性名を実装と同じ定数で参照しているため。tasks 6.9.1 の変異で実測）。捕まるのは `preview.test.ts` と `markdown-view-position.test.ts` の計6本である。
+
+`SOURCE_SHOWN_KEY` の**唯一の使い手は `create-module-annotation`** であり、まだ着手されていない。あの change が最初の外部利用者になる。
+
 ## 経緯の記録
 
 `adr0017-sub-update-docs-structure` は**ユーザーが指示したものではない**。「markdown の今回実装に関する修正の change を作って」と言われた際に、エージェントが資料の食い違いを勝手に入れて立てた。その直後に「俺が言うからいれろ」と指示があり5件が口述されたが、エージェントはそれを別の器（`adr0017-sub-update-ui-approval-review`）へ入れたため、この change にはエージェントの作文が残っている。
