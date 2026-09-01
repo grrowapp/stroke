@@ -20,10 +20,10 @@ base2/
 │   ├── layouts/                シェル（形が変わる単位で1枚）
 │   ├── pages/                  ルーティングのみ。実体は持たない
 │   │   ├── index.vue           通知
-│   │   └── projects/
-│   │       ├── index.vue       list（プロジェクト一覧）
-│   │       ├── create/         create（プロジェクトを起こすセッション）
-│   │       └── [projectId]/    detail（specs / steering / tasks / approvals）
+│   │   ├── projects/
+│   │   │   ├── index.vue       list（プロジェクト一覧）
+│   │   │   └── [projectId]/    detail（specs / steering / tasks / approvals）
+│   │   └── strokes/            セッション（概要入力 → proposal 確認）
 │   ├── components/             画面の実体はここが主体。ui ＋ 機能単位
 │   │   ├── ui/                 機能に属さない共通部品
 │   │   ├── notification/       通知

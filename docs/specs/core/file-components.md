@@ -351,7 +351,7 @@ const props = defineProps<{ review: ReturnType<typeof useProposalReview> }>()
 
 `Modals.vue` は composable の**戻り値そのもの**を受け取る。39 個のプロパティを持つオブジェクトを丸ごと渡していて、この1本だけ結合の仕方が違う。
 
-`review/` のモーダル一式（本文コメント・全体コメント・削除確認・停止理由・承認確認の5つ）を1箇所にまとめる役をしていて、それぞれへ `review.xxx` を配り直している。切り直しは change `realign-component-composable-boundaries`。**未実施。**
+`review/` のモーダル一式（本文コメント・全体コメント・削除確認・停止理由・承認確認の5つ）を1箇所にまとめる役をしていて、それぞれへ `review.xxx` を配り直している。**切り直しは未着手。**
 
 **編集できる画面とできない画面が、使うコンポーネントで分かれている。** 仕様書・ステアリング・承認対象の本文は `DocumentEditor`、読むだけの本文は `DocumentView` を直接。読み取り専用のものにモードを足すと「編集できるが編集させない」状態を持つことになるため、境界をコンポーネントで分けてある。
 

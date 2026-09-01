@@ -5,7 +5,7 @@
 軸は **@nuxt/ui (4.10.0) / vueuse (@vueuse/core 14.4.0) / Nuxt 標準機能で代替できるものは置き換える**。
 
 - 棚卸しの本体は `docs/specs/core/file-components.md`（全19本。旧 `file-component.md` を統合済み）。ここは置換の可否だけを扱う
-- 別軸（component と composable をまたぐ切り直し `realign-component-composable-boundaries`・置き場の再編）はこの評価に持ち込まない
+- 別軸（component と composable をまたぐ切り直し・置き場の再編）はこの評価に持ち込まない
 - 記述は実装と node_modules の実物（型定義・dist ソース）から抽出した事実に限る
 
 ## 判定の方針
