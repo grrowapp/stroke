@@ -154,7 +154,7 @@ markdown を扱う実体が `nuxt.config.ts`（parse 設定）・`app/components
 
 いまの形には次が付いてくる。
 
-- **押し間違いが取り消せない。** 承認は1押しで確定し、その瞬間に改名とエージェントの起動まで進む。`adr0017-sub-update-ui-approval-review` で承認と即時却下を同じ並びに置くと、隣り合うぶんこの危険が増える
+- **判断を取り下げる道が系に無い。** 承認は1押しで確定し、その瞬間に改名とエージェントの起動まで進む。戻す手段は「プロジェクトごと消す」しかなく、それはストロークの往復の記録ごと消すことになる（`docs/specs/api/contract.md:184` が U11 は `approved` を受理しないと規定）
 - **失敗の戻し方が endpoint の中に埋まっている。** 改名が失敗したら `phase` を書き戻す、steering のキックが届かなければ `invocation` を `failed` に倒す、という後始末を1つの関数が抱えている。どの段で失敗したかによって戻す先が変わる
 - **昇格した後にしか steering を起こせない。** 起動が失敗しても昇格は残るので、`failed` を拾って起こし直す巡回が要る
 
@@ -165,7 +165,14 @@ markdown を扱う実体が `nuxt.config.ts`（parse 設定）・`app/components
 - 失敗した段だけをやり直せ、後始末が段ごとに分かれている
 - 承認がプロジェクト生成の唯一の引き金であることは変わっていない
 
-**親との関係** — 後続。`adr0017-sub-update-ui-approval-review` が承認と即時却下を同じ並びに置くため、押し間違いの危険がそちらの実施で増える。両者の順序を決めてから着手する。
+**親との関係** — 後続。markdown の切り出しとは独立した、承認まわりの構造の整理である。
+
+**当初「`update-ui-approval-review` が承認と即時却下を並べるので危険が増える。両者の順序を決めてから着手する」と書いていたが、これは誤りだった**（2026-09-01 に実測で判明）。**2つは別の承認である。**
+
+- この change が触る `POST /api/strokes/:id/approve` を叩くのは**ストローク側の proposal 確認画面**（`app/pages/strokes/[sessionId]/proposal.vue`）。**既に確認モーダルが挟まっており1押しでは確定しない**。隣に並ぶのは差し戻しだけ
+- `update-ui-approval-review` が触るのは**本家 spec-workflow の承認依頼画面**（`app/components/workspace/ApprovalCard.vue` ほか）。送り先は `POST /api/projects/:projectId/approvals/:id/:action` で別物
+
+**順序の依存は無く、どちらを先に通してもよい。** 取り消しが要る理由は押し間違いではなく、判断を取り下げる道が系に無いことである。完了判定4項目は変わらない。
 
 ### 資料化
 
