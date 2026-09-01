@@ -2,18 +2,24 @@
 /**
  * 承認対象の文書に指摘を付ける面。本家の `ApprovalsAnnotator.tsx` に対応する。
  *
- * 見せ方は本家と同じ3つ。
+ * 見せ方は2つ。**どちらの面でも指摘を付けられる**（specs/project/ui）。
  *
- * - `preview`    — 整形して読む。ここからは指摘を付けられない
- * - `annotate`   — 生テキスト。**指摘を付けられるのはこの面だけ**
- * - `side-by-side` — 左が生テキスト、右が整形
+ * - `preview`  — 整形して読む
+ * - `annotate` — 生テキスト（`MarkdownSource`）
+ *
+ * 両方を並べる面（本家の `side-by-side`）は持たない。あれは読む面と指摘する面が別だったことに
+ * 由来する面で、どちらでも付けられるなら要らない（ADR-0017）。
  *
  * 指摘はレンダリング後の HTML ではなく生テキストに対して付け、位置は文字オフセットで
  * 持つ（`ReviewAnnotateSource`）。同じ語が本文に何度現れても、選んだ箇所だけが残る。
+ * どちらの面で付けた指摘も両方の面に出て、一方で消せば両方から消える——注釈は `useAnnotations`
+ * の1つの一覧で、面はそれを塗っているだけだからである。
  *
  * `preview` の中身はこの部品が決めない。そこに何を置くかは呼ぶ側が `#preview` スロットで
- * 渡す（承認画面は読むだけの整形。編集の口は無い — specs/document-editing）。
- * スロットは面を切り替えても外さない。外すと描いた本文（図など）が描き直しになる。
+ * 渡す（承認画面は読むだけの整形。編集の口は無い — specs/document-editing）。注釈の面
+ * （`ReviewAnnotateSource`）は本文をどう描くかを知らないので、位置の口は呼ぶ側が面の `ref` を
+ * `previewPort` で渡し、図に生テキストを添えたい範囲（`sourceShown`）はスロットの props で
+ * 呼ぶ側へ返す。スロットは面を切り替えても外さない。外すと描いた本文（図など）が描き直しになる。
  *
  * 右の指摘の一覧（コメント欄）はしまえる（specs/project/ui「承認画面の指摘の一覧はしまえる」）。
  * しまうと 44px のつまみだけが残り、空いた幅は本文が取る。開閉の状態はこの部品の中に閉じ、
@@ -23,15 +29,16 @@
  * ここには置かない（承認一覧の `ApprovalCard` が持つ）。
  */
 import { useEventListener, useMounted } from '@vueuse/core';
-import { computed, navigateTo, onMounted, refreshNuxtData, ref } from '#imports';
+import { computed, navigateTo, onMounted, refreshNuxtData, ref, useTemplateRef } from '#imports';
 
-import MarkdownView from '#markdown/render/MarkdownView.vue';
+import MarkdownSource from '#markdown/render/MarkdownSource.vue';
 import AnnotateSource from '~/components/review/AnnotateSource.vue';
 import CommentCard from '~/components/review/CommentCard.vue';
 import CommentModal from '~/components/review/CommentModal.vue';
 import { useAnnotations } from '~/composables/useAnnotations';
 import { pendingApprovalsKey, respondToApproval } from '~/composables/useProjectApi';
 
+import type { PositionPort, SourceRange } from '#markdown/position/types';
 import type { Annotation, HighlightColor } from '#shared/stroke';
 
 const props = defineProps<{
@@ -41,25 +48,49 @@ const props = defineProps<{
   approvalId: string;
   /** 本家に繋がっていないと送れない */
   canRespond?: boolean;
+  /**
+   * `#preview` に置いた面が出している位置の口。呼ぶ側が面（`MarkdownView`）の `ref` を
+   * そのまま渡す。面がまだ描かれていなければ `null`
+   */
+  previewPort?: PositionPort | null;
 }>();
 
-/** 本文の見せ方。名前は本家（`ViewMode`）と同じ */
-type ViewMode = 'preview' | 'annotate' | 'side-by-side';
+defineSlots<{
+  /**
+   * 整形して読む面。`sourceShown` は図に生テキストを添えたい範囲で、置いた `MarkdownView` の
+   * 同名の prop へそのまま渡す
+   */
+  preview(props: { sourceShown: SourceRange[] }): unknown;
+}>();
+
+/** 本文の見せ方。名前は本家（`ViewMode`）と同じ。`side-by-side` は持たない */
+type ViewMode = 'preview' | 'annotate';
 
 const MODES: { value: ViewMode; label: string }[] = [
   { value: 'preview', label: 'プレビュー' },
-  { value: 'annotate', label: '注釈' },
-  { value: 'side-by-side', label: '並列表示' },
+  { value: 'annotate', label: '生テキスト' },
 ];
 
 /**
  * 開いたときは整形して読む面にする。本家も `MDXEditorWrapper mode="view"` で開く。
- * 承認は読んで判断する場で、いきなり生テキストにはしない。
+ * 承認は読んで判断する場で、いきなり生テキストにはしない。読む面のまま指摘を付けられる。
  */
 const mode = ref<ViewMode>('preview');
 
-/** 指摘を付けられる面かどうか。生テキストが出ている面だけ */
-const annotatable = computed(() => mode.value !== 'preview');
+/**
+ * 面ごとの注釈の面。一覧のコメント → 本文の範囲（`reveal`）は、いま出ている面へ向ける。
+ * プレビューは `v-show` で残しているので常に在り、生テキストの面は出ているときだけ在る。
+ */
+const previewAnnotator = useTemplateRef<InstanceType<typeof AnnotateSource>>('previewAnnotator');
+const sourceAnnotator = useTemplateRef<InstanceType<typeof AnnotateSource>>('sourceAnnotator');
+
+/** 生テキストの面の位置の口。面の `ref` をそのまま渡す */
+const sourceSurface = useTemplateRef<InstanceType<typeof MarkdownSource>>('sourceSurface');
+
+function locate(id: string): void {
+  const annotator = mode.value === 'preview' ? previewAnnotator.value : sourceAnnotator.value;
+  annotator?.reveal(id);
+}
 
 const a = useAnnotations();
 const comments = a.comments;
@@ -327,7 +358,7 @@ async function requestRevision(): Promise<void> {
 
   if (comments.value.length === 0) {
     failure.value =
-      'コメントが1件もありません。「注釈」か「並列表示」に切り替えて本文を選ぶか、「全体へのコメント」を足してから差し戻してください。';
+      'コメントが1件もありません。本文を選んでコメントを付けるか、「全体へのコメント」を足してから差し戻してください。';
     return;
   }
 
@@ -362,7 +393,7 @@ async function requestRevision(): Promise<void> {
 <template>
   <div>
     <!--
-      面の切替。本家は3つを1つの枠に収めた segmented control で出す。選んでいるものだけを
+      面の切替。本家は面を1つの枠に収めた segmented control で出す。選んでいるものだけを
       アクセントで塗り、残りは塗らない（本家 `ApprovalsPage` の View Mode Tabs）。
       承認済みの表示は無い（本家は保留中しか返さない・ADR-0006）
     -->
@@ -389,16 +420,31 @@ async function requestRevision(): Promise<void> {
     <div class="flex gap-4">
       <div class="min-w-0 flex-1" data-testid="approval-main">
         <!--
-          プレビュー。中身は呼ぶ側が決める（承認画面は読むだけの整形をここに置く）。
+          プレビュー: 整形された本文。ここからも指摘を付けられる。
+
+          中身は呼ぶ側が決める（承認画面は読むだけの整形をここに置く）。注釈の面はその上に
+          載せるだけで、位置の口は `previewPort` で受け、図に生テキストを添えたい範囲
+          （`sourceShown`）はスロットの props で呼ぶ側へ返す。
           面を切り替えても外さない: 外すと描いた本文（図など）が描き直しになる
         -->
         <div v-show="mode === 'preview'">
-          <!-- 本文の枠は呼ぶ側が持つ -->
-          <slot name="preview" />
+          <AnnotateSource
+            ref="previewAnnotator"
+            v-slot="{ sourceShown }"
+            :source="source"
+            :comments="comments"
+            :port="previewPort"
+            @select="onSelect"
+            @click-mark="editComment"
+          >
+            <!-- 本文の枠は呼ぶ側が持つ -->
+            <slot name="preview" :source-shown="sourceShown" />
+          </AnnotateSource>
         </div>
 
         <!--
-          注釈: 生テキスト。指摘を付けられるのはこの面だけ。
+          生テキスト: 書いてある通りの字（`MarkdownSource`）。こちらでも同じ注釈が出て、
+          同じように付けられる。
 
           本家（`ApprovalsAnnotator`）は本文の列をまるごと1つの枠に入れ、その中に沈んだ面
           （surface-inset）の箱を置く。操作の帯とデータの領域を切っているのはこの外側の枠で、
@@ -406,33 +452,17 @@ async function requestRevision(): Promise<void> {
         -->
         <div v-if="mode === 'annotate'" class="sb-panel" data-testid="approval-body">
           <AnnotateSource
+            ref="sourceAnnotator"
             :source="source"
             :comments="comments"
+            :port="sourceSurface"
             class="rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-inset)]"
             data-testid="approval-annotate-source"
             @select="onSelect"
             @click-mark="editComment"
-          />
-        </div>
-
-        <!-- 並列表示: 左が注釈、右が整形。本家も外側は1つの枠 -->
-        <div v-else-if="mode === 'side-by-side'" class="sb-panel" data-testid="approval-body">
-          <div class="grid gap-4 md:grid-cols-2">
-            <AnnotateSource
-              :source="source"
-              :comments="comments"
-              class="min-w-0 rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-inset)]"
-              data-testid="approval-annotate-source"
-              @select="onSelect"
-              @click-mark="editComment"
-            />
-            <!--
-              右は読むだけの整形。`DocumentView` を使うと `document-content` が
-              プレビューのぶんと2つになるので、ここは素で描く
-            -->
-            <!-- 本文の型は markdown モジュールが持つ（本家写し。`SideBySideView.tsx` も同じ並び） -->
-            <MarkdownView :value="source" testid="approval-rendered" class="min-w-0" />
-          </div>
+          >
+            <MarkdownSource ref="sourceSurface" :value="source" />
+          </AnnotateSource>
         </div>
       </div>
 
@@ -537,18 +567,14 @@ async function requestRevision(): Promise<void> {
             </button>
           </h4>
 
-          <p v-if="!annotatable" class="text-xs text-[var(--text-muted)]">
-            「注釈」か「並列表示」に切り替えると、本文を選んでコメントを付けられます。
-          </p>
-
           <!--
             本家のこのボタンは `.btn` ではなく
             `w-full px-3 py-2 bg-[var(--accent-primary)] text-white rounded-lg text-xs sm:text-sm`。
             実測 12px / 400 / padding 8px 12px / 角丸 8px / 枠なし。`.sb-action` は
             角丸 6px・600 相当なので、ここだけ本家の指定をそのまま持つ。
+            どの面でも出す（付けられない面が無いので、切り替えを促す断り書きは無い）。
           -->
           <button
-            v-else
             type="button"
             class="flex w-full items-center justify-center gap-3 rounded-[var(--radius-lg)] bg-[var(--accent-primary)] px-3 py-2 text-sm text-white transition-colors hover:bg-[var(--interactive-primary-hover)]"
             data-testid="approval-add-general"
@@ -569,7 +595,7 @@ async function requestRevision(): Promise<void> {
           </p>
 
           <div v-for="c in comments" :key="c.id" data-testid="approval-comment">
-            <CommentCard :comment="c" @edit="editComment" @remove="deleteId = $event" />
+            <CommentCard :comment="c" @edit="editComment" @remove="deleteId = $event" @locate="locate" />
           </div>
         </div>
 
