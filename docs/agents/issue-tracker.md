@@ -38,6 +38,12 @@ openspec/
 - `CONTEXT.md`
 - `CLAUDE.md`
 
+構造（ファイルの置き場）に触る change は、**規範 → 物差し → 移行課題**の順に読む。構造の正は規範で、食い違ったら規範が勝つ。
+
+1. 規範 — `docs/specs/core/system-structure.md`（到達点）
+2. 物差し — `openspec/specs/app-structure`（判定を Requirement + Scenario にしたもの。区切りの名前は持たない）
+3. 移行課題 — `docs/specs/plan/structure-migration.md`（規範と現状の差。差があること自体は違反ではない）
+
 ## change-id の命名
 
 **先頭に動詞を置く。動詞は下表の5つから選ぶ。** kebab-case で `<動詞>-<対象>`、対象は「何を」→「何の」の順（`create-module-markdown` = module を作る、markdown の）。
