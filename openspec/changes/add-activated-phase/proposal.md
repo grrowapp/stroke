@@ -43,7 +43,7 @@ approved ──────────── 生成中 ────────
 ### 対象外
 
 - `/write-steering-v2` が存在しない件（[`fix-missing-write-steering-skill`](../../tickets/fix-missing-write-steering-skill.md)）。**あれは原因ではなく、この穴を露出させた症状である。** スキルを置いても、次に claude が別の理由で空振りすれば同じことが起きる
-- 承認 endpoint が3つの仕事を1回でやっている件（`adr0017-sub-separate-approval-decision-from-promotion`）。段の分割はこの change では扱わない
+- 承認 endpoint が3つの仕事を1回でやっている件（`separate-approval-decision-from-promotion`）。段の分割はこの change では扱わない
 
 ## Capabilities
 

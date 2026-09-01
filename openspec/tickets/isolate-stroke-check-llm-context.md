@@ -1,7 +1,8 @@
 ---
-status: ready-for-agent
 tags:
   - bug
+status: Open
+order: -3.0
 ---
 
 # isolate-stroke-check-llm-context

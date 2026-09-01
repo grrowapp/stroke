@@ -1,5 +1,5 @@
 ---
-status: ready-for-agent
+status: Tasks
 tags:
   - bug
 change: update-project-list-view

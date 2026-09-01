@@ -7,28 +7,37 @@
 
 ### Requirement: 階層を表すディレクトリでモジュールを分ける
 
-`app/components/` と `app/composables/` の配下は、画面の階層を表すディレクトリで分けられていなければならない（SHALL）。ディレクトリ名は `layouts/` のシェル名と一致していなければならない（SHALL）。すなわち下層専用のものは `workspace/`、階層をまたぐものは `shared/` に置く。
+`app/components/` の配下は、画面の階層を表すディレクトリで分けられていなければならない（SHALL）。ディレクトリ名は `layouts/` のシェル名と一致していなければならない（SHALL）。すなわち下層専用のものは `workspace/`、階層をまたぐものは `shared/` に置く。
 
-モジュールを `app/components/` または `app/composables/` の直下に、階層ディレクトリを介さず直接置いてはならない（MUST NOT）。
+コンポーネントを `app/components/` の直下に、階層ディレクトリを介さず直接置いてはならない（MUST NOT）。
 
-#### Scenario: 下層からだけ使うモジュールを追加する
+**`app/composables/` は本要件の対象外である。** composable は関心単位の `useXxx` を `app/composables/` の直下に平置きし、階層ディレクトリを作ってはならない（MUST NOT）。正は `docs/specs/core/system-structure.md`「composables は関心単位の `useXxx` を平置きにする。境界のディレクトリを作らない」。
 
-- **WHEN** `layout: 'workspace'` のページからのみ参照されるコンポーネントまたは composable を追加する
-- **THEN** そのファイルは `app/components/workspace/` または `app/composables/workspace/` に置かれる
+#### Scenario: 下層からだけ使うコンポーネントを追加する
 
-#### Scenario: 階層をまたいで使うモジュールを追加する
+- **WHEN** `layout: 'workspace'` のページからのみ参照されるコンポーネントを追加する
+- **THEN** そのファイルは `app/components/workspace/` に置かれる
 
-- **WHEN** 上層のページと下層のページの両方から参照されるモジュールを追加する
-- **THEN** そのファイルは `app/components/shared/` または `app/composables/shared/` に置かれる
+#### Scenario: 階層をまたいで使うコンポーネントを追加する
+
+- **WHEN** 上層のページと下層のページの両方から参照されるコンポーネントを追加する
+- **THEN** そのファイルは `app/components/shared/` に置かれる
 
 #### Scenario: 階層ディレクトリを介さない配置
 
-- **WHEN** `app/composables/useSomething.ts` のように階層ディレクトリを介さずファイルが置かれている
+- **WHEN** `app/components/Something.vue` のように階層ディレクトリを介さずファイルが置かれている
 - **THEN** その配置は本要件に反しており、いずれかの階層ディレクトリへ移す対象になる
+
+#### Scenario: composable を追加する
+
+- **WHEN** どの階層から参照されるかによらず composable を追加する
+- **THEN** そのファイルは `app/composables/useXxx.ts` として直下に置かれ、`app/composables/workspace/` や `app/composables/shared/` は作られない
 
 ### Requirement: 配置は実際の参照範囲に従う
 
-モジュールの置き場所は、そのモジュールを実際に参照しているファイルの範囲によって決めなければならない（SHALL）。役割・名前・将来の想定によって決めてはならない（MUST NOT）。
+本要件は `app/components/` の配下に置かれるコンポーネントに適用する。`modules/` に置かれるものは本要件の対象外であり、その配置は「画面の階層に属さない機能は `modules/` に置く」の判定に従う（SHALL）。`app/composables/` は階層で分けないので、本要件の対象外である。
+
+`app/components/` の配下では、コンポーネントの置き場所は、そのモジュールを実際に参照しているファイルの範囲によって決めなければならない（SHALL）。役割・名前・将来の想定によって決めてはならない（MUST NOT）。
 
 単一の階層からのみ参照されているモジュールを `shared/` に置いてはならない（MUST NOT）。複数の階層から参照されているモジュールを特定の階層のディレクトリに置いてはならない（MUST NOT）。
 
@@ -46,6 +55,12 @@
 
 - **WHEN** `shared/` に置かれているモジュールの参照元が、単一の階層だけになる
 - **THEN** そのモジュールはその階層のディレクトリへ移される
+
+#### Scenario: 複数の階層から参照される自己完結の機能
+
+- **GIVEN** ある機能が上層と下層の双方から参照されており、画面の階層に依存せず、公開する口が定まっている
+- **WHEN** その置き場所を決める
+- **THEN** `shared/` ではなく `modules/<機能名>/` に置かれる
 
 ### Requirement: 実体を伴わないディレクトリを作らない
 
@@ -65,7 +80,9 @@
 
 ### Requirement: モジュールの参照は明示 import で行う
 
-モジュールの参照は `~/components/<階層>/<名前>` および `~/composables/<階層>/<名前>` の形の明示 import で行わなければならない（SHALL）。Nuxt の auto-import に依存してはならない（MUST NOT）。
+モジュールの参照は `~/components/<階層>/<名前>` および `~/composables/<名前>` の形の明示 import で行わなければならない（SHALL）。Nuxt の auto-import に依存してはならない（MUST NOT）。
+
+`modules/` に置かれたものの参照も、そのモジュールが公開する口を指す明示 import で行わなければならない（SHALL）。モジュールの内側のファイルを直接指す import を書いてはならない（MUST NOT）。
 
 この制約により、ディレクトリの移動が Nuxt の規約による名前解決に影響せず、参照関係が grep で機械的に追跡できる。
 
@@ -78,3 +95,37 @@
 
 - **WHEN** モジュールを別の階層ディレクトリへ移す
 - **THEN** 影響範囲は import パスを書いているファイルに限られ、grep で網羅的に特定できる
+
+#### Scenario: `modules/` の機能を参照する
+
+- **WHEN** ページまたはコンポーネントが `modules/` の機能を使う
+- **THEN** そのファイルの先頭に、その機能が公開する口を指す import 文があり、内側のファイルを直接指す import は現れない
+
+### Requirement: 画面の階層に属さない機能は `modules/` に置く
+
+画面の階層（上層ポータル / 下層ワークスペース）に属さず、それ自体で完結する機能は、リポジトリルートの `modules/` に、機能ごとのディレクトリを作って置かなければならない（SHALL）。
+
+`modules/` に置いてよいのは、次のすべてを満たすものに限る（SHALL）。
+
+- 画面の階層に依存しない。どの階層から参照されても同じように働く
+- 外へ公開する口が定まっており、外がその内側の作りを知らずに使える
+- 内側の作りを変えても、公開する口が同じであれば外が変わらない
+
+上記を満たさないものを `modules/` に置いてはならない（MUST NOT）。画面の都合や特定のページの事情を持つものは、これまでどおり `app/components/` の階層ディレクトリ、または `app/composables/` の直下に置く。
+
+`modules/` に置いたものの実体を、`app/` の側に重複して持ってはならない（MUST NOT）。
+
+#### Scenario: 階層に依存しない機能を追加する
+
+- **WHEN** どの階層から参照されても同じように働き、公開する口が定まっている機能を追加する
+- **THEN** そのファイルは `modules/<機能名>/` に置かれ、`app/components/` にも `app/composables/` にも置かれない
+
+#### Scenario: 画面の都合を持つ部品を追加する
+
+- **WHEN** 特定のページの事情に依存する部品を追加する
+- **THEN** そのファイルは `modules/` ではなく、階層ディレクトリに置かれる
+
+#### Scenario: モジュールの内側を変える
+
+- **WHEN** `modules/<機能名>/` の内側の作りを変え、公開する口を変えない
+- **THEN** `app/` 配下のファイルは変わらない

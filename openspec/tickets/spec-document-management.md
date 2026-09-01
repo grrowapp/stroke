@@ -1,7 +1,7 @@
 ---
-status: needs-triage
 tags:
   - enhancement
+status: Proposal
 ---
 
 # spec-document-management
@@ -31,4 +31,4 @@ tags:
 
 **この change を待っているもの:** `create-spec-document`（作成の口の追加）が完了を前提としている。あちらは単独では着手できない。
 
-**関連:** `adr0017-sub-full-width-markdown-editor` が共通の編集 UI に全幅トグルを足す。この画面が同じ編集 UI を使うなら、そちらの成果が自動的に効く。
+**関連:** `add-full-width-markdown-editor` が共通の編集 UI に全幅トグルを足す。この画面が同じ編集 UI を使うなら、そちらの成果が自動的に効く。

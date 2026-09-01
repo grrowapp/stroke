@@ -1,5 +1,5 @@
 ---
-status: needs-info
+status: Proposal
 tags:
   - enhancement
 ---

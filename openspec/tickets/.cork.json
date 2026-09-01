@@ -1,0 +1,22 @@
+{
+  "statuses": [
+    {
+      "label": "Open"
+    },
+    {
+      "label": "Proposal"
+    },
+    {
+      "label": "Design"
+    },
+    {
+      "label": "Tasks"
+    },
+    {
+      "label": "Wait-for-archive"
+    },
+    {
+      "label": "Done"
+    }
+  ]
+}

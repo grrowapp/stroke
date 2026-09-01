@@ -1,7 +1,8 @@
 ---
-status: ready-for-agent
 tags:
   - bug
+status: Open
+order: -5.0
 ---
 
 # restrict-agent-add-dir-scope
