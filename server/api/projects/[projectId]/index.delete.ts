@@ -5,7 +5,7 @@ import { DeleteError, isSafeSegment, removeTarget } from '../../../handler/delet
 import { isAfterApproval, readPhase } from '../../../handler/phase'
 import { readStrokeConfig } from '../../../utils/stroke/config'
 import { conflict } from '../../../utils/stroke/conflict'
-import { isRunning } from '../../../utils/stroke/running'
+import { isRunning, projectRunPath } from '../../../utils/stroke/running'
 import { deriveProjectId } from '../../../utils/upstream/project-id'
 
 /**
@@ -43,7 +43,10 @@ export default defineEventHandler(async (event): Promise<Response> => {
     })
   }
 
-  if (isRunning(name)) {
+  // busy 判定の単位は起動（U13）・セッションの削除（U11）・承認（U10）と同じ1つの事実
+  // （作業場所ディレクトリの実体）——単位の定義は `running.ts` に集約してあり、
+  // 口ごとに数え直さない（fix-rename-during-running-session）。
+  if (await isRunning(projectRunPath(root, name))) {
     throw conflict('busy', 'このプロジェクトは AI の応答を待っている。完了するまで削除は受け付けない。')
   }
 

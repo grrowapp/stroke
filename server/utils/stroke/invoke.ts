@@ -1,13 +1,12 @@
 import type { Invocation, SessionSummary } from '#shared/stroke'
-import { invokeAi, type AiRun } from './ai'
+import { invokeAi, type AiRun, type InvokeAiOutcome } from './ai'
 import { readStrokeConfig } from './config'
 import { initSessionOpenspec } from './openspec'
 import { readState, sessionExists, writeState } from './session-store'
-import { submissionCount } from './submission-signal'
+import { forgetLaunchSubmission, hasLaunchSubmission, submissionCount } from './submission-signal'
+import { submissionPath } from './submission-path'
 import {
-  MCP_SERVER_ALLOWED_TOOL,
   MCP_SERVER_NAME,
-  UPSTREAM_MCP_ALLOWED_TOOL,
   UPSTREAM_MCP_SERVER_NAME,
   withMcpToolsAllowed,
 } from '../mcp/allowed-tools'
@@ -41,11 +40,6 @@ export function invokePath(sessionId: string, cwd: string): string {
   return `/api/strokes/${encodeURIComponent(sessionId)}/invoke-agent?cwd=${encodeURIComponent(cwd)}`
 }
 
-/** A8 の path。`invocation` の唯一の書き込み口。 */
-export function submissionPath(sessionId: string): string {
-  return `/api/strokes/${encodeURIComponent(sessionId)}/submission`
-}
-
 /**
  * `invocation` を書く口。**A8 を通す**（openspec/specs/agent/invocation）。
  *
@@ -74,6 +68,18 @@ function invocationWriter(sessionId: string) {
 function submittedSince(sessionId: string): () => boolean {
   const before = submissionCount(sessionId)
   return () => submissionCount(sessionId) > before
+}
+
+/**
+ * steering 用の「作業が行われたか」。flontier の `submittedSince` と対だが、比べる前後の
+ * 数ではなく起動単位（接続 token）の記録を読む——steering の提出は stroke-board の
+ * endpoint を通らず、対象の `sessionId` に結びつける経路が無いため
+ * （design.md D1「steering の作業の signal は起動（接続 token）を単位にする」）。
+ *
+ * 記録者は `submit-document.ts` の steering 分岐（受理された提出だけを記録する）。
+ */
+function submittedByLaunch(token: string): () => boolean {
+  return () => hasLaunchSubmission(token)
 }
 
 /** steering の会話 id を `state.json` に覚える。次のキックの続き先になる。 */
@@ -119,11 +125,14 @@ export function buildRun(options: {
         // 自前 MCP サーバー（provide-operations-via-mcp）も同じ --mcp-config に並べる
         // （既存フラグ・本家 MCP の並びは変えない）。
         // MCP ツールは --allowedTools に載っていないと呼べないため、同じく呼び出し
-        // ごとにここで足す（tasks 4.5）。**本家 MCP の分も足す**——配るだけでは
-        // 一覧に出るのに1つも呼べず、「呼べないものを見せてから失敗させない」
-        // （specs `mcp/server`）を破る（santa-method レビュー指摘 4周目 2026-08-30）。
+        // ごとにここで足す（tasks 4.5）。**本家 MCP の分は足さない**——配線と許可は別で、
+        // 配線の目的（起動時の登録簿への自己登録）は許可なしで果たされる
+        // （`initialize()` が stdio transport を繋ぐ前に自己登録する。本家 2.2.5
+        // `dist/server.js`）。`--allowedTools` は可視性を決めないので、外しても本家の
+        // ツールは一覧から消えない——呼ばせない責務は案内（`get-steering-guide`）が
+        // 併せて負う（adr0016-sub-fix-upstream-mcp-allowance design.md D1）。
         args: [
-          ...withMcpToolsAllowed(claude.args, [MCP_SERVER_ALLOWED_TOOL, UPSTREAM_MCP_ALLOWED_TOOL]),
+          ...withMcpToolsAllowed(claude.args),
           '--mcp-config',
           mcpConfigFor(cwd, token, claude.apiBaseUrl),
         ],
@@ -142,6 +151,12 @@ export function buildRun(options: {
       conversationId: runId,
       hasConversation: async () => runId !== undefined,
       setInvocation: invocationWriter(sessionId),
+      // steering の1回の実行は steering 文書の提出（本家が受理したもの）で終わる。
+      // プロセスが正常終了しても提出が1つも無ければ、作業をせずに終わったということ
+      // なので起こし直す（fix-steering-empty-completion）。この起動の token で読む——
+      // steering の提出は stroke-board の endpoint を通らないため、対象の id ではなく
+      // 起動そのものを単位に数える（design.md D1）。
+      didWork: submittedByLaunch(token),
       remember: conversationWriter(sessionId),
       // 作業場所は昇格済みのプロジェクト。`.spec-workflow/` の内部構造は本家 MCP が作る
       prepare: undefined,
@@ -271,16 +286,23 @@ function mcpConfigFor(cwd: string, token: string, apiBaseUrl: string): string {
  * 材料を組み立てて起こす。結果は待たない。
  *
  * spawn 直前に接続表 token を発行・登録し（provide-operations-via-mcp design.md「接続の
- * 担保」）、実行終了時（正常・異常とも）に削除する。**`buildRun` が同期的に throw する
- * 経路も含める。**`invokeAi` の引数として評価される `buildRun(...)` が例外を投げると
- * `invokeAi` 自体が呼ばれず `.finally` がどの promise にもアタッチされないため、
- * その経路は別途 catch して削除する（santa-method レビュー指摘）。
+ * 担保」）、実行終了時（正常・異常とも——`buildRun` が同期的に throw する経路も含む）に
+ * 削除する。**削除は `settled` の1本に集約する**
+ * （fix-idle-stuck-on-run-build-failure design.md「接続の担保」・Risks）。
  *
- * **この関数自身は同期的に throw しない。** `kick` は `async` 宣言ではない通常関数のため、
- * catch 節で素の `throw` をすると呼び出し式の評価中に同期的に例外が飛び、呼び出し元
- * （`invoke-agent.get.ts`）の `.catch()/.finally()` が一切アタッチされないまま素通りする
- * （busy ガード解除・エラーログがどちらも実行されなくなる。santa-method レビュー指摘）。
- * 常に `Promise` を返す契約を保つため `Promise.reject` で包む。
+ * `buildRun` の呼び出しは `invokeAi` の内側へ移した。ここで渡すのは組み立て済みの
+ * `AiRun` ではなく「組み立て方」——`buildRun` をこの起動の材料で閉じ込めた関数——である。
+ * `invokeAi` が組み立てに失敗しても、その記録（`failed`/`error`）を書くのは `invokeAi`
+ * であって `kick` ではない（design.md D1「書き込むのは invokeAi だけ」）。
+ *
+ * **戻り値は2つの完結点を持つ。**
+ *
+ * - `built`: 組み立ての成否**だけ**を表す。失敗すれば reject、成功すれば resolve する。
+ *   AI の応答の完了は待たない。起動を要求した側（U13）はここまでだけを待ってよい
+ *   （openspec/specs/api/session/invoke-agent）
+ * - `settled`: 実行全体の完了。組み立てに失敗した場合も、その記録を書き終えた時点で
+ *   resolve する（reject しない）。busy ガード解除・接続表 token の削除はこちらへ
+ *   紐づける——組み立てに失敗した実行も、記録を書き終えるまでは「実行中」として扱う
  */
 export function kick(options: {
   sessionId: string
@@ -288,20 +310,29 @@ export function kick(options: {
   kind: RunKind
   retries: number
   runId?: string
-}): Promise<void> {
+}): InvokeAiOutcome {
   const token = issueConnectionToken()
   registerConnection(
     token,
     options.kind === 'steering' ? { projectPath: options.cwd } : { sessionId: options.sessionId },
   )
 
-  let run: AiRun
-  try {
-    run = buildRun({ ...options, token })
-  } catch (error) {
-    removeConnection(token)
-    return Promise.reject(error)
-  }
+  const { built, settled } = invokeAi(
+    options.sessionId,
+    options.retries,
+    () => buildRun({ ...options, token }),
+  )
 
-  return invokeAi(options.sessionId, run).finally(() => removeConnection(token))
+  // 削除は settled の1本に集約する（fix-idle-stuck-on-run-build-failure design.md
+  // 「接続の担保」）。起動単位の提出記録（steering）も同じ寿命で捨てる——次の起動が
+  // 前の起動の提出を自分の作業として数えないようにするため（fix-steering-empty-completion
+  // design.md D1「記録は removeConnection(token) と同じ `.finally` で捨てる」）。
+  // flontier の起動でも forgetLaunchSubmission は無害（何も記録されていないので no-op）。
+  return {
+    built,
+    settled: settled.finally(() => {
+      removeConnection(token)
+      forgetLaunchSubmission(token)
+    }),
+  }
 }

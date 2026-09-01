@@ -261,9 +261,25 @@ export default defineNuxtConfig({
         '--setting-sources', SETTING_SOURCES_REQUIRED,
         '--model', 'sonnet',
         // curl / jq / printenv は落とした（取得・提出を MCP ツール以外で真似る余地を
-        // 残さない・ユーザー指示 2026-08-27）。`Write` は develop 側の追加で、proposal を
-        // `docs/proposal.md` に書くのに要るので残す
-        '--allowedTools', 'Skill Bash(openspec *) Read Edit Write',
+        // 残さない・ユーザー指示 2026-08-27）。
+        //
+        // **`Write` / `Edit` は外した**（adr0016-sub-fix-direct-write-allowance）。
+        // かつての注記「`Write` は proposal を `docs/proposal.md` に書くのに要る」は
+        // 誤りで、それを書くのは A7（`server/utils/stroke/session-store.ts` の
+        // `sessionProposal().write`）である。実際に入った理由はワークフロー定義の
+        // `generates`（`stroke.md` / `proposal.md`）の新規作成だった（`1ce89cfc`）が、
+        // その手順は `get-guide` が `openspec` コマンドを禁じたことで届いていない。
+        //
+        // 実測（2026-09-01、`yarn check:stroke --approve` の flontier / steering 2実行）
+        // で `Write` も `Edit` も呼び出し0回。外した状態でも往復・承認・steering 3本が
+        // 揃うことを実機で確かめてある。**これで「文書は MCP ツールを通してしか出せない」
+        // が構造で担保される**（`docs/specs/api/mcp-tools.md`「操作の入口はこれだけ」）。
+        //
+        // `Read` は残す。steering 工程には文脈を取る MCP ツールが無く（公開は
+        // get-steering-guide / get-steering / submit-document の3本）、実測でも
+        // `Read` 5回・`Bash` 2回でプロジェクトを直接読んでいる。読み取りの口を
+        // MCP へ寄せるのは別 change の仕事である。
+        '--allowedTools', 'Skill Bash(openspec *) Read',
         '--disallowedTools', 'Bash(cd *)',
         // `--mcp-config` は「追加」であって「限定」ではない。これが無いと開発者個人の
         // MCP 設定が全部読み込まれる——実測（2026-08-30・デバッグログ全23本）で

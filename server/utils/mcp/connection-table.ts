@@ -58,7 +58,7 @@ export interface ConnectionUnauthorizedFailure {
 }
 
 export type ConnectionResolution =
-  | { ok: true, context: ConnectionContext }
+  | { ok: true, context: ConnectionContext, token: string }
   | ({ ok: false } & ConnectionUnauthorizedFailure)
 
 const TOKEN_MISSING = 'x-stroke-token ヘッダが無い。'
@@ -97,5 +97,5 @@ export function resolveConnection(headers: ConnectionHeaders): ConnectionResolut
     return { ok: false, status: 401, errorCode: 'unauthorized', error: TOKEN_UNKNOWN }
   }
 
-  return { ok: true, context }
+  return { ok: true, context, token }
 }

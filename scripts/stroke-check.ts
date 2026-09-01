@@ -107,8 +107,19 @@ function beginRoundWait(): void {
 /** 画面1 を開き直す上限。dev がモジュールを取り落とすと数回に1回は開けない（`openStrokes`） */
 const OPEN_ATTEMPTS = 5
 
-/** 投入する既定の概要。設計判断が既にいくつか入っていて、問いが立ちやすいもの */
-const DEFAULT_OVERVIEW = `## setai
+/**
+ * 投入する既定の概要。設計判断が既にいくつか入っていて、問いが立ちやすいもの。
+ *
+ * **見出しの名前は、実在のプロジェクトと被らないものにすること。** エージェントは
+ * この見出しからプロジェクト名の候補を作り、承認するとその名前で `projectShareRoot`
+ * （`/opt/projects`）にディレクトリができる。実在の名前を使うと、検証で作った物と
+ * 本物が同じ場所に並び、片付けのときに本物を消す事故が起きうる
+ * （ユーザー指摘 2026-09-01。かつて `setai` を使っており、実在の `/opt/projects/setai`
+ * と `setai-2`〜`setai-5` が隣り合っていた）。
+ *
+ * `stroke-check-` で始めておけば、検証で出来たものだと名前だけで分かる。
+ */
+const DEFAULT_OVERVIEW = `## stroke-check-fixture
 
 - Claude Code の \`settings.json\` を編集する CLI
 - 上記のメニュー型編集操作-TUI版
@@ -639,10 +650,12 @@ function fallbackProjectName(): string {
  * @returns 承認で確定したプロジェクト名
  */
 async function approve(page: Page): Promise<string> {
-  // **承認そのものに busy ガードは無い**（`approve.post.ts`「busy ガードは U7・U9 のみ。
-  // 承認はエージェントの呼び出しを起動しないため対象にしない」）。それでも実行の終わりを
-  // 待つのは、承認がセッションディレクトリを**改名する**からである。まだ動いている claude の
-  // cwd を足元から動かすことになる。
+  // **承認そのものは busy ガードの対象である**（`approve.post.ts`。fix-rename-during-running-session
+  // で対象になった。実行中に承認すると 409 busy で断られる）。それでも実行の終わりを
+  // ここで待つのは、断られてやり直すのではなく**一度で通したい**からである——待たずに
+  // 投げて 409 を踏むと、この巡回スクリプトはそこで止まってしまう。承認がセッション
+  // ディレクトリを**改名する**性質そのもの（まだ動いている claude の cwd を足元から
+  // 動かす）は変わっていない。
   //
   // 基準は**この待ちに入った時点**（`waitForNext` が控えた本数）にする。`settle` の中で
   // 数え直すと、proposal を出した実行が既に終わっていても「増えていない」と見えて、
