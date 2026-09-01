@@ -1,14 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { ALPHA, resetBoard, stub } from './support';
+import { ALPHA, addSelectionComment, painted, resetBoard, selectIn, stub } from './support';
 
 /**
- * 承認画面の3つの面（プレビュー / 注釈 / 並列表示）と、そこで付けた指摘の行き先。
+ * 承認画面の2つの面（プレビュー / 生テキスト）と、そこで付けた指摘の行き先。
  *
- * 指摘を付けられるのは生テキストが出ている面だけである。溜めた指摘は差し戻し
- * （`needs-revision`）で本家へ渡り、`response` / `annotations` / `comments` の3つの
- * フィールドとして承認リクエストと同じファイルに書かれる。1本のテキストに畳まないので、
- * 箇所と指摘の対応が残る。
+ * 指摘はどちらの面でも付けられ、どちらで付けても両方の面に出る（specs/project/ui）。
+ * 溜めた指摘は差し戻し（`needs-revision`）で本家へ渡り、`response` / `annotations` /
+ * `comments` の3つのフィールドとして承認リクエストと同じファイルに書かれる。1本のテキストに
+ * 畳まないので、箇所と指摘の対応が残る。
  *
  * 承認・却下は指摘を運ばない。それらは承認一覧の側にあり、`workspace.spec.ts` が見る。
  */
@@ -19,53 +19,26 @@ const APPROVAL = `/projects/${ALPHA}/approvals/an1`;
 const TITLE = 'ステアリング: product.md の承認';
 
 /**
- * 生テキストの上で範囲を選び、注釈の面に選択が起きたことを伝える。
+ * 生テキストの面で、本文全体での文字オフセットを指して選ぶ。
  *
- * 注釈はレンダリング後の HTML ではなく生テキストに対して付くので、位置は本文全体での
- * 文字オフセットで指す。断片は `data-start` を持っており、面はそこから位置を復元する。
+ * 生テキストの面は書いてある通りの字なので、面の上の文字数と生テキストのオフセットが一致する。
  */
-async function selectRange(page: Page, start: number, end: number): Promise<void> {
-  await page.evaluate(
-    (range) => {
-      const surface = document.querySelector('[data-testid="approval-annotate-source"]');
-      if (surface === null) throw new Error('注釈の面が出ていない');
+const selectRange = (page: Page, start: number, end: number): Promise<void> =>
+  selectIn(page, 'approval-annotate-source', { start, end });
 
-      const parts = [...surface.querySelectorAll<HTMLElement>('[data-start]')];
-      const holder = parts.find((element) => {
-        const from = Number(element.dataset.start);
-        return from <= range.start && range.end <= from + (element.textContent ?? '').length;
-      });
-      if (holder === undefined) throw new Error('選ぶ範囲が1つの断片に収まっていない');
+/** 差し戻して、本家へ届いた箇所つきの指摘を返す */
+async function revise(page: Page) {
+  await page.getByTestId('approval-revision').click();
+  await expect(page).toHaveURL(new RegExp(`/projects/${ALPHA}/approvals$`));
 
-      const text = holder.firstChild;
-      if (text === null) throw new Error('断片に文字が無い');
-
-      const from = Number(holder.dataset.start);
-      const selection = document.createRange();
-      selection.setStart(text, range.start - from);
-      selection.setEnd(text, range.end - from);
-
-      const current = window.getSelection();
-      if (current === null) throw new Error('選択を作れない');
-      current.removeAllRanges();
-      current.addRange(selection);
-
-      surface.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
-    },
-    { start, end },
-  );
+  const { lastApprovalAction } = await stub.stats();
+  const comments = lastApprovalAction?.comments as
+    | { type: string; comment: string; selectedText?: string; startOffset?: number; endOffset?: number }[]
+    | null;
+  return (comments ?? []).filter((item) => item.type === 'selection');
 }
 
-/** 本文へのコメントを1件付ける。モーダルが開いてから本文を入れて確定する */
-async function addSelectionComment(page: Page, body: string): Promise<void> {
-  const modal = page.getByRole('dialog');
-  await expect(modal).toBeVisible();
-  await modal.getByRole('textbox').fill(body);
-  await modal.getByRole('button', { name: '付ける' }).click();
-  await expect(modal).toHaveCount(0);
-}
-
-test.describe('承認画面の3つの面', () => {
+test.describe('承認画面の2つの面', () => {
   test.beforeEach(async ({ page }) => {
     await resetBoard(page);
     await stub.requestApproval(ALPHA, {
@@ -77,27 +50,28 @@ test.describe('承認画面の3つの面', () => {
     });
   });
 
-  test('プレビュー / 注釈 / 並列表示 の3つがある', async ({ page }) => {
+  test('プレビュー / 生テキスト の2つで、両方を並べる面は無い', async ({ page }) => {
     await page.goto(APPROVAL);
 
     await expect(page.getByTestId('approval-mode-preview')).toHaveText('プレビュー');
-    await expect(page.getByTestId('approval-mode-annotate')).toHaveText('注釈');
-    await expect(page.getByTestId('approval-mode-side-by-side')).toHaveText('並列表示');
+    await expect(page.getByTestId('approval-mode-annotate')).toHaveText('生テキスト');
+    await expect(page.getByTestId('approval-modes').getByRole('button')).toHaveCount(2);
+    await expect(page.getByTestId('approval-mode-side-by-side')).toHaveCount(0);
   });
 
-  test('開いたときはプレビューで、指摘は付けられない', async ({ page }) => {
+  test('開いたときはプレビューで、そのまま指摘を付けられる', async ({ page }) => {
     await page.goto(APPROVAL);
 
     // 整形された本文が出ており、生テキストの面は出ていない
     await expect(page.getByTestId('document-content')).toBeVisible();
     await expect(page.getByTestId('approval-annotate-source')).toHaveCount(0);
 
-    // 指摘を付ける口も出ない。代わりに切り替えを促す
-    await expect(page.getByTestId('approval-add-general')).toHaveCount(0);
-    await expect(page.getByTestId('approval-comments')).toContainText('切り替える');
+    // 指摘を付ける口はこの面でも出る。切り替えを促す断り書きは無い
+    await expect(page.getByTestId('approval-add-general')).toBeVisible();
+    await expect(page.getByTestId('approval-comments')).not.toContainText('切り替える');
   });
 
-  test('注釈に切り替えると生の markdown が出る', async ({ page }) => {
+  test('生テキストに切り替えると生の markdown が出る', async ({ page }) => {
     await page.goto(APPROVAL);
     await page.getByTestId('approval-mode-annotate').click();
 
@@ -105,16 +79,6 @@ test.describe('承認画面の3つの面', () => {
     await expect(page.getByTestId('approval-annotate-source')).toContainText(`# ${TITLE}`);
     await expect(page.getByTestId('approval-add-general')).toBeVisible();
   });
-
-  test('並列表示は左が生テキスト、右が整形', async ({ page }) => {
-    await page.goto(APPROVAL);
-    await page.getByTestId('approval-mode-side-by-side').click();
-
-    await expect(page.getByTestId('approval-annotate-source')).toContainText(`# ${TITLE}`);
-    // 右は整形なので `#` は消え、見出しの要素になる
-    await expect(page.getByTestId('approval-rendered').locator('h1')).toHaveText(TITLE);
-  });
-
 });
 
 /**
@@ -386,6 +350,11 @@ test.describe('コメント欄をしまう', () => {
   });
 });
 
+/**
+ * 生テキストの面で指摘を付ける。面の作りは変わった（生テキストは `MarkdownSource`、塗りは
+ * CSS Custom Highlight API）が、**振る舞いは変わらない**——選んだ範囲・付いた注釈・本家へ
+ * 渡る値は以前と同じでなければならない。
+ */
 test.describe('指摘を付ける', () => {
   test.beforeEach(async ({ page }) => {
     await resetBoard(page);
@@ -414,10 +383,9 @@ test.describe('指摘を付ける', () => {
     await expect(card).toContainText('ステアリング');
     await expect(card).toContainText('言い回しを直してほしい');
 
-    // 選んだ箇所は本文上でも目立つ
-    await expect(page.getByTestId('approval-annotate-source').locator('mark')).toHaveText(
-      'ステアリング',
-    );
+    // 選んだ箇所は本文上でも目立つ。塗りは要素を作らない（`<mark>` は無い）
+    await expect.poll(() => painted(page)).toContain('ステアリング');
+    await expect(page.getByTestId('approval-annotate-source').locator('mark')).toHaveCount(0);
   });
 
   test('箇所に紐づかない指摘は全体へのコメントで付ける', async ({ page }) => {
@@ -431,7 +399,7 @@ test.describe('指摘を付ける', () => {
     await expect(page.getByTestId('approval-comment')).toContainText('全体へのコメント');
 
     // 箇所に紐づかないので本文は塗られない
-    await expect(page.getByTestId('approval-annotate-source').locator('mark')).toHaveCount(0);
+    expect(await painted(page)).toEqual([]);
   });
 
   test('付けたコメントは消せる', async ({ page }) => {
@@ -573,59 +541,21 @@ test.describe('本家へ渡るオフセットの基準', () => {
   ].join('\n');
 
   /**
-   * 生テキストの面で語を探して選ぶ。
+   * 生テキストの面で語を探して選び、差し戻して、本家へ届いた箇所つきの指摘を1件返す。
    *
    * **オフセットで指さない。** 指すと、こちらが数えた位置を面へ教えることになり、面が
    * 自分で数えた位置と食い違っても分からない。DOM に出ている字の上で選び、**面が何番と
    * 答えるか**を見る。
    */
-  async function selectWord(page: Page, word: string): Promise<void> {
-    await page.evaluate((target) => {
-      const surface = document.querySelector('[data-testid="approval-annotate-source"]');
-      if (surface === null) throw new Error('注釈の面が出ていない');
-
-      for (const element of surface.querySelectorAll<HTMLElement>('[data-start]')) {
-        const text = element.firstChild;
-        if (text === null || text.nodeType !== Node.TEXT_NODE) continue;
-
-        const at = (text.textContent ?? '').indexOf(target);
-        if (at === -1) continue;
-
-        const selection = document.createRange();
-        selection.setStart(text, at);
-        selection.setEnd(text, at + target.length);
-
-        const current = window.getSelection();
-        if (current === null) throw new Error('選択を作れない');
-        current.removeAllRanges();
-        current.addRange(selection);
-
-        surface.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
-        return;
-      }
-
-      throw new Error(`面に「${target}」が出ていない`);
-    }, word);
-  }
-
-  /** 差し戻して、本家へ届いた箇所つきの指摘を1件返す */
   async function reviseWith(page: Page, word: string) {
     await page.getByTestId('approval-mode-annotate').click();
     await expect(page.getByTestId('approval-annotate-source')).toBeVisible();
 
-    await selectWord(page, word);
+    await selectIn(page, 'approval-annotate-source', { word });
     await addSelectionComment(page, `${word} を直してほしい`);
     await expect(page.getByTestId('approval-comment-count')).toHaveText('1');
 
-    await page.getByTestId('approval-revision').click();
-    await expect(page).toHaveURL(new RegExp(`/projects/${ALPHA}/approvals$`));
-
-    const { lastApprovalAction } = await stub.stats();
-    const comments = lastApprovalAction?.comments as
-      | { type: string; selectedText?: string; startOffset?: number; endOffset?: number }[]
-      | null;
-
-    const selection = comments?.find((item) => item.type === 'selection');
+    const [selection] = await revise(page);
     expect(selection, '箇所つきの指摘が届いていない').toBeDefined();
     return selection!;
   }
@@ -680,5 +610,197 @@ test.describe('本家へ渡るオフセットの基準', () => {
     expect(FRONT_MATTER_CONTENT.slice(selection.startOffset, selection.endOffset)).toBe(
       '前置きを持つ文書',
     );
+  });
+});
+
+/**
+ * 整形された本文の面からの往復（散文・コードブロックの内側・図）。
+ *
+ * 整形された本文の上で選んだ範囲は、位置の口（`MarkdownView` の `toSourceRange`）が生テキストの
+ * 位置に写す。**位置の持ち方は生テキストの1本だけ**なので、どちらの面で付けても同じ注釈が
+ * 両方の面に出て、本家へ渡る値も同じ形になる（`openspec/specs/annotation`）。
+ *
+ * ここでも期待値を数値で書かない。送られたオフセットで本文を切って、選んだ字と突き合わせる。
+ */
+test.describe('整形された本文で指摘を付ける', () => {
+  const RICH_CONTENT = [
+    '# 整形された本文',
+    '',
+    '一つめの段落に**強調されたモモンガ**が居る。',
+    '',
+    '```ts',
+    'const answer = compute(42);',
+    'export { answer };',
+    '```',
+    '',
+    '```mermaid',
+    'flowchart LR',
+    '  a[はじめ] --> b[おわり]',
+    '```',
+    '',
+    '最後の段落。',
+    '',
+  ].join('\n');
+
+  test.beforeEach(async ({ page }) => {
+    await resetBoard(page);
+    await stub.requestApproval(ALPHA, {
+      id: 'an1',
+      title: TITLE,
+      filePath: '.spec-workflow/steering/product.md',
+      category: 'steering',
+      categoryName: 'steering',
+      content: RICH_CONTENT,
+    });
+    await page.goto(APPROVAL);
+    await expect(page.getByTestId('document-content')).toBeVisible();
+  });
+
+  test('散文: プレビューで選んだ箇所に指摘が付き、生テキストの面にも同じ注釈が出る', async ({
+    page,
+  }) => {
+    // 読んでいる面のまま付ける。面を切り替えない
+    await selectIn(page, 'document-content', { word: 'モモンガ' });
+    await addSelectionComment(page, '名前を変えてほしい');
+
+    await expect(page.getByTestId('approval-comment-count')).toHaveText('1');
+    const card = page.getByTestId('approval-comment');
+    await expect(card).toContainText('モモンガ');
+    await expect(card).toContainText('名前を変えてほしい');
+
+    // 整形された本文の上で塗られている。要素は増えていない
+    await expect.poll(() => painted(page)).toContain('モモンガ');
+    await expect(page.getByTestId('document-content').locator('mark')).toHaveCount(0);
+
+    // 一覧 → 本文。「本文へ」で、その範囲がしばらく目立つ
+    await card.getByTestId('comment-locate').click();
+    await expect.poll(() => painted(page, 'focus')).toContain('モモンガ');
+
+    // 本文 → 一覧。塗られた字を押すと、そのコメントの編集が開く
+    const point = await page.getByTestId('document-content').evaluate((element) => {
+      const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+        const at = (node as Text).data.indexOf('モモンガ');
+        if (at < 0) continue;
+        const range = document.createRange();
+        range.setStart(node, at);
+        range.setEnd(node, at + 4);
+        const box = range.getBoundingClientRect();
+        return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+      }
+      throw new Error('本文に「モモンガ」が出ていない');
+    });
+    await page.mouse.click(point.x, point.y);
+    const modal = page.getByRole('dialog');
+    await expect(modal).toBeVisible();
+    await expect(modal.getByRole('textbox')).toHaveValue('名前を変えてほしい');
+    await modal.getByRole('button', { name: 'やめる' }).click();
+    await expect(modal).toHaveCount(0);
+
+    // 生テキストの面へ切り替えても、一覧はそのままで、同じ注釈が対応する箇所に出る
+    await page.getByTestId('approval-mode-annotate').click();
+    await expect(page.getByTestId('approval-annotate-source')).toBeVisible();
+    await expect(page.getByTestId('approval-comment-count')).toHaveText('1');
+    await expect(card).toContainText('名前を変えてほしい');
+    await expect.poll(() => painted(page)).toContain('モモンガ');
+
+    // 本家へ渡る位置は生テキストの上の同じ語を指す
+    const [selection] = await revise(page);
+    expect(selection?.selectedText).toBe('モモンガ');
+    expect(RICH_CONTENT.slice(selection?.startOffset, selection?.endOffset)).toBe('モモンガ');
+  });
+
+  test('散文: 強調をまたいで選ぶと、生テキストの上で連続した1つの範囲になる', async ({
+    page,
+  }) => {
+    await selectIn(page, 'document-content', { word: 'モモンガが居る' });
+    await addSelectionComment(page, '要素をまたいだ指摘');
+
+    await expect(page.getByTestId('approval-comment-count')).toHaveText('1');
+    // 強調の表示は崩れない（要素構造に触れていない）
+    await expect(page.getByTestId('document-content').locator('strong')).toHaveText(
+      '強調されたモモンガ',
+    );
+
+    // 生テキストの上では強調の記号（`**`）を跨いだ1つの範囲
+    const [selection] = await revise(page);
+    expect(selection?.selectedText).toBe('モモンガ**が居る');
+    expect(RICH_CONTENT.slice(selection?.startOffset, selection?.endOffset)).toBe('モモンガ**が居る');
+  });
+
+  test('コードブロックの内側: 行の一部を選ぶと、その範囲だけに付く', async ({ page }) => {
+    await selectIn(page, 'document-content', { word: 'compute(42)' });
+    await addSelectionComment(page, '関数名を変えてほしい');
+
+    await expect(page.getByTestId('approval-comment-count')).toHaveText('1');
+    await expect(page.getByTestId('approval-comment')).toContainText('compute(42)');
+    await expect.poll(() => painted(page)).toContain('compute(42)');
+
+    // 生テキストの面でも同じ範囲を指す
+    await page.getByTestId('approval-mode-annotate').click();
+    await expect(page.getByTestId('approval-annotate-source')).toBeVisible();
+    await expect.poll(() => painted(page)).toContain('compute(42)');
+
+    const [selection] = await revise(page);
+    expect(selection?.selectedText).toBe('compute(42)');
+    expect(RICH_CONTENT.slice(selection?.startOffset, selection?.endOffset)).toBe('compute(42)');
+  });
+
+  test('図: 注釈が付いた図にだけ生テキストが添えられ、付けた一語だけが示される', async ({
+    page,
+  }) => {
+    const body = page.getByTestId('document-content');
+
+    // 図は描かれている。注釈が無いうちは生テキストを添えない
+    await expect(body.getByTestId('mermaid-diagram').locator('svg')).toBeVisible({ timeout: 15_000 });
+    await expect(body.getByTestId('mermaid-source')).toHaveCount(0);
+
+    // 生テキストの面で、図の中の一語に付ける
+    await page.getByTestId('approval-mode-annotate').click();
+    await expect(page.getByTestId('approval-annotate-source')).toBeVisible();
+    await selectIn(page, 'approval-annotate-source', { word: 'おわり' });
+    await addSelectionComment(page, '終端の名前を変えてほしい');
+    await expect(page.getByTestId('approval-comment-count')).toHaveText('1');
+
+    // プレビューへ戻ると、図は残ったまま、そのもとになった生テキストが添えられる
+    await page.getByTestId('approval-mode-preview').click();
+    await expect(body.getByTestId('mermaid-with-source')).toBeVisible({ timeout: 15_000 });
+    await expect(body.getByTestId('mermaid-diagram').locator('svg')).toBeVisible();
+    await expect(body.getByTestId('mermaid-source')).toContainText('flowchart LR');
+    // 添えられた生テキストの上で、付けた一語だけが塗られる
+    await expect.poll(() => painted(page)).toEqual(['おわり']);
+
+    // 添えられた生テキストの上でも選べる。図全体には広がらない
+    await selectIn(page, 'mermaid-source', { word: 'はじめ' });
+    await addSelectionComment(page, '始端の名前を変えてほしい');
+    await expect(page.getByTestId('approval-comment-count')).toHaveText('2');
+    await expect.poll(() => painted(page)).toEqual(['おわり', 'はじめ']);
+
+    // 差し戻しで送られる位置は、付けたときの範囲のまま
+    const selections = await revise(page);
+    expect(selections.map((item) => item.selectedText)).toEqual(['おわり', 'はじめ']);
+    for (const item of selections) {
+      expect(RICH_CONTENT.slice(item.startOffset, item.endOffset)).toBe(item.selectedText);
+    }
+  });
+
+  test('一方の面で消した注釈は、もう一方の面からも消える', async ({ page }) => {
+    await selectIn(page, 'document-content', { word: 'モモンガ' });
+    await addSelectionComment(page, '消される指摘');
+    await expect.poll(() => painted(page)).toContain('モモンガ');
+
+    await page.getByTestId('approval-mode-annotate').click();
+    await expect(page.getByTestId('approval-annotate-source')).toBeVisible();
+    await expect.poll(() => painted(page)).toContain('モモンガ');
+
+    await page.getByTestId('approval-comment').getByRole('button', { name: '消す' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: '消す' }).click();
+
+    await expect(page.getByTestId('approval-comment-count')).toHaveText('0');
+    await expect.poll(() => painted(page)).toEqual([]);
+
+    await page.getByTestId('approval-mode-preview').click();
+    await expect(page.getByTestId('approval-comment-count')).toHaveText('0');
+    await expect.poll(() => painted(page)).toEqual([]);
   });
 });

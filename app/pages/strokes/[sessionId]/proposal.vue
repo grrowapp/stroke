@@ -2,6 +2,7 @@
 // 画面2(proposal 確認)。ui.md の採用案 = B(右パネル常設)。
 // 決める操作(差し戻す・承認)はビュー切替と同じ上部固定バーに集約する。
 // 差し戻し後の問い返しは画面1 へ戻さず、この画面の帯とモーダルで受ける。
+import MarkdownSource from '#markdown/render/MarkdownSource.vue'
 import MarkdownView from '#markdown/render/MarkdownView.vue'
 
 import type { Phase, SessionStatus, Stroke } from '#shared/stroke'
@@ -69,11 +70,20 @@ const approved = computed(() => phase.value === 'approved')
 // 承認後は注釈も差し戻しもしないため、整形されたプレビューだけを見せる
 const shownMode = computed(() => (approved.value ? 'preview' : viewMode.value))
 
+// 見せ方は2つ。どちらでも指摘を付けられるので、両方を並べる面は無い（specs/stroke/frontier）
 const modes = [
   { value: 'preview', label: 'プレビュー' },
-  { value: 'annotate', label: '注釈' },
-  { value: 'side-by-side', label: '左右' },
+  { value: 'annotate', label: '生テキスト' },
 ] as const
+
+// 注釈の面へ渡す位置の口。面はどちらも `PositionPort` を `defineExpose` で名乗るので、
+// `ref` をそのまま渡す。出ていない面の `ref` は null
+const previewSurface = useTemplateRef<InstanceType<typeof MarkdownView>>('previewSurface')
+const sourceSurface = useTemplateRef<InstanceType<typeof MarkdownSource>>('sourceSurface')
+
+// 一覧のコメント → 本文の範囲。出ている面の注釈の面へ渡す（面は同時に1つしか出ないので
+// `ref` は1つでよい）
+const annotator = useTemplateRef<{ reveal: (id: string) => boolean }>('annotator')
 </script>
 
 <template>
@@ -152,46 +162,66 @@ const modes = [
     >
       <section class="min-w-0">
         <!--
-          プレビュー: 整形。ここからは指摘を付けられない。
+          承認後: 整形されたプレビューを読むだけ。注釈も差し戻しもしないので、注釈の面に
+          載せない。
 
           本文の型は markdown モジュールが持つ。`surface` を寝かせるのは、この画面が
           自前の余白（`px-8 py-8`）を持つ別レイアウトで、本家写しの暗い矩形を重ねると
           枠と余白が二重になるため。
         -->
         <MarkdownView
-          v-if="shownMode === 'preview'"
+          v-if="approved"
           :value="proposal"
           :surface="false"
           testid="proposal-preview"
           class="px-8 py-8"
         />
 
-        <!-- 注釈: 生テキスト。指摘を付けられるのはこの面だけ -->
+        <!--
+          プレビュー: 整形された本文。ここからも指摘を付けられる。
+
+          注釈の面（`ReviewAnnotateSource`）は本文をどう描くかを知らない。面はスロットで
+          渡し、位置の口は面の `ref` で渡す。図に生テキストを添えたい範囲（`sourceShown`）は
+          注釈の面がスロットから出すので、`MarkdownView` の同名の prop へそのまま通す。
+        -->
         <ReviewAnnotateSource
-          v-else-if="shownMode === 'annotate'"
+          v-else-if="shownMode === 'preview'"
+          ref="annotator"
+          v-slot="{ sourceShown }"
           :source="proposal"
           :comments="comments"
+          :port="previewSurface"
+          @select="review.onSelect"
+          @click-mark="review.editComment"
+        >
+          <MarkdownView
+            ref="previewSurface"
+            :value="proposal"
+            :surface="false"
+            :source-shown="sourceShown"
+            testid="proposal-preview"
+            class="px-8 py-8"
+          />
+        </ReviewAnnotateSource>
+
+        <!-- 生テキスト: 書いてある通りの字。こちらでも同じ注釈が出て、同じように付けられる -->
+        <ReviewAnnotateSource
+          v-else
+          ref="annotator"
+          :source="proposal"
+          :comments="comments"
+          :port="sourceSurface"
           class="px-4 py-4"
           @select="review.onSelect"
           @click-mark="review.editComment"
-        />
-
-        <!-- 左右: 左が注釈、右がプレビュー -->
-        <div v-else class="grid grid-cols-2">
-          <ReviewAnnotateSource
-            :source="proposal"
-            :comments="comments"
-            class="min-w-0 border-r border-default px-4 py-4"
-            @select="review.onSelect"
-            @click-mark="review.editComment"
-          />
-          <MarkdownView
+        >
+          <MarkdownSource
+            ref="sourceSurface"
             :value="proposal"
             :surface="false"
-            testid="proposal-rendered"
-            class="min-w-0 px-6 py-6"
+            testid="proposal-source"
           />
-        </div>
+        </ReviewAnnotateSource>
       </section>
 
       <aside
@@ -207,7 +237,7 @@ const modes = [
           <p v-if="!comments.length" class="py-8 text-center text-sm text-muted">
             まだコメントがありません<br>
             <span class="text-xs">
-              「注釈」か「左右」に切り替えて本文を選ぶと、その箇所にコメントを付けられます。<br>
+              本文を選ぶと、その箇所にコメントを付けられます。<br>
               箇所に紐づかない指摘は「＋ 全体へのコメント」から付けられます。
             </span>
           </p>
@@ -217,6 +247,7 @@ const modes = [
             :comment="c"
             @edit="review.editComment"
             @remove="deleteId = $event"
+            @locate="annotator?.reveal($event)"
           />
         </div>
       </aside>

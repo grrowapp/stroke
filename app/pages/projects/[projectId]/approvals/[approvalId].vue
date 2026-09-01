@@ -2,10 +2,10 @@
 /**
  * 下層 — 承認依頼1件と、その対象文書の中身。
  *
- * 本家の承認画面と同じ3つの面を持つ（プレビュー / 注釈 / 並列表示）。指摘を付けられるのは
- * 生テキストが出ている面だけで、溜めた指摘は差し戻し（`needs-revision`）で本家へ渡る。
- * 面と指摘の扱いは `ReviewApprovalAnnotator` が持ち、ここは対象文書の取得と、
- * プレビューに何を置くかだけを決める。
+ * 面は2つ（プレビュー / 生テキスト）で、どちらでも指摘を付けられる。溜めた指摘は差し戻し
+ * （`needs-revision`）で本家へ渡る。面と指摘の扱いは `ReviewApprovalAnnotator` が持ち、
+ * ここは対象文書の取得と、プレビューに何を置くかだけを決める。プレビューの面
+ * （`MarkdownView`）が出す位置の口は、その `ref` を `previewPort` で渡す。
  *
  * **承認画面では編集しない。** 本家の承認画面（`ApprovalsAnnotator`）は読んで判断し指摘を
  * 付ける場で、編集の口を持たない（ユーザー決定 2026-09-01・specs/document-editing）。
@@ -15,7 +15,7 @@
  * 承認・却下はここに置かない。それは承認一覧の `ApprovalCard` が持つ。差し戻しだけを
  * ここに置くのは、それが運ぶ指摘がこの画面にしか無いためである。
  */
-import { computed, definePageMeta, useRoute } from '#imports';
+import { computed, definePageMeta, useRoute, useTemplateRef } from '#imports';
 
 import ApprovalAnnotator from '~/components/review/ApprovalAnnotator.vue';
 import MarkdownView from '#markdown/render/MarkdownView.vue';
@@ -41,6 +41,12 @@ const { upstreamConnected } = useBoardSocket();
 
 /** 注釈のオフセットが指す生テキスト。保存されている中身そのもの */
 const source = computed(() => document.value?.content ?? '');
+
+/**
+ * プレビューの面。位置の口（`PositionPort`）を `defineExpose` で名乗るので、`ref` をそのまま
+ * 注釈の面へ渡す。まだ描かれていなければ null
+ */
+const previewSurface = useTemplateRef<InstanceType<typeof MarkdownView>>('previewSurface');
 
 const CATEGORY: Record<string, string> = { spec: '仕様', steering: 'ステアリング' };
 </script>
@@ -78,19 +84,23 @@ const CATEGORY: Record<string, string> = { spec: '仕様', steering: 'ステア�
       :project-id="projectId"
       :approval-id="approvalId"
       :can-respond="upstreamConnected"
+      :preview-port="previewSurface"
     >
       <!--
         整形して読む面。承認から来た人は読んで判断するので、開いた直後はこれが出る。
-        読むだけで、編集の口は無い。
+        読むだけで、編集の口は無い。ここからも指摘を付けられる。
+
+        `sourceShown` は図に生テキストを添えたい範囲。注釈の面がスロットから出すので、
+        `MarkdownView` の同名の prop へそのまま通す。
       -->
-      <template #preview>
+      <template #preview="{ sourceShown }">
         <!--
           枠（`sb-panel`）を持つのは、本家の承認画面が注釈の面と同じく本文を
           `bg-panel border rounded-lg` の中に置くため（`ApprovalsAnnotator.tsx` の
           左列）。仕様書・ステアリングの画面はパネル1枚なので枠を重ねない。
         -->
         <div class="sb-panel" data-testid="approval-document">
-          <MarkdownView :value="document?.content">
+          <MarkdownView ref="previewSurface" :value="document?.content" :source-shown="sourceShown">
             <template #empty>
               <EmptyState testid="document-missing" title="中身がありません">
                 対象の文書を取得できませんでした。
