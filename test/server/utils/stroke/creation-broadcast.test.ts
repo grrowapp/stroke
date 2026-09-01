@@ -11,6 +11,11 @@ import { creationOutcomeOf } from '../../../../server/utils/stroke/session-store
  * **`invocation` を合図の材料に使うが、行の判定には使わない。** 行が生成中か完了かは
  * ファイルシステム（`.spec-workflow/` の有無）から毎回導く（D7）。ここで流すのは
  * 「決着したから取り直せ」と、決着のモーダルを出す引き金だけである。
+ *
+ * 生成の**始まり**（`in-progress`）の起点は昇格の段（U14・`promote.post.ts`）にあり、
+ * 承認の判断（U10）では流さない。そちらは `test/server/api/strokes/promote.post.test.ts` が
+ * 押さえる。昇格の直後に A8 で書かれる `failed`（起動の段の引き渡し）は決着ではないので、
+ * ここの「リトライ待ちは流さない」がそのまま効く。
  */
 
 describe('決着の配信の起点', () => {

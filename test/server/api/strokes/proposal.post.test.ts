@@ -71,6 +71,36 @@ describe('A7 POST /api/strokes/:id/proposal', () => {
     );
   });
 
+  /**
+   * 判断はそれが下された proposal に結びつく（openspec/specs/api/session/approve）。出し直しで
+   * 失効させるのは proposal を書く口がここ1つだからで（design.md 決定2）、口が増えたら
+   * ここが落ちるのではなく漏れる——増やすときはこのテストの相方を足すこと。
+   */
+  it('出し直すと記録されていた承認の判断は失効する', async () => {
+    readStateMock.mockResolvedValueOnce({
+      phase: 'proposed',
+      currentQuestion: null,
+      invocation: 'idle',
+      retries: 1,
+      decision: { projectName: 'decided-on-old-proposal' },
+    });
+
+    await proposalHandler(fakeEvent('session-1', BODY) as never);
+
+    expect(writeStateMock).toHaveBeenCalledTimes(1);
+    const [, written] = writeStateMock.mock.calls[0]!;
+    expect(written).toEqual({
+      phase: 'proposed',
+      currentQuestion: null,
+      invocation: 'idle',
+      retries: 1,
+      projectName: 'example-project',
+    });
+    expect('decision' in written).toBe(false);
+    // 失効は出し直しそのものを妨げない
+    expect(write).toHaveBeenCalledWith('# 提案\n\n本文。');
+  });
+
   it('承認済みのセッションには 409 を返し、本文を残さない', async () => {
     readStateMock.mockResolvedValueOnce({ phase: 'approved', projectName: 'example', invocation: 'idle' });
     const event = fakeEvent('session-1', BODY);
