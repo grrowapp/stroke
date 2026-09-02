@@ -68,7 +68,7 @@ type ViewMode = 'preview' | 'annotate';
 
 const MODES: { value: ViewMode; label: string }[] = [
   { value: 'preview', label: 'プレビュー' },
-  { value: 'annotate', label: '生テキスト' },
+  { value: 'annotate', label: '注釈' },
 ];
 
 /**

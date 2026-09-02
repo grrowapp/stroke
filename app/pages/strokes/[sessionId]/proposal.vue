@@ -73,7 +73,7 @@ const shownMode = computed(() => (approved.value ? 'preview' : viewMode.value))
 // 見せ方は2つ。どちらでも指摘を付けられるので、両方を並べる面は無い（specs/stroke/frontier）
 const modes = [
   { value: 'preview', label: 'プレビュー' },
-  { value: 'annotate', label: '生テキスト' },
+  { value: 'annotate', label: '注釈' },
 ] as const
 
 // 注釈の面へ渡す位置の口。面はどちらも `PositionPort` を `defineExpose` で名乗るので、
