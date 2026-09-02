@@ -3,7 +3,6 @@
 画面（`app/`）・エージェント（`claude -p`）とサーバ（`server/`）の境界。型は `shared/stroke.ts`。
 ここに並ぶ番号が実際にどう繋がるかは `docs/specs/architecture/question-flow.md`、入れ物の形と検証の規定は
 `docs/specs/core/schema.md`。
-方式の詳細（決定・シーケンス）は `openspec/changes/migrate-claude-p-to-api-endpoint/design.md` を参照。
 
 ## セッションの参照方法
 
@@ -21,7 +20,7 @@
 
 - 1リソース1パス。書き手は POST、読み手は GET または WS 配信。
 - POST は受理だけを返す（本文なし・204）。例外は U1（`sessionId` を返す）だけ。
-- ストロークの問いと差し戻しへの問い返しは区別しない。提出は1口（A5）・配信は1チャネル
+- ストロークの問いと差し戻しへの問い返しは区別しない。提出は1つの endpoint（A5）・配信は1チャネル
   （W1）に統合し、strokes に一様に記録する。proposal の初提出は strokes にマーカー行として
   記録する。
 - HTTP はステートレス。POST は受理・返却して即完結し、AI の呼び出し結果を待たない。結果は
@@ -262,7 +261,7 @@ invokeAi だけである（`openspec/specs/api/stroke/submission`）。
 - output: 本文なし（204）
 - **受理した本文を残す。** セッションの `docs/proposal.md` へ書き、以後に繋ぎ直した画面
   （W2 の接続時配信）でも承認（U10）でも同じ proposal が得られる。出し直しは上書きで、
-  残るのは最後に受理した1件だけ（`openspec/specs/api/stroke/proposal`）。
+  残るのは最後に受理した1件だけ。
 - **残せなければ受理しない。** 書けなかったときは失敗を返し、phase も進めず W2 へも
   配信しない。受理したのに残っていない状態を作らない。
 - 順序は「残す → phase を進める → W2 配信」。
@@ -272,9 +271,9 @@ invokeAi だけである（`openspec/specs/api/stroke/submission`）。
 
 - input: `{ invocation: 'running' | 'idle' | 'failed' | 'error', retries?: number }`
 - output: 本文なし（204）
-- 実行の記録を指定の値に変えるだけの口。**`invocation` の唯一の書き込み口**であり、
+- 実行の記録を指定の値に変えるだけの endpoint。**`invocation` を書き込めるのはここだけ**であり、
   叩くのは invokeAi だけとする。claude（エージェント）と画面は叩かない
-  （`openspec/specs/api/stroke/submission`）。A5・A7 も `invocation` に触れない。
+  A5・A7 も `invocation` に触れない。
 - 値の意味づけも遷移の判定もここでは持たない。`retries` は渡されたときだけ上書きする
   （`error` からの再実行で 0 に戻すのに使う）。
 - エラー: 400 形式不正 / 404 セッションなし
@@ -293,11 +292,35 @@ invokeAi だけである（`openspec/specs/api/stroke/submission`）。
 
 ## 約束
 
-- **404**: 存在しないセッション uuid、または GET で対象がまだ保存されていない。
-  画面はセッション未存在なら概要入力（`/`）へ戻す。
-- **409 (`busy`)**: そのセッションで呼び出しが実行中のときの起動（U13）と削除（U11）。
-  受理系（U7・U9）は実行中でも受理する。
-- **409 (`name-conflict`)**: 承認時に `/opt/projects/<name>` が既に存在するとき。
-- **409 (`phase`)**: その操作が今の phase に当てはまらない。
-- 502 は無い。リトライを尽くした失敗は `invocation: failed`（U2）で伝わる。ユーザーの
-  再試行は同じ入力 POST（U7 / U9）の再送と、その成功応答後の U13。
+**status の意味はここが決める。どの endpoint がどれを返すかは、各 endpoint の資料が持つ。**
+ここに endpoint の名前を並べない——並べると、endpoint が増減するたびにこの資料が変わる。
+
+| status | 意味 | 呼び手の次の手 |
+|---|---|---|
+| **404** | 対象が無い。または GET で、まだ保存されていない | セッションが無いなら概要入力（`/`）へ戻す |
+| **409 `busy`** | 同じ対象で AI が走っている | **待てば通る。** 応答が終わってから同じ操作をやり直す |
+| **409 `name-conflict`** | 昇格先の名前が既に使われている | 別の名前で出し直す |
+| **409 `phase`** | いまの phase にその操作が当てはまらない | 何もしない。phase が進むのを待つ |
+| **503** | 環境か設定を直すまで通らない | **待っても通らない。** 直してからやり直す |
+
+**409 と 503 の分かれ目は「待てば通るか」である。** 同じ「今は無理」でも、呼び手の次の手が違う。
+
+**受理と起動は別である。** 受理系は AI が走っていても受理する。多重起動を止めるのは起動側だけで、受理側は `busy` を見ない。
+
+**502 は無い。** リトライを尽くした失敗は実行の記録（`invocation: failed`）で伝わる。ユーザーの再試行は、同じ入力の再送と、その成功応答に続く起動である。
+
+## 対称性
+
+リソースは「書き手 POST ↔ 読み手 GET / WS」の1対。
+
+| リソース | 書く | 読む |
+|---|---|---|
+| `/overview` | U1 | A1 |
+| `/answer` | U7 | U3（strokes の末尾） |
+| `/send-back` | U9 | A4 |
+| `/question` | A5 | W1（画面）・U3（記録） |
+| `/proposal` | A7 | W2（画面）・U3（マーカー） |
+| `/submission` | A8 | U2（`invocation`） |
+
+A8 だけはエージェント側に置かれているが、**claude は叩かない**。実行の記録を書くのは
+invokeAi だけである。

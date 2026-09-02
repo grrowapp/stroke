@@ -284,7 +284,7 @@ export default defineNuxtConfig({
         // 実測（2026-09-01、`yarn check:stroke --approve` の flontier / steering 2実行）
         // で `Write` も `Edit` も呼び出し0回。外した状態でも往復・承認・steering 3本が
         // 揃うことを実機で確かめてある。**これで「文書は MCP ツールを通してしか出せない」
-        // が構造で担保される**（`docs/specs/api/mcp-tools.md`「操作の入口はこれだけ」）。
+        // が構造で担保される**（`docs/specs/mcp/tools.md`「操作の入口はこれだけ」）。
         //
         // `Read` は残す。steering 工程には文脈を取る MCP ツールが無く（公開は
         // get-steering-guide / get-steering / submit-document の3本）、実測でも

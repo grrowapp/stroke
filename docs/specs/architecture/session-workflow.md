@@ -2,7 +2,7 @@
 
 claude プロセスへの指示は2つに分かれる。**どの成果物を作るか**は openspec のワークフロースキーマにあり、スキーマを編集すればコード変更・再ビルド・再起動なしに次回の呼び出しから反映される（`openspec/specs/workflow-definition/spec.md`）。**どう進めるか**（手順）は MCP の案内ツール（`get-guide` / `get-steering-guide`）が返し、本文はツールのソースが持つ。
 
-操作（取得・提出）の入口は MCP ツールだけである。契約は `docs/specs/api/mcp-tools.md`。
+操作（取得・提出）の入口は MCP ツールだけである。契約は `docs/specs/mcp/tools.md`。
 
 store（マシン共有の登録簿）は使わない。**登録作業は不要**で、旧 `stroke-sessions` の登録が残っていても参照されない（unregister は任意）。
 

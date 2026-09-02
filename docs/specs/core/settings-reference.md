@@ -159,7 +159,7 @@ AI へ渡す定型。**手順の本文をここに書かない。** 手順は MC
 
 **許可するのは、実測で要ると確かめた道具だけとする。** 根拠なく残った道具は、MCP ツールを通さない経路を黙って開けたままにする。
 
-**成果物をファイルへ直接書ける道具を許可しない。** 取得・提出の入口は MCP ツールだけである（`docs/specs/api/mcp-tools.md`「操作の入口はこれだけである」）。`Write` / `Edit` はそれを迂回できるので外した——実測 2026-09-01（`yarn check:stroke --approve` を2周、計4実行）で呼び出しは0回、外した構成でも往復・承認・steering 3本が揃うことを実機で確かめている。
+**成果物をファイルへ直接書ける道具を許可しない。** 取得・提出の入口は MCP ツールだけである（`docs/specs/mcp/tools.md`「操作の入口はこれだけである」）。`Write` / `Edit` はそれを迂回できるので外した——実測 2026-09-01（`yarn check:stroke --approve` を2周、計4実行）で呼び出しは0回、外した構成でも往復・承認・steering 3本が揃うことを実機で確かめている。
 
 **`Read` は残してある。** steering 工程には文脈を取る MCP ツールが無く（公開は `get-steering-guide` / `get-steering` / `submit-document` の3本）、同じ実測で `Read` は5回使われていた。読み取りの口を MCP へ寄せるのは change `adr0016-sub-add-steering-context-tools` の仕事で、**道具を用意する前に `Read` を外すと steering が成立しない。**
 
