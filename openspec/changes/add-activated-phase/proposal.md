@@ -53,9 +53,12 @@ approved ──────────── 生成中 ────────
 
 ### Modified Capabilities
 
-- `project/generation` — 生成の決着の判定と、その配信
+- `project/generation` — 生成中か完了かの判定を phase だけにする。`.spec-workflow/` の有無を判定から外す。既存の昇格済みプロジェクトの起動時の記録し直し
+- `agent/invocation` — 承認以降の局面に `activated` を含める。生成中の steering の完了時に完成の記録を試み、受理されなければ `failed` にする
+- `api/session/get` — 返す phase の値に `activated` を足す
+- `stroke/frontier` — 保持する phase の値に `activated` を足す
 
-**追記 2026-09-02。** 起票の時点では「`activated` を立てる endpoint をサーバに足す」としか書いておらず、その endpoint を capability として立てていなかった。`separate-approval-decision-from-promotion` が develop へ入り、**承認の各段がそれぞれ capability を持つ形**（`api/session/approve` / `api/session/promote`）になったため、完成の記録も同じ形で並べる（design.md D4）。
+**追記 2026-09-02。** 起票の時点では「`activated` を立てる endpoint をサーバに足す」としか書いておらず、その endpoint を capability として立てていなかった。`separate-approval-decision-from-promotion` が develop へ入り、**承認の各段がそれぞれ capability を持つ形**（`api/session/approve` / `api/session/promote`）になったため、完成の記録も同じ形で並べる。
 
 ## Impact
 
@@ -68,10 +71,10 @@ approved ──────────── 生成中 ────────
 | `server/utils/stroke/session-store.ts` | zod の枝、`creationOutcomeOf` の判定 |
 | `server/utils/control/creating.ts` | `phase` を持ち帰る（いまは `approved` かの真偽だけ） |
 | `server/utils/control/directory.ts` | 行の `creation` を phase から引く。生成中を接続の判定から外す |
-| `server/api/strokes/[id]/activate.post.ts`（新規） | `activated` を立てる endpoint（U15） |
-| `server/api/strokes/[id]/invoke-agent.get.ts` | 起こす定型と `runId` の選び分けに `activated` を通す |
+| `server/api/sessions/[id]/activate.post.ts`（新規） | `activated` を立てる endpoint（U15、`POST /api/sessions/:id/activate`） |
+| `server/api/sessions/[id]/invoke-agent.get.ts` | 起こす定型と `runId` の選び分けに `activated` を通す。実装はいま `server/api/strokes/[id]/` に置かれているが、docs の定義は `/api/sessions/` である（ticket「見つけた課題」） |
 | `server/utils/stroke/ai.ts` | 成功の分岐から U15 を叩く。steering にも `didWork` を渡す |
-| `server/plugins/` | 既存の `state.json` を一度だけ書き上げる（design.md D7） |
+| `server/plugins/` | 起動時に一度だけ、`approved` の対象それぞれに U15 を叩いて既存の `state.json` を書き上げる |
 
 ### phase の値がばら撒かれている現状
 
@@ -101,11 +104,13 @@ session-store.ts            creationOutcomeOf の `phase !== 'approved'`
 ```
 誰が   invokeAi。claude のプロセスを終了まで握っている
 いつ   プロセスが終わり、結果を判定した時点
-どう   承認 API を phase 付きで叩く。新規 endpoint を生やさない
-失敗   同じ分岐で invocation に失敗を立て、WS の通知パターンに失敗を乗せる
+どう   U15 POST /api/sessions/:id/activate を叩く。U15 が承認依頼の有無を確かめて phase を書く
+失敗   U15 が受理しなければ invocation を failed に立て、巡回の起こし直しに回す
 ```
 
-`invokeAi` は既に成功・失敗の分岐を両方持っている（`ai.ts:112-141`）。**その先に「API を叩く」を足すだけ**で、新しい判定を作らない。
+`invokeAi` は既に成功・失敗の分岐を両方持っている（`ai.ts` の `runBuiltInvocation`）。**その先に「U15 を叩く」を足すだけ**で、新しい判定を `invokeAi` に作らない。判定は U15 の1箇所に閉じる。
+
+起票時の tasks が書いていた「新規 endpoint を生やさない」は、U10 が唯一の phase 書き込み endpoint だった時点の前提である。3段化で段ごとに endpoint を持つ形になったので、完成の記録も1本の endpoint で受ける。
 
 ### 書くのが「提出の瞬間」でなくてよい理由
 
@@ -124,12 +129,10 @@ phase        消えない。区間の端として残る
 
 **同じ判定でも、行き先が `invocation` か `phase` かで意味が変わる。** `didWork` を steering にも渡せば失敗は拾えるようになるが、それだけでは「完成した」を記録する場所が無いままで、境界は引けない。`activated` が要るのはそのためである。
 
-### 承認 API が phase を受け取る形について
+### U15 と ADR-0014 の関係
 
-ADR-0014「API は暗黙の状態分岐を持たない」は、**判定の材料が契約から読めるか**を分かれ目にしている。phase を引数として外に出す形は、同 ADR が対象外とする「引数で制御される分岐」に当たる。
+ADR-0014「API は暗黙の状態分岐を持たない」は、**判定の材料が契約から読めるか**を分かれ目にしている。U15 は引数を取らず、対象の実体（phase と `.spec-workflow/approvals/` の有無）だけを見て受理・不受理を決める。これは同 ADR が対象外とする「責務の不成立」の分岐である。phase を引数で受け取る形は取らない——呼び出し側が任意の phase を書けると、遷移の正しさを API が保証しなくなる。
 
-ただし呼び出し側が任意の phase を書けると、遷移の正しさを API が保証しなくなる。**受け取れる遷移を限る**か、**遷移そのものを引数にする**かは design で決める。
+### 「初回の」の見分け方
 
-## 未決
-
-**「初回の」をどう見分けるか。** 2回目以降に `activated` を書き直しても実害は無いが、何を以て初回とするかは決めておく。
+`activated` は一方向の遷移で、U15 は対象が `approved` のときだけ立てる。`activated` の対象への U15 は受理しない。完成済みプロジェクトの steering を起こし直しても、完了時に U15 は呼ばない。これで「初回」は定義から決まる。

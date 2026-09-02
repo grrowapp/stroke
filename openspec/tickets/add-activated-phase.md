@@ -2,6 +2,7 @@
 status: Planning
 tags:
   - proposal
+  - specs
 triage:
   - bug
 change: add-activated-phase
@@ -93,9 +94,9 @@ date: 2026-09-02
 
 | 段 | endpoint | すること |
 | --- | --- | --- |
-| 判断 | U10 `POST /api/strokes/:id/approve` | 判断を `proposed` の中の `decision` として記録する。**`phase` を動かさない・改名しない・起動しない**。取り下げは同 path の `DELETE` |
-| 昇格 | U14 `POST /api/strokes/:id/promote` | 改名して `phase: 'approved'` を書く。**本文を取らない**（名前は判断が持つ）。起動しない。busy ガードを持つ |
-| 起こし | U13 `GET /api/strokes/:id/invoke-agent` | steering を起こす。昇格の成功を見た側が呼ぶ |
+| 判断 | U10 `POST /api/sessions/:id/approve` | 判断を `proposed` の中の `decision` として記録する。**`phase` を動かさない・改名しない・起動しない**。取り下げは同 path の `DELETE` |
+| 昇格 | U14 `POST /api/sessions/:id/promote` | 改名して `phase: 'approved'` を書く。**本文を取らない**（名前は判断が持つ）。起動しない。busy ガードを持つ |
+| 起こし | U13 `GET /api/sessions/:id/invoke-agent` | steering を起こす。昇格の成功を見た側が呼ぶ |
 
 **昇格の完了時点で `invocation` は `failed` に置かれる**（U14 が A8 経由で書く）。起動の要求が届かなくても巡回が拾えるようにするためで、**失敗の印ではなく「起こし直す対象」の印**である。決着として流すと昇格した瞬間に失敗のモーダルが出るので、流してはいけない。
 
@@ -143,11 +144,20 @@ date: 2026-09-02
 
 **巻き戻しに注意。** `activated` を書かれた `state.json` が残った状態で `Phase` から `activated` を外すと、phase を読む側が知らない値として落とし（zod なら `readState` が失敗、`session-core` の `readPhase` なら `'unknown'`）、**削除の endpoint がどちらも受理しなくなる**。
 
+### `handler/phase.ts` を没にするときに決めておくこと
+
+- **削除 endpoint 2本（U11 / P1）が `readState` を使うとき、壊れた `state.json`（zod が失敗する）をどう扱うか。** いまの `readPhase` は「分からないものは通さない」（null を許すに倒すと、壊れた `state.json` を持つ本物のプロジェクトが消せてしまう）と決めている。この意図は引き継ぐ
+- **`session-core.ts` のもう1つの生読み `readPhase`（U12 一覧用）も同時に `readState` へ寄せるか。** 一覧は壊れた1件で全体を落とせないので、外れた値を `'unknown'` に倒す挙動は残す形になる。読みを1本化するなら、`readState` の失敗を一覧側で `'unknown'` に写す層が要る
+
 ### 検討した案（決定ではない）
 
-- **`activated` を書く endpoint** — 3段化で「段ごとに endpoint を持つ」形になったので、`POST /api/strokes/:id/activate` を1本置く案を検討した。U10 は「`phase` を動かさない」と契約に明記されており足せない。U14 は「本文を取らない」ので `{ phase }` を足すと昇格が名前を引数で受け取れる余地を開く。**起票時の tasks が書いていた「新規 endpoint を生やさない」は、U10 が唯一の phase 書き込み endpoint だった時点の前提**なので、そのまま適用できない
+- **`activated` を書く endpoint** — 3段化で「段ごとに endpoint を持つ」形になったので、`POST /api/sessions/:id/activate` を1本置く案を検討した。U10 は「`phase` を動かさない」と契約に明記されており足せない。U14 は「本文を取らない」ので `{ phase }` を足すと昇格が名前を引数で受け取れる余地を開く。**起票時の tasks が書いていた「新規 endpoint を生やさない」は、U10 が唯一の phase 書き込み endpoint だった時点の前提**なので、そのまま適用できない
 - **行と配信の根拠** — 成功は phase の遷移から、失敗は `invocation` の `error` から導く案を検討した。失敗は「区間の中で終われなかった」ことで区間の外に出る出来事ではないため、phase では表せない
 - **走査の使い道** — `.spec-workflow/` の有無は**プロジェクトの母集合を作るためだけ**に使い、行の状態の判定には使わない。生成中の行を接続の判定の対象から外せば、「アクティブに化けて入場できる」経路が閉じる。入場のガード（`app/pages/projects/index.vue:55`）自体は今のままでよい
+
+### 見つけた課題（この ticket の外）
+
+**U 系の endpoint が実装では `/api/strokes/` に在る。** docs（`docs/specs/api/overview.md`、`sessions/*.md`）は `/api/sessions/` と定めており、実装が間違いである。この ticket の表記は docs に合わせて `/api/sessions/` で書いている。直す作業は [[fix-session-api-path]] に起票した。U15 `POST /api/sessions/:id/activate` は、あちらの完了を待たず `server/api/sessions/[id]/` に置く。
 
 ### 上位資料との食い違い（未反映）
 

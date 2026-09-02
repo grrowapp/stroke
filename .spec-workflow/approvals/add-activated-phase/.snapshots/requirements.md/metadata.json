@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/add-activated-phase/requirements.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-09-02T08:52:56.543Z",
+      "trigger": "initial",
+      "approvalId": "approval_1788339176484_h6352mjd0",
+      "approvalTitle": "specs: add-activated-phase — Phase に activated を足し、完成の記録（U15）と判定の一本化を規定する delta 5本"
+    }
+  ]
+}
