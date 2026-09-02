@@ -119,7 +119,15 @@ watch([(): string => props.code, (): string => colorMode.value], draw);
 </script>
 
 <template>
-  <!-- エラー: 本家と同じく文言と元ソースを畳んで出す -->
+  <!--
+    エラー: 本家と同じく文言と元ソースを畳んで出す。
+
+    **色も本家の className の写しである**（`bg-red-50 dark:bg-red-900/20 border border-red-200
+    dark:border-red-800 rounded-lg p-4 my-4` / `text-red-700 dark:text-red-300` /
+    `text-red-600 dark:text-red-400`。既定がダークなので dark 側だけを残した）。
+    design token へ寄せないこと——寄せると本家のどれを写したのかが読めなくなり、本家が
+    変わったときに追随できない（change `adopt-upstream-design-tokens` の design D5）。
+  -->
   <div
     v-if="failure"
     class="my-4 rounded-lg border border-red-800 bg-red-900/20 p-4"
@@ -133,7 +141,13 @@ watch([(): string => props.code, (): string => colorMode.value], draw);
     </details>
   </div>
 
-  <!-- 描く前。SSR と hydration 直後はここ。図の分の高さを先に取っておく -->
+  <!--
+    描く前。SSR と hydration 直後はここ。図の分の高さを先に取っておく。
+
+    **色も本家の className の写しである**（`bg-gray-100 dark:bg-gray-800 rounded-lg p-4 my-4
+    animate-pulse` / `h-32 bg-gray-200 dark:bg-gray-700 rounded` /
+    `text-gray-500 dark:text-gray-400`）。上のエラーと同じ理由で token へ寄せない。
+  -->
   <div
     v-else-if="!svg"
     class="my-4 animate-pulse rounded-lg bg-gray-800 p-4"

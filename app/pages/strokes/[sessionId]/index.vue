@@ -128,7 +128,7 @@ async function answer(given: Answer) {
 </script>
 
 <template>
-  <div class="mx-auto max-w-2xl px-6 py-14 pb-40">
+  <div class="sb-stroke-page">
     <!-- 履歴は常に見えている。開閉を挟まないと辿れない形にしない -->
     <StrokeBreadcrumb class="mb-8" current="question" :strokes="strokes" />
 

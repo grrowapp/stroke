@@ -42,7 +42,7 @@ async function start(overview: string) {
 </script>
 
 <template>
-  <div class="mx-auto max-w-2xl px-6 py-14 pb-40">
+  <div class="sb-stroke-page">
     <UAlert
       v-if="errorMessage"
       class="mb-6"

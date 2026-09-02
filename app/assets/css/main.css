@@ -1243,6 +1243,73 @@ body {
 }
 
 /*
+ * ここから下は「ストローク」の様式。出どころが上の2区画と違う。
+ *
+ * 上層は prototype（`navigation.prototype.html`）、下層は本家 v2.2.7 の写しである。
+ * **ストロークには写す元が無い。** 本家 spec-workflow-mcp に、AI と往復して概要を詰める
+ * 画面が存在しないためで、ここの値の出どころは change `adopt-upstream-design-tokens` である。
+ *
+ * 本家の密度（bar `10px 14px` / 見出し 15px）へ寄せていないのは、写す元が無いことに加えて
+ * 用途が違うためである。本家の画面は読む画面、ストロークは**長文を読み書きする画面**で、
+ * 余白はその読み書きのために置かれている。
+ *
+ * 色は上の2区画と同じ token を使う。ここで定義するのは**寸法と面**だけである。
+ *
+ * 型（`text-sm` / `text-xs` / `text-lg`）に別名を被せないこと。`@theme` が既に本家の値へ
+ * 上書きしている（12px / 11px / 16px）ので、Tailwind のクラスをそのまま書けば定義済みの値に
+ * 載る。ここで名前を足すと、1つの property に持ち主が2人になる。
+ */
+
+/*
+ * sticky なヘッダーの高さ。`strokes/[sessionId]/proposal.vue` の実測値
+ * （`px-6 py-3` の bar + 下線 1px）。
+ *
+ * **3箇所が同時に動かないと表示が壊れる**ので、1箇所に置く。本文の最低の高さ
+ * （`calc(100vh - この値)`）、脇の一覧の sticky の位置、脇の一覧の高さの3つで、
+ * ずれると本文と脇の下端が食い違う。
+ */
+:root {
+  --sb-stroke-bar-h: 57px;
+}
+
+@layer components {
+  /*
+   * 中央寄せ1カラムの器。概要入力（`strokes/index.vue`）と問いの往復
+   * （`strokes/[sessionId]/index.vue`）が使う。
+   *
+   * 下の余白が大きいのは、画面の下に操作の並び（送信・待機）が重なるためである。
+   * 本文が隠れないだけの逃げを取ってある。
+   */
+  .sb-stroke-page {
+    margin-inline: auto;
+    max-width: 42rem;
+    padding-inline: 24px;
+    padding-top: 56px;
+    padding-bottom: 160px;
+  }
+
+  /*
+   * パネルの面。**角丸・枠・地だけを持ち、内側の余白は持たない。**
+   *
+   * 余白を含めないのは、使う2箇所で用途が違うためである——`AgentQuestion` の詳細説明は
+   * `p-3`、`StrokeBreadcrumb` の往復全文は `p-4`。面が同じであることを名前で示し、
+   * 余白は使う側が役目に合わせて持つ。
+   *
+   * `AgentQuestion` の選択肢のボタンはこの面に含めない。枠の色が選択の状態で変わるので、
+   * 面の定義に混ぜると持ち主が2人になる。
+   *
+   * **混色は `in oklab`。** ここは `bg-elevated/50` を写した先で、Tailwind が透明度付きの色を
+   * `color-mix(in oklab, …)` で出す（生成 CSS で確認）。`in srgb` で書くと色空間が変わり、
+   * 移す前と後で見た目がずれる。**この change は見た目を変える作業ではない。**
+   */
+  .sb-stroke-card {
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--ui-border);
+    background: color-mix(in oklab, var(--ui-bg-elevated) 50%, transparent);
+  }
+}
+
+/*
  * 注釈の塗り（CSS Custom Highlight API）。
  *
  * 塗る側は `app/composables/useAnnotationHighlight.ts`。色ごとに1つの `Highlight` を
