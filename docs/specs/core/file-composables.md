@@ -6,6 +6,8 @@
 
 規範は**関心単位の `useXxx` を平置き**（境界のディレクトリ shared / workspace を作らない）。現在の9本:
 
+（`create-module-markdown` で `modules/markdown/` へ移った composable は無い。モジュールの `runtime/position/*.ts` は位置の対応を出す関数で、composable ではなく、この棚卸しの対象外。全数は `docs/specs/core/system-structure.md` §3。）
+
 | 関心 | composable | 整理の方向 |
 | --- | --- | --- |
 | 通知の受信 | `useBoardSocket` | vueuse の `createSharedComposable` で1本に共有。そのまま |
@@ -14,7 +16,7 @@
 | ステアリングの読み書き | `useSteeringDocuments` | `useProjectApi` と同じ関心の口として並べる |
 | 問いの往復 | `useAgentQuestion` | 回答送信・AI 起動（契約 U7 / U13）。そのまま |
 | セッションの WS 購読 | `useSessionChannel` | W1 / W2 の唯一の受け口。購読先のパスと届く型を引数で受け、呼び出し側が直接呼ぶ |
-| proposal のレビュー | `useProposalReview` | 39 プロパティに肥大し `Modals.vue` と密結合。分割は**保留** — markdown コンポーネント集約の確定後、`flatten-composables` の design で決める（分割案はここで固定しない） |
+| proposal のレビュー | `useProposalReview` | 39 プロパティに肥大し `Modals.vue` と密結合。分割は**保留** — markdown コンポーネント集約（`create-module-markdown` で実施済み）の確定後、`flatten-composables` の design で決める（分割案はここで固定しない） |
 | 注釈 | `useAnnotations` | 色定義5件をコンポーネントが逆向き import している。**色の実値は CSS へ移し、データ（`Annotation.highlightColor`）は色名のみ持つ**（検討） |
 | 待機とリトライ | `useWaitingRetry` | timer は vueuse の `useIntervalFn` に委譲済み。そのまま |
 
@@ -109,7 +111,7 @@ URL を `computed` で組み、`typeof window === 'undefined'` なら空文字�
 
 **参照元**（8）— `components/shared/NotificationToaster.vue`（`onNotification`）、`layouts/portal.vue`、`layouts/workspace.vue`、`pages/index.vue`、`pages/projects/index.vue`、`pages/projects/[projectId]/approvals/[approvalId].vue`、`pages/projects/[projectId]/specs/[specName]/[document].vue`、`pages/projects/[projectId]/steering/[name].vue`
 
-※ 下層3ページは `upstreamConnected` だけを取る。`app.vue` と `DocumentEditor.vue` は呼ばずにコメントで触れているだけ。
+※ 下層3ページは `upstreamConnected` だけを取る。`app.vue` と `modules/markdown/runtime/edit/MarkdownEditor.vue`（旧 `DocumentEditor.vue`）は呼ばずにコメントで触れているだけ。
 
 ### useRelativeTime.ts
 

@@ -73,7 +73,15 @@ archive から戻された feature を直す回は `update-<feature名>` を使�
 
 ## 既存の例外
 
-この規約より前に作られた change のうち、`full-width-markdown-editor`（形容詞句）と `spec-document-management`（名詞句）は当てはまらない。改名しない。
+この規約より前に作られた change のうち、`full-width-markdown-editor`（形容詞句）と `spec-document-management`（名詞句）は当てはまらない。
+
+「改名しない」としていたのは、**規約のためだけに既存の change を触るのは割に合わない**という理由だった。名前を変えると ticket・親 change・ADR・実装コードのコメントまで参照が散らばり、得るものが規約への適合だけになる。
+
+**`full-width-markdown-editor` はこの例外から外す。** 2026-08-31 に `create-module-markdown` から委譲した5本を独立させる（`adr0017-sub-` を外す）判断があり、**どのみち改名する必要が生じた**。改名の手間が別の理由で発生するなら、そのついでに規約へ揃えるのが安い。新しい名前は `add-full-width-markdown-editor`（ADR-0017「委譲の内訳」に改名前後の対応表がある）。
+
+**`spec-document-management` は例外のまま残す。** 改名する別の理由が無く、上の理屈がそのまま当てはまる。
+
+つまりこの節は「**規約のためだけには改名しない**」という意味であって、「未来永劫この名前を変えない」ではない。他の理由で改名するときは規約へ揃える。
 
 ## 採番の経緯
 

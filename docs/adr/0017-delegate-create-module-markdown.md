@@ -7,19 +7,26 @@
 
 `create-module-markdown` の範囲を **markdown を1つのモジュールに閉じ、外から見える口を絞ること**に限り、そこに収まらないものを5本の change へ委譲する。
 
-- `adr0017-sub-create-module-annotation`
-- `adr0017-sub-full-width-markdown-editor`
-- `adr0017-sub-update-ui-approval-review`
-- `adr0017-sub-separate-approval-decision-from-promotion`
-- `adr0017-sub-update-docs-structure`
+**委譲した5本は独立した change として扱う。** 親の範囲を割ったものではなく別の関心事なので、親の archive 条件に含まれず、着手の順も親に縛られない。したがって change-id に親の子であることを示す接頭辞を持たせない（2026-08-31 にユーザーの決定で `adr0017-sub-` を外した。改名前の名前は本 ADR の履歴と archive 済み change の記述に残る）。
+
+| change | 委譲前の名前 |
+| --- | --- |
+| `create-module-annotation` | `adr0017-sub-create-module-annotation` |
+| `add-full-width-markdown-editor` | `adr0017-sub-full-width-markdown-editor` |
+| `update-ui-approval-review` | `adr0017-sub-update-ui-approval-review` |
+| `separate-approval-decision-from-promotion` | `adr0017-sub-separate-approval-decision-from-promotion` |
+| `update-docs-structure` | `adr0017-sub-update-docs-structure` |
+
+**この5本が `create-module-markdown` から委譲されたという経緯は、本 ADR が唯一の記録である。** change-id からその手がかりが消えたので、由来を辿るときはここを見ること。
 
 あわせて、**親の範囲に残った作業そのものを4本へ分割する**。委譲（別の関心事へ渡す）ではなく分割（親の範囲を割る）なので、親は4本が全部終わるまで archive しない。
 
-- `adr0017-sub-create-position-port-preview`
-- `adr0017-sub-add-detection-assumptions`
-- `adr0017-sub-fix-normalization-offset`
-- `adr0017-sub-create-reference-mdc`
-- `adr0017-sub-update-module-terminology`
+- `adr0017-sub-create-position-port-preview` — **完了**（archive 済み）
+- `adr0017-sub-add-detection-assumptions` — **完了**（archive 済み）
+- `adr0017-sub-fix-normalization-offset` — **完了**（archive 済み）
+- `adr0017-sub-create-reference-mdc` — **完了**（archive 済み）
+
+**分割した4本はすべて完了した。** 親 `create-module-markdown` の archive を止めるものは、親自身に残る最終検証（tasks 6.9）だけである。
 
 ## 背景
 
@@ -46,14 +53,16 @@ markdown を扱う実体が `nuxt.config.ts`（parse 設定）・`app/components
 
 利用者にとってできること、または選べる幅が変わるもの（4件）。
 
-#### adr0017-sub-create-module-annotation
+#### create-module-annotation
 
 - **種別**: 拡張
 - **状態**: 未着手（tasks 0/23）
 - **成果物**: specs + tasks（**0/23**。proposal・design 未作成）
-- **触るファイル**: `modules/annotation/`（新規）、注釈の面を持つ画面
+- **触るファイル**: `app/components/review/AnnotateSource.vue`（塗りの置き換え）、注釈の面を持つ画面（承認画面・ストローク側の proposal 確認画面）
 
-**対応内容** — 注釈を `modules/annotation/` に閉じ、markdown の描き方を知らずに済むようにする。整形された本文の面でも注釈を付けられるようにし、どちらの面で付けた注釈も両方の面に出るようにする。面を2つ（整形された本文・生テキスト）に絞る。
+**対応内容** — 注釈が markdown の描き方を知らずに済むようにする。整形された本文の面でも注釈を付けられるようにし、どちらの面で付けた注釈も両方の面に出るようにする。面を2つ（整形された本文・生テキスト）に絞る。
+
+**`modules/annotation/` は作らない**（2026-09-01 ユーザー判断）。当初は注釈を `modules/annotation/` に閉じると書いていたが、注釈は差し戻しペイロードと画面の流れに埋まった業務の部品で、`app-structure` の「画面の都合を持つものは `modules/` に置かない」側に当たる。目的は置き場に依らないので、実体は `app/` のまま。
 
 注釈は本家（`react-text-annotate-blend`）の写しで、生テキストの面にしか付けられない。整形された本文を読みながら指摘したい場でも、指摘のためだけに面を切り替えることになる。
 
@@ -61,34 +70,40 @@ markdown を扱う実体が `nuxt.config.ts`（parse 設定）・`app/components
 
 **完了判定** — 次をすべて満たしたとき完了とする。
 
-- 注釈の実体が `modules/annotation/` に閉じ、markdown の描き方に依存しない
+- 注釈の実体が markdown の描き方に依存しない
 - 整形された本文の面で注釈を付けられる
 - どちらの面で付けた注釈も、両方の面に出る
 - 面が2つに絞られ、並列表示が無くなっている
 
 **親との関係** — 後続。親 change は markdown を扱う実体をモジュールに閉じ、「描いた本文と生テキストの位置の対応」を口として公開するところまでを持つ。この change はその口の利用者として注釈の側を扱う。したがって親の口が確定してから着手する。
 
-#### adr0017-sub-full-width-markdown-editor
+#### add-full-width-markdown-editor
 
 - **種別**: 拡張
 - **状態**: 未着手（成果物が proposal のみ）
 - **成果物**: proposal のみ（design・specs・tasks 未作成）
-- **触るファイル**: 共通の編集 UI（`DocumentEditor`）と、それを載せる仕様書・承認・ステアリングの3画面
+- **触るファイル**: `app/components/review/ApprovalAnnotator.vue`（コメント欄の列と開閉）、`app/pages/projects/[projectId]/approvals/[approvalId].vue`（編集の口を外す）
 
-**対応内容** — マークダウン編集画面に全幅トグルを付ける。仕様書・承認・ステアリングの3画面で共通の編集 UI にトグルを置き、ON でサイドバーを隠してビューポート全幅で編集、OFF で元のレイアウトに戻す。
+**対応内容** — 承認画面の指摘の一覧（コメント欄）をしまって、本文を広く読めるようにする。しまうと 44px のつまみだけが残り、つまみで一覧だけが戻る。開閉の口は、掴んで引く／見出し帯のボタン／つまみのクリック／右辺の不可視のレール の4つ（prototype で確定）。
 
-境界は proposal で切られている。**ヘッダーは隠さない。** ストローク側の proposal 確認画面（注釈 UI）は対象外。
+当初は「編集 UI に全幅トグルを付け、仕様書・承認・ステアリングの3画面に効かせる」と書いていたが、**それは委譲時の書き違いで、意図は最初から承認画面のコメント欄の話だった**（2026-09-01 にユーザーが訂正）。対象は承認画面だけ。
+
+**左のナビゲーションとコメント欄は連動しない。コメント欄の幅は固定。** 左を畳んで空いた幅は本文だけが取る。本文に固定幅（`max-width` や桁幅）は与えず、ビューポートに追従する。左右の余白は残ってよい。
+
+**承認画面から編集の口を外す。** 本家 `ApprovalsAnnotator` に編集は無い。承認画面は読んで判断し指摘を付ける場（ユーザー決定 2026-09-01）。編集が無いのは承認画面だけで、仕様書・ステアリングの6本の編集は変えない。`document-editing` の「承認画面からも直せる」を落とす。
 
 **完了判定** — 次をすべて満たしたとき完了とする。
 
-- 編集 UI にトグルがあり、ON で編集領域がビューポート全幅になる
-- OFF で元のレイアウトに戻る
+- 承認画面でコメント欄をしまえ、44px のつまみから戻せる。口は4つある。レールは光らない
+- 左のナビを畳んでもコメント欄は出たままで幅も変わらず、空いた幅は本文だけが取る
+- 本文に固定幅が無く、ビューポートに追従する
 - ヘッダーは常に見えている
-- 適用先は仕様書・承認・ステアリングの3画面。注釈 UI には出ない
+- 承認画面に編集の口が無い。仕様書・ステアリングの編集は変わっていない
+- しまった状態は保存されない
 
-**親との関係** — 後続。markdown を扱う実体をモジュールに閉じた後、その編集面の見せ方を変える。着手前に `replace-handrolled-with-libraries`（archive 済み）が同じ編集 UI を部分置換していることを確認すること。競合するのは同一コンポーネントの内部だけで、外から見た振る舞いは独立している。
+**親との関係** — 後続。`create-module-annotation` と同じ `ApprovalAnnotator.vue` を触るが、こちらは外側（列と開閉）、あちらは内側（面）。**こちらが先。** 承認画面から `MarkdownEditor` が消えることで、あちらが要していた「`MarkdownEditor` に口を素通しさせる」例外が不要になる。
 
-#### adr0017-sub-update-ui-approval-review
+#### update-ui-approval-review
 
 - **種別**: 拡張
 - **状態**: 未着手（tasks 0/26）
@@ -123,7 +138,7 @@ markdown を扱う実体が `nuxt.config.ts`（parse 設定）・`app/components
 
 **親との関係** — 後続。markdown の切り出しとは独立した画面の改善であり、親の delta に混ぜると何を直したのかが読めなくなるため分けた。
 
-#### adr0017-sub-separate-approval-decision-from-promotion
+#### separate-approval-decision-from-promotion
 
 - **種別**: 拡張
 - **状態**: 未着手（成果物が `.openspec.yaml` のみ）
@@ -142,7 +157,7 @@ markdown を扱う実体が `nuxt.config.ts`（parse 設定）・`app/components
 
 いまの形には次が付いてくる。
 
-- **押し間違いが取り消せない。** 承認は1押しで確定し、その瞬間に改名とエージェントの起動まで進む。`adr0017-sub-update-ui-approval-review` で承認と即時却下を同じ並びに置くと、隣り合うぶんこの危険が増える
+- **判断を取り下げる道が系に無い。** 承認は1押しで確定し、その瞬間に改名とエージェントの起動まで進む。戻す手段は「プロジェクトごと消す」しかなく、それはストロークの往復の記録ごと消すことになる（`docs/specs/api/contract.md:184` が U11 は `approved` を受理しないと規定）
 - **失敗の戻し方が endpoint の中に埋まっている。** 改名が失敗したら `phase` を書き戻す、steering のキックが届かなければ `invocation` を `failed` に倒す、という後始末を1つの関数が抱えている。どの段で失敗したかによって戻す先が変わる
 - **昇格した後にしか steering を起こせない。** 起動が失敗しても昇格は残るので、`failed` を拾って起こし直す巡回が要る
 
@@ -153,13 +168,20 @@ markdown を扱う実体が `nuxt.config.ts`（parse 設定）・`app/components
 - 失敗した段だけをやり直せ、後始末が段ごとに分かれている
 - 承認がプロジェクト生成の唯一の引き金であることは変わっていない
 
-**親との関係** — 後続。`adr0017-sub-update-ui-approval-review` が承認と即時却下を同じ並びに置くため、押し間違いの危険がそちらの実施で増える。両者の順序を決めてから着手する。
+**親との関係** — 後続。markdown の切り出しとは独立した、承認まわりの構造の整理である。
+
+**当初「`update-ui-approval-review` が承認と即時却下を並べるので危険が増える。両者の順序を決めてから着手する」と書いていたが、これは誤りだった**（2026-09-01 に実測で判明）。**2つは別の承認である。**
+
+- この change が触る `POST /api/strokes/:id/approve` を叩くのは**ストローク側の proposal 確認画面**（`app/pages/strokes/[sessionId]/proposal.vue`）。**既に確認モーダルが挟まっており1押しでは確定しない**。隣に並ぶのは差し戻しだけ
+- `update-ui-approval-review` が触るのは**本家 spec-workflow の承認依頼画面**（`app/components/workspace/ApprovalCard.vue` ほか）。送り先は `POST /api/projects/:projectId/approvals/:id/:action` で別物
+
+**順序の依存は無く、どちらを先に通してもよい。** 取り消しが要る理由は押し間違いではなく、判断を取り下げる道が系に無いことである。完了判定4項目は変わらない。
 
 ### 資料化
 
 振る舞いを変えず、実装を文書へ写すもの（1件）。
 
-#### adr0017-sub-update-docs-structure
+#### update-docs-structure
 
 - **種別**: 資料化
 - **状態**: 未着手（tasks 0/26）
@@ -223,7 +245,7 @@ markdown を扱う実体が `nuxt.config.ts`（parse 設定）・`app/components
 - **種別**: 検知
 - **状態**: 未着手
 - **成果物**: 未作成
-- **触るファイル**: `test/modules/markdown/runtime/position/*.test.ts`、`e2e/markdown-hydration.spec.ts`、`modules/markdown/runtime/position/types.ts` / `preview.ts` / `fence.ts`、`modules/markdown/runtime/render/MarkdownView.vue`（コメント）、`modules/markdown/index.ts`（コメント）
+- **触るファイル**: `test/modules/markdown/runtime/position/*.test.ts`、`test/e2e/markdown-hydration.spec.ts`、`modules/markdown/runtime/position/types.ts` / `preview.ts` / `fence.ts`、`modules/markdown/runtime/render/MarkdownView.vue`（コメント）、`modules/markdown/index.ts`（コメント）
 - **引き取る tasks**: 6.1・6.2・6.3・6.4・6.5・6.6.2・6.9・6.10・6.14
 
 **対応内容** — 実装で崩れた前提7件を、踏んだら止まる状態にする。うち3件は**黙って壊れる**（症状が出ないまま誤った位置を返す、別の場所が壊れる）。資料に書くだけでは、読まなかった人が同じ穴に落ちる。
@@ -249,7 +271,7 @@ markdown を扱う実体が `nuxt.config.ts`（parse 設定）・`app/components
 - **種別**: 不具合
 - **状態**: 未着手
 - **成果物**: 未作成
-- **触るファイル**: `app/pages/projects/[projectId]/approvals/[approvalId].vue`、`app/composables/useAnnotations.ts`、`modules/markdown/runtime/render/`、`e2e/fixtures/upstream-stub.mjs`、`e2e/approval-annotation.spec.ts`
+- **触るファイル**: `app/pages/projects/[projectId]/approvals/[approvalId].vue`、`app/composables/useAnnotations.ts`、`modules/markdown/runtime/render/`、`test/e2e/fixtures/upstream-stub.mjs`、`test/e2e/approval-annotation.spec.ts`
 - **引き取る tasks**: 6.11
 
 **対応内容** — 本番の呼び出し側が、正規化していない生文字列を渡している。`approvals/[approvalId].vue:60` の `source` が `MarkdownView` にも注釈の基準にもそのまま渡っており、CRLF を含む文書が来ると、いま在る注釈機能が黙ってずれる。生ファイルを渡すと `null` には倒れず、**黙って別の場所を返す**（実測）。本家は `readFile` / `writeFile` で素通しするため、CRLF も front matter も含まれうる（実測）。
@@ -265,7 +287,7 @@ markdown を扱う実体が `nuxt.config.ts`（parse 設定）・`app/components
 - 正規化を行う場所が決まり、「呼ぶ側が忘れずにやる」形になっていない
 - 生ファイルの座標で保存すると決めた場合、正規化後 ↔ 生ファイル の対応が在る
 - CRLF と front matter を含む文書で注釈が正しい位置に付くことを E2E で確かめている
-- `e2e/fixtures/upstream-stub.mjs` が CRLF と front matter の2件を返す
+- `test/e2e/fixtures/upstream-stub.mjs` が CRLF と front matter の2件を返す
 
 **親との関係** — 分割。`adr0017-sub-create-position-port-preview` の後続。口の形が固まってから、口が受け取る座標の基準を決める。
 
@@ -295,21 +317,18 @@ markdown を扱う実体が `nuxt.config.ts`（parse 設定）・`app/components
 
 **親との関係** — 分割。`adr0017-sub-create-position-port-preview` の後続。6.8.2（どのテストが固定しているか）は `adr0017-sub-add-detection-assumptions` が加える検知の名前を突き合わせる必要があるため、その完了後に一度だけ確認する。
 
-### 資料化（続き）
+## 触らないと決めた契約
 
-#### adr0017-sub-update-module-terminology
+分解の作業台（ralph の epic）に、**どの change でも変えないと決めた契約**が2つ書かれていた。作業台は役目を終えて消したが、この2つは change の artifact にも specs にも書かれていないのでここへ移す。
 
-- **種別**: 資料化
-- **状態**: 未着手
-- **成果物**: 未作成
-- **触るファイル**: `modules/markdown/` のコメント33箇所、`app/` 12箇所、本 ADR、`specs/_epics/create-module-markdown/epic.md`、親 change の artifact、子 change の artifact と ticket
-- **引き取る tasks**: 無し（親の tasks に項目が無い。grilling で生じた）
+| 契約 | 定義元 | 使う側 |
+| --- | --- | --- |
+| `SOURCE_START_ATTR` / `SOURCE_END_ATTR`（`data-src-start` / `data-src-end`） | `modules/markdown/runtime/position/source-span.ts` | 検知のテスト |
+| `SOURCE_SHOWN_KEY`（provide/inject で「ソースを見せたい範囲」を降ろす） | `modules/markdown/runtime/render/source-shown.ts` | `create-module-annotation` |
 
-**対応内容** — 「口」という語を落とし、普通の用語へ置き換える。同じ語が **alias / 公開コンポーネント / `defineExpose` の型 / 差し替え先** の4つに当てられており、「位置の口を出す」が何を足すことなのか読めない。新しいドメイン用語は立てず、`CONTEXT.md` にも定義を置かない。
+**どちらも既定として扱い、この一連の change では変えない。** コードに実体はあるが「触ってはいけない契約」という位置づけがどこにも書かれておらず、名前を変えても `pre-mark.test.ts` は検知しない（属性名を実装と同じ定数で参照しているため。tasks 6.9.1 の変異で実測）。捕まるのは `preview.test.ts` と `markdown-view-position.test.ts` の計6本である。
 
-対象は **146箇所 / 29ファイル**（実測。`入口`・`出口` などの複合語12箇所は対象外）。**specs の Requirement 見出しを2本含む**ため、振る舞いを変えないまま規範文書の見出しが変わる。
-
-**親との関係** — 分割。`create-module-markdown` の grilling でユーザーが指摘した（「口とは？ その用語定義やめない？ 禁止」）。当時「別 change に切る」と言われたまま起票されずに落ちていたものを、後から起こした。`CONTEXT.md:52` と `MarkdownView.vue` / `types.ts` の分は `adr0017-sub-create-position-port-preview` が先に直している。
+`SOURCE_SHOWN_KEY` の**唯一の使い手は `create-module-annotation`** であり、まだ着手されていない。あの change が最初の外部利用者になる。
 
 ## 経緯の記録
 

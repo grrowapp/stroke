@@ -65,7 +65,7 @@ markdown の解釈に使っている `@nuxtjs/mdc` について、実装の途�
   `件1: 解析の段を自前で組み直させない`（6本）
 - `test/modules/markdown/runtime/render/markdown-view-position.test.ts` の
   ``解析の段は `<MDC>` に残っている``（3本）
-- `e2e/markdown-hydration.spec.ts` の `markdown を描く画面のハイドレーション`（1本）。
+- `test/e2e/markdown-hydration.spec.ts` の `markdown を描く画面のハイドレーション`（1本）。
   症状の側の網で、形を保ったまま別の理由でずれた場合にも落ちる
 
 ---
@@ -229,7 +229,7 @@ front matter を作る依存も持たないが、文書を書くのは AI か人
 
 ## ハイドレーション検知が拾えない範囲
 
-`e2e/markdown-hydration.spec.ts` は SSR が送った HTML とハイドレーション後の DOM を突き合わせるが、
+`test/e2e/markdown-hydration.spec.ts` は SSR が送った HTML とハイドレーション後の DOM を突き合わせるが、
 **拾えない食い違いが2つある。**
 
 **属性だけのずれが拾えない。** Vue は本番ビルドで要素の属性のずれを直さない。実測では、配る HTML の
@@ -269,7 +269,7 @@ front matter を作る依存も持たないが、文書を書くのは AI か人
   `preview` / `plain` / `pre-mark` / `normalize`
 - `test/modules/markdown/runtime/render/markdown-view-position.test.ts` — 位置の対応が外から
   引ける形で公開されていること
-- `e2e/markdown-hydration.spec.ts` — 件1 の症状の側の網
+- `test/e2e/markdown-hydration.spec.ts` — 件1 の症状の側の網
 
 **関連する資料**
 

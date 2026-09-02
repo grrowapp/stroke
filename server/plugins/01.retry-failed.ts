@@ -6,10 +6,15 @@ import { LOG_PREFIX } from '../utils/stroke/log'
 import { shouldRetry } from '../utils/stroke/sweep'
 
 /**
- * 失敗した実行を起こし直す巡回（openspec/specs/portal/batch）。
+ * 起こし直す対象を拾う巡回（openspec/specs/portal/batch）。
  *
  * 一覧（U12）から `invocation === 'failed'` の件**だけ**を取り、その `path` を cwd に
  * 添えて自身の U13 を叩く。**他の判定を持たない。**
+ *
+ * `failed` は「失敗した実行」に限らず「起こし直す対象」の印である（`sweep.ts`）。昇格の
+ * 受け口（U14）は起動を要求せず、昇格した対象をこの値で残す。起動の要求が一度も届かなくても
+ * ここが拾って steering を起こす——渡す値は画面のキックと同じ（`kind` は U13 が phase から
+ * 導き、cwd は一覧の `path` = 昇格後のディレクトリ）。
  *
  * - `idle` にはやり直すものが無い
  * - `error` はリトライ上限に達した終端で、ユーザーへ引き渡す

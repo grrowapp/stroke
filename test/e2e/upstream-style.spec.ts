@@ -273,18 +273,17 @@ test.describe('操作の帯とデータの領域が本家と同じに分かれ�
       });
 
     /*
-     * プレビューの箱は `DocumentEditor` が `framed` で持つ。承認画面だけ枠が要る:
+     * プレビューの箱は承認画面（`approvals/[approvalId].vue`）が持つ。承認画面だけ枠が要る:
      * 本家の `ApprovalsAnnotator` は外側の承認カードの中にもう1枚
      * `bg-panel border rounded-lg` を置き、どの面でも同じ枠に本文を入れる。
      * 仕様書・ステアリングの画面（`SpecViewerPage`）はパネル1枚なので枠を重ねない。
      */
-    expect(await surface('document-body')).toEqual(expected);
+    expect(await surface('approval-document')).toEqual(expected);
 
+    // 面は2つ（プレビュー / 生テキスト）。並べる面は無い（specs/project/ui）
     await page.getByTestId('approval-mode-annotate').click();
     expect(await surface('approval-body')).toEqual(expected);
-
-    await page.getByTestId('approval-mode-side-by-side').click();
-    expect(await surface('approval-body')).toEqual(expected);
+    await expect(page.getByTestId('approval-mode-side-by-side')).toHaveCount(0);
   });
 
   /**

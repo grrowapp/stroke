@@ -180,7 +180,7 @@ flowchart LR
 
 **実装で判明（上の前提は誤り。削除の判定自体は変わらない）**
 
-**MDC の既定サニタイズは属性しか落とさない。** 実測では `<img>` も `<script>` も**タグとして AST に残る**（落ちるのは `on*` 属性と危険スキームの href だけ）。旧 `MarkdownNodes` は生 HTML を全て捨てていたため、設定なしで載せ替えると既存の E2E「文書に混ざった生 HTML は描かず、実行もしない」（`e2e/upstream-style.spec.ts`）が落ちる。
+**MDC の既定サニタイズは属性しか落とさない。** 実測では `<img>` も `<script>` も**タグとして AST に残る**（落ちるのは `on*` 属性と危険スキームの href だけ）。旧 `MarkdownNodes` は生 HTML を全て捨てていたため、設定なしで載せ替えると既存の E2E「文書に混ざった生 HTML は描かず、実行もしない」（`test/e2e/upstream-style.spec.ts`）が落ちる。
 
 役割の引き受け先は**設定**である。`nuxt.config.ts` に `mdc.rehypePlugins: { 'rehype-raw': false }` を置くと生 HTML が要素化されなくなり、旧実装と同じ振る舞いに戻る。加えて `mdc.components.prose: false`（下記）にすると `ProseScript` も経由しなくなるため、「Prose コンポーネントが script を握り潰す」という当ての方も無くなる。**生 HTML を描かない根拠は `rehype-raw` を切っている一点**であり、この設定を外すと成立しない。
 
@@ -265,7 +265,7 @@ component の19本勘定の外だが、markdown 描画の関心として本文�
 | 置換 | 衝突し得る記述 | 変換後の条件 | 検証結果 |
 | --- | --- | --- | --- |
 | SbIcon / UpstreamIcon → UIcon | `SbIcon.vue` 冒頭「アイコンセットの選定は決めていないので、勝手に別のものを選ばない」 | customCollections は**現行パスの登録**であり、別のセットを選ぶことではない。この解釈で進めてよいかを実装前に確認。出どころ2系統の区別はコレクション名で保つ | 満たした。解釈はユーザー確認済み。`sb:` / `upstream:` の2コレクションに現行パスを登録し、`icon.mode: 'svg'` でパスが DOM に出るようにして一致を確認 |
-| NotificationToaster → useToast | `openspec/specs/notification-toast`「形は本家と同じ」「押しても何も起きない」 | theming 後の見た目・挙動が spec の Requirement を満たすことを E2E で検証。満たせなければ採らない | 満たした。Requirement 全件（5秒消滅・手動 dismiss・1行テキスト・押しても何も起きない・4種の色・フォーカスを奪わない・初回ロードで過去分を出さない）を `e2e/toast.spec.ts` で確認（4種の色とアイコンは `e2e/upstream-style.spec.ts`） |
+| NotificationToaster → useToast | `openspec/specs/notification-toast`「形は本家と同じ」「押しても何も起きない」 | theming 後の見た目・挙動が spec の Requirement を満たすことを E2E で検証。満たせなければ採らない | 満たした。Requirement 全件（5秒消滅・手動 dismiss・1行テキスト・押しても何も起きない・4種の色・フォーカスを奪わない・初回ロードで過去分を出さない）を `test/e2e/toast.spec.ts` で確認（4種の色とアイコンは `test/e2e/upstream-style.spec.ts`） |
 | EmptyState / RecordList → UEmpty / UTable | 各ファイル冒頭の本家（SteeringPage.tsx / SpecsPage.tsx）再現コメント | `:ui` 上書き後の描画が**本家と同一**であることを検証（スクリーンショット比較ではなくテストで） | 満たした。いずれも `:ui` の**置換関数**が要る（併記では既定テーマに負ける）。`EmptyState` の `text-lg`/`text-sm` に対の line-height が付く差は、本家も同じユーティリティを使うため許容（2026-08-25 ユーザー確認） |
 
 ---

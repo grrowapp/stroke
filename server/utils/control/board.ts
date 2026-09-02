@@ -80,7 +80,8 @@ export function broadcastConnection(connected: boolean): void {
  * 行の中身は載せない。一覧の正は `GET /api/projects` の1つで、これは「取り直せ」の合図と
  * 完了を祝う引き金である（design.md D3）。
  *
- * 呼ぶのは2箇所だけ——承認処理（昇格の直後）と `setInvocation`（A8）。`invocation` の
+ * 呼ぶのは2箇所だけ——昇格の受け口（U14・改名の直後）と `setInvocation`（A8）。承認の
+ * 判断（U10）では呼ばない——その時点でプロジェクトはまだ無い。`invocation` の
  * 書き込みはすべて A8 を通るので、書いたのに流れない経路が生まれない（design.md D5）。
  */
 export function broadcastProjectCreation(name: string, state: ProjectCreationOutcome): void {

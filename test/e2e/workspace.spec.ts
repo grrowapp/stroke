@@ -403,10 +403,10 @@ test.describe('承認', () => {
 
     await expect(page.getByTestId('approval-meta')).toContainText('.spec-workflow/steering/tech.md');
 
-    // 承認は読んで判断する場なので、まず整形して出る。直すときに編集へ入る
-    // （specs/document-editing の改定・`ApprovalAnnotator` の preview 面）
+    // 承認は読んで判断する場なので、整形して出る。編集の口は無い
+    // （specs/document-editing・`ApprovalAnnotator` の preview 面）
     await expect(page.getByTestId('document-content')).toContainText('本文');
-    await expect(page.getByTestId('document-edit')).toBeVisible();
+    await expect(page.getByTestId('document-edit')).toHaveCount(0);
   });
 
   test('既に処理済みの承認依頼はその旨が出る', async ({ page }) => {
