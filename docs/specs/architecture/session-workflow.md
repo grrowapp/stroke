@@ -88,8 +88,8 @@ server/mcp/tools/                                      MCP ツール8本（フ�
 
 ## 実行の記録（`invocation`）
 
-`state.json` が4値で持つ。書き込みは A8（`POST /api/strokes/:id/submission`）経由で
-invokeAi だけが行う（`openspec/specs/agent/invocation`）。
+`state.json` が4値で持つ。書き込みは A8（`POST /api/strokes/:id/submission`）を通す。
+claude（エージェント）と画面からは書けない（`openspec/specs/agent/invocation`）。
 
 ```mermaid
 stateDiagram-v2
@@ -111,9 +111,9 @@ stateDiagram-v2
   区別できず、誰も起こし直さない
 - サーバー再起動で宙に浮いた `running` は、**まずその claude を終了させてから** `failed` へ
   倒して巡回に拾わせる（`server/plugins/01.reap-running.ts`）。終了させられない場合と、
-  自分が起こしたものか判定できない場合は `error` へ倒してユーザーに引き渡す
-- **他インスタンスが起こした実行には触らない。** `projectShareRoot` は複数のインスタンスで
-  共有されるため、後始末は起動の引数を照合して自分のものだけを対象にする
+  走っているものを調べられない場合は `error` へ倒してユーザーに引き渡す
+- **どのインスタンスが起こしたかは見ない。** 起動の引数の照合で対象を指していると分かれば、
+  それはこのアプリが起こした実行として扱う
 
 ## 実測で確定していること
 

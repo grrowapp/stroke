@@ -3,11 +3,12 @@ import { promisify } from 'node:util'
 import { LOG_PREFIX } from './log'
 
 /**
- * 走っているプロセスの一覧を取る口（`fix-orphan-run-on-restart`）。
+ * 走っているプロセスの一覧を取る
+ * （openspec/specs/bootstrap/system/cleanup-agent-process）。
  *
  * 起動時の後始末（`server/utils/stroke/reap.ts`）が、前のプロセスが残した子を argv の
- * 中身で照合するために使う（design.md Decision 1）。pid は記録しない——記録した pid を
- * 探す形は採らない決定（design.md「pid を state.json に持つ案は採らない」）。
+ * 中身で照合するために使う。pid は記録しない——記録した pid を探す形は採らない
+ * （pid は再利用されるので、殺す前に argv の照合が結局要る）。
  */
 
 const execFileAsync = promisify(execFile)
@@ -29,8 +30,8 @@ const MAX_BUFFER_BYTES = 16 * 1024 * 1024
  * 走っているプロセスの一覧を取る。
  *
  * **取れなかったら `null` を返す。** `ps` が無い・権限が無い等の環境では例外を投げず、
- * 呼び出し側（起動時の後始末・巡回）を止めない——「判定できない」に倒れる
- * （tasks 1.1・design.md Risks「プロセス一覧を取れない環境」）。
+ * 呼び出し側（起動時の後始末）を止めない——「判定できない」に倒れる
+ * （`ps` が無い・権限が無い環境ではここが `null` になる）。
  */
 export async function listLiveProcesses(): Promise<LiveProcess[] | null> {
   let stdout: string

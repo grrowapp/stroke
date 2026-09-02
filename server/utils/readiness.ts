@@ -3,10 +3,11 @@ import { isAbsolute } from 'node:path'
 import { describeClaudeArgsError, readStrokeConfig } from './stroke/config'
 
 /**
- * 実行中はじめて気付いては困る前提が揃っているかを確かめる（specs/startup-readiness）。
+ * AI の起動に必要な前提が揃っているかを確かめる
+ * （openspec/specs/api/session/invoke-agent「前提が欠けている間は起動を受け付けない」）。
  *
  * 判定結果は保持しない。呼ばれるたびに実際の書き込み可否と設定を見るため、欠けていた
- * 前提が後から満たされれば、サービスを再起動せずに通るようになる（design.md 決定2）。
+ * 前提が後から満たされれば、サービスを再起動せずに通るようになる。
  *
  * @returns 欠けている前提。1つずつ独立した文言で返し、全て揃っていれば空。
  */

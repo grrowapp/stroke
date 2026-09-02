@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { listLiveProcesses, parsePsOutput } from '../../../../server/utils/stroke/live-processes'
 
 /**
- * 走っているプロセスの一覧を取る口（`fix-orphan-run-on-restart` tasks 1.1）。
+ * 走っているプロセスの一覧を取る
+ * （openspec/specs/bootstrap/system/cleanup-agent-process）。
  *
  * 見るのは、`ps -o pid=,args=` の生の出力を pid と argv に分けられること（純粋な
  * パース）と、取れない環境では例外を投げず `null` に倒れること（呼び出し側を止めない）。
