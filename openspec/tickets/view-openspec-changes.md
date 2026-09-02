@@ -1,10 +1,11 @@
 ---
-status: Planning
-change: view-openspec-changes
 tags:
   - proposal
+status: Planning
 triage:
   - enhancement
+change: view-openspec-changes
+order: -13.0
 ---
 
 # view-openspec-changes

@@ -1,6 +1,5 @@
 ---
 status: Doing
-change: fix-idle-stuck-on-run-build-failure
 tags:
   - proposal
   - specs
@@ -9,6 +8,8 @@ tags:
   - provide-operations-via-mcp/1efe8b7b-f95c-4774-bebe-0498f673be5f
 triage:
   - bug
+change: fix-idle-stuck-on-run-build-failure
+order: -6.0
 ---
 
 # fix-idle-stuck-on-run-build-failure

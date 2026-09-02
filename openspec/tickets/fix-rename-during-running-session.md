@@ -1,5 +1,7 @@
 ---
-status: Doing
+triage:
+  - bug
+status: Planning
 change: fix-rename-during-running-session
 tags:
   - proposal
@@ -7,8 +9,7 @@ tags:
   - design
   - tasks
   - provide-operations-via-mcp/1efe8b7b-f95c-4774-bebe-0498f673be5f
-triage:
-  - bug
+order: -6.0
 ---
 
 # fix-rename-during-running-session

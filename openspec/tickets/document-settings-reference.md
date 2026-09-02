@@ -1,13 +1,13 @@
 ---
+order: 0.0
+triage:
+  - enhancement
 status: Doing
 change: document-settings-reference
 tags:
   - proposal
   - design
   - tasks
-triage:
-  - enhancement
-order: -1.0
 ---
 
 # document-settings-reference

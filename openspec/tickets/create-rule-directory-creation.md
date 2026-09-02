@@ -1,11 +1,12 @@
 ---
 status: Doing
-change: create-rule-directory-creation
 tags:
   - proposal
   - tasks
 triage:
   - maintenance
+change: create-rule-directory-creation
+order: -5.0
 ---
 
 # create-rule-directory-creation

@@ -1,4 +1,6 @@
 ---
+triage:
+  - bug
 status: Doing
 change: adr0016-sub-fix-project-id-lookup
 tags:
@@ -7,8 +9,7 @@ tags:
   - design
   - tasks
   - provide-operations-via-mcp/1efe8b7b-f95c-4774-bebe-0498f673be5f
-triage:
-  - bug
+order: -3.0
 ---
 
 # adr0016-sub-fix-project-id-lookup

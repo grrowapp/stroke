@@ -1,10 +1,11 @@
 ---
-status: Planning
 change: spec-document-management
-tags:
-  - proposal
+status: Planning
 triage:
   - enhancement
+tags:
+  - proposal
+order: -9.0
 ---
 
 # spec-document-management

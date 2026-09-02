@@ -1,14 +1,14 @@
 ---
 status: Doing
-change: align-settings-conventions
+order: -1.0
+triage:
+  - enhancement
 tags:
   - proposal
   - specs
   - design
   - tasks
-triage:
-  - enhancement
-order: 0.0
+change: align-settings-conventions
 ---
 
 # align-settings-conventions

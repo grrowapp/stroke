@@ -1,13 +1,14 @@
 ---
 status: Doing
+triage:
+  - bug
 change: update-project-list-view
 tags:
   - proposal
   - specs
   - ui
   - tasks
-triage:
-  - bug
+order: -9.0
 ---
 
 # update-project-list-view

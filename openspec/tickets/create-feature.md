@@ -1,10 +1,11 @@
 ---
-status: Planning
-change: create-feature
 tags:
   - proposal
 triage:
   - enhancement
+status: Planning
+change: create-feature
+order: -3.0
 ---
 
 # create-feature

@@ -1,10 +1,11 @@
 ---
-status: Planning
-change: create-spec-document
 tags:
   - proposal
 triage:
   - enhancement
+status: Planning
+change: create-spec-document
+order: -4.0
 ---
 
 # create-spec-document

@@ -1,11 +1,12 @@
 ---
 status: Planning
-change: scope-storage-requirements
+triage:
+  - enhancement
 tags:
   - proposal
   - specs
-triage:
-  - enhancement
+change: scope-storage-requirements
+order: -8.0
 ---
 
 # scope-storage-requirements

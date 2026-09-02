@@ -1,14 +1,15 @@
 ---
+triage:
+  - bug
 status: Doing
-change: adr0016-sub-fix-direct-write-allowance
 tags:
   - proposal
   - specs
   - design
   - tasks
   - provide-operations-via-mcp/1efe8b7b-f95c-4774-bebe-0498f673be5f
-triage:
-  - bug
+change: adr0016-sub-fix-direct-write-allowance
+order: -2.0
 ---
 
 # adr0016-sub-fix-direct-write-allowance

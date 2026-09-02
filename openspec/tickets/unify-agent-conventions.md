@@ -1,10 +1,11 @@
 ---
-status: Planning
-change: unify-agent-conventions
-tags:
-  - proposal
 triage:
   - enhancement
+tags:
+  - proposal
+status: Planning
+change: unify-agent-conventions
+order: -10.0
 ---
 
 # unify-agent-conventions

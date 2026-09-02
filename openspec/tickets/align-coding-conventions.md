@@ -1,10 +1,11 @@
 ---
-status: Planning
-change: align-coding-conventions
 tags:
   - proposal
 triage:
   - enhancement
+status: Planning
+change: align-coding-conventions
+order: -2.0
 ---
 
 # align-coding-conventions

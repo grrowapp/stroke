@@ -1,14 +1,16 @@
 ---
-status: Doing
 change: fix-orphan-run-on-restart
+triage:
+  - bug
 tags:
   - proposal
   - specs
   - design
   - tasks
   - provide-operations-via-mcp/1efe8b7b-f95c-4774-bebe-0498f673be5f
-triage:
-  - bug
+  - update-provide-operations-via-mcp/1efe8b7b-f95c-4774-bebe-0498f673be5f
+status: Doing
+date: 2026-09-02
 ---
 
 # fix-orphan-run-on-restart
@@ -23,3 +25,67 @@ A8 で `invocation` を書き、新しい実行の記録を上書きする。
 出どころ: change `provide-operations-via-mcp` の santa-method レビュー 9周目（2026-08-31）。
 
 対応する change: `fix-orphan-run-on-restart`
+
+---
+
+## 追記（2026-09-02）— 起票時の記述の訂正と、問題になるケースの切り分け
+
+起票時の記述に**2つ誤りがある**。実測とコード確認で分かったことを残す。
+
+### 訂正1: 「孤児が終わると A8 で `invocation` を書き、記録を上書きする」は起こらない
+
+`invocation` を書くのは `invokeAi` の `setInvocation` で、その継続は再起動で消えたワーカーの中にあり
+二度と走らない。孤児自身が A8 を叩く口も無い（`--allowedTools` に HTTP を叩く手段が無く、MCP は
+接続表が空なので 401）。**上書きは起きない。**
+
+### 訂正2: 「孤児が生き残る」は正しいが、永久にではない
+
+**実測（2026-09-02、本物の `claude -p`）**: `server/utils/stroke/claude.ts` と同じ
+`stdio: ['ignore','pipe','pipe']` で起こし、2秒後に親だけ `exit` させた。
+
+```
+claude pid = 1088009 / 親は exit 済み（t=+2s）
+t=+1s 〜 t=+25s : 生存（ppid=1 へ里子）
+t=+40s          : 終了
+```
+
+`claude -p` は非対話なので**ターンを終えれば自分で落ちる**。親の死は exit を早めも遅らせもしない
+（stdout のパイプが閉じても EPIPE で落ちなかった）。**孤児の寿命は親の死ではなくターンの長さで決まる。**
+
+### この change の範囲（2026-09-02 に絞り込み）
+
+起票時は下の(1)(2)を1本に混ぜていた。**(1) は既に手当て済み**と分かったので、**この change は (2)
+だけを扱う**。直し方は「起動時に前のプロセスの claude を終了させる」——起こし直す時点で重なる相手が
+居なくなるので、(2) は成立しなくなる。
+
+**サーバーインスタンスを同時に複数走らせる前提は、この change から締め出す。** その前提を持ち込むと
+「その `running` は誰が起こしたのか」を判定する仕掛けが要るが、それは単一インスタンスで動かす通常の
+運用には不要なオーバーヘッドである。ここでは扱わない。
+
+### 2つの切り分け
+
+「勝手に落ちるなら放っておけばよいのでは」に対する答え。
+
+**(1) 記録が `running` のまま固まる — 既に手当て済み。欠陥ではない**
+
+孤児が exit しても、上記の訂正1のとおり `invocation` を書く者が居ない。`running` のまま残る。
+
+- 巡回（`server/plugins/01.retry-failed.ts`）は `invocation === 'failed'` しか拾わない
+- 画面が再実行の操作を出すのは `invocation` が `error` のときだけ（`app/composables/useWaitingRetry.ts`）
+
+つまり **`running` は自動でも手動でも動かせない死に状態**になりうる。**しかし変更前の
+`01.retry-failed.ts` が「初回だけは `running` も倒す」を既に持っており、ここは手当て済みである**
+（同ファイルのコメント「倒さないと永久に放置される」）。**この change が直すものではない。**
+
+**(2) 孤児と2本目が重なる — これがこの change の直す欠陥**
+
+初回掃除は `failed` へ倒すだけで、その周回では起こさない。U13 を叩くのは
+`SWEEP_INTERVAL_MS = 60_000` の次の周回。よって孤児と2本目が同時に走るのは、
+**孤児が初回掃除から60秒を越えて生きている場合**である。
+
+孤児の寿命はターンの長さで決まる（上の実測）。ストロークの実行は guide を読み、`openspec` を叩き、
+文書を書いてから提出するので分単位になり、その間 MCP には触れないので 401 で早期に終わることもない。
+**60秒の隙間は容易に越える。**
+
+**直し方は「起動時に前のプロセスの claude を終了させる」。** 起こし直す時点で重なる相手が居なく
+なるので、(2) は成立しなくなる。`running` を倒す流れも巡回の条件も変えない。

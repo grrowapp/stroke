@@ -1,13 +1,14 @@
 ---
-status: Doing
 change: fix-ws-disconnect-crash
+status: Doing
+triage:
+  - bug
 tags:
   - proposal
   - specs
   - design
   - tasks
-triage:
-  - bug
+order: -8.0
 ---
 
 # fix-ws-disconnect-crash

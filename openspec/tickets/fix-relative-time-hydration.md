@@ -1,11 +1,12 @@
 ---
-status: Planning
 change: fix-relative-time-hydration
+triage:
+  - bug
 tags:
   - proposal
   - specs
-triage:
-  - bug
+status: Planning
+order: -5.0
 ---
 
 # fix-relative-time-hydration
