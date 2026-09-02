@@ -61,3 +61,13 @@ operations:
       - archive の前に、その change の成果物が commit 済みであることを確かめる。
         未コミットのまま archive すると、change は閉じたのに成果物が git に
         入っていない状態になる
+
+      - >-
+        archive の前に `openspec/changes/<change-id>/tasks.md` を読み、
+        チェックボックスを全て確認する。未チェック（`- [ ]`）が1つでも
+        あれば archive 不可
+
+      - >-
+        archive の前に tasks.md からユーザーの完了承認を得るタスクを探す。
+        無ければ archive 不可。有れば
+        チェック状態を確認し、未チェックなら archive 不可
