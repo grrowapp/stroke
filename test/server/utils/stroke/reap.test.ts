@@ -6,21 +6,22 @@ import { listLiveProcesses, type LiveProcess } from '../../../../server/utils/st
 import { reapRunning, terminateProcess, type ReapDeps } from '../../../../server/utils/stroke/reap'
 
 /**
- * 起動時の後始末（`fix-orphan-run-on-restart` tasks 4.1〜4.4）。
+ * 起動時の後始末（openspec/specs/bootstrap/system/cleanup-agent-process）。
  *
- * 「自分の生きている claude を止めてから失敗にする」だけは、実際にプロセスを起こして
+ * 「生きている claude を止めてから失敗にする」だけは、実際にプロセスを起こして
  * `ps` で見つけ `SIGKILL` で終わらせるところまでを本物で確かめる——`claude` そのものは
  * 一度も起動しない（`node` を代わりに使う。`claude.test.ts` と同じ手口）。ユーザー指示
- * 「実際に kill するのはテストの中だけ」に沿う。他の分岐（プロセスが無い／別インスタンス／
- * 判定できない）は、後始末の判断そのものを見るのが目的なので `ReapDeps` を差し替える。
+ * 「実際に kill するのはテストの中だけ」に沿う。他の分岐（プロセスが無い／判定できない）は、
+ * 後始末の判断そのものを見るのが目的なので `ReapDeps` を差し替える。
+ *
+ * **どのサーバーインスタンスが起こしたかは見ない。** その前提を置かないことを決めている
+ * （proposal「この change で扱わないもの」）ので、ポート違いを見分けるテストも持たない。
  */
 
-const OWN_API_BASE_URL = 'http://example.test:3599'
-const FOREIGN_API_BASE_URL = 'http://example.test:3399'
 const SESSION_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
 
-function mcpConfigWithUrl(apiBaseUrl: string): string {
-  return JSON.stringify({ mcpServers: { 'stroke-board': { type: 'http', url: `${apiBaseUrl}/mcp`, headers: {} } } })
+function mcpConfig(): string {
+  return JSON.stringify({ mcpServers: { 'stroke-board': { type: 'http', url: 'http://example.test:3599/mcp', headers: {} } } })
 }
 
 function strokeSession(overrides: Partial<SessionSummary> = {}): SessionSummary {
@@ -39,7 +40,6 @@ function baseDeps(overrides: Partial<ReapDeps> = {}): { deps: ReapDeps, written:
   const written: Array<{ sessionId: string, invocation: Invocation }> = []
   const deps: ReapDeps = {
     listProcesses: async () => [],
-    apiBaseUrl: OWN_API_BASE_URL,
     terminate: async () => true,
     writeInvocation: async (sessionId, invocation) => {
       written.push({ sessionId, invocation })
@@ -54,27 +54,27 @@ describe('reapRunning: running でない対象・空の一覧', () => {
     const { deps, written } = baseDeps()
     const counts = await reapRunning([strokeSession({ invocation: 'idle' })], deps)
 
-    expect(counts).toEqual({ killed: 0, failed: 0, errored: 0, skipped: 0 })
+    expect(counts).toEqual({ killed: 0, failed: 0, errored: 0 })
     expect(written).toEqual([])
   })
 })
 
-describe('reapRunning: プロセスがもう無い（tasks 4.2）', () => {
+describe('reapRunning: プロセスがもう無い', () => {
   it('対象に一致する claude がどこにも走っていなければ failed にする', async () => {
     const { deps, written } = baseDeps({ listProcesses: async () => [] })
     const counts = await reapRunning([strokeSession()], deps)
 
-    expect(counts).toEqual({ killed: 0, failed: 1, errored: 0, skipped: 0 })
+    expect(counts).toEqual({ killed: 0, failed: 1, errored: 0 })
     expect(written).toEqual([{ sessionId: SESSION_ID, invocation: 'failed' }])
   })
 })
 
-describe('reapRunning: 判定できない（tasks 4.3）', () => {
+describe('reapRunning: 判定できない', () => {
   it('プロセス一覧を取れなければ error にする（failed にしない）', async () => {
     const { deps, written } = baseDeps({ listProcesses: async () => null })
     const counts = await reapRunning([strokeSession()], deps)
 
-    expect(counts).toEqual({ killed: 0, failed: 0, errored: 1, skipped: 0 })
+    expect(counts).toEqual({ killed: 0, failed: 0, errored: 1 })
     expect(written).toEqual([{ sessionId: SESSION_ID, invocation: 'error' }])
   })
 
@@ -82,14 +82,14 @@ describe('reapRunning: 判定できない（tasks 4.3）', () => {
     const { deps, written } = baseDeps({ listProcesses: async () => [] })
     const counts = await reapRunning([strokeSession({ phase: 'unknown' })], deps)
 
-    expect(counts).toEqual({ killed: 0, failed: 0, errored: 1, skipped: 0 })
+    expect(counts).toEqual({ killed: 0, failed: 0, errored: 1 })
     expect(written).toEqual([{ sessionId: SESSION_ID, invocation: 'error' }])
   })
 
   it('一致した自分の claude を終了させられなければ error にする（failed にしない）', async () => {
     const process0: LiveProcess = {
       pid: 424242,
-      argv: `claude -p --session-id ${SESSION_ID} --mcp-config ${mcpConfigWithUrl(OWN_API_BASE_URL)}`,
+      argv: `claude -p --session-id ${SESSION_ID} --mcp-config ${mcpConfig()}`,
     }
     const { deps, written } = baseDeps({
       listProcesses: async () => [process0],
@@ -97,69 +97,48 @@ describe('reapRunning: 判定できない（tasks 4.3）', () => {
     })
     const counts = await reapRunning([strokeSession()], deps)
 
-    expect(counts).toEqual({ killed: 0, failed: 0, errored: 1, skipped: 0 })
+    expect(counts).toEqual({ killed: 0, failed: 0, errored: 1 })
     expect(written).toEqual([{ sessionId: SESSION_ID, invocation: 'error' }])
   })
 })
 
-describe('reapRunning: 別インスタンスの実行には触らない（tasks 4.4）', () => {
-  it('対象に一致するが自分の apiBaseUrl を持たない claude は、止めず invocation も書き換えない', async () => {
-    const process0: LiveProcess = {
-      pid: 424242,
-      argv: `claude -p --session-id ${SESSION_ID} --mcp-config ${mcpConfigWithUrl(FOREIGN_API_BASE_URL)}`,
-    }
-    let terminateCalled = false
-    const { deps, written } = baseDeps({
-      listProcesses: async () => [process0],
-      terminate: async () => {
-        terminateCalled = true
-        return true
-      },
-    })
-    const counts = await reapRunning([strokeSession()], deps)
-
-    expect(counts).toEqual({ killed: 0, failed: 0, errored: 0, skipped: 1 })
-    expect(written).toEqual([])
-    expect(terminateCalled).toBe(false)
-  })
-})
-
 describe('reapRunning: 複数件をまとめて数える', () => {
-  it('4つの分岐が混ざっていても、それぞれ正しく数えて書く', async () => {
+  it('3つの分岐が混ざっていても、それぞれ正しく数えて書く', async () => {
     const alive: LiveProcess = {
       pid: 1,
-      argv: `claude -p --session-id own-id --mcp-config ${mcpConfigWithUrl(OWN_API_BASE_URL)}`,
+      argv: `claude -p --session-id alive-id --mcp-config ${mcpConfig()}`,
     }
-    const foreign: LiveProcess = {
+    const stubborn: LiveProcess = {
       pid: 2,
-      argv: `claude -p --session-id foreign-id --mcp-config ${mcpConfigWithUrl(FOREIGN_API_BASE_URL)}`,
+      argv: `claude -p --session-id stubborn-id --mcp-config ${mcpConfig()}`,
     }
     const { deps, written } = baseDeps({
-      listProcesses: async () => [alive, foreign],
-      terminate: async (pid) => pid === 1,
+      listProcesses: async () => [alive, stubborn],
+      terminate: async pid => pid === 1,
     })
 
     const counts = await reapRunning([
-      strokeSession({ id: 'own-id' }), // 自分のものが走っている → 止めて failed
-      strokeSession({ id: 'foreign-id' }), // 別インスタンスのもの → 触らない
+      strokeSession({ id: 'alive-id' }), // 走っている → 止めて failed
+      strokeSession({ id: 'stubborn-id' }), // 走っているが止められない → error
       strokeSession({ id: 'gone-id' }), // 一致するプロセスが無い → failed
     ], deps)
 
-    expect(counts).toEqual({ killed: 1, failed: 2, errored: 0, skipped: 1 })
-    // 書く順は sessions の並び順のまま（own-id → foreign-id[触らない] → gone-id）
+    expect(counts).toEqual({ killed: 1, failed: 2, errored: 1 })
+    // 書く順は sessions の並び順のまま
     expect(written).toEqual([
-      { sessionId: 'own-id', invocation: 'failed' },
+      { sessionId: 'alive-id', invocation: 'failed' },
+      { sessionId: 'stubborn-id', invocation: 'error' },
       { sessionId: 'gone-id', invocation: 'failed' },
     ])
   })
 })
 
 /**
- * tasks 4.1: 走っている自分の claude を実際に起こして見つけ、`SIGKILL` で止めてから
+ * 走っている claude を実際に起こして見つけ、`SIGKILL` で止めてから
  * `failed` にする。`claude` の代わりに `node` を使うだけで、プロセスの発見・照合・終了・
  * 終了の確認はすべて本物の実装（`listLiveProcesses` / `terminateProcess`）を通す。
  */
-describe('reapRunning: 実際に走っている自分の claude を止める（tasks 4.1）', () => {
+describe('reapRunning: 実際に走っている claude を止める', () => {
   const spawned: ChildProcess[] = []
 
   afterEach(() => {
@@ -193,7 +172,7 @@ describe('reapRunning: 実際に走っている自分の claude を止める（t
   }
 
   it('自分が起こした claude が走っていたら、終了させてから failed にする', async () => {
-    const argv = ['--session-id', SESSION_ID, '--mcp-config', mcpConfigWithUrl(OWN_API_BASE_URL)]
+    const argv = ['--session-id', SESSION_ID, '--mcp-config', mcpConfig()]
     const child = spawnFakeClaude(argv)
     expect(child.pid).toBeDefined()
     await waitUntilVisible(child.pid!)
@@ -201,12 +180,11 @@ describe('reapRunning: 実際に走っている自分の claude を止める（t
     const written: Array<{ sessionId: string, invocation: Invocation }> = []
     const counts = await reapRunning([strokeSession()], {
       listProcesses: listLiveProcesses,
-      apiBaseUrl: OWN_API_BASE_URL,
       terminate: terminateProcess,
       writeInvocation: async (sessionId, invocation) => { written.push({ sessionId, invocation }) },
     })
 
-    expect(counts).toEqual({ killed: 1, failed: 1, errored: 0, skipped: 0 })
+    expect(counts).toEqual({ killed: 1, failed: 1, errored: 0 })
     expect(written).toEqual([{ sessionId: SESSION_ID, invocation: 'failed' }])
 
     // 実際に終了している（再度一覧を取っても現れない）
@@ -215,7 +193,7 @@ describe('reapRunning: 実際に走っている自分の claude を止める（t
   })
 
   it('会話は失われない（実測: SIGKILL で止めても --resume で続けられるという既存の確認と同じ前提。ここでは終了そのものだけを見る）', async () => {
-    const argv = ['--resume', SESSION_ID, '--mcp-config', mcpConfigWithUrl(OWN_API_BASE_URL)]
+    const argv = ['--resume', SESSION_ID, '--mcp-config', mcpConfig()]
     const child = spawnFakeClaude(argv)
     await waitUntilVisible(child.pid!)
 

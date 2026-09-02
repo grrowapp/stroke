@@ -17,21 +17,21 @@ import { shouldRetry } from '../utils/stroke/sweep'
  * 導き、cwd は一覧の `path` = 昇格後のディレクトリ）。
  *
  * - `idle` にはやり直すものが無い
- * - `error` はリトライ上限に達した終端で、ユーザーへ引き渡す
+ * - `error` は自動では回復しない終端で、ユーザーへ引き渡す（リトライ上限に達した実行と、
+ *   起動時の後始末が終わらせられなかった実行の両方が入る）
  * - `running` は実行中。時間切れの判定は invokeAi の責務（プロセス内の見張り）。
  *   サーバー再起動をまたいで残った `running` の後始末は、専用のプラグイン
  *   （`server/plugins/01.reap-running.ts`）が担う——巡回はここで `running` を拾わない
- *   （design.md Decision 3。以前はここが初回周回で `running` も `failed` へ倒していたが、
+ *   （以前はここが初回周回で `running` も `failed` へ倒していたが、
  *   `portal/batch`「巡回は `failed` だけを拾う」と食い違っていた）
  *
  * 上限判定も定型の選択も invokeAi が行う。cwd も自分で組み立てない——一覧が返した
- * `path` をそのまま渡す（design.md D5）。
+ * `path` をそのまま渡す。
  *
  * **参照は API の応答から得て、書き込みは A8 を通す**（openspec/specs/agent/invocation
  * の MUST NOT: ファイルを直接読んで実行状態を判定してはならない）。
  *
- * 起動時の後始末（`01.reap-running.ts`）と巡回の間に、呼び出し順序の取り決めは持たない
- * （openspec/specs/agent/invocation「起動時の後始末と巡回は、互いの完了を待たない」）。
+ * 起動時の後始末（`01.reap-running.ts`）と巡回の間に、呼び出し順序の取り決めは持たない。
  * 対象1件ごとの順序——後始末は終了を確かめてから `failed` を書く——だけで二重起動は
  * 防げているため、待ち合わせの仕組みは不要である。
  */
@@ -45,7 +45,7 @@ export default defineNitroPlugin((nitro) => {
     try {
       sessions = await $fetch<SessionSummary[]>('/api/strokes')
     } catch (error) {
-      // 取れなければ次の巡回で拾う。前提が欠けているなら起動時チェックが伝える。
+      // 取れなければ次の巡回で拾う。
       console.warn(`${LOG_PREFIX} 一覧を取れなかった。次の巡回で拾う`, error)
       return
     }

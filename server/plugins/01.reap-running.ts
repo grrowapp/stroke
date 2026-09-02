@@ -3,19 +3,17 @@ import { defineNitroPlugin } from 'nitropack/runtime'
 import type { SessionSummary } from '#shared/stroke'
 import { LOG_PREFIX } from '../utils/stroke/log'
 import { listLiveProcesses } from '../utils/stroke/live-processes'
-import { resolveApiBaseUrlOnceListening } from '../utils/stroke/listen-address'
 import { reapRunning, terminateProcess, type ReapCounts } from '../utils/stroke/reap'
 import { submissionPath } from '../utils/stroke/submission-path'
 
 /**
- * 起動時の後始末（`fix-orphan-run-on-restart`）。**起動のたびに1回だけ**走る、専用の
- * プラグイン（design.md Decision 3「後始末を巡回から切り出し、起動時の専用ステップに
- * する」）。
+ * 起動時の後始末（openspec/specs/bootstrap/system/cleanup-agent-process）。
+ * **起動のたびに1回だけ**走る、専用のプラグイン。後始末を巡回から切り出し、起動時の
+ * 専用ステップに置く。
  *
- * 前のプロセスが残した `running` を、生きている claude の有無で判定して倒す
- * （判定・分岐そのものは `server/utils/stroke/reap.ts`）。巡回プラグイン
- * （`server/plugins/01.retry-failed.ts`）との間に、呼び出し順序の取り決めは持たない
- * （openspec/specs/agent/invocation「起動時の後始末と巡回は、互いの完了を待たない」）——
+ * 前のプロセスが残した `running` を、生きている claude の有無で判定し、**終了させてから**
+ * 倒す（判定・分岐そのものは `server/utils/stroke/reap.ts`）。巡回プラグイン
+ * （`server/plugins/01.retry-failed.ts`）との間に、呼び出し順序の取り決めは持たない——
  * 対象1件ごとの順序（終了を確かめてから `failed` を書く）だけで二重起動は防げている。
  *
  * **参照は API の応答から得て、書き込みは A8 を通す**（openspec/specs/agent/invocation
@@ -30,12 +28,6 @@ export default defineNitroPlugin(() => {
 })
 
 async function reap(): Promise<void> {
-  // 起動時に1回だけの処理なので、待てるだけ待ってから解決する
-  // （`listen-address.ts` の `resolveApiBaseUrlOnceListening` の docblock）。dev で
-  // listen より前にここへ来ても、即座に諦めず listen を待つ——この後始末は次回の巡回で
-  // 拾い直されないため。
-  const apiBaseUrl = await resolveApiBaseUrlOnceListening()
-
   let sessions: SessionSummary[]
   try {
     sessions = await $fetch<SessionSummary[]>('/api/strokes')
@@ -46,7 +38,6 @@ async function reap(): Promise<void> {
 
   const counts = await reapRunning(sessions, {
     listProcesses: listLiveProcesses,
-    apiBaseUrl,
     terminate: terminateProcess,
     writeInvocation: async (sessionId, invocation) => {
       await $fetch(submissionPath(sessionId), { method: 'POST', body: { invocation } })
@@ -57,10 +48,10 @@ async function reap(): Promise<void> {
 }
 
 function logCounts(counts: ReapCounts): void {
-  if (counts.killed === 0 && counts.failed === 0 && counts.errored === 0 && counts.skipped === 0) return
+  if (counts.killed === 0 && counts.failed === 0 && counts.errored === 0) return
   console.warn(
     `${LOG_PREFIX} 起動時の後始末: `
     + `止めた ${counts.killed} 件・failed にした ${counts.failed} 件・`
-    + `error にした ${counts.errored} 件・触らなかった ${counts.skipped} 件`,
+    + `error にした ${counts.errored} 件`,
   )
 }
