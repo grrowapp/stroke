@@ -6,14 +6,15 @@
 
 前提: **セッションの置き場とプロジェクトの置き場を `SPEC_WORKFLOW_SHARED_ROOT` に統一する**（その場所をどこにするかは設定の値の話で、ここでは決めない）。
 
-`proposal.md` は**claude 自身がセッションの時点から `docs/` 配下に書く**。サーバーのコードは proposal.md を作らない。これにより、proposal 確認画面で承認を押したときの処理は**セッションディレクトリをプロジェクト名へ rename するだけ**になる——中身は全部そのままプロジェクトに昇格し、ファイルの生成も移動も無い。画面はモーダルを閉じてプロジェクト一覧に戻る。ユーザーの操作はここまでで、steering 作成はサーバーが裏で始める。
+`proposal.md` は**claude 自身がセッションの時点から `docs/` 配下に書く**。サーバーのコードは proposal.md を作らない。承認は3段に分かれる（change `separate-approval-decision-from-promotion`・2026-09-02）——**U10 で判断を記録し、U14 でセッションディレクトリをプロジェクト名へ rename（＝昇格）し、昇格の成功を見た画面が U13 で steering の claude を起こす**。届かなければ巡回が拾って起こす。判断は昇格の前なら取り消せる。中身は全部そのままプロジェクトに昇格し、ファイルの生成も移動も無い。画面はモーダルを閉じてプロジェクト一覧に戻る。steering 作成が自動で始まること自体は変わらない（ADR-0011）。
 
 ```mermaid
 flowchart TB
-  approve["proposal 確認画面で承認ボタン押下"] --> ren["サーバー: セッションディレクトリを<br>プロジェクト名へ <b>rename</b>（＝プロジェクトに昇格。<br>中身は全部そのまま。ファイル移動なし）"]
+  approve["proposal 確認画面で承認ボタン押下"] --> decide["U10: 判断を記録<br>（改名しない・起動しない。取り消し可）"]
+  decide --> ren["U14: セッションディレクトリを<br>プロジェクト名へ <b>rename</b>（＝プロジェクトに昇格。<br>中身は全部そのまま。ファイル移動なし）"]
   ren --> back["モーダルを閉じて<br>プロジェクト一覧 /projects に戻る"]
   ren --> show["サーバー: 上層へ <b>in-progress</b> を配信<br>一覧の最下部に<b>生成中の行</b>が出る"]
-  ren --> launch["サーバー: steering 作成の claude を裏で起動"]
+  ren --> launch["画面: U13 で steering 作成の claude を起こす<br>（届かなければ巡回が拾う）"]
   launch --> steering["本家 spec-workflow MCP で<br>steering 文書を作成"]
   steering --> appear[".spec-workflow/ ができる"]
   appear --> done["実行が終わったら <b>done</b> を配信<br>生成中の表現が外れ、一度だけ祝う"]
