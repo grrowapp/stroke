@@ -6,7 +6,6 @@
 
 | 現状 | 規範との差 |
 | --- | --- |
-| `pages/strokes/**` | ルーティングを `pages/projects/create/` 配下へ |
 | `components/` が project / prototype / review / shared / stroke / workspace ＋直下平置き | `ui/` ＋機能単位へ移す（全数の対応は `docs/specs/core/file-components.md`。`project/` 2本と `prototype/` 5本は棚卸しに未追従）。**`update-docs-structure` では動かさない。移行課題として残る。** ~~ただし `global/MarkdownPre.vue` は動かせない~~ → **解消済み**（`create-module-markdown`）。`MarkdownPre` は `modules/markdown/runtime/render/MarkdownFence.vue` へ移り、`mdc.components.map` が要求する `app.component()` 登録は `modules/markdown/index.ts` の `addComponent({ global: true })` が行う。`components/global/` は消え、規範の区切りに従えない例外は無くなった |
 | ~~`composables/` が shared / workspace ＋直下平置き~~ | **平置きは実施済み**（`replace-handrolled-with-libraries`）。9本すべてが `app/composables/` 直下。残るのは `useProposalReview` の分割と、`useAnnotations` の色定数の扱い——**色の実値は CSS へ移し、データ（`Annotation.highlightColor`）は色名のみ持つ**（検討）——（`docs/specs/core/file-composables.md`） |
 | `composables/useRelativeTime.ts` が `useXxx` を持たない | 中身は純関数 `formatRelativeTime` のみで、規範の「関心単位の `useXxx` を平置き」に当てはまらない。参照元は5ページ。**規範のツリーに純関数の置き場（`app/utils/` 等）が無い**ため、置き場の新設とあわせて決める |

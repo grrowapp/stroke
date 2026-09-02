@@ -89,6 +89,110 @@
 | `workspace/RecordList` | specs / tasks / steering の4画面 |
 | `workspace/WorkspacePanel` | 下層の9画面すべて |
 
+## 個別
+
+props と挙動まで書き出してあるのは、ポータル側の5本。残る9本は上の「一覧」の表が持つ。
+
+### shared/NotificationToaster.vue
+
+通知トースト。128行。props なし。**`<template>` は空で、markup を持たない。**
+
+`app.vue` に常設され、`useBoardSocket().onNotification` を購読して `toast.add()` へ変換する役だけを持つ。描画は `app.vue` の `<UApp :toaster>`。**要素を出さないことがこの component の正しい姿**（`replace-handrolled-with-libraries` の design 決定1）。
+
+`app.vue` 直下から外せない。外すと購読が0になり、`createSharedComposable` が参照カウント式で state ごと接続を捨てる。
+
+| 挙動 | 仕様 |
+| --- | --- |
+| 位置 | 右上固定・縦積み |
+| 消滅 | 5秒で自動、× で手動 |
+| 内容 | 1行テキスト |
+| 押下 | **何も起きない** |
+
+トーストから対象へ進ませないのは、対象を開く導線を通知一覧に一本化しているため。本家 spec-workflow-mcp と同じ形にしている（`specs/notification-toast`）。
+
+`info` / `success` / `warning` / `error` の4トーンを持ち、それぞれに面の色とグリフを対応させている。
+
+### workspace/ApprovalCard.vue
+
+承認依頼1件のカード。208行。**`workspace/` で唯一 emit を持つ。**
+
+```ts
+defineProps<{ approval: ApprovalDto; to: string; projectId: string }>()
+defineEmits<{ responded: [] }>()
+```
+
+`responded` は承認/却下を送り終えたときに発火する。親が一覧を取り直すために使う。
+
+本家の承認画面は一覧ではなく**カードの縦積み**（`ApprovalsPage.tsx` の `space-y-3 sm:space-y-4` の中に1件1枚）。他の下層画面が表なのに対し、ここだけ形が違う。
+
+却下は理由の入力を伴う。**操作を押しても対象の画面へは飛ばない。**
+
+日時は `Intl.DateTimeFormat`（`ja-JP` / `hourCycle: 'h23'`）に預けてある。
+
+### workspace/EmptyState.vue
+
+中身が無いことを示す。43行。
+
+```ts
+withDefaults(
+  defineProps<{ testid?: string; title?: string; icon?: 'document' | 'tasks' | 'check-circle' }>(),
+  { icon: 'document' }
+)
+```
+
+説明文は既定スロットで渡す。
+
+形は本家の Empty State（`SteeringPage.tsx` / `SpecsPage.tsx`）に合わせる。中央寄せの `py-12` に 48px のアイコン、見出し、説明の順。無彩色にするのは `ui.md` の Visual Language による。
+
+`layouts/workspace.vue` からも使われる唯一の `workspace/` コンポーネント。本家から解決できないプロジェクトを「未接続」として示すのに使う。
+
+中身は `UEmpty` + `:ui` の置換関数（`SlotClassReplacer`）に預けてある（`variant="naked"`）。
+
+### workspace/RecordList.vue
+
+下層の一覧。209行。**各行はリンクで、URL で対象を指せる。**
+
+```ts
+export type RecordTone = 'success' | 'pending' | 'info' | 'in-progress' | 'warning' | 'error';
+
+export interface RecordItem {
+  key: string;                  // 一覧内で一意
+  label: string;
+  detail?: string;              // 行の下段に出す補足
+  icon?: 'document' | 'steering' | 'tasks' | 'check-circle';
+  badge?: { text: string; tone: RecordTone };
+  progress?: { completed: number; total: number };   // badge と併用しない
+  meta?: string;                // 3列目。最終更新など
+  to?: string;                  // 無ければ選べない行になる
+}
+```
+
+`labels`（列見出し）を呼び出し側から渡すのは、本家が画面ごとに文言を変えているため。
+
+`to` を省くと選べない行になる。**未作成の文書にリンクを張らない**のはこの仕組みによる。
+
+行全体がリンクになっている（`1ea2bec fix: 一覧の行全体を押せるようにする`）。
+
+**設計の背景** — 本家のダッシュボードは `projectId` を localStorage に持ち URL に出さないため、「どのプロジェクトの何」を指すリンクが作れない。stroke-board はそれを繰り返さない。
+
+中身は `UTable`（TanStack Table）に預けてある。列は `columns`、様式は `:ui` の置換関数と cell slot。
+
+### workspace/WorkspacePanel.vue
+
+下層の画面の外枠。28行。**下層で最も使われるコンポーネント**（9画面すべて）。
+
+```ts
+defineProps<{ title: string; subtitle?: string; testid?: string }>()
+```
+
+スロットは2つ — 既定スロット（中身）と `actions`（見出しの右）。
+
+本家は下層の各画面を1枚のパネルに載せ、その中に見出しと副題を置いてから中身を出す（`SteeringPage.tsx` / `SpecsPage.tsx` の `Content`）。画面ごとに枠を書くと寸法がずれるため、ここに集約している。
+
+`actions` スロットは本家が検索や並び替えを置く位置だが、**stroke-board は読むだけなので通常は空**。
+
+---
+
 ## 置き場の区分
 
 現状の5層は、**基準が揃っていない。**

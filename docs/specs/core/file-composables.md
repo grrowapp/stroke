@@ -16,7 +16,7 @@
 | ステアリングの読み書き | `useSteeringDocuments` | `useProjectApi` と同じ関心の口として並べる |
 | 問いの往復 | `useAgentQuestion` | 回答送信・AI 起動（契約 U7 / U13）。そのまま |
 | セッションの WS 購読 | `useSessionChannel` | W1 / W2 の唯一の受け口。購読先のパスと届く型を引数で受け、呼び出し側が直接呼ぶ |
-| proposal のレビュー | `useProposalReview` | 39 プロパティに肥大し `Modals.vue` と密結合。分割は**保留** — markdown コンポーネント集約（`create-module-markdown` で実施済み）の確定後、`flatten-composables` の design で決める（分割案はここで固定しない） |
+| proposal のレビュー | `useProposalReview` | 39 プロパティに肥大し `Modals.vue` と密結合。うち13はモーダルの状態で、component 側の引き直しと不可分。**分割は未着手**（分割案はここで固定しない） |
 | 注釈 | `useAnnotations` | 色定義5件をコンポーネントが逆向き import している。**色の実値は CSS へ移し、データ（`Annotation.highlightColor`）は色名のみ持つ**（検討） |
 | 待機とリトライ | `useWaitingRetry` | timer は vueuse の `useIntervalFn` に委譲済み。そのまま |
 
