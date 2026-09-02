@@ -29,7 +29,7 @@ approved ──────────── 生成中 ────────
 ```
 
 - **`Phase` に `activated` を足す。** steering の**初回の承認依頼が提出された**ときに書く。ここから先が、本当の意味でプロジェクトインスタンスが準備された状態である
-- **`activated` を書く口をサーバに足す。** 提出を受けて立てる
+- **`activated` を書く endpoint をサーバに足す。** 提出を受けて立てる
 - **`invocation` から失敗の応答を出せるようにし、WS の通知パターンに失敗を入れる。** claude の処理がエラーなら、ユーザー側にプロジェクト作成失敗のアクションを出す
 
 始点（`approved`）と終点（`activated`）が確定した1点になるので、**生成中の判定が区間の内外だけになる**。走査（`.spec-workflow` の有無）もプロセスの状態（`invocation`）も見ない。
@@ -42,52 +42,52 @@ approved ──────────── 生成中 ────────
 
 ### 対象外
 
-- `/write-steering-v2` が存在しない件（[`fix-missing-write-steering-skill`](../../tickets/fix-missing-write-steering-skill.md)）。**あれは原因ではなく、この穴を露出させた症状である。** スキルを置いても、次に claude が別の理由で空振りすれば同じことが起きる
+- `/write-steering-v2` が存在しない件（[`fix-missing-write-steering-skill`](../../tickets/fix-missing-write-steering-skill.md)）。スキルを置くのはあちらの仕事である。**この change が受け持つのは、スキルの有無にかかわらず、steering の作成が完了しなかったときにプロジェクトの生成が失敗したという状態が現れること**である
 - 承認 endpoint が3つの仕事を1回でやっている件（`separate-approval-decision-from-promotion`）。段の分割はこの change では扱わない
 
 ## Capabilities
 
 ### New Capabilities
 
-- `api/session/activate`: 昇格した対象を、steering が成果物を出し終えた状態にする受け口（U15）。成果物の有無を確かめてから立てる。起動も判断も昇格も受け持たない
+- `api/session/activate`: 昇格した対象を、steering が成果物を出し終えた状態にする endpoint（U15）。成果物の有無を確かめてから立てる。起動も判断も昇格も受け持たない
 
 ### Modified Capabilities
 
 - `project/generation` — 生成の決着の判定と、その配信
 
-**追記 2026-09-02。** 起票の時点では「`activated` を立てる口をサーバに足す」としか書いておらず、その口を capability として立てていなかった。`separate-approval-decision-from-promotion` が develop へ入り、**承認の各段がそれぞれ capability を持つ形**（`api/session/approve` / `api/session/promote`）になったため、完成の記録も同じ形で並べる（design.md D4）。
+**追記 2026-09-02。** 起票の時点では「`activated` を立てる endpoint をサーバに足す」としか書いておらず、その endpoint を capability として立てていなかった。`separate-approval-decision-from-promotion` が develop へ入り、**承認の各段がそれぞれ capability を持つ形**（`api/session/approve` / `api/session/promote`）になったため、完成の記録も同じ形で並べる（design.md D4）。
 
 ## Impact
 
 | ファイル | 内容 |
 | --- | --- |
 | `shared/stroke.ts` | `Phase` に `activated` を足す。値の一覧を1つ持つ形にする |
-| `server/handler/phase.ts` | 値の集合を1箇所に閉じ、`readPhase` の連鎖を解く。`isAfterApproval` に `activated` を含める |
+| `server/handler/phase.ts` | **没にする。** 生読みの `readPhase` と承認軸の述語（`isBeforeApproval` / `isAfterApproval`）をやめる |
+| `server/api/sessions/[id]/index.delete.ts` / `server/api/projects/[projectId]/index.delete.ts` | `handler/phase.ts` の代わりに `readState` で phase を読み、受理範囲を自分で持つ |
 | `server/utils/stroke/session-core.ts` | **もう1つの `readPhase`**（起票時に数えていなかった5箇所目） |
 | `server/utils/stroke/session-store.ts` | zod の枝、`creationOutcomeOf` の判定 |
 | `server/utils/control/creating.ts` | `phase` を持ち帰る（いまは `approved` かの真偽だけ） |
 | `server/utils/control/directory.ts` | 行の `creation` を phase から引く。生成中を接続の判定から外す |
-| `server/api/strokes/[id]/activate.post.ts`（新規） | `activated` を立てる受け口（U15） |
+| `server/api/strokes/[id]/activate.post.ts`（新規） | `activated` を立てる endpoint（U15） |
 | `server/api/strokes/[id]/invoke-agent.get.ts` | 起こす定型と `runId` の選び分けに `activated` を通す |
 | `server/utils/stroke/ai.ts` | 成功の分岐から U15 を叩く。steering にも `didWork` を渡す |
 | `server/plugins/` | 既存の `state.json` を一度だけ書き上げる（design.md D7） |
 
 ### phase の値がばら撒かれている現状
 
-`approved` の先に足す前提は既に `handler/phase.ts` のコメントにある。
-
-> 判定の中身を1箇所に置くのは、局面が増えたとき（`approved` の先に何か足すなど）に直す場所を1つにするためである。
-
-`isBeforeApproval` / `isAfterApproval` で**入口**は1つになったが、**値の集合そのもの**は4箇所に残っている。
+phase の値の集合と、`state.json` から phase を読む処理が、それぞれ複数箇所にある。
 
 ```
-shared/stroke.ts:104        型のユニオン3本
-handler/phase.ts:38         readPhase の中の `=== 'stroking' || === 'proposed' || === 'approved'`
-session-store.ts:84-87      zod の literal 3本
-session-store.ts:206        creationOutcomeOf の `phase !== 'approved'`
+shared/stroke.ts            型のユニオン3本
+handler/phase.ts            readPhase（生読み）の `=== 'stroking' || === 'proposed' || === 'approved'`
+session-core.ts             もう1つの readPhase（生読み）。同じ連鎖で、外れた値を 'unknown' に倒す
+session-store.ts            zod の literal 3本（readState）
+session-store.ts            creationOutcomeOf の `phase !== 'approved'`
 ```
 
-イコール比較を各所へ足していく形は取らない。値を1箇所に置き、判定は述語（`isBeforeApproval` のような）で表す。
+`handler/phase.ts` はこの change で没にする（上の Impact）。`docs/specs/api/projects/delete.md` が「どの局面のものを許すかは各 endpoint が持つ」と定めているのに、承認を軸にした述語を endpoint の外に置き、zod を通さない読みを増やしているためである。
+
+イコール比較を各所へ足していく形は取らない。値は `shared/stroke.ts` に1つ置き、読みは `readState` に1本化する。
 
 ## 決定の記録
 
