@@ -10,6 +10,17 @@ stroke-board が追随する本家 spec-workflow-mcp の基準を **2.2.7** と�
 実体は `https://github.com/Pimzino/spec-workflow-mcp` の main（手元では
 `/home/vagrant/work/repo/spec-workflow-mcp`、`package.json` の `version` が `2.2.7`）。
 
+**基準は「いつ時点でそう決めたか」とセットでしか意味を持たない。** 本家は動き続けるので、
+版だけを書いても、読む人はそれが今も成り立つのか判断できない。基準を書くときは決めた日を
+添え、観測を書くときは**読んだ版と読んだ日**を添える（`docs/specs/reference/upstream-observations.md`）。
+
+**実行時に走る版はこの基準と一致しない。** 起動は `npx -y @pimzino/spec-workflow-mcp@latest`
+で、`@latest` が解決した版が走る。手元の解決先は **2.2.5** だった（実測 2026-09-01。
+npx のキャッシュと `node_modules` の両方で `core/git-utils.js` はバイト一致）。基準より古い
+版が走ることも新しい版が走ることもある。**基準は「何を読んで設計したか」を指すのであって、
+実行時の版を固定するものではない。** 固定したいなら起動の指定から `@latest` を外す判断が要る
+——それはこの ADR の範囲外である。
+
 ## 背景
 
 ADR-0006 は基準を v2.2.5 と定めていた。一方で ADR-0006 の本文には

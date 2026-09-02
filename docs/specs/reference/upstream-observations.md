@@ -210,7 +210,7 @@ broadcastToProject(projectId, {type:'spec-update', data:{specs, archivedSpecs}})
 
 **効いてくるのは共有ルートが git 管理下へ入ったときである。** いま `projectShareRoot` は `/opt/projects` で git リポジトリではないため解決しても値が変わらないが、git の内側へ動かすと本家の `projectPath` はトップレベルへ化け、パスの完全一致では引き当てられなくなる。
 
-> **読んだ実体は 2.2.5 である**（`npx -y @pimzino/spec-workflow-mcp@latest` の解決先と `node_modules` の両方。`core/git-utils.js` はバイト一致）。この資料の冒頭と [ADR-0008](../../adr/0008-baseline-is-2-2-7.md) は基準を 2.2.7 としているが、**実測と食い違っている**。基準版の扱いは別に判断する。
+> **読んだ実体は 2.2.5、読んだ日は 2026-09-01**（`npx -y @pimzino/spec-workflow-mcp@latest` の解決先と `node_modules` の両方。`core/git-utils.js` はバイト一致）。基準は 2.2.7（[ADR-0008](../../adr/0008-baseline-is-2-2-7.md)、2026-08-21 に決定）だが、**実行時に走るのは `@latest` が解決した版**なので基準とは一致しない。基準は「何を読んで設計したか」を指す。
 
 ## 参照
 
