@@ -1,7 +1,10 @@
 ---
+status: Planning
+change: spec-document-management
 tags:
+  - proposal
+triage:
   - enhancement
-status: Proposal
 ---
 
 # spec-document-management

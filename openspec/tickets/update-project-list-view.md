@@ -1,8 +1,13 @@
 ---
-status: Tasks
-tags:
-  - bug
+status: Doing
 change: update-project-list-view
+tags:
+  - proposal
+  - specs
+  - ui
+  - tasks
+triage:
+  - bug
 ---
 
 # update-project-list-view

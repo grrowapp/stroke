@@ -1,7 +1,8 @@
 ---
-tags:
-  - bug
 status: Open
+change: fix-agent-question-api-path
+triage:
+  - bug
 order: -1.0
 ---
 

@@ -1,6 +1,9 @@
 ---
-status: Proposal
+status: Planning
+change: create-feature
 tags:
+  - proposal
+triage:
   - enhancement
 ---
 

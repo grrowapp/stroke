@@ -29,16 +29,16 @@
 
 ## 5. 実機での確認
 
-- [ ] 5.1 dev を起動し、承認済みプロジェクトで steering 工程を1周させ、`get-steering` と `submit-document`（`type: steering`）が成功することを確認する（`projectShareRoot` は現状のまま = git 管理外）
+- [x] 5.1 dev を起動し、承認済みプロジェクトで steering 工程を1周させ、`get-steering` と `submit-document`（`type: steering`）が成功することを確認する（`projectShareRoot` は現状のまま = git 管理外）
+  - （実測 2026-09-01: dev(3599) で `yarn check:stroke --approve` を2周。両周とも承認 → steering 着地。steering 実行で `get-steering` 3回・`submit-document`（`type: steering`）3回が成功し、文書3本が揃った）
 - [ ] 5.2 一覧に対応しないパスで引き当てを失敗させ、`error` 本文から「一覧に何があったか」が読めることを確認する
 - [ ] 5.3 起動したプロセス・作ったセッションを片付け、ポートの解放を確認する
+  - （実測 2026-09-01: 起動していた `yarn dev`（PID 379862、3599）を `kill -TERM` で停止。`ss -tlnp | grep 3599` 該当なし＝ポート解放、`ps -p 379862` 該当なし＝プロセス停止を確認した。ただし作ったセッション・プロジェクトの片付け（`/opt/projects` 配下）はユーザー確認待ちのため未実施）
 
-## 6. 上位資料への整合反映（ADR-0004 の手続き。承認前に書き換えない）
+## 6. 上位資料への整合反映（change update-docs-for-runtime-fixes へ委譲済み）
 
-- [ ] 6.1 design の「提案1」（`docs/specs/reference/upstream-observations.md` へ「登録されるパスは git のトップレベルへ解決される」の節を足す）をユーザーへ提示し、承認を得る
-- [ ] 6.2 design の「提案2」（`docs/specs/api/mcp-tools.md` の `project_not_registered` 行の「意味」列の書き換え）をユーザーへ提示し、承認を得る
-- [ ] 6.3 承認された分だけを編集する。承認されなかった提案は資料へ触れず、その旨を change に記録する
-- [ ] 6.4 基準版の食い違い（資料と ADR-0008 は 2.2.7、実体は 2.2.5）を報告し、この change で扱うか別立てにするかの判断を仰ぐ
+- [x] 6.1 上位資料への整合反映を change `update-docs-for-runtime-fixes` へ委譲した。提案の内容は同 change の ticket に一覧（この change の分は `U1` / `M2`）。**この change では `docs/` を書き換えない**
+- [x] 6.4 基準版の食い違い（資料と ADR-0008 は 2.2.7、実体は 2.2.5）を報告し、この change で扱うか別立てにするかの判断を仰ぐ（`update-docs-for-runtime-fixes` の ticket に `D4` として記録済み。扱いはユーザー判断待ち）
 
 ## 7. 締め
 

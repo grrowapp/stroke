@@ -1,7 +1,12 @@
 ---
-status: Tasks
+status: Planning
 change: update-ui-approval-review
 tags:
+  - proposal
+  - specs
+  - design
+  - tasks
+triage:
   - enhancement
 ---
 

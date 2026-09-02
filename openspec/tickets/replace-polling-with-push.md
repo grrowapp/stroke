@@ -1,6 +1,11 @@
 ---
-status: Tasks
+status: Planning
 change: replace-polling-with-push
+tags:
+  - proposal
+  - specs
+  - design
+  - tasks
 ---
 
 # replace-polling-with-push

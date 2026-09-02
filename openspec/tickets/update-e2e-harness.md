@@ -1,7 +1,12 @@
 ---
-status: Tasks
+status: Planning
 change: update-e2e-harness
 tags:
+  - proposal
+  - specs
+  - design
+  - tasks
+triage:
   - maintenance
 ---
 

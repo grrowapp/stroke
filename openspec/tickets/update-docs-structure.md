@@ -1,7 +1,12 @@
 ---
-status: Tasks
+status: Doing
 change: update-docs-structure
 tags:
+  - proposal
+  - specs
+  - design
+  - tasks
+triage:
   - maintenance
 ---
 

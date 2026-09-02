@@ -5,9 +5,11 @@
 ## 1. 要否を実測で確かめる
 
 - [ ] 1.1 検証の前提を整える。他の worktree の dev サーバーが動いていないことを確かめる（`projectShareRoot` = `/opt/projects` は共有され、巡回が相手のセッションを再キックする）
-- [ ] 1.2 `nuxt.config.ts` の `claude.debugLogDir` に一時的な出力先を設定する（この change の成果には含めない。5章で空へ戻す）
+- [x] 1.2 `nuxt.config.ts` の `claude.debugLogDir` に一時的な出力先を設定する（この change の成果には含めない。5章で空へ戻す）
+  - （実測 2026-09-01: `claude.debugLogDir` を `.stroke-check/debug-log` に一時設定した）
 - [ ] 1.3 `yarn check:stroke` で flontier の1周（初回起動 → 往復 → proposal 提出 → 差し戻し → 出し直し）を通す
-- [ ] 1.4 承認まで進めて steering 工程の実行をログに残す。`adr0016-sub-add-stroke-check-approval-option` が未了なら、承認はブラウザで押す（サーバーを直接叩かない）
+- [x] 1.4 承認まで進めて steering 工程の実行をログに残す。`adr0016-sub-add-stroke-check-approval-option` が未了なら、承認はブラウザで押す（サーバーを直接叩かない）
+  - （実測 2026-09-01: `yarn check:stroke --approve` で2周とも承認 → steering 工程の実行がログに残った。`--approve` が機能したため当該 change は完了しており、ブラウザ手動承認は不要だった）
 - [ ] 1.5 生出力の `tool_use` を道具名で数え、`Skill` / `Bash(openspec *)` / `Read` / `Edit` / `Write` の**5つすべて**の回数を出す。flontier 分と steering 分を分けて数える
 - [ ] 1.6 `Bash` の `tool_use` に `openspec` の呼び出しが現れるかを見る。現れないなら、ワークフロー定義（`~/.local/share/openspec/schemas/flontier-strokeflow/schema.yaml`）の `stroke.md` / `proposal.md` 生成要求はエージェントに届いていない（design.md 決定4 の分岐）
 - [ ] 1.7 セッションディレクトリ直下に、エージェントが書いたファイル（下書きの `proposal.md` など）が残っているかを確かめる。`docs/proposal.md` はサーバーが書くので対象外
@@ -22,27 +24,31 @@
 - [ ] 2.3 コメントを design.md 決定5 の形へ書き直す。外した場合は「何を・どの実測で・何が塞がるか」、残した場合は「何のために・どの実測がそれを示したか」
 - [x] 2.4 `yarn test` と `yarn typecheck`（または `yarn build`）が通ることを確かめる。`test/server/utils/mcp/allowed-tools.test.ts` は設定値ではなく独自のリテラルを使っているので、値の変更では落ちないはず——落ちたらその理由を確かめる（2026-09-01: `yarn typecheck` exit 0、`yarn test` exit 0・58 files / 735 tests passed）
 
-## 3. 上位資料への整合反映（ADR-0004）
+## 3. 上位資料への整合反映（change update-docs-for-runtime-fixes へ委譲済み）
 
-- [ ] 3.1 design.md「上位資料への整合反映」の提案をユーザーへ示し、**承認を得る**。承認前に `docs/` を書き換えない
-- [ ] 3.2 承認後、`docs/specs/core/settings-reference.md:145` の `claude.args` の JSON を実装の値に揃える
-- [ ] 3.3 承認後、同ファイルに `--allowedTools` の段落を新設する（許可は実測で要ると確かめた道具だけ・成果物をファイルへ直接書ける道具を許可しない・MCP 分は呼び出しごとに追記されるので定義に含まれない）
+- [x] 3.1 上位資料への整合反映を change `update-docs-for-runtime-fixes` へ委譲した。提案の内容は同 change の ticket に一覧（この change の分は `R2` / `R3`）。**この change では `docs/` を書き換えない**
 - [ ] 3.4 `docs/specs/api/mcp-tools.md` の「操作の入口はこれだけである」と食い違いが残っていないことを読んで確かめる（同ファイルは変えない）
 
 ## 4. 外した構成で1周を通す
 
 - [ ] 4.1 2章の値で flontier の1周（往復 → proposal 提出 → 差し戻し → 出し直し）を通す
-- [ ] 4.2 承認まで進め、steering 3文書が `submit-document`（`type: "steering"`）を経て受理されることを確かめる。文書の有無だけで合格にしない（`scripts/stroke-check.ts` の `submitDocumentCount`）
-- [ ] 4.3 実行の記録に、許可されていない道具を呼んで拒否された跡（`permission_denials`）が無いことを確かめる。あればその道具は要るということなので 1.9 の判定へ差し戻す
+- [x] 4.2 承認まで進め、steering 3文書が `submit-document`（`type: "steering"`）を経て受理されることを確かめる。文書の有無だけで合格にしない（`scripts/stroke-check.ts` の `submitDocumentCount`）
+  - （実測 2026-09-01: 2周目（`--allowedTools` から `Write`/`Edit` を外した構成）で承認 → `submit-document`（`type: steering`）3回が成功し、文書3本が揃った）
+- [x] 4.3 実行の記録に、許可されていない道具を呼んで拒否された跡（`permission_denials`）が無いことを確かめる。あればその道具は要るということなので 1.9 の判定へ差し戻す
+  - （実測 2026-09-01: 2周目（`Write`/`Edit` を外した構成）で `permission_denials` 0件）
 - [ ] 4.4 提出された proposal の本文を読み、下書きを置けなくなったことで内容が痩せていないかを確かめる。痩せていたら「残して根拠を書き直す」へ倒す
 - [ ] 4.5 4.1〜4.4 の結果を 1.8 と同じ場所へ追記する
 
 ## 5. 片付け
 
-- [ ] 5.1 `claude.debugLogDir` を空へ戻す（1.2 の一時設定を残さない）
-- [ ] 5.2 デバッグログのファイルを手で消す（ローテーションが無く、概要・問い・proposal の全文が残る）
+- [x] 5.1 `claude.debugLogDir` を空へ戻す（1.2 の一時設定を残さない）
+  - （実測 2026-09-01: 計測後に `''` へ戻した）
+- [x] 5.2 デバッグログのファイルを手で消す（ローテーションが無く、概要・問い・proposal の全文が残る）
+  - （実測 2026-09-01: ログは削除済み）
 - [ ] 5.3 検証で作ったセッション・昇格したプロジェクトを `/opt/projects` から片付ける
-- [ ] 5.4 起動した dev サーバーを停止し、ポートが解放されたことを確かめる
+  - （2026-09-01 追記: `/opt/projects` 配下はユーザー確認待ちのため未実施。`setai`〜`setai-5` の5件とセッションディレクトリが残っている（全21件））
+- [x] 5.4 起動した dev サーバーを停止し、ポートが解放されたことを確かめる
+  - （実測 2026-09-01: `yarn dev`（PID 379862、3599）を `kill -TERM` で停止。`ss -tlnp | grep 3599` 該当なし＝ポート解放、`ps -p 379862` 該当なし＝プロセス停止を確認。3399（別 worktree の既定ポート）は前後とも listen 無く、ポートの取り合いは起きていない）
 
 ## 6. レビューと完了
 

@@ -1,6 +1,7 @@
 ---
 status: Open
-tags:
+change: fix-submit-document-project-name
+triage:
   - bug
 ---
 

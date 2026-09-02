@@ -37,7 +37,7 @@
 - **承認・却下の置き場と押し間違いの手当て。** `update-ui-approval-review` が持つ
 - **編集面の全幅トグル。** `add-full-width-markdown-editor` が持つ
 - **develop に入っている prototype（指摘の一覧を左右へしまう）の本実装化。** あれは `add-full-width-markdown-editor` の `ui.md` を決めるための使い捨てで、この change は畳むか避けるかを決めるだけである（design 決定8）
-- **markdown の解釈・描画・見た目。** `modules/markdown/` へ入るのは `MarkdownEditor` が内側の口を素通しする1件だけで（design 決定1 の例外・R11）、描き方は1つも変えない
+- **markdown の解釈・描画・見た目。** `modules/markdown/` には入らない。承認画面のプレビューは `add-full-width-markdown-editor` で `MarkdownView` 直置きになるので、口はそのまま届く
 - **色の実値をデータから外すこと。** `Annotation.highlightColor` を色名だけにする案（`docs/specs/core/file-composables.md`）は保存形の変更にあたるので持ち込まない。塗りの実値が CSS へ移るのは、`::highlight()` が inline style を受け取れないことによる帰結にとどめる
 
 ## Capabilities
@@ -68,15 +68,13 @@
 - `app/components/review/ApprovalAnnotator.vue` — 面を2つにし、どちらにも注釈の面を載せる。`ViewMode`（`:106`）と `MODES`（`:108-112`）から `side-by-side` が消え、`annotatable`（`:121`）の分岐と `:463-465` の断り書きも消える。`PROTOTYPE` のコメントが付いた外側のレイアウトには手を入れない（design 決定8）
 - `app/pages/strokes/[sessionId]/proposal.vue` — **同じ書き換えが要る。** ここも3つの面を持ち（`:72-76`）、`ReviewAnnotateSource` を2箇所（`:170` と `:181`）で使っている
 - `app/composables/useProposalReview.ts` — `ViewMode`（`:16`）の取りうる値が変わる
-- `app/pages/projects/[projectId]/approvals/[approvalId].vue` — **承認画面のプレビューの中身を置いているのはここである**（`:113-137` の `#preview` slot）。整形された本文の面で指摘を付けられるようにする経路がここを通る（`MarkdownEditor` が `:119-126`、編集できない文書の `MarkdownView` が `:129-135`）
-- `modules/markdown/runtime/edit/MarkdownEditor.vue` — **口の素通しを足す。** 内側の `MarkdownView`（`:259` と `:269`）を `ref` で受け、`PositionPort` を `defineExpose` で出し直す（現状は `defineExpose` が1件も無い）。**決定1（`modules/markdown/` を触らない）をこの1点だけ緩める例外で、markdown の解釈・描画・見た目は1つも変わらない**（design 決定1・R11、tasks 6.4）
-- `modules/markdown/runtime/render/MarkdownView.vue` / `MarkdownSource.vue` / `runtime/position/` — **変更しない。** この change は口の利用者であり、口の提供者ではない。直す必要が出たら、それは口の設計が誤っていた合図である（design 決定1）。**上の `MarkdownEditor.vue` の素通しだけが例外**で、そこでも口の形は1文字も変わらない
+- `app/pages/projects/[projectId]/approvals/[approvalId].vue` — **承認画面のプレビューの中身を置いているのはここである**（`#preview` slot）。`add-full-width-markdown-editor` が編集を外して `MarkdownView` 直置きにするので、その `ref` から位置の口を受ける
+- `modules/markdown/` — **変更しない。** この change は口の利用者であり、口の提供者ではない。直す必要が出たら、それは口の設計が誤っていた合図である（design 決定1）
 
 **テスト**
 
 - `test/e2e/approval-annotation.spec.ts` — 生テキストの面の振る舞いは変えないが、**面の DOM が変わるので選択を作る補助関数（`selectRange`。`:27-57`）は書き換わる**（`data-start` の断片が無くなるため）。`approval-mode-side-by-side` を `:85` と `:111` で踏んでいる。整形された本文からの往復（散文・コードブロックの内側・図の3種）を足す
 - `test/e2e/upstream-style.spec.ts` — `approval-mode-side-by-side` を踏んでいる（`:286`）。2つの面に合わせる
-- `test/modules/markdown/runtime/edit/` の単体テスト（新規1本）— `MarkdownEditor` が `PositionPort` を出しており、呼びが内側の `MarkdownView` へ届くこと。整形された面が無いとき（生テキストを編集している枝）は `null` で倒れること（tasks 7.14）
 - `test/app/components/review/` と `test/app/composables/` の単体テスト（新規。写し元の構造に従う）— `annotation` spec の Scenario（同じ語の重複・要素をまたぐ選択・本文が動かないこと・フェンスの内側・言語指定の無いフェンス・フェンスをまたぐ選択・図の中の一語・図に添えても本文が動かないこと・図の注釈の差し戻し・重なりの3種）、範囲の妥当性の述語、位置の口が `null` を返したときの倒れ方、差し戻しペイロードの形（tasks 7章）
 - `yarn test:e2e` はこの change の artifact 作成時には実行していない
 
@@ -93,6 +91,7 @@
 
 - 前提: `create-module-markdown`（archive 済み）。位置の口が無いと整形の面に注釈を載せられない
 - 前提: `adr0017-sub-fix-normalization-offset`（archive 済み）。2つの面の座標系が揃っていないと、面をまたいだ注釈が別の場所を指す
+- 前提: `add-full-width-markdown-editor`。承認画面から編集を外し、プレビューを `MarkdownView` 直置きにする。これが先に入れば `MarkdownEditor` を触らずに口が届く。同じ `ApprovalAnnotator.vue` の外側（コメント欄の開閉と幅）もあちらが持つ
 - 並走: `update-ui-approval-review`（0/26）。同じ `ApprovalAnnotator.vue` を触る。あちらは差し戻しボタンの置き場と却下の追加で、面の数には触らない
 - 並走: `add-full-width-markdown-editor`。その prototype が `ApprovalAnnotator.vue` の外側のレイアウトを書き換えている（design 決定8）。**この change は外側に手を入れず、prototype を畳まない** — 畳むとあちらが `ui.md` を書くための材料を失う
 - ADR-0017「委譲の内訳」の `create-module-annotation`。完了判定はあちらが定める
@@ -107,6 +106,6 @@
 | `project/ui` と `stroke/frontier` の扱い | **delta を2本作った。`project/ui` は MODIFIED、`stroke/frontier` は REMOVED + ADDED** | どちらも「指摘を付けられるのは素の本文の側だけ」を定めており、この change と正面から食い違う。足さずに進めると、本体 specs に反する実装が入る。手法が割れるのは要件名が変わるかどうかによる（design 決定10）|
 | 保存形を触らない | **`Annotation` と差し戻しペイロードは1バイトも変えない** | 本家へ出て行く契約である。塗り方を変えるのに保存形を巻き込む理由が無い |
 | 色の実値の行き先 | **CSS へ移すが、データからは外さない** | `::highlight()` は inline style を受け取れないので、塗りの実値は CSS に置くほかない。一方 `Annotation.highlightColor` は本家へ渡る値なので、そこから色を抜くのは保存形の変更にあたる |
-| `MarkdownView` / `MarkdownSource` を触らない | **口の利用者に徹する** | 触る必要が出たら、それは親が公開した口の設計が誤っていた合図である。黙って直すと、口の検証という**この change の副次的な価値**が失われる（`MarkdownEditor` の素通しはこの表の外。下の注を見ること） |
+| `MarkdownView` / `MarkdownSource` を触らない | **口の利用者に徹する** | 触る必要が出たら、それは親が公開した口の設計が誤っていた合図である。黙って直すと、口の検証という**この change の副次的な価値**が失われる |
 
-**`MarkdownEditor` に位置の口が無い件は、この表から外れた。** 倒し方は**ユーザーの決めとして倒れている** — `MarkdownEditor` に `PositionPort` を `defineExpose` で出させ、決定1（`modules/markdown/` を触らない）をこの1点だけ緩める（design 決定1・R11、tasks 6.4）。私が取った仮定ではない。
+**`MarkdownEditor` に位置の口が無い件は消えた。** 承認画面は編集できない（本家どおり。ユーザー決定 2026-09-01）ので、プレビューは `MarkdownView` 直置きになり、口は最初から出ている。決定1 に例外は無い。

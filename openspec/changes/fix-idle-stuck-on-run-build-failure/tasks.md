@@ -30,10 +30,9 @@
 - [x] 4.5 `yarn test` が通る（746 tests passed, 0 failed）
 - [x] 4.6 型検査（`yarn typecheck`）が通る（exit 0）。**`yarn lint` はこのリポジトリに存在しない**（`package.json` に `lint` script が無く、eslint 設定も無い）ため実行していない——報告に明記
 
-## 5. 上位資料への整合反映（ユーザー承認を得てから）
+## 5. 上位資料への整合反映（change update-docs-for-runtime-fixes へ委譲済み）
 
-- [ ] 5.1 design.md の「上位資料への整合反映（提案）」をユーザーへ提示し、承認を得る
-- [ ] 5.2 承認を得たら `docs/specs/api/contract.md` の U13 の節（output・エラー行）を提案どおりに更新する。**承認前は書き換えない**
+- [x] 5.1 上位資料への整合反映を change `update-docs-for-runtime-fixes` へ委譲した。提案の内容は同 change の ticket に一覧（この change の分は `C4` / `C5`）。**この change では `docs/` を書き換えない**
 - [ ] 5.3 `docs/specs/api/contract.md` の A8 の節と `docs/specs/architecture/session-workflow.md` が変更不要のままであること（`invocation` の書き手が `invokeAi` 1つに保たれていること）を確かめる
 
 ## 6. 仕上げ

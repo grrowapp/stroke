@@ -1,7 +1,12 @@
 ---
-status: Tasks
+status: Doing
 change: separate-approval-decision-from-promotion
 tags:
+  - proposal
+  - specs
+  - design
+  - tasks
+triage:
   - enhancement
 ---
 

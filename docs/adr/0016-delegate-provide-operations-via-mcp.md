@@ -7,11 +7,11 @@
   - 起動フラグ・定型・設定の一覧 → [docs/specs/core/settings-reference.md](../specs/core/settings-reference.md)
   - 配線と置き場 → [docs/specs/architecture/session-workflow.md](../specs/architecture/session-workflow.md)
   - 代行を確定した方式とする判断 → [docs/specs/api/mcp-tools.md](../specs/api/mcp-tools.md)「提供の形」「代行するもの」（`adr0016-sub-implement-mcp-operations` の結論。暫定・第一段という書きぶりは docs から消えている）
-- **確定していないもの**: 2026-09-01 に足した後続3本（`fix-upstream-mcp-allowance` / `fix-direct-write-allowance` / `fix-project-id-lookup`）の委譲理由は、まだ docs に落ちていない。**取りこぼす規約が残るので archive にしない**（CLAUDE.md「更新対応」）
+- **確定していないもの**: 2026-09-01 に足した後続4本（`fix-upstream-mcp-allowance` / `fix-direct-write-allowance` / `fix-project-id-lookup` / `add-steering-context-tools`）の委譲理由は、まだ docs に落ちていない。**取りこぼす規約が残るので archive にしない**（CLAUDE.md「更新対応」）
 
 ## 決定
 
-`provide-operations-via-mcp` の範囲を**現行操作の代行**（既存 REST への薄いプロキシ）に限り、そこに収まらないものを 13 本の change へ委譲する。委譲は3種に分ける。
+`provide-operations-via-mcp` の範囲を**現行操作の代行**（既存 REST への薄いプロキシ）に限り、そこに収まらないものを 14 本の change へ委譲する。委譲は3種に分ける。
 
 - **後続**（この change の完了後に着手する。範囲を意図的に切った先）
   - `adr0016-sub-implement-mcp-operations`
@@ -22,6 +22,7 @@
   - `adr0016-sub-fix-upstream-mcp-allowance`（2026-09-01 追加）
   - `adr0016-sub-fix-direct-write-allowance`（2026-09-01 追加）
   - `adr0016-sub-fix-project-id-lookup`（2026-09-01 追加）
+  - `adr0016-sub-add-steering-context-tools`（2026-09-01 追加）
 - **前提**（この change の検証・承認がそれ無しには成立しない。tasks 6章に明記）
   - `adr0016-sub-add-stroke-check-approval-option`
   - `adr0016-sub-define-request-validation-messages`
@@ -249,7 +250,7 @@ instruction は `/get-overview` `/get-strokes` `/get-send-back` というスラ�
 
 ### バグ
 
-ticket の tags が bug のもの。あるべき振る舞いに戻す（4件）。
+ticket の tags が bug のもの。あるべき振る舞いに戻す（5件）。
 
 #### adr0016-sub-fix-busy-response-handling
 
@@ -322,6 +323,25 @@ ticket の tags が bug のもの。あるべき振る舞いに戻す（4件）�
 **起票時に書いた「本家が持つ別の手掛かり（`workflowRootPath` など）も見る」は取り下げた**（2026-09-01）。`GET /api/projects/list` は `workflowRootPath` を返さず、登録簿を直読みしても `SPEC_WORKFLOW_SHARED_ROOT` / `resolveGitRoot` で決まる値なので起動 cwd との一致も祖先関係も保証されない。**`agent-messanger` の食い違いの機序も git ではなかった**——当該ディレクトリに `.git` は無く、同ディレクトリの `.mcp.json` が `SPEC_WORKFLOW_SHARED_ROOT` を渡している（`git-utils.js` が env を最優先で返す）。食い違う登録が在るという事実は正しいが、原因の説明は誤りだった。
 
 **親との関係** — 後続。親 change の santa-method レビュー 8・9周目（2026-08-31）が見つけた。当初は範囲外として記録したが、**範囲外の扱いは不正だった**（ユーザー指摘 2026-09-01）。
+
+#### adr0016-sub-add-steering-context-tools
+
+- **状態**: Propose / bug
+- **成果物**: proposal のみ（specs・design・tasks 未作成）
+- **触るファイル**:
+  - `server/utils/mcp/exposed-tools.ts` — steering の公開一覧
+  - `server/mcp/tools/` — 公開するツール（既存の再利用か新設かは design）
+  - `nuxt.config.ts` — `--allowedTools` の `Read` / `Bash(openspec *)`
+  - `server/mcp/tools/get-steering-guide.ts` — 案内の文言
+  - `docs/specs/api/mcp-tools.md` / `docs/specs/core/settings-reference.md` — 整合反映
+
+**問題** — steering 工程に文脈を取る MCP ツールが1本も無く、claude が毎回ファイルを直接読んでいる。`docs/specs/api/mcp-tools.md` の「操作の入口はこれだけである。ファイルの直読み・直書きも、コマンドによる代行も採らない」と、`get-steering-guide` の「ファイルを直接読み書きしない」の両方が守られていない。
+
+**原因** — 公開しているのが `get-steering-guide` / `get-steering` / `submit-document` の3本だけである。実測 2026-09-01（`yarn check:stroke --approve` を2周、`debugLogDir` を一時設定して計測）では、steering の実行が2周とも `Read` 5回・`Bash` 1〜2回で `overview.txt` / `docs/proposal.md` / `state.json` / `strokes.json` / `openspec/config.yaml` を直接読み、`.spec-workflow` と `openspec` を `find` していた。**flontier 側は `Read` も `Bash` も0回**で、差は道具の有無そのものにある。
+
+**対処** — 文脈を取るツールを steering に用意し、その後で `Read` を外す。`Read` を先に外すと工程が成立しない（実測のとおり文脈は全部ファイルから取っている）。
+
+**親との関係** — 後続。`adr0016-sub-fix-direct-write-allowance` が `Write` / `Edit` を外して書き込み側を構造で閉じた結果、**読み取り側だけが開いたまま残っている**ことが実機検証で分かった（2026-09-01）。同 change の対の位置にある。
 
 ### 資料化
 

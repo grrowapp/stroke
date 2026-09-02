@@ -55,8 +55,9 @@ workflow/openspec/changes/
 # openspec の store 登録マーカー。マシンローカルな台帳メタデータで、リポジトリの成果物ではない
 .openspec-store/
 
-# cork（ticket の一覧ビュー）が ticket を開くたびに書く AppleDouble。
-# 本体ファイルのリソースフォークであって成果物ではない
+# cork（ticket の一覧ビュー）の副産物。列の定義はマシンごとの表示設定、
+# `._*` は ticket を開くたびに書かれる AppleDouble。どちらも成果物ではない
+openspec/tickets/.cork.json
 openspec/tickets/._*
 
 # nanopm — local PM state (not for version control)

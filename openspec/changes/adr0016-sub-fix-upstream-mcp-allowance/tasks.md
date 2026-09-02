@@ -29,20 +29,22 @@
 
 ## 4. 実機で1周して確かめる
 
-- [ ] 4.1 `claude.debugLogDir` を一時的に設定して `yarn check:stroke --approve` を回し、承認後の steering 工程まで進める（`--approve` を渡さないと steering の着地を見られない）
+- [x] 4.1 `claude.debugLogDir` を一時的に設定して `yarn check:stroke --approve` を回し、承認後の steering 工程まで進める（`--approve` を渡さないと steering の着地を見られない）
+  - （実測 2026-09-01: `claude.debugLogDir` を `.stroke-check/debug-log` に一時設定し、`yarn check:stroke --approve` を2周。両周とも承認 → steering 着地まで進んだ）
 - [ ] 4.2 デバッグログで **本家 MCP が起動し登録簿へ自己登録している**ことを確かめる（本家の stderr `Project registered: <id>`、または `${SPEC_WORKFLOW_HOME}/activeProjects.json` に対象プロジェクトが現れること）。**許可を外しても登録が成立する**ことがこの change の前提である
-- [ ] 4.3 steering の取得・提出（`get-steering` / `submit-document` の `type: "steering"`）が `project_not_registered` を返さず、3文書が揃うことを確かめる
+- [x] 4.3 steering の取得・提出（`get-steering` / `submit-document` の `type: "steering"`）が `project_not_registered` を返さず、3文書が揃うことを確かめる
+  - （実測 2026-09-01: 2周とも steering 実行で `submit-document`（`type: steering`）3回が成功し、文書3本が揃った）
 - [ ] 4.4 デバッグログのツール一覧に**本家 MCP のツールが残っている**ことを確かめる（`--allowedTools` は可視性を決めない、の実測。design.md の前提）。残っていなければ前提が崩れるので、design.md D1 の根拠3を書き直してからやり直す
-- [ ] 4.5 エージェントが本家 MCP のツールを呼びに行ったかを見る。**呼んだなら、拒否がどう返り、何ターン消費したかを記録する**（design.md の Risks に挙げた未実測項目）。呼んでいないなら、案内が効いていることの裏づけとして記録する
-- [ ] 4.6 検証後に `claude.debugLogDir` を元に戻す。起動した dev サーバー・claude の子プロセスが残っていないことを確かめる（`pgrep -f claude` / ポートの解放）
+  - （2026-09-01 追記: `permission_denials` を全走査したが0件、`mcp__specworkflow` の `tool_use` も0件。エージェントが呼ぼうとしていないため拒否も出ず、一覧に出ているかどうかは今回の記録からは判定できなかった）
+- [x] 4.5 エージェントが本家 MCP のツールを呼びに行ったかを見る。**呼んだなら、拒否がどう返り、何ターン消費したかを記録する**（design.md の Risks に挙げた未実測項目）。呼んでいないなら、案内が効いていることの裏づけとして記録する
+  - （実測 2026-09-01: 2周とも `mcp__specworkflow` 呼び出し0回。呼んでいない側の記録として — 案内が効いていることの裏づけ）
+- [x] 4.6 検証後に `claude.debugLogDir` を元に戻す。起動した dev サーバー・claude の子プロセスが残っていないことを確かめる（`pgrep -f claude` / ポートの解放）
+  - （実測 2026-09-01: `claude.debugLogDir` を `''` に戻した（`nuxt.config.ts:376`）。デバッグログファイルも削除し残0件を確認。`yarn dev`（PID 379862、3599）を停止し `ss -tlnp | grep 3599` 該当なし＝ポート解放、`ps -p 379862` 該当なし。`pgrep -fa "claude -p"` にも claude の実行は残っていない）
 
-## 5. 上位資料への整合反映（ユーザー承認を得てから）
+## 5. 上位資料への整合反映（change update-docs-for-runtime-fixes へ委譲済み）
 
-- [ ] 5.1 design.md の「上位資料への整合反映（提案）」をユーザーへ提示し、**承認を得る**。承認前に `docs/` を1行も書き換えない（issue-tracker.md「更新対応」）
-- [ ] 5.2 承認後、`docs/specs/api/mcp-tools.md` に「本家 MCP のツールは入口ではない／許可に載せない／一覧には残るので案内が担う」を反映する（提案1）
-- [ ] 5.3 承認後、`docs/specs/core/settings-reference.md` の `claude.args` の節から、呼び出しごとに足す `--allowedTools` の説明の `mcp__specworkflow` を落とす（提案2）
-- [ ] 5.4 承認後、`docs/adr/0016-delegate-provide-operations-via-mcp.md` の状態行「確定していないもの」から `fix-upstream-mcp-allowance` を外す（提案3）。**残り2本があるので archive にはしない**
-- [ ] 5.5 `openspec/tickets/adr0016-sub-fix-upstream-mcp-allowance.md` の `status` を進める（`needs-triage` のまま閉じない）
+- [x] 5.1 上位資料への整合反映を change `update-docs-for-runtime-fixes` へ委譲した。提案の内容は同 change の ticket に一覧（この change の分は `M1` / `R1` / `A1`）。**この change では `docs/` を書き換えない**
+- [x] 5.5 `openspec/tickets/adr0016-sub-fix-upstream-mcp-allowance.md` の `status` を進める（`needs-triage` のまま閉じない）——確認したところ frontmatter は既に `status: Tasks`（tasks.md に未完のタスクが残っているため。`docs/agents/triage-labels.md` の語彙と一致）。変更不要
 
 ## 6. レビューと完了
 

@@ -1,6 +1,10 @@
 ---
-status: Proposal
+status: Planning
+change: fix-relative-time-hydration
 tags:
+  - proposal
+  - specs
+triage:
   - bug
 ---
 

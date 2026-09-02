@@ -1,7 +1,12 @@
 ---
-status: Tasks
+status: Doing
 change: create-module-annotation
 tags:
+  - proposal
+  - specs
+  - design
+  - tasks
+triage:
   - enhancement
 ---
 

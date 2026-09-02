@@ -1,7 +1,8 @@
 ---
-tags:
-  - enhancement
 status: Open
+change: fold-stroke-css
+triage:
+  - enhancement
 order: -2.0
 ---
 

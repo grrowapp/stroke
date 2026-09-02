@@ -40,14 +40,14 @@
 
 **Non-Goals:**
 
-- 位置の口そのものを直すこと。この change は利用者であり、提供者ではない（決定1）。**`MarkdownEditor` が内側の口を素通しする1件だけが例外**で、口の形は1文字も変わらない
+- 位置の口そのものを直すこと。この change は利用者であり、提供者ではない（決定1）。例外は無い
 - 保存形と外へ出る値を変えること（Context 5）
 - 全体へのコメント、差し戻しの送信、承認・却下の置き場
 - prototype の本実装化（決定8）
 
 ## Decisions
 
-### 決定1: 口の利用者に徹する。`modules/markdown/` を触らない（例外は「口の素通し」1件だけ）
+### 決定1: 口の利用者に徹する。`modules/markdown/` を触らない
 
 `MarkdownView.vue` と `MarkdownSource.vue` は変更しない。**触る必要が出たら、それは親が公開した口の設計が誤っていた合図である。** 黙って直すと、口の検証というこの change の副次的な価値が失われるので、直したくなった箇所は記録して残す。
 
@@ -55,15 +55,7 @@
 
 **代替: 生テキストの面は `AnnotateSource` のまま残す。** 却下。塗りを口の上に載せる形にする以上、面が自前で `data-start` を振る理由が無くなる。残すと、生テキストの面だけが別の仕組みで動くことになり、「面の違いによる分岐が要らない」（`markdown/module`）が成立しない。
 
-**例外を1件だけ持つ: `MarkdownEditor.vue` に `PositionPort` を `defineExpose` で出させる**（R11、tasks 6.4）。承認画面のプレビューは `MarkdownEditor` を通っており（`ApprovalAnnotator.vue:317` の `<slot name="preview" />` へ `approvals/[approvalId].vue:119-126` が差し込む）、そこに口が出ていないと、整形された本文の面へ外から位置が届かない。緩める理由は3つある。
-
-- **触らないと change の主目的が成立しない。** 「整形された本文の面でも指摘を付けられる」は承認画面が主戦場であり（`project/ui`）、そこへ口が届かないまま残すと、この change は目的の半分を落とす
-- **`MarkdownView` が既に持っている口（`:141`）をそのまま通すだけである。** markdown の解釈・描画・見た目は1つも変わらない。`modules/markdown/` の内側に新しい判断を持ち込まない
-- **決定1 の趣旨は「注釈の都合で markdown の振る舞いを変えない」ことである。** 内側の口を素通しさせるのは、その趣旨に反しない
-
-**ただし素通し以上のことをやりたくなったら、それは口の設計が誤っていた合図である。** 素通しの向こう側で範囲を加工する・面を選び直す・注釈の存在を `modules/markdown/` に知らせる、のどれかが要ると分かった時点で手を止め、上の但し書き（直さずに記録する）へ戻る。**その場で直さない。**
-
-**代替: 呼ぶ側（`approvals/[approvalId].vue`）が注釈の面を自分で置く。** 却下。決定1 を字面のまま守れるが、面の組み立てが `ApprovalAnnotator` の外へ漏れ、承認画面だけが他と違う組み方を持つことになる。守られるのは字面だけで、趣旨（markdown の振る舞いを注釈の都合で動かさない）は素通しの方がよく守れる。
+**例外は無い。** 以前は「承認画面のプレビューが `MarkdownEditor` を通っていて口が出ていない」ため素通しの例外を持っていたが、承認画面は編集できない（本家どおり。ユーザー決定 2026-09-01）と決まり、`add-full-width-markdown-editor` がプレビューを `MarkdownView` 直置きにする。`MarkdownView` は既に口を出している（`:141`）ので、呼ぶ側はその `ref` から受けるだけでよい。
 
 ### 決定2: `SourceRange` を branded type にしない（ticket「引き継いだ判断」）
 
@@ -220,13 +212,13 @@ tasks 8.2 は「生テキストの面の振る舞いが変わっていないこ�
 | R2 | `::highlight()` に効かないプロパティ（枠・余白・`box-shadow`）で重なりを表そうとして、行き詰まる | 重なりは**件数から作る 1本の `Highlight` を下線で**出す（決定3）。tasks 2.1 で効くプロパティを実測してから作る |
 | R3 | **同一範囲・同色の2件目が本文の上で消える。** 色ごとに1つの `Highlight` にまとめると、同じ範囲は1つの範囲でしかない。`priority` で重なりを解こうとすると必ずここに落ちる | R2 と同じ 1本で塞ぐ（tasks 2.3）。`annotation` spec:207-210「同一範囲に2件」が落ちる形なので、**踏んだら止まる**（tasks 7.10） |
 | R4 | 座標から文字位置を引く経路（決定5）がブラウザで割れる。`caretPositionFromPoint` と `caretRangeFromPoint` のどちらが在るかが違う | tasks 5.1 が両方を見ることを明示している。**片方しか見ない実装にしない**。塗れない環境と同じく、引けなければ「一覧へ辿れない」に倒れるだけで、指摘は付けられる（tasks 5.4） |
-| R5 | **口が足りないと分かったとき、`modules/markdown/` を直したくなる**（決定1と正面からぶつかる） | 直さず記録する。直しが要るという事実が、この change の成果の一部である。直すなら別 change として起こし、口の利用者を1つ持った状態で判断する。**例外は決定1 が持つ1件（`MarkdownEditor` の素通し）だけ**で、そこから先へ広げない |
+| R5 | **口が足りないと分かったとき、`modules/markdown/` を直したくなる**（決定1と正面からぶつかる） | 直さず記録する。直しが要るという事実が、この change の成果の一部である。直すなら別 change として起こし、口の利用者を1つ持った状態で判断する |
 | R6 | prototype の書き換えた外側のレイアウトを、面の内側と取り違えて触る（決定8） | 触らない印は `PROTOTYPE` のコメントである（`ApprovalAnnotator.vue` の `:30` `:35` `:39` `:306` `:360` `:369` `:384` `:411` `:448`）。**版の食い違いはもう無い** — `usePrototypeFullWidth.ts` / `PrototypeVariantBar.vue` は存在せず、`:31` は `usePrototypePanels` を import している（実測 2026-09-01） |
 | R7 | **ストローク側の proposal 確認画面が抜け落ちる**（決定9） | tasks が `app/pages/strokes/[sessionId]/proposal.vue` と `app/composables/useProposalReview.ts` を 6.5〜6.8 で**名指しする**。6章の見出しにも両画面が対象であることを書いた。「移設の時点で気付く」には頼らない |
 | R8 | `project/ui` と `stroke/frontier` の delta が無いまま実装に入り、**本体 specs に反する実装が残る**（決定10） | **2本とも作成済みで、`openspec validate --strict` を通っている。** 本体 specs への反映は archive の工程が行う。この change 側でやることは残っていない |
 | R9 | 色の実値が CSS へ移ることで、`Annotation.highlightColor` に入っている実値と**二重管理**になる | 保存形は触らない（Context 5）。塗りは色**名**（`HighlightColorName`）で引き、`bg` / `border` の実値は塗りに使わない。ペイロードに残る実値は本家へ渡すためのものと割り切る |
 | R10 | `AnnotateSource` を「据置」とした資料（Context 8）と食い違ったまま進む | 上位資料への整合反映として下に出し、ユーザー承認まで着手しない |
-| R11 | **承認画面の整形された本文の面へ、位置の口が届かない。** プレビューの中身は呼ぶ側が `<slot name="preview" />`（`ApprovalAnnotator.vue:317`）へ差し込んでおり、編集できる文書では `MarkdownEditor` が入る（`approvals/[approvalId].vue:119-126`）。`MarkdownEditor.vue` は `MarkdownView` を内側に持つ（`:259` `:269`）が、**`PositionPort` を `defineExpose` で出し直していない**（実測。`defineExpose` が1件も無い） | **`MarkdownEditor` に `PositionPort` を出させる（決定済み。決定1 の例外1件）。** 内側の `MarkdownView` を `ref` で受け、`toSourceRange` / `toDomRange` をそのまま通すだけにする（tasks 6.4）。markdown の解釈も描画も見た目も動かないので、決定1 の趣旨は保たれる。**素通し以上のことが要ると分かったら、そこで手を止める**（決定1 の但し書き、R5）。ストローク側の proposal 確認画面はプレビューが `MarkdownView` を直に置いている（`proposal.vue:161`）ので、こちらには当たらない |
+| R11 | **`add-full-width-markdown-editor` より先に着手すると、承認画面のプレビューがまだ `MarkdownEditor` で、位置の口が届かない** | 着手順を守る（あちらが先。proposal「他の change との関係」）。先に入っていなければ着手しない |
 
 ## 上位資料への整合反映（提案。ユーザー承認まで着手しない）
 
@@ -250,7 +242,7 @@ tasks 8.2 は「生テキストの面の振る舞いが変わっていないこ�
 - 面が3つから2つになる。**失われる操作は無い** — 並べる面でできたことは、どちらの面でもできるようになる
 - 整形された本文の面で指摘を付けられるようになり、「切り替えるとコメントを付けられます」の断り書きが消える
 
-ロールバックは `AnnotateSource.vue` と面の組み立て（`ApprovalAnnotator.vue` / `proposal.vue`）を戻すだけで元に戻る。設定もデータも動かさない。`modules/markdown/` へ入るのは `MarkdownEditor` の口の素通し1件だけ（決定1 の例外）で、**これは使い手が居なくなっても害が無い**（出ているだけの口で、描き方を何も変えていない）。戻すときにあちらを巻き込まない。
+ロールバックは `AnnotateSource.vue` と面の組み立て（`ApprovalAnnotator.vue` / `proposal.vue`）を戻すだけで元に戻る。設定もデータも動かさない。`modules/markdown/` には入らない。
 
 ## Open Questions
 

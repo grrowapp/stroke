@@ -1,6 +1,9 @@
 ---
-status: Proposal
+status: Planning
+change: create-spec-document
 tags:
+  - proposal
+triage:
   - enhancement
 ---
 

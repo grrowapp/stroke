@@ -38,6 +38,8 @@
 
 **「`phase` を動かさない」は型で表せる**（tasks 2.2）。`stateSchema` は `phase` の `z.discriminatedUnion` である（`server/utils/stroke/session-store.ts:83-94`）。判断を読む・書く・消す口を **`proposed` の分岐に閉じた型**（`Extract<SessionState, { phase: 'proposed' }>`）で受け、同じ型を返す形にすれば、`phase` を別の値へ動かす書き方が型で通らない。**新しい制約を足すのではなく、既にある分岐を使い切るだけである。**
 
+> **実装時の補足（2026-09-01）。** `SessionState` の型は zod と違い `stroking | proposed` を1つの分岐（`phase: 'stroking' | 'proposed'`）にまとめていたので、`Extract<SessionState, { phase: 'proposed' }>` は `never` になる。型の側も zod と同じく分岐を割り、`proposed` を `ProposedState`（`decision?` を持つ）として名前を付けた。判断を書く・消す口は `withDecision(state: ProposedState, …): ProposedState` / `withoutDecision(state: ProposedState): ProposedState` の純関数で、保存は呼び出し側が `writeState` で行う（受け口が前提の判定を持つため）。`approved` を渡す呼び出しが型で落ちることは `@ts-expect-error` で固定した（`test/server/utils/stroke/session-decision.test.ts`）。
+
 **代案A: `phase` に新しい値（`decided` など）を足す。** 採らない。`Phase` は `shared/stroke.ts:104` の3値で、`server/handler/phase.ts`・`docs/specs/api/contract.md`・U8/U9/U11/A5/A7 の phase 判定・画面の `approved` 判定がこの3値を前提にしている。局面を1つ増やすと、この change が問うていない場所が全部動く。**判断は局面ではなく、局面の中で持つ印である**——判断が下りてもセッションはセッションのままだ、というのがこの change の骨子なので、局面を分けるのは筋が違う。
 
 **代案B: 別ファイル（`decision.json`）に持つ。** 採らない。状態が2つの入れ物へ割れる。加えて `updatedAt` は `state.json` の mtime である（`docs/specs/api/contract.md:192`）ので、判断を別ファイルへ書くと一覧の並びが動かない——判断という利用者の操作が、時系列に現れなくなる。
@@ -47,6 +49,8 @@
 `api/session/approve` の「判断は、それが下された proposal に結びつく」は、**proposal の受理（A7）が記録された判断を消す**ことで満たす。proposal の版番号やハッシュを持たない。
 
 **代案: proposal に版の印を持たせ、昇格の直前に突き合わせる。** 採らない。版という新しい概念を系に持ち込むことになり、印を誰が採番し誰が持ち回るかが増える。**proposal を書く口が1つなら、そこで消せば足りる。** ただしこれは前提に依存するので、**proposal を書く口が A7 だけであることを実装で確かめ、テストで固定する**（tasks 1章）。口が増えたら漏れる形なので、リスクとして下に記録する。
+
+> **実測（2026-09-01・tasks 1.1）。** `sessionProposal(...).write` の呼び出し元は `server/api/strokes/[id]/proposal.post.ts:36`（A7）の1つだけ。他の2箇所（`approve.post.ts`・`server/routes/api/strokes/[id]/ws/proposal.ts`）は `read` である。前提は成立し、決定2 はそのまま。A7 は前の状態を丸ごと写さず `proposed` の状態を組み立て直す形にし、`decision` を持ち越さないことを `test/server/api/strokes/proposal.post.test.ts` で固定した。差し戻し（U9）が判断に触れないことは `send-back.post.test.ts` で固定した。
 
 ### 決定3: 昇格の受け口は `POST /api/strokes/:id/promote`。名前を引数に取らない
 
@@ -74,6 +78,8 @@
 
 **画面の見え方には出ない。** 生成中の判定は `phase` と `.spec-workflow/` だけで行い、`invocation` を材料にしない（`project/generation`・`creating.ts:13`）。
 
+> **実測（2026-09-01・tasks 1.3・1.4）。** 一覧の材料を作る `server/utils/control/creating.ts` と `directory.ts` は `invocation` を読まない（`server/utils/control/` で `invocation` を含むのは `board.ts`（配信）と `creating.ts`（読まないと書いた doc）だけ）。E2E `stroke-exit.spec.ts` は昇格直後の行が `data-creation="in-progress"` で出ることを見ており、`failed` にしても通った。巡回と画面のキックで渡る値は同じ——cwd は巡回が U12 の `path`（`sessionDir(root, name)`）、画面が U2 の `path`（同じ式）で、`kind` は U13 が `phase === 'approved'` から導くのでどちらも `steering`。
+
 **どこから書くかは決定7で決める。** ここで決めたのは「昇格の完了時点の値は `failed`」までである。
 
 ### 決定5: 3段を叩くのは昇格を要求した側。既定の流れは今の体験を変えない
@@ -83,6 +89,8 @@
 **承認モーダルで確定した後、昇格へは自動で続ける。** 今の体験（承認 → 一覧へ戻る → 生成中の行）を変えない。**取り消せる余地は、API としてそこに在ることで満たす**——判断と昇格が別の呼び出しになった時点で、間に人の操作を挟める形は成立している。挟むかどうかは面の設計であり、この change では決めない（Non-Goals）。
 
 `broadcastProjectCreation`（`server/utils/control/board.ts:86`）は**昇格の受け口へ移す**。判断の記録では配信しない——その時点でプロジェクトはまだ無く、配信すれば一覧に生成中の行が出てしまう。
+
+> **実装時の補足（2026-09-01）。** 画面の `approve()` は U10 を叩く前に `DELETE .../approve` を1回送る。承認と昇格の間で画面が落ちたセッションを開き直すと、判断が残ったまま `proposed` の画面に戻り、U10 は「重ねて判断は受理しない」で 409 になる——面には取り消しの操作が無い（Non-Goals）ので、画面はいま確定した名前で残っている判断を置き換える。判断が無ければ `DELETE` は何も変えない。U14 が `name-conflict` を返したとき（判断の後に同じ名前が保存先に現れた）も、判断を取り下げてから名前の衝突として面に出す。U13 は U2 の `path` を cwd に添えて画面が叩き、届かなくても知らせない——昇格の受け口が `failed` にしてあるので巡回が拾う（起動の段のやり直しは巡回である）。
 
 ### 決定6: 昇格の失敗の器（`promotionFailed` / `retryPromotion`）は残し、やり直しの単位を段にする
 
@@ -127,6 +135,7 @@
 
 - 展開の順序に制約は無い。判断のフィールドを持たない既存のセッションは「判断が記録されていない」として扱われ、承認からやり直せる
 - 巻き戻すときは**読めるが、書き戻すと消える**。`stateSchema` は `phase` の `z.discriminatedUnion` で（`server/utils/stroke/session-store.ts:83-94`）、3つの分岐はいずれも strict でない `z.object`（:84・:85・:86-93）である。strict でないので `decision` を持つ `state.json` を旧実装が**読むことはできる**。ただし **zod は既定で未知のキーを strip する**ので、`readState` の `stateSchema.safeParse`（:152）を抜けた時点で `decision` は落ちている。`writeState` が書くのは parse 済みのオブジェクトなので（:212-214）、旧実装が一度読んで書き直したセッションからは `decision` が**消える**。残るのではなく黙って失われる、が正しい。実害は「そのセッションは判断が記録されていないものとして扱われ、承認からやり直しになる」ことに留まり、proposal もストロークの往復の記録も無事である——**この点は実装時に実測で確かめる**（tasks 1.2）
+  - **実測（2026-09-01・zod 4.4.3）。** `decision` を知らない旧スキーマで `decision` を持つ `state.json` を `safeParse` すると `success: true`、parse 後のキーは `phase, currentQuestion, invocation, retries` で `decision` は落ちている。**読めるが、書き戻すと消える**で正しい。記述はこのまま
 
 ## 上位資料への整合反映（ユーザー承認が要る）
 

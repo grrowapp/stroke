@@ -1,6 +1,11 @@
 ---
-status: Tasks
+status: Doing
+change: document-settings-reference
 tags:
+  - proposal
+  - design
+  - tasks
+triage:
   - enhancement
 order: -1.0
 ---

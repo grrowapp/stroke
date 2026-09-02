@@ -1,7 +1,13 @@
 ---
+status: Doing
+change: fix-ws-disconnect-crash
 tags:
+  - proposal
+  - specs
+  - design
+  - tasks
+triage:
   - bug
-status: Tasks
 ---
 
 # fix-ws-disconnect-crash

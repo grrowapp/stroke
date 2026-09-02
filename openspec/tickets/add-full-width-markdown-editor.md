@@ -1,7 +1,13 @@
 ---
-status: Tasks
+status: Doing
 change: add-full-width-markdown-editor
 tags:
+  - proposal
+  - specs
+  - ui
+  - design
+  - tasks
+triage:
   - enhancement
 ---
 

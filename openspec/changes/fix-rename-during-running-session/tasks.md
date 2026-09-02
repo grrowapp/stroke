@@ -36,13 +36,12 @@
 
 - [ ] 5.1 `yarn check:stroke --approve` を通す。`scripts/stroke-check.ts` の `approve()` は今も実行の終わりを待つが、待たせずに承認を投げた場合に 409 busy で断られることも一度手で確かめる
 - [x] 5.2 `scripts/stroke-check.ts` の `approve()` のコメント「**承認そのものに busy ガードは無い**（`approve.post.ts`「busy ガードは U7・U9 のみ…」）」を実装に合わせて直す。実行の終わりを待つ理由（断られずに一度で通したい）に書き換える
-- [ ] 5.3 起動したものを止め、ポートと一時ファイルを片付ける
+- [x] 5.3 起動したものを止め、ポートと一時ファイルを片付ける
+  - （実測 2026-09-01: `yarn dev`（PID 379862、3599）を `kill -TERM` で停止し `ss -tlnp | grep 3599` 該当なし＝ポート解放を確認。`claude.debugLogDir` を `''` に戻し、デバッグログファイルを削除して残0件を確認した）
 
-## 6. 上位資料への整合反映（ユーザー承認が要る）
+## 6. 上位資料への整合反映（change update-docs-for-runtime-fixes へ委譲済み）
 
-- [ ] 6.1 design.md「上位資料への整合反映」の3件をユーザーへ提示し、承認を得る
-- [ ] 6.2 承認が得られたら `docs/specs/api/contract.md` の U10・`## 約束`・U13 を直す。**承認前に書き換えない**
-- [ ] 6.3 承認が得られなかった項目は、食い違いが残ることを ticket に書き残す
+- [x] 6.1 上位資料への整合反映を change `update-docs-for-runtime-fixes` へ委譲した。提案の内容は同 change の ticket に一覧（この change の分は `C1` / `C2` / `C3`）。**この change では `docs/` を書き換えない**
 
 ## 7. 締め
 

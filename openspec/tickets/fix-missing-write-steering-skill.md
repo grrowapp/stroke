@@ -1,6 +1,7 @@
 ---
 status: Open
-tags:
+change: fix-missing-write-steering-skill
+triage:
   - bug
 ---
 

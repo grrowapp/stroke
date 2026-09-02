@@ -1,7 +1,10 @@
 ---
+status: Planning
+change: view-openspec-changes
 tags:
+  - proposal
+triage:
   - enhancement
-status: Proposal
 ---
 
 # view-openspec-changes

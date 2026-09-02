@@ -1,6 +1,9 @@
 ---
-status: Proposal
+status: Planning
+change: align-coding-conventions
 tags:
+  - proposal
+triage:
   - enhancement
 ---
 

@@ -1,7 +1,11 @@
 ---
+status: Planning
+change: scope-storage-requirements
 tags:
+  - proposal
+  - specs
+triage:
   - enhancement
-status: Proposal
 ---
 
 # scope-storage-requirements

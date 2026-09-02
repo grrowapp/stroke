@@ -1,7 +1,10 @@
 ---
+status: Planning
+change: adopt-upstream-design-tokens
 tags:
+  - proposal
+triage:
   - enhancement
-status: Proposal
 ---
 
 # adopt-upstream-design-tokens

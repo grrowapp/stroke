@@ -1,7 +1,10 @@
 ---
-status: Tasks
+status: Doing
 change: create-rule-directory-creation
 tags:
+  - proposal
+  - tasks
+triage:
   - maintenance
 ---
 

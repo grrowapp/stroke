@@ -50,7 +50,8 @@ operations:
         チェックボックスを付けてはならない。**。規定は
         `docs/agents/ticket-labels.md`「Doing」
 
-      - `openspec/tickets/<change-id>.md` の `tags` へ既に同じ物がある場合を除き
+      - >-
+        `openspec/tickets/<change-id>.md` の `tags` へ既に同じ物がある場合を除き
         `<ブランチ名>/<セッション ID>` を追記する。`tags` は追記のみで、
         作業が完了しても既存の項目を消さない。担当が変わったら同じ形式で
         さらに追記する。規定は `docs/agents/issue-tracker.md`「ticket の起票」

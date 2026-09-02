@@ -1,6 +1,9 @@
 ---
-status: Proposal
+status: Planning
+change: unify-agent-conventions
 tags:
+  - proposal
+triage:
   - enhancement
 ---
 
