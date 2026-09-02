@@ -62,16 +62,18 @@
 | `StrokeBreadcrumb.vue` | 116 | `strokes: Stroke[]` / `current` | — |
 | `WaitingIndicator.vue` | 11 | `message: string` | — |
 | `review/AnnotateSource.vue` | 248 | `source: string` / `comments: Annotation[]` / `port?: PositionPort \| null`（面の `ref` を素通し）+ default slot（面。`sourceShown: SourceRange[]` を渡す） | `select: [{text,start,end}]` / `clickMark: [id]`。`defineExpose({ reveal })`（一覧→本文） |
-| `review/ApprovalAnnotator.vue` | 680 | `source` / `projectId` / `approvalId` / `canRespond` + `#preview` slot | — 。面は2つ（プレビュー／注釈）。コメント欄はしまえる（幅固定） |
+| `review/ApprovalAnnotator.vue` | 835 | `source` / `projectId` / `approvalId` / `approvalTitle` / `canRespond` + `#preview` slot | — 。決める操作の行（レビューを閉じる／即時承認／即時却下／修正を依頼）を持ち、その場で決めて一覧へ戻す。面は2つ（プレビュー／注釈）。コメント欄はしまえる（幅固定） |
 | `review/CommentCard.vue` | 57 | `comment: Annotation` | `edit: [id]` / `remove: [id]` |
 | `review/CommentModal.vue` | 62 | 編集対象ほか + `v-model:open` | `save: [comment, color]` |
+| `review/RejectModal.vue` | 66 | `v-model:open` | `submit: [reason]`。即時却下の理由（本家の Reject Approval の写し。空では送れない） |
 | `review/Modals.vue` | 94 | **`review: ReturnType<typeof useProposalReview>`** | — |
-| `shared/NotificationToaster.vue` | 128 | — | — |
+| `shared/NotificationToaster.vue` | 35 | — | — 。tone → 色クラスと `toast.add()` は `useUpstreamToast` へ抜き出した |
 | `stroke/OverviewForm.vue` | 65 | — | `submit: [overview]` |
-| `workspace/ApprovalCard.vue` | 208 | `approval: ApprovalDto` / `to` / `projectId` | `responded: []` |
+| `workspace/ApprovalCard.vue` | 197 | `approval: ApprovalDto` / `to` / `projectId` | `responded: []`。却下は `RejectModal`、結果は `useUpstreamToast` |
 | `workspace/EmptyState.vue` | 43 | `testid` / `title` / `icon` + 既定 slot | — |
 | `workspace/RecordList.vue` | 209 | `items: RecordItem[]` / `testid` / `labels` | — |
 | `workspace/WorkspacePanel.vue` | 28 | `title` / `subtitle` / `testid` + `actions` slot | — |
+| `workspace/WorkspaceShell.vue` | 182 | 既定 slot | — 。下層の殻（ヘッダー・左のナビ・本文余白）。`layouts/workspace.vue` と `layouts/approval.vue` が共用 |
 
 ### 参照元
 
@@ -84,8 +86,10 @@
 | `review/ApprovalAnnotator` | `pages/projects/[projectId]/approvals/[approvalId].vue`。`AnnotateSource` / `CommentCard` / `CommentModal` / `useAnnotations` をポータル側から使い回す唯一の経路 |
 | `shared/NotificationToaster` | `app.vue` 直下 |
 | `stroke/OverviewForm` | `pages/strokes/index.vue` |
+| `review/RejectModal` | `workspace/ApprovalCard` と `review/ApprovalAnnotator`（一覧のカードと対象文書を読む画面で同じモーダル） |
 | `workspace/ApprovalCard` | `pages/projects/[projectId]/approvals/` の2画面 |
-| `workspace/EmptyState` | `layouts/workspace.vue` と下層の5画面。モジュール側（`MarkdownView`）は参照しない — 中身が無いときに出すものは `#empty` slot で呼ぶ側が渡す |
+| `workspace/WorkspaceShell` | `layouts/workspace.vue` と `layouts/approval.vue`（承認依頼をその場のモーダルとして開く器） |
+| `workspace/EmptyState` | `workspace/WorkspaceShell.vue` と下層の5画面。モジュール側（`MarkdownView`）は参照しない — 中身が無いときに出すものは `#empty` slot で呼ぶ側が渡す |
 | `workspace/RecordList` | specs / tasks / steering の4画面 |
 | `workspace/WorkspacePanel` | 下層の9画面すべて |
 
@@ -103,7 +107,8 @@ app/components/
 │   ├── ApprovalAnnotator.vue
 │   ├── CommentCard.vue
 │   ├── CommentModal.vue
-│   └── Modals.vue
+│   ├── Modals.vue
+│   └── RejectModal.vue
 ├── shared/                  ← ポータル側の共用
 │   └── NotificationToaster.vue
 ├── stroke/                  ← 画面1でしか使わないもの
@@ -112,7 +117,8 @@ app/components/
     ├── ApprovalCard.vue
     ├── EmptyState.vue
     ├── RecordList.vue
-    └── WorkspacePanel.vue
+    ├── WorkspacePanel.vue
+    └── WorkspaceShell.vue
 ```
 
 （未追従の `project/` と `prototype/` はこの図に含めていない。）
@@ -127,7 +133,7 @@ app/components/
 
 ## 受け渡しの形
 
-13本は **props と emit**（と slot）で閉じている。型は `#shared/stroke`（ストローク側）と `#shared/types`（ポータル側）から取る。素直な形。
+15本は **props と emit**（と slot）で閉じている。型は `#shared/stroke`（ストローク側）と `#shared/types`（ポータル側）から取る。素直な形。
 
 **1本だけ違う。**
 

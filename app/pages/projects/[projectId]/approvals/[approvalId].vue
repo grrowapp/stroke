@@ -12,8 +12,10 @@
  * 直すのはその文書自身の画面（仕様書・ステアリング）で行う。編集が無いのは承認画面だけで、
  * 仕様書・ステアリングの6本の編集は変えていない。
  *
- * 承認・却下はここに置かない。それは承認一覧の `ApprovalCard` が持つ。差し戻しだけを
- * ここに置くのは、それが運ぶ指摘がこの画面にしか無いためである。
+ * 決める操作（レビューを閉じる・即時承認・即時却下・修正を依頼）は `ApprovalAnnotator` の
+ * 操作行が持つ（change `update-ui-approval-review` design 決定2）。読んで判断した場で
+ * 終わらせられ、別の画面へ戻らなくてよい。器はルート付きモーダル（`layouts/approval.vue`。
+ * design 決定1）で、一覧の上にその場で開き、URL でも直接指せる。
  */
 import { computed, definePageMeta, useRoute, useTemplateRef } from '#imports';
 
@@ -24,7 +26,7 @@ import WorkspacePanel from '~/components/workspace/WorkspacePanel.vue';
 import { useBoardSocket } from '~/composables/useBoardSocket';
 import { useApprovalContent, useProjectId, usePendingApprovals } from '~/composables/useProjectApi';
 
-definePageMeta({ layout: 'workspace' });
+definePageMeta({ layout: 'approval' });
 
 const route = useRoute();
 const projectId = useProjectId();
@@ -83,6 +85,7 @@ const CATEGORY: Record<string, string> = { spec: '仕様', steering: 'ステア�
       :source="source"
       :project-id="projectId"
       :approval-id="approvalId"
+      :approval-title="approval.title"
       :can-respond="upstreamConnected"
       :preview-port="previewSurface"
     >

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 承認対象の文書に指摘を付ける面。本家の `ApprovalsAnnotator.tsx` に対応する。
+ * 承認対象の文書に指摘を付け、その場で決める面。本家の `ApprovalsAnnotator.tsx` に対応する。
  *
  * 見せ方は2つ。**どちらの面でも指摘を付けられる**（specs/project/ui）。
  *
@@ -9,6 +9,13 @@
  *
  * 両方を並べる面（本家の `side-by-side`）は持たない。あれは読む面と指摘する面が別だったことに
  * 由来する面で、どちらでも付けられるなら要らない（ADR-0017）。
+ *
+ * **決める操作（即時承認・即時却下・修正を依頼）は画面上部の操作行に集める**
+ * （change `update-ui-approval-review` design 決定2）。本家の実画面がその形——決める操作は
+ * カードの操作行に集まり、面の切替はその下の行に単独で置かれる。行の先頭は「レビューを閉じる」
+ * （本家の Close Review の位置。一段明るい `.sb-action-light`）。文言は本家の日本語ロケール
+ * （決定4）。修正を依頼はコメント 0 件では disabled（本家どおり）で、コメントが有る状態の
+ * 即時承認は本家どおり警告で止める（サーバーも注釈付き承認を受けない）。
  *
  * 指摘はレンダリング後の HTML ではなく生テキストに対して付け、位置は文字オフセットで
  * 持つ（`ReviewAnnotateSource`）。同じ語が本文に何度現れても、選んだ箇所だけが残る。
@@ -23,19 +30,31 @@
  *
  * 右の指摘の一覧（コメント欄）はしまえる（specs/project/ui「承認画面の指摘の一覧はしまえる」）。
  * しまうと 44px のつまみだけが残り、空いた幅は本文が取る。開閉の状態はこの部品の中に閉じ、
- * 左のナビ（`workspace.vue`）とは連動しない。保存もしない。
+ * 左のナビ（`WorkspaceShell`）とは連動しない。保存もしない。決める操作は欄の外（操作行）に
+ * 居るので、しまっても見えたままである。
  *
- * 溜めた指摘は差し戻し（`needs-revision`）で本家へ渡る。承認・却下は指摘を運ばないので
- * ここには置かない（承認一覧の `ApprovalCard` が持つ）。
+ * 溜めた指摘は修正依頼（`needs-revision`）で本家へ渡る。即時承認・即時却下は指摘を運ばない
+ * （`response` しか持たない）。送った結果はトーストで示す——閉じただけにしない
+ * （specs/project/ui「理由を求める入力は本文の上に重ねて出す」）。
  */
 import { useEventListener, useMounted } from '@vueuse/core';
-import { computed, navigateTo, onMounted, refreshNuxtData, ref, useTemplateRef } from '#imports';
+import {
+  computed,
+  navigateTo,
+  onMounted,
+  refreshNuxtData,
+  ref,
+  useRouter,
+  useTemplateRef,
+} from '#imports';
 
 import MarkdownSource from '#markdown/render/MarkdownSource.vue';
 import AnnotateSource from '~/components/review/AnnotateSource.vue';
 import CommentCard from '~/components/review/CommentCard.vue';
 import CommentModal from '~/components/review/CommentModal.vue';
+import RejectModal from '~/components/review/RejectModal.vue';
 import { useAnnotations } from '~/composables/useAnnotations';
+import { useUpstreamToast } from '~/composables/useUpstreamToast';
 import { pendingApprovalsKey, respondToApproval } from '~/composables/useProjectApi';
 
 import type { PositionPort, SourceRange } from '#markdown/position/types';
@@ -46,6 +65,8 @@ const props = defineProps<{
   source: string;
   projectId: string;
   approvalId: string;
+  /** 承認依頼の件名。送った結果のトースト（「「件名」が承認されました」）に使う */
+  approvalTitle: string;
   /** 本家に繋がっていないと送れない */
   canRespond?: boolean;
   /**
@@ -72,8 +93,9 @@ const MODES: { value: ViewMode; label: string }[] = [
 ];
 
 /**
- * 開いたときは整形して読む面にする。本家も `MDXEditorWrapper mode="view"` で開く。
- * 承認は読んで判断する場で、いきなり生テキストにはしない。読む面のまま指摘を付けられる。
+ * 開いたときは整形して読む面にする。承認は読んで判断する場で、いきなり生テキストには
+ * しない。読む面のまま指摘を付けられる（specs/project/ui「承認画面を開いた直後」。
+ * 本家は Annotate で開くが、あちらは Preview では指摘を付けられないための形）。
  */
 const mode = ref<ViewMode>('preview');
 
@@ -213,7 +235,7 @@ const TUCKED_WIDTH = 44;
 const openWidth = ref<number | null>(null);
 
 /**
- * 左のナビの畳みは `workspace.vue` が cookie（`spec-workflow-sidebar-collapsed`）に持つ。
+ * 左のナビの畳みは `WorkspaceShell` が cookie（`spec-workflow-sidebar-collapsed`）に持つ。
  * ここではその値で**測ってよい瞬間かどうか**だけを見る。左の開閉に合わせてコメント欄を
  * 動かす（連動する）コードは持たない。
  */
@@ -330,9 +352,11 @@ function onDragStart(event: PointerEvent): void {
   window.addEventListener('pointerup', onDragEnd, { once: true });
 }
 
-// --- 差し戻し
+// --- 決める（即時承認・即時却下・修正を依頼）と閉じる
 
-const sending = ref(false);
+const { show } = useUpstreamToast();
+
+const busy = ref<'approve' | 'reject' | 'revision' | null>(null);
 const failure = ref<string | null>(null);
 
 /**
@@ -344,25 +368,113 @@ const mounted = useMounted();
 
 const cannotRespond = computed(() => mounted.value && props.canRespond === false);
 
+/** 本家はコメント > 0 のときだけ件数を付ける（Request Revisions (N)） */
+const revisionLabel = computed(() =>
+  comments.value.length > 0 ? `修正を依頼（${comments.value.length}）` : '修正を依頼',
+);
+
+const router = useRouter();
+
 /**
- * 指摘を付けて本家へ返す。
+ * レビューを閉じる。判断せずに一覧へ戻るだけで、何も送らない。
+ *
+ * 一覧から来たときは履歴を1つ戻る——進む（push）と一覧が先頭から描き直されるが、
+ * 戻る（back）ならブラウザが覚えたスクロール位置へ着地し、どこを見ていたかが保たれる
+ * （specs/project/ui「開いた承認依頼を閉じる」）。URL の直開きや通知からの着地では
+ * 戻る先が一覧ではないので、一覧へ進む。
+ */
+function closeReview(): void {
+  const back = (router.options.history.state['back'] ?? null) as string | null;
+  if (back !== null && back.endsWith('/approvals')) {
+    router.back();
+    return;
+  }
+  void navigateTo(`/projects/${props.projectId}/approvals`);
+}
+
+/**
+ * 決着の共通処理。本家が保留中から外すので、この承認依頼の画面はもう空になる。一覧へ戻す。
+ *
+ * 戻る前に保留中の一覧を捨てる。一覧ページと詳細ページは同じキーでこれを取っており、
+ * 捨てないと**一覧が詳細ページで取った古い中身をそのまま描く**（応答したはずの
+ * 承認依頼が残って見える）。先回りして画面から消すのではなく、本家から取り直させる。
+ */
+async function settle(): Promise<void> {
+  a.clear();
+  await refreshNuxtData(pendingApprovalsKey(props.projectId));
+  await navigateTo(`/projects/${props.projectId}/approvals`);
+}
+
+/** コメントが有る状態で即時承認を押した。本家どおり警告で止める */
+const approveWarning = ref(false);
+
+/**
+ * 即時承認。コメントが有るときは送らない——注釈を運べるのは修正依頼だけで、承認に
+ * 付けて送ることはできない（specs/project/ui。サーバーも弾く）。本家も同じ警告で止める。
+ */
+async function approve(): Promise<void> {
+  if (busy.value !== null) return;
+
+  if (comments.value.length > 0) {
+    approveWarning.value = true;
+    return;
+  }
+
+  busy.value = 'approve';
+  failure.value = null;
+
+  const reason = await respondToApproval(props.projectId, props.approvalId, 'approve', {});
+
+  busy.value = null;
+
+  if (reason !== null) {
+    failure.value = reason;
+    return;
+  }
+
+  // 送った結果を示す。文言は本家の通知（`approvalsPage.notifications.approved`）
+  show(`「${props.approvalTitle}」が承認されました`, 'success');
+  await settle();
+}
+
+// --- 即時却下（理由はモーダルで求める）
+
+const rejecting = ref(false);
+
+async function reject(reasonText: string): Promise<void> {
+  if (busy.value !== null) return;
+
+  busy.value = 'reject';
+  failure.value = null;
+
+  const reason = await respondToApproval(props.projectId, props.approvalId, 'reject', {
+    response: reasonText,
+  });
+
+  busy.value = null;
+
+  if (reason !== null) {
+    failure.value = reason;
+    return;
+  }
+
+  show(`「${props.approvalTitle}」が却下されました`, 'info');
+  await settle();
+}
+
+/**
+ * 指摘を付けて本家へ返す（修正を依頼）。
  *
  * 送るのは `response` / `annotations` / `comments` の3つで、本家は承認リクエストと同じ
  * 1ファイルに3つのフィールドとして書く。1本のテキストに畳まないのは、箇所と指摘の
  * 対応が畳むと失われるため。
  *
- * コメントが0件なら送らない。理由の無い差し戻しを本家に残さない（本家も同じく止める）。
+ * コメントが0件のときはボタンが disabled（本家どおり）。ここまで来ないが、万一来ても送らない。
  */
 async function requestRevision(): Promise<void> {
-  if (sending.value) return;
+  if (busy.value !== null || comments.value.length === 0) return;
 
-  if (comments.value.length === 0) {
-    failure.value =
-      'コメントが1件もありません。本文を選んでコメントを付けるか、「全体へのコメント」を足してから差し戻してください。';
-    return;
-  }
-
-  sending.value = true;
+  busy.value = 'revision';
   failure.value = null;
 
   const reason = await respondToApproval(
@@ -372,26 +484,79 @@ async function requestRevision(): Promise<void> {
     a.buildRevisionPayload(),
   );
 
-  sending.value = false;
+  busy.value = null;
 
   if (reason !== null) {
     failure.value = reason;
     return;
   }
 
-  // 本家が保留中から外すので、この承認依頼の画面はもう空になる。一覧へ戻す。
-  //
-  // 戻る前に保留中の一覧を捨てる。一覧ページと詳細ページは同じキーでこれを取っており、
-  // 捨てないと**一覧が詳細ページで取った古い中身をそのまま描く**（差し戻したはずの
-  // 承認依頼が残って見える）。先回りして画面から消すのではなく、本家から取り直させる。
-  a.clear();
-  await refreshNuxtData(pendingApprovalsKey(props.projectId));
-  await navigateTo(`/projects/${props.projectId}/approvals`);
+  show(`「${props.approvalTitle}」の修正が要求されました`, 'info');
+  await settle();
 }
 </script>
 
 <template>
   <div>
+    <!--
+      決める操作の行（design 決定2）。本家 `ApprovalsPage` の操作行の写しで、面の切替より上に
+      1つの並びとして置く。先頭は開閉の口（レビューを閉じる。一段明るい）、続いて即時承認・
+      即時却下・修正を依頼。色は分けない（実画面の実測。承認だけを突出させない）。
+      コメント欄をしまってもこの行は見えたままになる。
+    -->
+    <div class="mb-4 flex flex-wrap items-center gap-3" data-testid="approval-decisions">
+      <button
+        type="button"
+        class="sb-action sb-action-light"
+        data-testid="approval-close"
+        @click="closeReview"
+      >
+        <UIcon name="upstream:close" class="h-4 w-4" />
+        レビューを閉じる
+      </button>
+
+      <button
+        type="button"
+        class="sb-action"
+        :disabled="busy !== null || cannotRespond"
+        data-testid="approval-approve"
+        @click="approve"
+      >
+        <UIcon name="upstream:check-circle" class="h-4 w-4" />
+        {{ busy === 'approve' ? '承認中…' : '即時承認' }}
+      </button>
+
+      <button
+        type="button"
+        class="sb-action"
+        :disabled="busy !== null || cannotRespond"
+        data-testid="approval-reject"
+        @click="rejecting = true"
+      >
+        <UIcon name="upstream:alert-circle" class="h-4 w-4" />
+        {{ busy === 'reject' ? '却下中…' : '即時却下' }}
+      </button>
+
+      <button
+        type="button"
+        class="sb-action"
+        :disabled="busy !== null || cannotRespond || comments.length === 0"
+        data-testid="approval-revision"
+        @click="requestRevision"
+      >
+        <UIcon name="upstream:chat" class="h-4 w-4" />
+        {{ busy === 'revision' ? '送信中…' : revisionLabel }}
+      </button>
+    </div>
+
+    <p v-if="cannotRespond" class="mb-4 text-xs text-[var(--text-muted)]">
+      本家に繋がっていないため送れません。
+    </p>
+
+    <p v-if="failure !== null" class="sb-error" data-testid="approval-revision-failure">
+      {{ failure }}
+    </p>
+
     <!--
       面の切替。本家は面を1つの枠に収めた segmented control で出す。選んでいるものだけを
       アクセントで塗り、残りは塗らない（本家 `ApprovalsPage` の View Mode Tabs）。
@@ -571,7 +736,7 @@ async function requestRevision(): Promise<void> {
             本家のこのボタンは `.btn` ではなく
             `w-full px-3 py-2 bg-[var(--accent-primary)] text-white rounded-lg text-xs sm:text-sm`。
             実測 12px / 400 / padding 8px 12px / 角丸 8px / 枠なし。`.sb-action` は
-            角丸 6px・600 相当なので、ここだけ本家の指定をそのまま持つ。
+            角丸 6px・500 相当なので、ここだけ本家の指定をそのまま持つ。
             どの面でも出す（付けられない面が無いので、切り替えを促す断り書きは無い）。
           -->
           <button
@@ -598,34 +763,6 @@ async function requestRevision(): Promise<void> {
             <CommentCard :comment="c" @edit="editComment" @remove="deleteId = $event" @locate="locate" />
           </div>
         </div>
-
-        <!--
-          差し戻し。承認・却下と違い、指摘を運ぶのはこれだけである。
-          承認・却下はこの画面に置かない（承認一覧の `ApprovalCard` が持つ）
-        -->
-        <div class="border-t border-[var(--border-default)] p-3">
-          <button
-            type="button"
-            class="sb-action w-full justify-center"
-            :disabled="sending || cannotRespond"
-            data-testid="approval-revision"
-            @click="requestRevision"
-          >
-            {{ sending ? '差し戻し中…' : `差し戻す（${comments.length}）` }}
-          </button>
-
-          <p v-if="cannotRespond" class="mt-2 text-xs text-[var(--text-muted)]">
-            本家に繋がっていないため送れません。
-          </p>
-
-          <p
-            v-if="failure !== null"
-            class="sb-error mt-2"
-            data-testid="approval-revision-failure"
-          >
-            {{ failure }}
-          </p>
-        </div>
         </template>
       </aside>
     </div>
@@ -639,6 +776,24 @@ async function requestRevision(): Promise<void> {
       :is-editing="editingId !== null"
       @save="saveComment"
     />
+
+    <!-- 即時却下の理由。承認一覧のカードと同じモーダル（design 決定3） -->
+    <RejectModal v-model:open="rejecting" @submit="reject" />
+
+    <!--
+      コメントが有る状態の即時承認は本家どおり止める。文言は本家 ja
+      （`approvalsPage.approvalWarning`）
+    -->
+    <UModal v-model:open="approveWarning" title="承認できません">
+      <template #body>
+        <p class="text-sm text-[var(--text-muted)]" data-testid="approval-approve-blocked">
+          コメントが存在する場合は承認できません。「修正を依頼」を使用してフィードバックを送信してください。
+        </p>
+      </template>
+      <template #footer>
+        <UButton color="neutral" variant="ghost" @click="approveWarning = false">閉じる</UButton>
+      </template>
+    </UModal>
 
     <!-- 全体へのコメント。箇所も色も無いので本文だけを入れさせる -->
     <UModal
