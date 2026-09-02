@@ -57,6 +57,7 @@ worktree = `git worktree` で切った作業ディレクトリ。それぞれが
 | ファイル名 | 概要 |
 | --- | --- |
 | `issue-tracker.md` | 「作業の規定」を参照 |
+| `ticket-tracker.md` | ticket の運用と `status` のラベル設定 |
 | `triage-labels.md` | triage の5ラベル |
 | `domain.md` | CONTEXT.md と ADR の運用 |
 

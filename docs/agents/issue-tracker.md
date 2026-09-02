@@ -69,10 +69,11 @@ change の起票と同時に `openspec/tickets/` に **ticket** を作る。**�
 
 - **どちらか単独の起票を厳禁とする** — `openspec/changes/<change-id>/` だけを作って ticket を作らない、`openspec/tickets/<change-id>.md` だけを作って change を作らない、そのいずれも認めない
 - ファイル名は change-id + `.md`（例: change `view-openspec-changes` → `openspec/tickets/view-openspec-changes.md`）。
-- 中身は frontmatter（`status` 必須・`change` 必須・`tags` 任意・`triage` 任意）＋本文の概要
-- `status` の値は `docs/agents/ticket-labels.md` による
+- 中身は frontmatter（`status` 必須・`change` 必須・`origin` 必須・`tags` 任意・`triage` 任意）＋本文の概要
+- `status` の値は `docs/agents/ticket-tracker.md`「ラベル設定」による
+- `origin` の値は `docs/agents/ticket-tracker.md`「起票の主体」による。`agent` のとき本文に書くものは同「エージェント主体の起票」
 - artifact を作成したタイミングで、スキーマで `generates` が設定されたその artifact の `id` を`tags`に追記する
-- **`openspec apply` またはスキルなどで同等の指示がはいったら、`tags `に`<ブランチ名>/<セッション ID>` を追記する。作業が完了しても消さない事。作業担当者が変わった場合は、新たに同様のルールで追記する
+- **tasks.md の先頭タスクで、`tags` に `<ブランチ名>/<セッション ID>` を追記する。** 作業が完了しても消さない事。作業担当者が変わった場合は、新たに同様のルールで追記する
 
   ```yaml
   tags:
