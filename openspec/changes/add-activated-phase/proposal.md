@@ -47,19 +47,30 @@ approved ──────────── 生成中 ────────
 
 ## Capabilities
 
+### New Capabilities
+
+- `api/session/activate`: 昇格した対象を、steering が成果物を出し終えた状態にする受け口（U15）。成果物の有無を確かめてから立てる。起動も判断も昇格も受け持たない
+
 ### Modified Capabilities
 
 - `project/generation` — 生成の決着の判定と、その配信
+
+**追記 2026-09-02。** 起票の時点では「`activated` を立てる口をサーバに足す」としか書いておらず、その口を capability として立てていなかった。`separate-approval-decision-from-promotion` が develop へ入り、**承認の各段がそれぞれ capability を持つ形**（`api/session/approve` / `api/session/promote`）になったため、完成の記録も同じ形で並べる（design.md D4）。
 
 ## Impact
 
 | ファイル | 内容 |
 | --- | --- |
-| `shared/stroke.ts` | `Phase` に `activated` を足す |
-| `server/handler/phase.ts` | 値の集合を1箇所に閉じ、`readPhase` の連鎖を解く |
-| `server/utils/stroke/session-store.ts` | zod のリテラル、`creationOutcomeOf` の判定 |
-| `server/utils/control/directory.ts` | 行の `creation` を phase から引く |
-| `server/api/` | `activated` を立てる口を1つ足す |
+| `shared/stroke.ts` | `Phase` に `activated` を足す。値の一覧を1つ持つ形にする |
+| `server/handler/phase.ts` | 値の集合を1箇所に閉じ、`readPhase` の連鎖を解く。`isAfterApproval` に `activated` を含める |
+| `server/utils/stroke/session-core.ts` | **もう1つの `readPhase`**（起票時に数えていなかった5箇所目） |
+| `server/utils/stroke/session-store.ts` | zod の枝、`creationOutcomeOf` の判定 |
+| `server/utils/control/creating.ts` | `phase` を持ち帰る（いまは `approved` かの真偽だけ） |
+| `server/utils/control/directory.ts` | 行の `creation` を phase から引く。生成中を接続の判定から外す |
+| `server/api/strokes/[id]/activate.post.ts`（新規） | `activated` を立てる受け口（U15） |
+| `server/api/strokes/[id]/invoke-agent.get.ts` | 起こす定型と `runId` の選び分けに `activated` を通す |
+| `server/utils/stroke/ai.ts` | 成功の分岐から U15 を叩く。steering にも `didWork` を渡す |
+| `server/plugins/` | 既存の `state.json` を一度だけ書き上げる（design.md D7） |
 
 ### phase の値がばら撒かれている現状
 

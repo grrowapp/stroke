@@ -15,6 +15,20 @@ approved ──────────── 生成中 ────────
 
 この design が決めるのは、その3つが決めていない残り——**契約の形**・**「出し終えた」を何で確かめるか**・**既存の `state.json` をどうするか**——である。
 
+### 承認は3段に分かれている（2026-09-02 追記）
+
+この design を最初に書いた後、`separate-approval-decision-from-promotion` が develop へマージされた。**`phase` を書く口が U10 から移っている。**
+
+| 段 | 口 | すること |
+| --- | --- | --- |
+| 判断 | U10 `POST /api/strokes/:id/approve` | 判断を `proposed` の中の `decision` として記録する。**`phase` を動かさない・改名しない・起動しない**。取り下げは同 path の `DELETE` |
+| 昇格 | U14 `POST /api/strokes/:id/promote` | 改名して `phase: 'approved'` を書く。**本文を取らない**（名前は判断が持つ）。起動しない |
+| 起こし | U13 `GET /api/strokes/:id/invoke-agent` | steering を起こす。昇格の成功を見た側が呼ぶ |
+
+昇格の完了時点で `invocation` は `failed` に置かれる（U14 が A8 経由で書く）。起動の要求が届かなくても巡回が拾えるようにするためで、**失敗の印ではなく「起こし直す対象」の印**である。
+
+この変化が下の D4・D5・D7 の前提を動かしている。該当箇所にそれぞれ追記した。
+
 ### いま値の集合が散っている場所
 
 proposal.md は4箇所を挙げているが、実装を読むと**5箇所**ある。
@@ -96,30 +110,37 @@ isGenerating(phase)      // approved                   — 生成中（区間の
 
 `isGenerating` を新しく足すのは、**行と配信が見るのはこれ1つ**にするためである。呼び出し側に `phase === 'approved'` を書かせない——それをやると `activated` を足した意味が消える。
 
-### D4 — U10 の入力を判別可能ユニオンにする
+### D4 — `activated` は自分の受け口を持つ（U15 `POST /api/strokes/:id/activate`）
 
-`POST /api/strokes/:id/approve` の入力を次の2形に限る。
+**この決定は 2026-09-02 に改めた。** 元の形（U10 の入力を判別可能ユニオンにして `{ phase: 'activated' }` を足す）は、承認が3段に分かれる前の U10——判断と昇格と起動を1回で行っていたもの——を前提にしていた。**その前提はもう無い。**
 
-| 入力 | 遷移 | 誰が叩くか |
-| --- | --- | --- |
-| `{ projectName: string }` | `proposed` → `approved` | 画面（承認モーダル）。**従来と同一** |
-| `{ phase: 'activated' }` | `approved` → `activated` | invokeAi |
+いまの U10 は判断を記録するだけで、`phase` を1つも動かさない（契約に「改名しない・`phase` を動かさない・起動しない」と明記されている）。そこへ `activated` を書く入力を足すと、**U10 の契約に正面から反する**。
 
-- **任意の phase を書かせない。** `phase` は `'activated'` のリテラルのみ受ける。`'approved'` も `'stroking'` も受けない
-- **省略は既定の遷移（昇格）**であることを契約に明記する。省略時に現在の phase を見て振る舞いを変えるのではなく、**入力の形が遷移を決める**
-- 遷移の始点と現在の phase が合わなければ 409 `phase`。これは「受け取った引数に対して責務が成立しない」ケースで、ADR-0014 の対象外である（既存の U10 が `proposed` のみ受理しているのと同じ形）
+段ごとに自分の受け口を持つ形は、既にこの系の作法である。`activated` も同じ形にする。
 
-**ADR-0014 に照らす。** 判定の材料（どの遷移か）は入力の形として契約に現れる。呼び出し側が渡していない内部状態を見て振る舞いを変える箇所は無い。
+```
+POST /api/strokes/:id/activate
+  input:  本文なし
+  output: 本文なし（204）
+  遷移:   approved → activated
+```
+
+- **本文を取らない。** U14 と同じ理由である——書く値は1つに決まっており、引数で受けると別の値を書けてしまう。「任意の phase を書かせない」（tasks 1.1）は、**入力を持たないことで形として保証される**。これは元の案（リテラル1つだけを受ける）より強い
+- `approved` でなければ 409 `phase`。「`approved` のセッションを `activated` にする」が責務なので、始点が違えば責務の不成立である（ADR-0014 補足1。U14 が「判断が無ければ受理しない」を同じ理屈で扱っているのと同型）
+- 叩くのは invokeAi。画面もエージェントも叩かない
+
+**tasks.md の「新規 endpoint を生やさない」を、ここで読み替える。** あの一文は、U10 が唯一の `phase` の書き込み口だった時点で「**2つ目の phase 書き込み口を作るな**」と言っていた。3段への分割で、`phase` の書き込み口は既に U10 から U14 へ移っており、**段ごとに受け口を持つことがこの系の形になった**。同じ意図——書き込み口を増やして散らさない——を今の形で満たすのは、遷移ごとに1つの受け口を置くことである。
 
 **却下した案**
 
-- `POST /api/strokes/:id/activate` を生やす — tasks.md が「新規 endpoint を生やさない」と確定させている。承認 API は既に phase を進める口であり、進める先が1つ増えるだけである
-- `{ transition: 'promote' | 'activate' }` を引数にする — 遷移名という新しい語彙を1つ増やすことになる。`projectName` を伴うか `phase` を伴うかで既に判別できるので、増やす必要が無い
+- **U14 に `{ phase: 'activated' }` を足す** — U14 は「本文を取らない」と契約に明記されている。本文を取る形へ変えると、昇格が名前を引数で受け取れる余地を開く（それを塞ぐために本文を取らない形にしてある）
+- **U10 に足す**（元の案）— 上のとおり U10 の契約に反する
+- `{ transition: 'promote' | 'activate' }` を引数にする — 遷移名という語彙を増やす。受け口を分ければ要らない
 - `PATCH /api/strokes/:id` で phase を部分更新する — 「任意の phase を書かせない」が形として保証できない
 
 ### D5 — 「出し終えた」は、承認依頼がファイルとして在ることで確かめる
 
-invokeAi がプロセスの終了を検知した時点で、`<プロジェクト>/.spec-workflow/approvals/` 配下に承認依頼のファイルが**1件以上**あることを確かめ、あれば U10 を `{ phase: 'activated' }` で叩く。
+invokeAi がプロセスの終了を検知した時点で、`<プロジェクト>/.spec-workflow/approvals/` 配下に承認依頼のファイルが**1件以上**あることを確かめ、あれば U15（D4）を叩く。
 
 **なぜ承認依頼であって、steering 文書でないか。** `activated` の意味は「レビューできる状態になった」である。文書が書かれていても承認依頼が出ていなければ、決着のモーダルの「レビューする」を押した先に何も無い——今回ユーザーが踏んだ経路そのものである。
 
@@ -149,6 +170,8 @@ invokeAi がプロセスの終了を検知した時点で、`<プロジェクト
 
 **失敗は `invocation` に残す。** 失敗は「区間の中で終われなかった」ことで、区間の外に出る出来事ではないので phase では表せない。proposal の「`invocation` は失敗の応答に専念させる」はこの形になる。
 
+**`failed` を決着として流さないことが、いっそう重要になった（2026-09-02 追記）。** 昇格（U14）は完了時点で `invocation` を `failed` に置く——起動の要求が届かなくても巡回が拾えるようにするためで、失敗の印ではない。ここを決着として流すと、**昇格した瞬間に必ず失敗のモーダルが出る**。いまの `creationOutcomeOf` は `failed` を流さないので、その形を保つ。
+
 行（`server/utils/control/directory.ts`）も同じ phase を見る。
 
 | phase | `creation` | `connection` |
@@ -169,12 +192,28 @@ invokeAi がプロセスの終了を検知した時点で、`<プロジェクト
 
 - 対象は `phase: 'approved'` のもの
 - D5 と**同じ判定**（承認依頼がファイルとして在るか）を通し、通ったものだけ `activated` へ上げる
-- 書き込みは U10 を `{ phase: 'activated' }` で叩く。直に書かない（書き込み口を増やさない）
+- 書き込みは U15（D4）を叩く。直に書かない（書き込み口を増やさない）
 - 通らなかったものは `approved` のまま残る。生成中として並び、決着のモーダルから「やり直す」「破棄する」を選べる。**これは正しい状態である**——承認依頼が無いプロジェクトは、実際にレビューできない
 
 **却下した案** — 移行しない。実測で `/opt/projects` に `state.json` を持つプロジェクトが存在するため、入れなくなる実害が出る。
 
 **却下した案** — `activated` を持たない `approved` を完了とみなす。それでは今回のバグがそのまま残る。
+
+### D8 — `approved` を見ている分岐は、すべて `activated` も通す（2026-09-02 追加）
+
+`activated` は「`approved` の後」であって「`approved` の代わり」ではない。**`approved` だけを見ている分岐は、放っておくと `activated` のプロジェクトを別物として落とす。** 3段への分割で、その分岐が増えている。
+
+| 箇所 | いまの形 | 落ちると何が起きるか |
+| --- | --- | --- |
+| `session-store.ts` の `stateSchema` | `phase` の判別可能ユニオンに `approved` の枝だけ | `activated` の `state.json` が読めず、`readState` が全面的に失敗する |
+| `invoke-agent.get.ts`（U13）の `kind` 導出 | `phase === 'approved' ? 'steering' : 'stroke'` | 完成したプロジェクトを起こし直すと**ストロークの定型**で走り、steering の MCP も渡らない |
+| `invoke-agent.get.ts` の `runId` | `phase === 'approved' ? state.runId : undefined` | 会話の続き先を失い、初回として走り直す |
+| `handler/phase.ts` の `isAfterApproval` | `phase === 'approved'` | 削除の口2つのどちらからも消せなくなる（D3） |
+| `promote.post.ts`（U14）の受理判定 | `phase === 'approved'` なら「既に昇格している」 | そのままでよい。`activated` も昇格済みなので、同じ 409 に落ちるべきである |
+
+**`activated` は `approved` と同じ形の状態にする。** `state.json` の中身（`projectName` / `invocation` / `retries` / `runId`）は変えず、`phase` の値だけが違う枝にする。zod の枝を2つに分けるか、`phase` を `z.enum(['approved', 'activated'])` で受ける1枝にするかは実装の選択で、**どちらでも `activated` の `state.json` が読める**ことだけを満たす。
+
+判定は D3 の述語を通す。`phase === 'approved'` の直書きを残さない——残すと、次に値が増えたときに同じ表をもう一度作ることになる。
 
 ## Risks / Trade-offs
 
@@ -202,8 +241,10 @@ invokeAi がプロセスの終了を検知した時点で、`<プロジェクト
 
 | 資料 | 箇所 | 反映の内容 |
 | --- | --- | --- |
-| `docs/specs/api/contract.md` | U10（:162-176） | 入力が2形になること、`activated` への遷移、409 の条件 |
-| `docs/specs/api/contract.md` | U2（:129）・U12（:192） | `phase` の値に `activated` を足す |
+| `docs/specs/api/contract.md` | 一覧表と「受理系」の並び（:29-31・:44-48） | **U15 `POST /api/strokes/:id/activate` を足す**。承認の流れが U10（判断）→ U14（昇格）→ U13（起こし）→ **U15（完成の記録）** の4段になる |
+| `docs/specs/api/contract.md` | U15 の節（新設） | 本文なし・204・`approved` からのみ受理・409 phase。叩くのは invokeAi だけ |
+| `docs/specs/api/contract.md` | U2（:132）・U12（:195） | `phase` の値に `activated` を足す |
+| `docs/specs/api/contract.md` | U13（:208-）| 起こす定型の選び分けが `approved` だけでなく `activated` も steering になること |
 | `CONTEXT.md` | 「生成中」 | 「終わりは `.spec-workflow/` が出来たとき」を**承認依頼が出たとき**へ改める。定義本体（ステアリングをまだ作り終えていない状態）は正しいので変えない。区間の終わりを指す用語を1つ足す（tasks 1.4） |
 | `docs/specs/plan/portal-stroke-exit.md` | 「承認ボタン → 一覧へ戻る」の図（:19-20） | 「`.spec-workflow/` ができる → 実行が終わったら done を配信」を、承認依頼の提出を終点とする形へ |
 
