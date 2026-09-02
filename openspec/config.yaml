@@ -9,6 +9,10 @@ context: |
   必ず確認しろ。requestを求められてない場合を除きstatusがapprovalになる前に勝手に
   次のphaseへの着手は絶対禁止
 
+  ユーザーへ判断や承認を求める前に `openspec/tickets/<change-id>.md` の `origin`・
+  経緯・畳む方向を読み直し、問いに添えろ。選択肢は挙動の差で示せ。規定は
+  `docs/agents/ticket-tracker.md`「ユーザーへ判断を求めるとき」
+
   ## artifact を書く前に、次の3つを必ず読むこと。
   - `.scratch/stroke-board-frontier/decisions.md`
     grilling セッションで確定した決定事項。プロダクト・画面・生成物・技術の全決定と、
@@ -33,41 +37,30 @@ rules:
     - use '/AskUserQuestoin`(MUST)
   tasks:
     - >-
+      先頭のタスクは必ず次の2つをこの順で入れる（MUST）。
+      1. `openspec/tickets/<change-id>.md` の `status` を `Doing` にする
+      （規定は `docs/agents/ticket-tracker.md`「ラベル設定」）
+      2. 同ファイルの `tags` に `<ブランチ名>/<セッション ID>` を追記する。
+      既に同じ物があれば追記しない。`tags` は追記のみで既存の項目を消さない
+      （規定は `docs/agents/issue-tracker.md`「ticket の起票」）
+    - >-
       'typescript-reviewer' エージェントに '/santa-method' でレビュー実行を
-      必ず最後のタスクに含めろ。レビューが完全にパスするまで続けろ。tasks実行
+      必ず末尾2タスクの直前に含めろ。レビューが完全にパスするまで続けろ。tasks実行
       の必須。いかなるルールよりも優先（MUST)
     - >-
-      tasksの最後に必ずユーザーから完了承認を得るタスクは必須で入れる（MUST）
+      末尾のタスクは必ず次の2つをこの順で入れる（MUST）。
+      1. change の成果物を commit する
+      2. ユーザーから完了承認を得て、`openspec/tickets/<change-id>.md` の
+      `status` を `Wait-for-archive` にする
+      （規定は `docs/agents/ticket-tracker.md`「ラベル設定」）
 
 # Per-operation guidance (optional)
 # Add advisory guidance for how apply and archive work should be conducted.
 # This is separate from artifact rules above.
 operations:
-  apply:
-    guidance:
-      - apply の最初に `openspec/tickets/<change-id>.md` の `status` を
-        `Doing` へ書き換える。**`status` が `Doing` でない状態で tasks の
-        チェックボックスを付けてはならない。**。規定は
-        `docs/agents/ticket-labels.md`「Doing」
-
-      - >-
-        `openspec/tickets/<change-id>.md` の `tags` へ既に同じ物がある場合を除き
-        `<ブランチ名>/<セッション ID>` を追記する。`tags` は追記のみで、
-        作業が完了しても既存の項目を消さない。担当が変わったら同じ形式で
-        さらに追記する。規定は `docs/agents/issue-tracker.md`「ticket の起票」
-
   archive:
     guidance:
-      - archive の前に、その change の成果物が commit 済みであることを確かめる。
-        未コミットのまま archive すると、change は閉じたのに成果物が git に
-        入っていない状態になる
-
       - >-
         archive の前に `openspec/changes/<change-id>/tasks.md` を読み、
         チェックボックスを全て確認する。未チェック（`- [ ]`）が1つでも
         あれば archive 不可
-
-      - >-
-        archive の前に tasks.md からユーザーの完了承認を得るタスクを探す。
-        無ければ archive 不可。有れば
-        チェック状態を確認し、未チェックなら archive 不可
