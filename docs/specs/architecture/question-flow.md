@@ -101,8 +101,9 @@ stateDiagram-v2
         差し戻し済み --> 確認中: A7 出し直し
     }
 
-    proposed --> approved: U10 承認
-    approved --> [*]
+    proposed --> approved: U10 判断 → U14 昇格
+    approved --> activated: U15 完成の記録<br/>（steering が承認依頼を出した）
+    activated --> [*]
 ```
 
 `invocation` は上の局面とは別に動く。U13 で `running`、A5 と A7 の受理で `idle`、

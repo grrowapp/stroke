@@ -5,7 +5,7 @@ import { LOG_PREFIX } from '../../../utils/stroke/log'
 import { assertNameAvailable, promoteSessionToProject, revertPromotion } from '../../../utils/stroke/project'
 import { beginRun, endRun, sessionRunPath } from '../../../utils/stroke/running'
 import { requireSessionId } from '../../../utils/stroke/session-param'
-import { readState, writeState } from '../../../utils/stroke/session-store'
+import { isPromotedState, readState, writeState } from '../../../utils/stroke/session-store'
 import { forgetSubmissions } from '../../../utils/stroke/submission-signal'
 import { submissionPath } from '../../../utils/stroke/submission-path'
 
@@ -71,7 +71,8 @@ export default defineEventHandler(async (event) => {
   const sessionId = await requireSessionId(event)
 
   const state = await readState(sessionId)
-  if (state.phase === 'approved') {
+  // `approved` も `activated` も昇格済み。重ねての昇格は受理しない
+  if (isPromotedState(state)) {
     throw conflict('phase', 'このセッションは既に昇格している。')
   }
   if (state.phase !== 'proposed' || state.decision === undefined) {

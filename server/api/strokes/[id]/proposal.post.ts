@@ -5,6 +5,7 @@ import { parseBody, proposalSubmitBody } from '../../../utils/stroke/request-sch
 import { requireSessionId } from '../../../utils/stroke/session-param'
 import { notifySubmission } from '../../../utils/stroke/submission-signal'
 import {
+  isPromotedState,
   markProposalStrokeIfFirst,
   readState,
   sessionProposal,
@@ -33,7 +34,8 @@ export default defineEventHandler(async (event) => {
   const { proposal, projectName } = parseBody(proposalSubmitBody, await readBody(event))
 
   const state = await readState(sessionId)
-  if (state.phase === 'approved') {
+  // 承認以降（`approved` / `activated`）は proposal を受けない
+  if (isPromotedState(state)) {
     throw conflict('phase', '承認済みのセッションには提出できない。')
   }
 

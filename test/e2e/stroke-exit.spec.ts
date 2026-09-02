@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -30,10 +30,9 @@ test.describe('承認して一覧へ戻る', () => {
   /**
    * 昇格したものを残さない。
    *
-   * 承認済み（`phase: 'approved'`）で `.spec-workflow` を持たないディレクトリが保存先に
-   * 居座ると、**次の実行から一覧に「生成中」として出る**（specs/project/directory）。
-   * それが他の spec の行数を狂わせる。この spec の中では `.spec-workflow` を作る回が
-   * あるので、消す前にディレクトリごと落とす。
+   * 昇格したディレクトリが保存先に居座ると、**次の実行から一覧に出る**
+   * （specs/project/directory）。それが他の spec の行数を狂わせる。この spec の中では
+   * `.spec-workflow` を作り、完成まで記録する回があるので、消す前にディレクトリごと落とす。
    */
   test.afterAll(async () => {
     await rm(join(PROJECTS_PARENT, SEEDED_PROJECT_NAME), { recursive: true, force: true });
@@ -193,22 +192,63 @@ test.describe('承認して一覧へ戻る', () => {
   });
 
   /**
+   * `.spec-workflow/` ができただけでは完了にならない（specs/project/generation・
+   * specs/project/directory。change `add-activated-phase`）。
+   *
+   * そのディレクトリは本家 MCP が接続した瞬間にでき、成果物が1つも無いうちからできている。
+   * 実行が正常終了して A8 で `idle` が書かれても、完成の記録（U15）が無い限り行は生成中の
+   * ままで、成功の決着も届かない。
+   */
+  test('.spec-workflow/ ができて実行が終わっても、完成の記録が無ければ生成中のまま', async ({ page, request }) => {
+    await page.goto('/projects');
+    await expect(page.getByTestId('projects-table')).toBeVisible();
+
+    mkdirSync(join(PROJECTS_PARENT, SEEDED_PROJECT_NAME, '.spec-workflow', 'approvals'), { recursive: true });
+
+    const finished = await request.post(`/api/strokes/${SEEDED_PROJECT_NAME}/submission`, {
+      data: { invocation: 'idle' },
+    });
+    expect(finished.ok()).toBe(true);
+
+    // 承認依頼が無いので完成の記録は受理されない
+    const refused = await request.post(`/api/sessions/${SEEDED_PROJECT_NAME}/activate`);
+    expect(refused.status()).toBe(409);
+
+    // 成功の決着は届かず、行は生成中のまま
+    await page.waitForTimeout(1_500);
+    await expect(page.getByTestId('project-creation-notice')).toHaveCount(0);
+    const row = page.getByTestId('project-row').filter({ hasText: SEEDED_PROJECT_NAME });
+    await expect(row).toHaveAttribute('data-creation', 'in-progress');
+
+    // 開き直しても生成中。走査に出るようになっても行の判定は phase で決まる
+    await page.goto('/projects');
+    await expect(page.getByTestId('project-row').filter({ hasText: SEEDED_PROJECT_NAME })).toHaveAttribute(
+      'data-creation',
+      'in-progress',
+    );
+  });
+
+  /**
    * 完了が届くと、生成中の表現が外れて一度だけ祝う（specs/project/generation）。
    *
-   * 完了の実体は「`.spec-workflow/` が在り、実行が終わっている」ことである（design.md D7）。
-   * steering は E2E では走らないので、両方を手で起こす——ディレクトリを作り、A8 で
-   * `invocation` を `idle` に戻す。A8 は invokeAi が叩く口そのものである。
+   * 完了の実体は完成の記録——steering が承認依頼を出したことを U15 が phase に書くこと
+   * ——である（specs/api/session/activate）。steering は E2E では走らないので、承認依頼の
+   * ファイルを手で置き、U15 を叩く。U15 は invokeAi が完了時に叩く口そのものである。
    */
   test('完了が届くと通常の行に変わり、知らせてから選ばせる', async ({ page, request }) => {
     await page.goto('/projects');
     await expect(page.getByTestId('projects-table')).toBeVisible();
 
-    mkdirSync(join(PROJECTS_PARENT, SEEDED_PROJECT_NAME, '.spec-workflow'), { recursive: true });
+    const approvals = join(PROJECTS_PARENT, SEEDED_PROJECT_NAME, '.spec-workflow', 'approvals', 'steering');
+    mkdirSync(approvals, { recursive: true });
+    writeFileSync(join(approvals, 'approval_1_e2e.json'), '{"status":"pending"}\n', 'utf8');
 
-    const response = await request.post(`/api/strokes/${SEEDED_PROJECT_NAME}/submission`, {
-      data: { invocation: 'idle' },
-    });
-    expect(response.ok()).toBe(true);
+    const response = await request.post(`/api/sessions/${SEEDED_PROJECT_NAME}/activate`);
+    expect(response.status()).toBe(204);
+
+    // 完成は一度だけ。記録し直しは受理しない
+    const again = await request.post(`/api/sessions/${SEEDED_PROJECT_NAME}/activate`);
+    expect(again.status()).toBe(409);
 
     // まず知らせる面。行の中ではなく、一覧の上に浮く
     const notice = page.getByTestId('project-creation-notice');
@@ -266,7 +306,8 @@ test.describe('承認して一覧へ戻る', () => {
     expect(read.ok(), 'GET が受理された').toBeFalsy();
     expect(existsSync(join(PROJECTS_PARENT, SEEDED_PROJECT_NAME))).toBe(true);
 
-    // 中身のある本物のプロジェクトは、この口では消えない
+    // 完成した（`activated`）本物のプロジェクトは、この口では消えない。根拠は phase で
+    // あって `.spec-workflow/` の有無ではない（specs/api/project/delete）
     const refused = await request.delete(path);
     expect(refused.status()).toBe(409);
     expect(existsSync(join(PROJECTS_PARENT, SEEDED_PROJECT_NAME))).toBe(true);

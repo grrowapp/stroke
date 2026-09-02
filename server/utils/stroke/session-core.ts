@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import fse from 'fs-extra'
-import type { Invocation, SessionSummary } from '#shared/stroke'
+import { isPhase, type Invocation, type SessionSummary } from '#shared/stroke'
 import { OPENSPEC_CONFIG_FILE, OPENSPEC_DIR } from './openspec'
 import { sessionDir, sessionFile } from './paths'
 
@@ -239,13 +239,21 @@ async function readInvocation(root: string, sessionId: string): Promise<Invocati
   return raw === 'running' || raw === 'failed' || raw === 'error' ? raw : 'idle'
 }
 
+/**
+ * 一覧に載せる phase。読めない・集合に無い値は `unknown` として載せる。
+ *
+ * ここは Nitro 無しの経路から読まれる core なので、zod を通す `readState`
+ * （`session-store.ts`。配信を import する）を持ち込まず、軽い読みを残す。ただし**値の集合は
+ * `shared/stroke.ts` の `PHASES` から引く**——ここに literal を並べない
+ * （add-activated-phase design D6）。
+ */
 async function readPhase(root: string, sessionId: string): Promise<SessionSummary['phase']> {
   try {
     const raw = JSON.parse(
       await readFile(sessionFile(root, sessionId, SESSION_FILES.state), 'utf8'),
     )
-    const phase = raw?.phase
-    return phase === 'stroking' || phase === 'proposed' || phase === 'approved' ? phase : 'unknown'
+    const phase: unknown = raw?.phase
+    return isPhase(phase) ? phase : 'unknown'
   } catch {
     return 'unknown'
   }

@@ -1,11 +1,12 @@
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
+import type { Phase } from '#shared/stroke'
 import { DeleteError, isSafeSegment, removeTarget } from '../../../handler/delete'
-import { isAfterApproval, readPhase } from '../../../handler/phase'
 import { readStrokeConfig } from '../../../utils/stroke/config'
 import { conflict } from '../../../utils/stroke/conflict'
 import { isRunning, projectRunPath } from '../../../utils/stroke/running'
+import { readState, type SessionState } from '../../../utils/stroke/session-store'
 import { deriveProjectId } from '../../../utils/upstream/project-id'
 
 /**
@@ -16,17 +17,27 @@ import { deriveProjectId } from '../../../utils/upstream/project-id'
  * `GET` でも到達できてしまう。
  *
  * **消せるのは承認以降のものだけである。** まだプロジェクトになっていないセッションは
- * ここでは受理しない——セッションの削除が扱う。この判定は endpoint が持ち、消す動作
- * （`handler/delete`）は判定を持たない。
+ * ここでは受理しない——セッションの削除が扱う。
  *
- * **`.spec-workflow/` を持つものは消さない。** それは本家がプロジェクトルートとして
- * 受け取っている実体で、この口が扱う対象ではない。この口は「作りきれずに終わったもの」を
- * 片付けるためにある。
+ * **完成したプロジェクト（`activated`）は消さない。** それは steering が承認依頼を出し、
+ * レビューできる状態に達した実体で、この口が扱う対象ではない。この口は「作りきれずに
+ * 終わったもの」を片付けるためにある。**根拠は phase であって `.spec-workflow/` の有無では
+ * ない**——そのディレクトリは本家 MCP が接続した瞬間にでき、作りきれなかったプロジェクトも
+ * 持っている。有無で断ると、失敗の決着で「破棄する」を選んだものが消せず一覧に居座る
+ * （add-activated-phase design D5）。
  *
- * 対象は `projectId` で指す。生成中・失敗した行は本家に登録されておらず registry から
- * 引けないので、**保存先を走査して導出値と突き合わせる**。id から名前を復元する手段は
- * ハッシュの性質上これしかない。
+ * つまりこの口が消すのは `approved` だけである（下の `DELETABLE`）。判定は endpoint が持ち、
+ * 消す動作（`handler/delete`）は判定を持たない。phase は `readState`（zod）で読み、
+ * **壊れた `state.json` は消さない**。
+ *
+ * 対象は `projectId` で指す。本家の id は workspace のパスから作られ、生成中の行は
+ * その式で導出した値を持つ（`upstream/project-id.ts`）。id から名前を復元する手段は
+ * ハッシュの性質上、**保存先を走査して導出値と突き合わせる**しかない。
  */
+
+/** この口が消してよい局面。作りきれなかったもの（生成中）だけ */
+const DELETABLE: readonly Phase[] = ['approved']
+
 export default defineEventHandler(async (event): Promise<Response> => {
   const projectId = getRouterParam(event, 'projectId')
   if (projectId === undefined || projectId === '') {
@@ -50,13 +61,17 @@ export default defineEventHandler(async (event): Promise<Response> => {
     throw conflict('busy', 'このプロジェクトは AI の応答を待っている。完了するまで削除は受け付けない。')
   }
 
-  const phase = await readPhase(root, name)
-  if (phase === null || !isAfterApproval(phase)) {
-    throw conflict('phase', 'まだプロジェクトになっていない。セッションの削除を使うこと。')
+  let state: SessionState
+  try {
+    state = await readState(name)
+  } catch {
+    throw conflict('phase', 'state.json を読めない。分からないものは消さない。')
   }
 
-  if (await hasSpecWorkflow(root, name)) {
-    throw conflict('phase', '中身のあるプロジェクトはここでは消せない。')
+  if (!DELETABLE.includes(state.phase)) {
+    throw state.phase === 'activated'
+      ? conflict('phase', '中身のあるプロジェクトはここでは消せない。')
+      : conflict('phase', 'まだプロジェクトになっていない。セッションの削除を使うこと。')
   }
 
   try {
@@ -90,15 +105,6 @@ async function resolveName(root: string | null, projectId: string): Promise<stri
   }
 
   return null
-}
-
-async function hasSpecWorkflow(root: string, name: string): Promise<boolean> {
-  try {
-    await readdir(join(root, name, '.spec-workflow'))
-    return true
-  } catch {
-    return false
-  }
 }
 
 function toHttp(error: unknown) {

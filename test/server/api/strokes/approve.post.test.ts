@@ -132,6 +132,16 @@ describe('U10 POST /api/strokes/:id/approve', () => {
     expect(promoteSessionToProject).not.toHaveBeenCalled();
   });
 
+  it('完成した（activated）後も同じく受理せず、何も変えない', async () => {
+    readStateMock.mockResolvedValueOnce({ phase: 'activated', projectName: 'made', invocation: 'idle' });
+
+    await expect(approveHandler(fakeEvent('made', BODY) as never)).rejects.toMatchObject({
+      statusCode: 409,
+      message: 'このセッションは既に承認済み。',
+    });
+    expect(writeStateMock).not.toHaveBeenCalled();
+  });
+
   it('proposal が出ていない局面（stroking）では受理しない', async () => {
     readStateMock.mockResolvedValueOnce({ phase: 'stroking', currentQuestion: null, invocation: 'idle' });
 

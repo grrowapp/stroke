@@ -70,6 +70,19 @@ export interface AiRun {
    * として残る。
    */
   didWork?: () => boolean
+  /**
+   * **完成を記録する**。`didWork` と同じ置き方で、渡されているときだけ呼ぶ。
+   *
+   * 生成中のプロジェクト（phase が `approved`）の steering だけが渡す（`invoke.ts`）。
+   * 完了時に呼び、true なら `idle`、false なら `failed` に倒す——承認依頼が無い、記録先に
+   * 届かない、はどちらも「完成でない」であり、`idle` にすると完成の記録が無いまま完了になる。
+   * **渡されているときは `didWork` に代わる**（完成の記録が受理されたなら作業は済んでいる。
+   * openspec/specs/agent/invocation「完了は output stream で検知して idle に変える」・
+   * add-activated-phase design D4）。
+   *
+   * invokeAi はいつ叩くかを判定しない。関数が渡されているかどうかが判定の結果である。
+   */
+  recordCompletion?: () => Promise<boolean>
   /** 走った会話の id を覚える。続きが要る用途だけ渡す */
   remember?: (conversationId: string) => Promise<void>
   /** 初回と判定されたときに実行環境を整える。要らない用途では省く */
@@ -194,7 +207,7 @@ async function writeInvocation(sessionId: string, invocation: Invocation, retrie
 async function runBuiltInvocation(sessionId: string, run: AiRun): Promise<void> {
   const {
     launch, cwd, debugLogDir, prompts, maxRetries, retries, timeoutMs, timeoutStepMs,
-    conversationId, hasConversation, setInvocation, remember, prepare, didWork,
+    conversationId, hasConversation, setInvocation, remember, prepare, didWork, recordCompletion,
   } = run
 
   // 上限判定は起動の前。**`retries` は「これまでに起こし直した回数」** なので、初回の
@@ -244,16 +257,32 @@ async function runBuiltInvocation(sessionId: string, run: AiRun): Promise<void> 
     if (remember && result.sessionId !== null) await remember(result.sessionId)
 
     // output stream の成功エンベロープ = プロセスは完了した。ただし**何もせずに
-    // 終わっている**ことがあるので、用途ごとの確認を通す。作業をしていなければ
-    // 失敗として起こし直す——ここを素通しにすると、問いも proposal も出ないまま
-    // `idle` になり、巡回（`failed` しか拾わない）も回収できない詰まりが残る。
-    if (didWork === undefined || didWork()) {
-      await setInvocation('idle', 0)
+    // 終わっている**ことがあるので、用途ごとの確認を通す。
+    //
+    // 完成の記録を渡された実行（生成中の steering）では、**完成の記録の受理が完了の唯一の
+    // 根拠**で、作業の判定はそれに代わる（openspec/specs/agent/invocation・add-activated-phase
+    // design D4）。ここで先に `didWork` を見ると、起こし直しの実行が文書を出さず承認依頼だけを
+    // 出したとき——前の実行で文書は済んでいる——に `failed` へ倒れ、承認依頼が在るのに誰も
+    // 完成を記録できないまま上限まで落ちる。
+    if (recordCompletion !== undefined) {
+      if (await recordCompletion()) {
+        await setInvocation('idle', 0)
+        return
+      }
+      console.warn(`${LOG_PREFIX} AI 呼び出しが失敗: ${sessionId}`, ['プロセスは成功したが完成を記録できない'])
+      await setInvocation('failed')
       return
     }
 
-    console.warn(`${LOG_PREFIX} AI 呼び出しが失敗: ${sessionId}`, ['プロセスは成功したが提出が届かない'])
-    await setInvocation('failed')
+    // 作業をしていなければ失敗として起こし直す——ここを素通しにすると、問いも proposal も
+    // 出ないまま `idle` になり、巡回（`failed` しか拾わない）も回収できない詰まりが残る。
+    if (didWork !== undefined && !didWork()) {
+      console.warn(`${LOG_PREFIX} AI 呼び出しが失敗: ${sessionId}`, ['プロセスは成功したが提出が届かない'])
+      await setInvocation('failed')
+      return
+    }
+
+    await setInvocation('idle', 0)
     return
   }
 

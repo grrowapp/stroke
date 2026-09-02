@@ -2,7 +2,7 @@ import { conflict } from '../../../utils/stroke/conflict'
 import { parseQuestion } from '../../../utils/stroke/question'
 import { requireSessionId } from '../../../utils/stroke/session-param'
 import { notifySubmission } from '../../../utils/stroke/submission-signal'
-import { readState, writeState } from '../../../utils/stroke/session-store'
+import { isPromotedState, readState, writeState } from '../../../utils/stroke/session-store'
 import { questionChannel } from '../../../utils/stroke/ws-channels'
 
 /**
@@ -23,7 +23,8 @@ export default defineEventHandler(async (event) => {
   }
 
   const state = await readState(sessionId)
-  if (state.phase === 'approved') {
+  // 承認以降（`approved` / `activated`）は問いを持たない
+  if (isPromotedState(state)) {
     throw conflict('phase', '承認済みのセッションには提出できない。')
   }
 

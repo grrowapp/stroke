@@ -1,4 +1,4 @@
-import type { Invocation, SessionSummary } from '#shared/stroke'
+import { isPromotedPhase, type Invocation, type SessionSummary } from '#shared/stroke'
 import { LOG_PREFIX } from './log'
 import type { LiveProcess } from './live-processes'
 import { matchesTarget, type ReapTarget } from './reap-match'
@@ -103,13 +103,14 @@ export async function reapRunning(sessions: readonly SessionSummary[], deps: Rea
   return counts
 }
 
-/** `SessionSummary` から照合対象を組み立てる。`phase` が `unknown` なら判定できない。 */
+/**
+ * `SessionSummary` から照合対象を組み立てる。`phase` が `unknown` なら判定できない。
+ * 昇格後（`approved` / `activated`）は steering、それ以外はストローク。
+ */
 function targetOf(session: SessionSummary): ReapTarget | undefined {
-  if (session.phase === 'approved') return { kind: 'steering', cwd: session.path }
-  if (session.phase === 'stroking' || session.phase === 'proposed') {
-    return { kind: 'stroke', sessionId: session.id }
-  }
-  return undefined
+  if (session.phase === 'unknown') return undefined
+  if (isPromotedPhase(session.phase)) return { kind: 'steering', cwd: session.path }
+  return { kind: 'stroke', sessionId: session.id }
 }
 
 /**

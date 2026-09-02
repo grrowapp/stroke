@@ -115,7 +115,7 @@ describe('組み立て（buildRun + runClaude）と照合の一致', () => {
     const dir = await tempDir()
     const outFile = join(dir, 'argv.txt')
 
-    const run = buildRun({ sessionId: SESSION_ID, cwd: dir, kind: 'stroke', retries: 0, token: 'token-1' })
+    const run = buildRun({ sessionId: SESSION_ID, cwd: dir, phase: 'stroking', retries: 0, token: 'token-1' })
     const launch = { command: 'node', args: ['-e', captureArgvScript(outFile), '--', ...run.launch.args], apiBaseUrl: run.launch.apiBaseUrl }
 
     const result = await runClaude({ sessionId: SESSION_ID, launch, cwd: dir, prompt: 'PROMPT', mode: 'new', timeoutMs: 30000 })
@@ -130,7 +130,7 @@ describe('組み立て（buildRun + runClaude）と照合の一致', () => {
     const dir = await tempDir()
     const outFile = join(dir, 'argv.txt')
 
-    const run = buildRun({ sessionId: SESSION_ID, cwd: dir, kind: 'stroke', retries: 1, token: 'token-1' })
+    const run = buildRun({ sessionId: SESSION_ID, cwd: dir, phase: 'stroking', retries: 1, token: 'token-1' })
     const launch = { command: 'node', args: ['-e', captureArgvScript(outFile), '--', ...run.launch.args], apiBaseUrl: run.launch.apiBaseUrl }
 
     const result = await runClaude({ sessionId: SESSION_ID, launch, cwd: dir, prompt: 'PROMPT', mode: 'resume', timeoutMs: 30000 })
@@ -146,7 +146,7 @@ describe('組み立て（buildRun + runClaude）と照合の一致', () => {
     const outFile = join(dir, 'argv.txt')
     const projectDir = join(dir, 'my-project')
 
-    const run = buildRun({ sessionId: 'my-project', cwd: projectDir, kind: 'steering', retries: 0, token: 'token-1' })
+    const run = buildRun({ sessionId: 'my-project', cwd: projectDir, phase: 'approved', retries: 0, token: 'token-1' })
     const launch = { command: 'node', args: ['-e', captureArgvScript(outFile), '--', ...run.launch.args], apiBaseUrl: run.launch.apiBaseUrl }
 
     // 会話 id を渡さない初回。claude 自身が採番する（conversationId 省略と同じ）
@@ -164,7 +164,7 @@ describe('組み立て（buildRun + runClaude）と照合の一致', () => {
     const projectDir = join(dir, 'my-project')
 
     const run = buildRun({
-      sessionId: 'my-project', cwd: projectDir, kind: 'steering', retries: 0, runId: 'run-id-1', token: 'token-1',
+      sessionId: 'my-project', cwd: projectDir, phase: 'approved', retries: 0, runId: 'run-id-1', token: 'token-1',
     })
     const launch = { command: 'node', args: ['-e', captureArgvScript(outFile), '--', ...run.launch.args], apiBaseUrl: run.launch.apiBaseUrl }
 

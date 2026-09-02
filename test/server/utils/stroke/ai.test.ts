@@ -198,6 +198,75 @@ describe('invokeAi', () => {
     expect(calls.at(-1)).toEqual({ invocation: 'failed', retries: undefined })
   })
 
+  /**
+   * 完成の記録（add-activated-phase design D4）。`didWork` と同じ置き方で、渡されているとき
+   * だけ呼ぶ。ai.ts は phase を知らず、渡された関数の真偽値しか見ない。渡されているときは
+   * 作業の判定に代わる——完成の記録が受理されたなら作業は済んでいる。
+   */
+  describe('完成の記録（recordCompletion）', () => {
+    it('記録が受理されれば idle（回数は戻す）', async () => {
+      runClaude.mockResolvedValue({ ok: true, sessionId: 'x' })
+      const recordCompletion = vi.fn(async () => true)
+
+      const { run, calls } = makeRun({ didWork: () => true, recordCompletion })
+      await runInvoke(run)
+
+      expect(recordCompletion).toHaveBeenCalledTimes(1)
+      expect(calls.at(-1)).toEqual({ invocation: 'idle', retries: 0 })
+    })
+
+    it('作業ありでも記録が受理されなければ failed（巡回が起こし直す）', async () => {
+      runClaude.mockResolvedValue({ ok: true, sessionId: 'x' })
+
+      const { run, calls } = makeRun({ didWork: () => true, recordCompletion: async () => false })
+      await runInvoke(run)
+
+      expect(calls.at(-1)).toEqual({ invocation: 'failed', retries: undefined })
+    })
+
+    it('渡されていなければ記録を試みず idle（ストローク・完成済みの steering）', async () => {
+      runClaude.mockResolvedValue({ ok: true, sessionId: 'x' })
+
+      const { run, calls } = makeRun({ didWork: () => true, recordCompletion: undefined })
+      await runInvoke(run)
+
+      expect(calls.at(-1)).toEqual({ invocation: 'idle', retries: 0 })
+    })
+
+    it('文書を出さない起こし直しでも、承認依頼が在って記録が受理されれば idle（作業の判定に代わる）', async () => {
+      // 前の実行で文書は済み、この実行は承認依頼だけを出した。didWork（文書の提出）は false だが
+      // 完成の記録が受理されるので完了。先に didWork を見ると上限まで failed を繰り返す
+      runClaude.mockResolvedValue({ ok: true, sessionId: 'x' })
+      const recordCompletion = vi.fn(async () => true)
+
+      const { run, calls } = makeRun({ didWork: () => false, recordCompletion })
+      await runInvoke(run)
+
+      expect(recordCompletion).toHaveBeenCalledTimes(1)
+      expect(calls.at(-1)).toEqual({ invocation: 'idle', retries: 0 })
+    })
+
+    it('何もせず、記録も受理されなければ failed', async () => {
+      runClaude.mockResolvedValue({ ok: true, sessionId: 'x' })
+
+      const { run, calls } = makeRun({ didWork: () => false, recordCompletion: async () => false })
+      await runInvoke(run)
+
+      expect(calls.at(-1)).toEqual({ invocation: 'failed', retries: undefined })
+    })
+
+    it('プロセスが失敗したら記録を試みない', async () => {
+      runClaude.mockResolvedValue({ ok: false, detail: 'timeout', sessionMissing: false })
+      const recordCompletion = vi.fn(async () => true)
+
+      const { run, calls } = makeRun({ recordCompletion })
+      await runInvoke(run)
+
+      expect(recordCompletion).not.toHaveBeenCalled()
+      expect(calls.at(-1)).toEqual({ invocation: 'failed', retries: undefined })
+    })
+  })
+
   it('1回の呼び出しで起こすのは1回だけ（起こし直しは巡回が担う）', async () => {
     runClaude.mockResolvedValue({ ok: false, sessionMissing: false, detail: 'タイムアウト' })
 

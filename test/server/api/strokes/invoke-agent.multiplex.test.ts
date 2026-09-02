@@ -26,7 +26,8 @@ vi.mock('../../../../server/utils/readiness', () => ({
   missingPrerequisites: vi.fn(async () => []),
 }));
 
-vi.mock('../../../../server/utils/stroke/session-store', () => ({
+vi.mock('../../../../server/utils/stroke/session-store', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../server/utils/stroke/session-store')>()),
   readState: vi.fn(async () => ({ phase: 'stroking', invocation: 'idle', retries: 0 })),
   sessionExists: vi.fn(async () => true),
 }));

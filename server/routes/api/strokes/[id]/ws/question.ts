@@ -1,4 +1,4 @@
-import { readState, sessionExists } from '../../../../../utils/stroke/session-store'
+import { isPromotedState, readState, sessionExists } from '../../../../../utils/stroke/session-store'
 import { questionChannel, sessionIdFromUrl } from '../../../../../utils/stroke/ws-channels'
 
 /**
@@ -19,8 +19,9 @@ export default defineWebSocketHandler({
     questionChannel.register(sessionId, peer)
 
     // 接続時配信: 現在の1問があればそれを1件流す（design.md 決定6）。
+    // 承認以降（`approved` / `activated`）は問いを持たない
     const state = await readState(sessionId)
-    if (state.phase !== 'approved' && state.currentQuestion) {
+    if (!isPromotedState(state) && state.currentQuestion) {
       peer.send(JSON.stringify(state.currentQuestion))
     }
   },
