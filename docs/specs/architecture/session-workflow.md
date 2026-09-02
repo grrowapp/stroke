@@ -95,8 +95,9 @@ invokeAi だけが行う（`openspec/specs/agent/invocation`）。
 stateDiagram-v2
     [*] --> idle: セッション作成
     idle --> running: U13 で起動
-    running --> idle: output stream で完了を検知
-    running --> failed: タイムアウト・起動失敗
+    running --> idle: 完了を検知（提出あり）
+    running --> failed: タイムアウト・起動失敗・提出なしの完了
+    running --> error: 起動時に後始末できない
     failed --> running: 巡回が起こし直す（上限内）
     failed --> error: 上限に達した状態で再キック
     error --> running: ユーザーの再実行（回数リセット）
@@ -105,8 +106,14 @@ stateDiagram-v2
 
 - `phase: 'approved'` の対象も `invocation` を持つ。昇格後は steering の実行が起こる
 - 上限（`runtimeConfig.claude.maxRetries`）の判定は invokeAi。巡回は `failed` だけを拾う
-- サーバー再起動で宙に浮いた `running` は、起動時に `failed` へ倒して巡回に拾わせる
-  （`server/plugins/01.reap-running.ts`）
+- **正常終了でも、その起動で提出が1つも受理されていなければ `failed` に倒す。** 提出は
+  flontier が問い・proposal、steering が steering 文書。空振りを `idle` にすると成功と
+  区別できず、誰も起こし直さない
+- サーバー再起動で宙に浮いた `running` は、**まずその claude を終了させてから** `failed` へ
+  倒して巡回に拾わせる（`server/plugins/01.reap-running.ts`）。終了させられない場合と、
+  自分が起こしたものか判定できない場合は `error` へ倒してユーザーに引き渡す
+- **他インスタンスが起こした実行には触らない。** `projectShareRoot` は複数のインスタンスで
+  共有されるため、後始末は起動の引数を照合して自分のものだけを対象にする
 
 ## 実測で確定していること
 

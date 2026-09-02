@@ -7,7 +7,9 @@
   - 起動フラグ・定型・設定の一覧 → [docs/specs/core/settings-reference.md](../specs/core/settings-reference.md)
   - 配線と置き場 → [docs/specs/architecture/session-workflow.md](../specs/architecture/session-workflow.md)
   - 代行を確定した方式とする判断 → [docs/specs/mcp/tools.md](../specs/mcp/tools.md)「提供の形」「代行するもの」（`adr0016-sub-implement-mcp-operations` の結論。暫定・第一段という書きぶりは docs から消えている）
-- **確定していないもの**: 2026-09-01 に足した後続4本（`fix-upstream-mcp-allowance` / `fix-direct-write-allowance` / `fix-project-id-lookup` / `add-steering-context-tools`）の委譲理由は、まだ docs に落ちていない。**取りこぼす規約が残るので archive にしない**（CLAUDE.md「更新対応」）
+  - 許可する道具の基準（本家 MCP を許可に載せない・直接書ける道具を許可しない） → [docs/specs/core/settings-reference.md](../specs/core/settings-reference.md)「`--allowedTools`」（`fix-upstream-mcp-allowance` / `fix-direct-write-allowance` の結論。実測 2026-09-01）
+  - 本家がパスを git のトップレベルへ解決する事実 → [docs/specs/reference/upstream-observations.md](../specs/reference/upstream-observations.md)「登録されるパスは git のトップレベルへ解決される」（`fix-project-id-lookup` の前提）
+- **確定していないもの**: `adr0016-sub-add-steering-context-tools` の結論——steering 工程が文脈を取る道具をどう持つか——は、まだ着手していないので docs に落ちていない。**取りこぼす規約が残るので archive にしない**（CLAUDE.md「更新対応」）
 
 ## 決定
 

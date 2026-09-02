@@ -189,6 +189,29 @@ broadcastToProject(projectId, {type:'spec-update', data:{specs, archivedSpecs}})
 
 ---
 
+## 登録されるパスは git のトップレベルへ解決される
+
+本家は登録の前に、渡されたパスを自分の規則で解決する。**渡したパスがそのまま登録されるとは限らない。**
+
+- `dist/index.js` — `resolveGitWorkspaceRoot(expandedPath)` を通してから登録へ渡す
+- `dist/core/git-utils.js` — `execSync('git rev-parse --show-toplevel', { cwd })` で解決する。失敗したら渡されたパスへ落とす。環境変数 `SPEC_WORKFLOW_SHARED_ROOT` があればそれを最優先で返す
+- `dist/core/project-registry.js` — 解決後の値を `projectPath` として登録し、`projectId` もその値から作る
+
+`GET /api/projects/list` が返す `projectPath` はこの解決後の値である。**`workflowRootPath` は返らない。**
+
+登録簿には実際に食い違う例がある（`/opt/projects/.spec-workflow-mcp/activeProjects.json`、実測 2026-09-01）。
+
+| projectId | projectPath | workflowRootPath |
+|---|---|---|
+| `EsR5M2woKQ9OUss8` | `/opt/projects/stroke-board` | `/opt/projects/stroke-board` |
+| `tLh761zAISCC1-qU` | `/home/vagrant/work/stroke-board/agent-messanger` | `/opt/projects/agent-messanger` |
+
+後者は git ではなく、同ディレクトリの `.mcp.json` が `SPEC_WORKFLOW_SHARED_ROOT` を渡していることによる。
+
+**効いてくるのは共有ルートが git 管理下へ入ったときである。** いま `projectShareRoot` は `/opt/projects` で git リポジトリではないため解決しても値が変わらないが、git の内側へ動かすと本家の `projectPath` はトップレベルへ化け、パスの完全一致では引き当てられなくなる。
+
+> **読んだ実体は 2.2.5 である**（`npx -y @pimzino/spec-workflow-mcp@latest` の解決先と `node_modules` の両方。`core/git-utils.js` はバイト一致）。この資料の冒頭と [ADR-0008](../../adr/0008-baseline-is-2-2-7.md) は基準を 2.2.7 としているが、**実測と食い違っている**。基準版の扱いは別に判断する。
+
 ## 参照
 
 - `src/core/security-utils.ts` — CORS / レート制限 / CSP
