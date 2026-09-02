@@ -119,7 +119,7 @@ function send(): void {
         </UBadge>
 
         <!-- 詳細説明: 既に確定していること、調べて分かった事実 -->
-        <div class="mb-4 rounded-lg border border-default bg-elevated/50 p-3">
+        <div class="sb-stroke-card mb-4 p-3">
           <p class="mb-1 text-xs font-medium text-muted">詳細説明</p>
           <p
             class="whitespace-pre-wrap text-sm leading-relaxed text-toned"

@@ -122,7 +122,7 @@ const annotator = useTemplateRef<{ reveal: (id: string) => boolean }>('annotator
     </header>
 
     <!-- 差し戻し中の待ち受け画面。上部固定バーは残し、本文の代わりに点滅する文言を全面に出す -->
-    <div v-if="sendingBack" class="flex min-h-[calc(100vh-57px)] items-center justify-center">
+    <div v-if="sendingBack" class="flex min-h-[calc(100vh-var(--sb-stroke-bar-h))] items-center justify-center">
       <WaitingIndicator message="AI が修正中です" />
     </div>
 
@@ -157,7 +157,7 @@ const annotator = useTemplateRef<{ reveal: (id: string) => boolean }>('annotator
 
     <div
       v-else
-      class="grid min-h-[calc(100vh-57px)] grid-cols-1"
+      class="grid min-h-[calc(100vh-var(--sb-stroke-bar-h))] grid-cols-1"
       :class="approved ? '' : 'lg:grid-cols-[minmax(0,1fr)_400px]'"
     >
       <section class="min-w-0">
@@ -204,14 +204,19 @@ const annotator = useTemplateRef<{ reveal: (id: string) => boolean }>('annotator
           />
         </ReviewAnnotateSource>
 
-        <!-- 生テキスト: 書いてある通りの字。こちらでも同じ注釈が出て、同じように付けられる -->
+        <!--
+          生テキスト: 書いてある通りの字。こちらでも同じ注釈が出て、同じように付けられる。
+
+          余白はプレビューと同じ `px-8 py-8`。**切り替えで同じ場所に出る**ので、違えると
+          `shownMode` を切り替えた瞬間に本文の左端が飛ぶ（change `adopt-upstream-design-tokens`）。
+        -->
         <ReviewAnnotateSource
           v-else
           ref="annotator"
           :source="proposal"
           :comments="comments"
           :port="sourceSurface"
-          class="px-4 py-4"
+          class="px-8 py-8"
           @select="review.onSelect"
           @click-mark="review.editComment"
         >
@@ -226,7 +231,7 @@ const annotator = useTemplateRef<{ reveal: (id: string) => boolean }>('annotator
 
       <aside
         v-if="!approved"
-        class="flex flex-col border-l border-default bg-elevated/40 lg:sticky lg:top-[57px] lg:h-[calc(100vh-57px)]"
+        class="flex flex-col border-l border-default bg-elevated/40 lg:sticky lg:top-[var(--sb-stroke-bar-h)] lg:h-[calc(100vh-var(--sb-stroke-bar-h))]"
       >
         <div class="border-b border-default px-5 py-4">
           <h4 class="mb-3 text-sm font-medium">コメント({{ comments.length }})</h4>
