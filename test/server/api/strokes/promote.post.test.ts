@@ -10,9 +10,15 @@ import { fakeEvent, stubNitroGlobals, type FakeEvent } from '../support';
  * 昇格の段（openspec/specs/api/session/promote）。判断が無ければ受理せず、順序は
  * 「衝突確認 → 改名 → `phase` を書く」のまま、失敗したら改名を戻して**判断は残す**。
  * 起動は要求せず、`invocation` を A8 経由で `failed` にして巡回へ引き渡す。
+ *
+ * **busy ガードは U10 からここへ移した**（fix-rename-during-running-session）。改名する
+ * のはこの段なので、対象になるのもここである。`running.ts` の実物は
+ * `test/server/utils/stroke/running.test.ts` が見ているので、ここでは `beginRun` /
+ * `endRun` をモックし、呼ばれ方（どのパスで占有するか・断られたら何も変えないか・解放が
+ * どこで起きるか）だけを見る。
  */
 
-const { assertNameAvailable, promoteSessionToProject, revertPromotion, broadcastProjectCreation, forgetSubmissions, fetchMock } =
+const { assertNameAvailable, promoteSessionToProject, revertPromotion, broadcastProjectCreation, forgetSubmissions, fetchMock, beginRun, endRun } =
   vi.hoisted(() => ({
     assertNameAvailable: vi.fn(async (_root: string, name: string) => `/share/${name}`),
     promoteSessionToProject: vi.fn(async (_root: string, _id: string, name: string) => `/share/${name}`),
@@ -20,6 +26,8 @@ const { assertNameAvailable, promoteSessionToProject, revertPromotion, broadcast
     broadcastProjectCreation: vi.fn(() => undefined),
     forgetSubmissions: vi.fn(() => undefined),
     fetchMock: vi.fn(async (..._args: unknown[]) => undefined),
+    beginRun: vi.fn(async (path: string) => `key:${path}`),
+    endRun: vi.fn(),
   }));
 
 vi.mock('#app/composables/ssr', () => ({
@@ -50,6 +58,14 @@ vi.mock('../../../../server/utils/stroke/submission-signal', () => ({
   submissionCount: vi.fn(() => 0),
 }));
 
+// `sessionRunPath` / `projectRunPath` は fs を引かない純粋関数なので本物を残し、
+// `beginRun` / `endRun` だけ差し替える
+vi.mock('../../../../server/utils/stroke/running', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../server/utils/stroke/running')>()),
+  beginRun,
+  endRun,
+}));
+
 vi.mock('../../../../server/utils/stroke/session-store', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../server/utils/stroke/session-store')>();
   return {
@@ -68,7 +84,9 @@ const { default: promoteHandler } = await import('../../../../server/api/strokes
 const { readState, sessionExists, writeState } = await import(
   '../../../../server/utils/stroke/session-store'
 );
-const { invokePath, submissionPath } = await import('../../../../server/utils/stroke/invoke');
+const { invokePath } = await import('../../../../server/utils/stroke/invoke');
+const { submissionPath } = await import('../../../../server/utils/stroke/submission-path');
+const { sessionRunPath } = await import('../../../../server/utils/stroke/running');
 
 const readStateMock = vi.mocked(readState);
 const writeStateMock = vi.mocked(writeState);
@@ -100,10 +118,16 @@ describe('U14 POST /api/strokes/:id/promote', () => {
     readStateMock.mockReset().mockResolvedValue(DECIDED);
     writeStateMock.mockReset().mockResolvedValue(undefined);
     sessionExistsMock.mockReset().mockResolvedValue(true);
+    beginRun.mockReset().mockImplementation(async (path: string) => `key:${path}`);
+    endRun.mockReset();
   });
 
-  it('判断の名前で「衝突確認 → 改名 → phase を書く」の順に昇格し、204 を返す', async () => {
+  it('判断の名前で「占有 → 衝突確認 → 改名 → phase を書く → 解放」の順に昇格し、204 を返す', async () => {
     const order: string[] = [];
+    beginRun.mockImplementation(async (path: string) => {
+      order.push('begin');
+      return `key:${path}`;
+    });
     assertNameAvailable.mockImplementation(async (_root, name) => {
       order.push('assert');
       return `/share/${name}`;
@@ -115,11 +139,14 @@ describe('U14 POST /api/strokes/:id/promote', () => {
     writeStateMock.mockImplementation(async () => {
       order.push('write');
     });
+    endRun.mockImplementation(() => {
+      order.push('end');
+    });
 
     const response = await promoteHandler(fakeEvent(SESSION, undefined) as never);
 
     expect((response as Response).status).toBe(204);
-    expect(order).toEqual(['assert', 'rename', 'write']);
+    expect(order).toEqual(['begin', 'assert', 'rename', 'write', 'end']);
     // 名前は本文からではなく判断から引く
     expect(assertNameAvailable).toHaveBeenCalledWith('/share', NAME);
     expect(promoteSessionToProject).toHaveBeenCalledWith('/share', SESSION, NAME);
@@ -274,5 +301,76 @@ describe('U14 POST /api/strokes/:id/promote', () => {
     await expect(promoteHandler(fakeEvent(SESSION, undefined) as never)).rejects.toThrow('既に存在する');
     expect(promoteSessionToProject).not.toHaveBeenCalled();
     expect(writeStateMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('U14 POST /api/strokes/:id/promote — busy ガード（U10 から移した。fix-rename-during-running-session）', () => {
+  beforeEach(() => {
+    assertNameAvailable.mockReset().mockImplementation(async (_root, name) => `/share/${name}`);
+    promoteSessionToProject.mockReset().mockImplementation(async (_root, _id, name) => `/share/${name}`);
+    revertPromotion.mockClear();
+    broadcastProjectCreation.mockClear();
+    forgetSubmissions.mockClear();
+    fetchMock.mockReset().mockResolvedValue(undefined);
+    readStateMock.mockReset().mockResolvedValue(DECIDED);
+    writeStateMock.mockReset().mockResolvedValue(undefined);
+    sessionExistsMock.mockReset().mockResolvedValue(true);
+    beginRun.mockReset().mockImplementation(async (path: string) => `key:${path}`);
+    endRun.mockReset();
+  });
+
+  it('対象の作業場所（セッション id・改名前の実体）を beginRun で占有する', async () => {
+    await promoteHandler(fakeEvent(SESSION, undefined) as never);
+
+    expect(beginRun).toHaveBeenCalledWith(sessionRunPath('/share', SESSION));
+  });
+
+  it('実行中は 409 busy を返し、何も変わらない（改名・phase 書き込み・配信・A8 のいずれも起きない）', async () => {
+    beginRun.mockRejectedValueOnce(
+      Object.assign(new Error('この作業場所は AI の応答を待っている。'), {
+        statusCode: 409,
+        data: { reason: 'busy' },
+      }),
+    );
+
+    await expect(promoteHandler(fakeEvent(SESSION, undefined) as never)).rejects.toMatchObject({
+      statusCode: 409,
+      data: { reason: 'busy' },
+    });
+
+    expect(assertNameAvailable).not.toHaveBeenCalled();
+    expect(promoteSessionToProject).not.toHaveBeenCalled();
+    expect(writeStateMock).not.toHaveBeenCalled();
+    expect(broadcastProjectCreation).not.toHaveBeenCalled();
+    expect(forgetSubmissions).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('busy で断ったときは占有を残さない。beginRun が失敗しているので endRun は呼ばれない', async () => {
+    beginRun.mockRejectedValueOnce(Object.assign(new Error('busy'), { statusCode: 409, data: { reason: 'busy' } }));
+
+    await expect(promoteHandler(fakeEvent(SESSION, undefined) as never)).rejects.toMatchObject({ statusCode: 409 });
+
+    // 占有を取れていない（beginRun が一度も返っていない）ので、解放も起きようがない
+    expect(endRun).not.toHaveBeenCalled();
+  });
+
+  it('占有は改名・phase 書き込みの直後、steering の起動（U13）を叩く前に解放される', async () => {
+    const response = await promoteHandler(fakeEvent(SESSION, undefined) as never);
+
+    expect((response as Response).status).toBe(204);
+    // beginRun が返したキーで解放する
+    expect(endRun).toHaveBeenCalledWith(`key:${sessionRunPath('/share', SESSION)}`);
+    // 解放後の対象へ、以後の呼び出し（= 呼び手が直後に叩く U13 の beginRun）が
+    // 同じキーで占有できる状態になっている
+    expect(endRun).toHaveBeenCalledTimes(1);
+  });
+
+  it('phase の書き込みに失敗して改名を戻しても、占有は解放される', async () => {
+    writeStateMock.mockRejectedValueOnce(new Error('disk full'));
+
+    await expect(promoteHandler(fakeEvent(SESSION, undefined) as never)).rejects.toThrow('disk full');
+
+    expect(endRun).toHaveBeenCalledWith(`key:${sessionRunPath('/share', SESSION)}`);
   });
 });

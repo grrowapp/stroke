@@ -10,7 +10,7 @@
 | `projects/` | `/api/projects/` の endpoint。1本につき1ファイル |
 | `ws/` | WS 配信 |
 
-## `sessions/` — 9本
+## `sessions/` — 10本
 
 | # | メソッド / パス | 内容 |
 |---|---|---|
@@ -19,10 +19,11 @@
 | U3 | `GET /api/sessions/:id/strokes` | 済んだストロークを見る |
 | U7 | `POST /api/sessions/:id/answer` | 問いに回答する |
 | U9 | `POST /api/sessions/:id/send-back` | proposal を差し戻す |
-| U10 | `POST /api/sessions/:id/approve` | 承認する |
+| U10 | `POST /api/sessions/:id/approve` | 承認の判断を記録する |
 | U11 | `DELETE /api/sessions/:id` | セッションを消す |
 | U12 | `GET /api/sessions` | セッションを一覧する |
 | U13 | `GET /api/sessions/:id/invoke-agent` | AI を起動する |
+| U14 | `POST /api/sessions/:id/promote` | セッションをプロジェクトへ昇格させる |
 
 ## `projects/` — 1本
 
