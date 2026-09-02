@@ -1,13 +1,14 @@
 ---
-status: Planning
 change: update-ui-approval-review
+triage:
+  - enhancement
+status: Planning
 tags:
   - proposal
   - specs
   - design
   - tasks
-triage:
-  - enhancement
+order: -12.0
 ---
 
 # update-ui-approval-review
