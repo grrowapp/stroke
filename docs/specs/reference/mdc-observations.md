@@ -263,8 +263,12 @@ front matter を作る依存も持たないが、文書を書くのは AI か人
 - `test/modules/markdown/fence-source.test.ts` — 件2・件5・件6・件7 の**差そのもの**を実測で固定する。
   `runtime/position/fence.ts` を書く人はここを先に読むこと（`fence.test.ts` は差を埋める側の検査で、
   差の一覧はこちらにある）
-- `test/modules/markdown/runtime/edit/roundtrip.test.ts` — TipTap の往復で表が潰れること。
-  変換を挟まない編集を選んだ根拠
+- **WYSIWYG（TipTap）を採らなかった根拠**は事実としてここに残す: 読み込んで取り出すだけの往復で、
+  見出し・箇条書き・コードブロック・引用・リンク・強調・チェックボックスは元に戻るが、**表だけが1行に潰れる**
+  （`StarterKit` に table が無く、Nuxt UI の `Editor` も読み込まない。実測 2026-08-30）。仕様書もステアリングも
+  表を使うため、変換を挟まない編集（markdown のテキストを直接編集）を選んだ。これを固定していた
+  `roundtrip.test.ts` は写し元を持たないテストだったため削除した（ユーザー決定 2026-09-02）。
+  再検討するときは TipTap の表の往復を試し直すこと
 - `test/modules/markdown/runtime/position/` — `silent-failure` / `edge-cases` / `fence` /
   `preview` / `plain` / `pre-mark` / `normalize`
 - `test/modules/markdown/runtime/render/markdown-view-position.test.ts` — 位置の対応が外から

@@ -89,7 +89,7 @@ test.describe('仕様書の文書を直す', () => {
   });
 
   test('表を含む本文を保存しても表が壊れない', async ({ page }) => {
-    // WYSIWYG を採らなかった理由がこれ（markdown-roundtrip.test.ts）。
+    // WYSIWYG を採らなかった理由がこれ（docs/specs/reference/mdc-observations.md）。
     // 変換を挟まない構成なので、書いたとおりに保存される
     const table = '# 表\n\n| 列1 | 列2 |\n| --- | --- |\n| a | b |';
 

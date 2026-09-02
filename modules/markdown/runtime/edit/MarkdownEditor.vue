@@ -9,7 +9,7 @@
  *
  * 扱うのは markdown のテキストそのもの。読み込みと保存のあいだで変換を挟まないので、
  * 開いて保存しただけで内容が変わることが構造的に起こらない（design.md の決定）。
- * WYSIWYG を採らなかった理由は `markdown-roundtrip.test.ts` に残してある。
+ * WYSIWYG を採らなかった理由は `docs/specs/reference/mdc-observations.md` に残してある。
  *
  * **保存そのものはここの責務ではない。** `save` を受け取って呼ぶだけで、保存先も
  * 保存の可否も呼ぶ側が決める（`openspec/specs/markdown/module`）。中身が無いときに
