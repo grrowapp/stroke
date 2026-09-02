@@ -158,7 +158,7 @@ defineProps<{
 
 **承認画面はこれを使いません。** 承認対象の本文は読むだけなので `DocumentView` を直接使います。読み取り専用のものにモードを足すと「編集できるが編集させない」状態を持つことになるため、境界をコンポーネントで分けています。
 
-WYSIWYG を採らなかった理由は `markdown-roundtrip.test.ts` に残してあります（TipTap は表が1行に潰れる）。
+WYSIWYG を採らなかった理由（TipTap は表が1行に潰れる）は `docs/specs/reference/mdc-observations.md` に残してあります。
 
 **参照元**（2）— `specs/[specName]/[document].vue`、`steering/[name].vue`
 

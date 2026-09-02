@@ -61,8 +61,8 @@
 | `AgentQuestion.vue` | 198 | `question: Question \| null` / `waiting` / `waitingMessage` / `answered` / `submitLabel` | `answer: [Answer]` |
 | `StrokeBreadcrumb.vue` | 116 | `strokes: Stroke[]` / `current` | — |
 | `WaitingIndicator.vue` | 11 | `message: string` | — |
-| `review/AnnotateSource.vue` | 132 | `source: string` / `comments: Annotation[]` | `select: [{text,start,end}]` / `clickMark: [id]` |
-| `review/ApprovalAnnotator.vue` | 430 | `source` / `projectId` / `approvalId` / `canRespond` + `#preview` slot | — |
+| `review/AnnotateSource.vue` | 248 | `source: string` / `comments: Annotation[]` / `port?: PositionPort \| null`（面の `ref` を素通し）+ default slot（面。`sourceShown: SourceRange[]` を渡す） | `select: [{text,start,end}]` / `clickMark: [id]`。`defineExpose({ reveal })`（一覧→本文） |
+| `review/ApprovalAnnotator.vue` | 680 | `source` / `projectId` / `approvalId` / `canRespond` + `#preview` slot | — 。面は2つ（プレビュー／注釈）。コメント欄はしまえる（幅固定） |
 | `review/CommentCard.vue` | 57 | `comment: Annotation` | `edit: [id]` / `remove: [id]` |
 | `review/CommentModal.vue` | 62 | 編集対象ほか + `v-model:open` | `save: [comment, color]` |
 | `review/Modals.vue` | 94 | **`review: ReturnType<typeof useProposalReview>`** | — |

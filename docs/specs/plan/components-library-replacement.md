@@ -33,7 +33,7 @@
 | `workspace/WorkspacePanel` | 見出し+slot の markup のみ。UCard に載せても markup は残り、消える自前実装が無い |
 | `review/CommentCard` | 同上。中身は注釈ドメインの表示で、外枠だけ UCard 化しても得るものが無い |
 | `StrokeBreadcrumb` | 本体は粒開き（toggle + 往復全文パネル）。`UBreadcrumb` はリンク列のモデルで、nav 行だけ載せ替えても自前実装は消えない |
-| `review/AnnotateSource` | Selection API の一回読取 + オフセット変換。vueuse `useTextSelection` はリアクティブ追跡で用途が異なり、代替できるライブラリが無い |
+| `review/AnnotateSource` | **置換済み（2026-09-02・`create-module-annotation`）。** 据置の根拠だった「オフセット変換を自前で持つ」役目が `#markdown` の位置の口へ移り、選択の検出は vueuse `useTextSelection`、塗りは CSS Custom Highlight API になった |
 | `WaitingIndicator` | 置換対象の機構が無い |
 | `review/CommentModal` | **@nuxt/ui 採用済み**（UModal/UTextarea/UButton） |
 | `review/Modals` | **@nuxt/ui 採用済み**。構造の問題は責務分離の軸 |

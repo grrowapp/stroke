@@ -56,8 +56,8 @@ markdown を扱う実体が `nuxt.config.ts`（parse 設定）・`app/components
 #### create-module-annotation
 
 - **種別**: 拡張
-- **状態**: 未着手（tasks 0/23）
-- **成果物**: specs + tasks（**0/23**。proposal・design 未作成）
+- **状態**: **完了**（2026-09-02 archive。ユーザー承認済み。上位資料への整合反映2件だけ承認待ちで残る）
+- **成果物**: `openspec/changes/archive/2026-09-02-create-module-annotation/`
 - **触るファイル**: `app/components/review/AnnotateSource.vue`（塗りの置き換え）、注釈の面を持つ画面（承認画面・ストローク側の proposal 確認画面）
 
 **対応内容** — 注釈が markdown の描き方を知らずに済むようにする。整形された本文の面でも注釈を付けられるようにし、どちらの面で付けた注釈も両方の面に出るようにする。面を2つ（整形された本文・生テキスト）に絞る。
@@ -80,8 +80,8 @@ markdown を扱う実体が `nuxt.config.ts`（parse 設定）・`app/components
 #### add-full-width-markdown-editor
 
 - **種別**: 拡張
-- **状態**: 未着手（成果物が proposal のみ）
-- **成果物**: proposal のみ（design・specs・tasks 未作成）
+- **状態**: **完了**（2026-09-02 archive。ユーザー承認済み。つまみは a を仮置き — 採用が変われば差し替え1箇所）
+- **成果物**: `openspec/changes/archive/2026-09-02-add-full-width-markdown-editor/`
 - **触るファイル**: `app/components/review/ApprovalAnnotator.vue`（コメント欄の列と開閉）、`app/pages/projects/[projectId]/approvals/[approvalId].vue`（編集の口を外す）
 
 **対応内容** — 承認画面の指摘の一覧（コメント欄）をしまって、本文を広く読めるようにする。しまうと 44px のつまみだけが残り、つまみで一覧だけが戻る。開閉の口は、掴んで引く／見出し帯のボタン／つまみのクリック／右辺の不可視のレール の4つ（prototype で確定）。
@@ -141,8 +141,8 @@ markdown を扱う実体が `nuxt.config.ts`（parse 設定）・`app/components
 #### separate-approval-decision-from-promotion
 
 - **種別**: 拡張
-- **状態**: 未着手（成果物が `.openspec.yaml` のみ）
-- **成果物**: `.openspec.yaml` のみ（proposal 以降すべて未作成）
+- **状態**: **完了**（2026-09-02 archive。ユーザー承認済み。docs 反映5件と本体 spec の Purpose が承認待ちで残る）
+- **成果物**: `openspec/changes/archive/2026-09-02-separate-approval-decision-from-promotion/`
 - **触るファイル**: `POST /api/strokes/:id/approve` の実装と、その後始末を抱える範囲
 
 **対応内容** — 承認の判断と、その結果として起きること（昇格・steering の起動）を切り離す。判断・昇格・起動を別々に扱えるようにし、押し間違いを取り消せる余地と、失敗した段だけをやり直せる形を作る。
@@ -184,8 +184,8 @@ markdown を扱う実体が `nuxt.config.ts`（parse 設定）・`app/components
 #### update-docs-structure
 
 - **種別**: 資料化
-- **状態**: 未着手（tasks 0/26）
-- **成果物**: proposal + design + specs + tasks（**0/26**）
+- **状態**: **完了**（2026-09-02 archive。ユーザー承認済み。4.3（写し元の無いテストの置き場）だけ判断待ちで残る）
+- **成果物**: `openspec/changes/archive/2026-09-02-update-docs-structure/`
 - **触るファイル**:
   - `docs/specs/core/system-structure.md` — ディレクトリ構造に `modules/` を追加。`app/components/` の切り方の規範を `app-structure` と揃える
   - `docs/specs/core/file-components.md` — `MarkdownPre` / `CodeBlock` / `MermaidDiagram` / `DocumentView` / `DocumentEditor` の行を落とす
