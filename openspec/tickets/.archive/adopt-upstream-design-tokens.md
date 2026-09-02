@@ -1,5 +1,5 @@
 ---
-status: Planning
+status: Wait-for-archive
 tags:
   - proposal
 change: adopt-upstream-design-tokens
