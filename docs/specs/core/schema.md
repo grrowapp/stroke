@@ -6,7 +6,10 @@
 |---|---|---|---|
 | `phase` | `"stroking"` \| `"proposed"` \| `"approved"` | 必須 | セッションの局面 |
 | `currentQuestion` | `Question` \| `null` | `approved` 以外は必須 | 今ユーザーが答えるべき問い |
-| `invocation` | `"running"` \| `"idle"` \| `"failed"` | `approved` 以外は必須 | `claude -p` の実行状態 |
+| `invocation` | `"running"` \| `"idle"` \| `"failed"` \| `"error"` | `approved` 以外は必須 | 実行の記録。`error` はリトライ上限に達した終端（`docs/specs/architecture/session-workflow.md`「実行の記録」） |
+| `retries` | `number` | 任意 | これまでに起こし直した回数。上限とタイムアウトの判定が読む |
+| `runId` | `string` | 任意 | steering の会話の続き先。claude が採番した id を覚えて次回 `--resume` に渡す |
+| `decision` | `object` | 任意 | 承認の判断。記録されている間もセッションは `proposed` のまま（`docs/specs/api/sessions/approve.md`） |
 | `projectName` | `string` | `approved` は必須、他は任意 | `approved` 前は AI が提案した kebab-case の候補、`approved` は確定した名前 |
 
 ```json

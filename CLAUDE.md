@@ -20,7 +20,8 @@ issue-trackerには、change-id の命名・ticket の起票・artifact・参照
 ## Dev サーバー
 
 - 起動・ビルドなどの実行は **package.json の scripts 経由**（`yarn dev` / `yarn build` / `yarn test` …）で行う。`node .output/server/index.mjs` のような直接起動をしない
-- ポートの既定は **3399**。**固定ではなく、並走させる worktree はずらす**（2026-08-31 時点で 3399 以外は pre5 の 3599 だけ）。同じ値が2箇所にある — ストロークの `claude.apiBaseUrl`（正は `docs/specs/core/settings-reference.md`）と `nuxt.config.ts` の `devServer.port`（起動時のビルド設定でストローク側設定ではないため settings-reference の対象外。`nuxt.config.ts` が実体）。**変えるときは必ず両方を揃えて変える**——片方だけ変えると、起動した claude は開いていないポートへ MCP 接続を試みる
+- ポートは**並走させる worktree ごとにずらす**。決めるのは `package.json` の `dev`（`nuxt dev --port <n>`）と `nuxt.config.ts` の `devServer.port` で、**CLI の `--port` が勝つ**。
+  - **揃える相手はもう無い。** エージェントへ渡す接続先は、サーバーが実際に bind したアドレスから作る（`server/utils/stroke/listen-address.ts`）。かつて `claude.apiBaseUrl` という設定と揃える必要があったが、**その設定は外した**（`docs/specs/core/settings-reference.md`「接続先は設定ではない」）
 - 3000 はこのマシンで別のプロセスが使用中。使わない。5000 は本家 spec-workflow の dashboard
 - E2E の STUB_PORT / APP_PORT（`playwright.config.ts`）は**実行のたびに 50000 から上へ空きを探して取る**（上限 60000）。固定値ではないので、worktree を並べて同時に `yarn test:e2e` を回してよい。どのポートを使ったかは Playwright の起動ログに出る
   - dev サーバーのポートとは要件が違う。人がブラウザで繋ぎに行く dev は既定を決めて worktree ごとにずらすが、E2E は立てて捨てるだけなので空きを取る

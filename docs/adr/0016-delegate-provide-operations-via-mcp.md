@@ -3,11 +3,13 @@
 - **状態**: 採用（一部は docs へ確定済み。**archive にはしない**——下の「確定していないもの」）
 - **日付**: 2026-08-29
 - **確定した先**:
-  - 提供方式・ツールの契約・結果の形・工程ごとの公開・接続 token → [docs/specs/api/mcp-tools.md](../specs/api/mcp-tools.md)
+  - 提供方式・ツールの契約・結果の形・工程ごとの公開・接続 token → [docs/specs/mcp/tools.md](../specs/mcp/tools.md)
   - 起動フラグ・定型・設定の一覧 → [docs/specs/core/settings-reference.md](../specs/core/settings-reference.md)
   - 配線と置き場 → [docs/specs/architecture/session-workflow.md](../specs/architecture/session-workflow.md)
-  - 代行を確定した方式とする判断 → [docs/specs/api/mcp-tools.md](../specs/api/mcp-tools.md)「提供の形」「代行するもの」（`adr0016-sub-implement-mcp-operations` の結論。暫定・第一段という書きぶりは docs から消えている）
-- **確定していないもの**: 2026-09-01 に足した後続4本（`fix-upstream-mcp-allowance` / `fix-direct-write-allowance` / `fix-project-id-lookup` / `add-steering-context-tools`）の委譲理由は、まだ docs に落ちていない。**取りこぼす規約が残るので archive にしない**（CLAUDE.md「更新対応」）
+  - 代行を確定した方式とする判断 → [docs/specs/mcp/tools.md](../specs/mcp/tools.md)「提供の形」「代行するもの」（`adr0016-sub-implement-mcp-operations` の結論。暫定・第一段という書きぶりは docs から消えている）
+  - 許可する道具の基準（本家 MCP を許可に載せない・直接書ける道具を許可しない） → [docs/specs/core/settings-reference.md](../specs/core/settings-reference.md)「`--allowedTools`」（`fix-upstream-mcp-allowance` / `fix-direct-write-allowance` の結論。実測 2026-09-01）
+  - 本家がパスを git のトップレベルへ解決する事実 → [docs/specs/reference/upstream-observations.md](../specs/reference/upstream-observations.md)「登録されるパスは git のトップレベルへ解決される」（`fix-project-id-lookup` の前提）
+- **確定していないもの**: `adr0016-sub-add-steering-context-tools` の結論——steering 工程が文脈を取る道具をどう持つか——は、まだ着手していないので docs に落ちていない。**取りこぼす規約が残るので archive にしない**（CLAUDE.md「更新対応」）
 
 ## 決定
 
@@ -277,13 +279,13 @@ ticket の tags が bug のもの。あるべき振る舞いに戻す（5件）�
 - **触るファイル**:
   - `server/utils/mcp/allowed-tools.ts` — `mcp__specworkflow` を許可へ足している箇所
   - `server/mcp/tools/get-steering-guide.ts` / `get-guide.ts` — 「呼ぶな」と述べている節
-  - `docs/specs/api/mcp-tools.md` — 整合反映（ADR-0004 の手続き）
+  - `docs/specs/mcp/tools.md` — 整合反映（ADR-0004 の手続き）
 
 **問題** — 本家 MCP のツールは `--allowedTools` に載っていて呼べるのに、案内は「この工程では1つも呼ばない」「`approvals` も呼ぶな」と書いている。守っているのは案内の散文だけである。
 
 **原因** — 許可へ足した理由は「配るだけでは一覧に出るのに1つも呼べず、『呼べないものを見せてから失敗させない』を破る」（親 change 6.2 の4周目）。一方、本家 MCP を起こす目的は起動時の登録簿への自己登録だけで、ツール呼び出しは1つも要らない。stdio の本家 MCP には `x-mcp-tools` のような絞りが無いので、「構造で塞ぐ」と「見せてから失敗させない」は両立しない。
 
-**対処** — どちらへ倒すかを design で決め、選んだ側を `docs/specs/api/mcp-tools.md` の「操作の入口はこれだけである」と整合させる。
+**対処** — どちらへ倒すかを design で決め、選んだ側を `docs/specs/mcp/tools.md` の「操作の入口はこれだけである」と整合させる。
 
 **親との関係** — 後続。親 change の santa-method レビュー 9周目（2026-08-31）が見つけた。当初は範囲外として記録したが、**範囲外の扱いは不正だった**（ユーザー指摘 2026-09-01）。案内2本の change（`create-flontier-guidance-mcp-tool` / `create-steering-guidance-mcp-tool`）が確定させた文言に掛かるので、それらの完了後に着手する。
 
@@ -295,7 +297,7 @@ ticket の tags が bug のもの。あるべき振る舞いに戻す（5件）�
   - `nuxt.config.ts` — `allowedTools` の値と、事実と違うコメント
   - `docs/specs/core/settings-reference.md` — 起動フラグの記述（ADR-0004 の手続き）
 
-**問題** — `--allowedTools` の `Write` / `Edit` が、MCP ツールを通さず文書を直接書く経路を残している。`docs/specs/api/mcp-tools.md` の「操作の入口はこれだけである。ファイルの直読み・直書きも、コマンドによる代行も採らない」を迂回できる。
+**問題** — `--allowedTools` の `Write` / `Edit` が、MCP ツールを通さず文書を直接書く経路を残している。`docs/specs/mcp/tools.md` の「操作の入口はこれだけである。ファイルの直読み・直書きも、コマンドによる代行も採らない」を迂回できる。
 
 **原因** — 要否を確かめずに残っている。`nuxt.config.ts` のコメントは「`Write` は proposal を `docs/proposal.md` に書くのに要る」と説明するが、proposal を書くのは受理した A7 である。**ただし `Write` が入った実際の理由は別で**、コミット `1ce89cfc`（2026-08-26）が示すとおりワークフロー定義の `generates`（`stroke.md` / `proposal.md`）の新規作成である。その要求は schema.yaml にいまも残っている。
 
@@ -312,7 +314,7 @@ ticket の tags が bug のもの。あるべき振る舞いに戻す（5件）�
 - **触るファイル**:
   - `server/utils/mcp/resolve-project-id.ts` — 照合の仕方
   - `docs/specs/reference/upstream-observations.md` — 本家の正規化についての事実を記録
-  - `docs/specs/api/mcp-tools.md` — `errorCode` を足す場合の整合反映（ADR-0004 の手続き）
+  - `docs/specs/mcp/tools.md` — `errorCode` を足す場合の整合反映（ADR-0004 の手続き）
 
 **問題** — projectId の引き当てが、本家がパスをどう正規化するかに暗黙で依存している。`projectShareRoot` が git リポジトリの内側へ動いた瞬間、steering 工程が静かに壊れる。失敗は `project_not_registered` として出るので、登録はあるのに「登録されていない」と読める。
 

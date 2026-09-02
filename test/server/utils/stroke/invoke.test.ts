@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MCP_SERVER_NAME } from '../../../../server/utils/mcp/allowed-tools';
 import { resolveConnection, type ConnectionContext } from '../../../../server/utils/mcp/connection-table';
@@ -25,7 +25,6 @@ vi.mock('../../../../server/utils/stroke/config', () => ({
       claude: {
         command: 'claude',
         args: ['--setting-sources', 'project'],
-        apiBaseUrl: 'http://example.test:3399',
         workflowSchema: 'flontier-strokeflow',
         firstPrompt: 'first',
         continuePrompt: 'continue',
@@ -42,6 +41,15 @@ vi.mock('../../../../server/utils/stroke/config', () => ({
 }));
 
 /**
+ * MCP の url に使う base URL は実際の待ち受けから組み立てる（provide-operations-via-mcp
+ * 続き。`listen-address.ts`）。ここで見たいのは buildRun がその値をそのまま url・
+ * STROKE_BASEURL に使うことだけなので、固定値を返す細工で足りる。
+ */
+vi.mock('../../../../server/utils/stroke/listen-address', () => ({
+  currentApiBaseUrl: () => 'http://example.test:3399',
+}));
+
+/**
  * ポータル側の設定。`readServerConfig` は `useRuntimeConfig()` を通るので、Nitro の外では
  * 解決できない。ここで見たいのは**その値が本家 MCP の `env` に載ること**だけである
  */
@@ -54,8 +62,16 @@ vi.mock('../../../../server/utils/config', () => ({
   }),
 }));
 
-/** 実行そのものは差し替える。見たいのは `kick` の前後の後始末だけである */
-const ai = vi.hoisted(() => ({ invokeAi: vi.fn<(sessionId: string, run: unknown) => Promise<void>>() }));
+/**
+ * 実行そのものは差し替える。見たいのは `kick` の前後の後始末（token の登録・削除）と、
+ * `kick` が `invokeAi` へ何を渡すかだけである——`invokeAi` 自身が組み立て失敗をどう
+ * 記録するか（`failed`/`error`・回数の進め方）は `ai.test.ts` の責務。
+ */
+type InvokeAiOutcome = { built: Promise<void>, settled: Promise<void> };
+
+const ai = vi.hoisted(() => ({
+  invokeAi: vi.fn<(sessionId: string, retries: number, build: () => unknown) => InvokeAiOutcome>(),
+}));
 
 vi.mock('../../../../server/utils/stroke/ai', () => ({ invokeAi: ai.invokeAi }));
 
@@ -83,6 +99,13 @@ function registered(token: string): ConnectionContext | null {
 }
 
 const { buildRun, kick } = await import('../../../../server/utils/stroke/invoke');
+const {
+  notifySubmission,
+  forgetSubmissions,
+  recordLaunchSubmission,
+  hasLaunchSubmission,
+  forgetLaunchSubmission,
+} = await import('../../../../server/utils/stroke/submission-signal');
 
 type McpConfig = {
   mcpServers: Record<string, {
@@ -191,7 +214,7 @@ describe('buildRun の --mcp-config', () => {
     expect(exposedToolsOf('steering')).toContain('submit-document');
   });
 
-  it('steering 工程は本家 MCP も --allowedTools に載せる（配るだけで呼べない状態にしない）', () => {
+  it('steering 工程は --allowedTools に自前 MCP だけを載せ、本家 MCP は載せない（配線とは別）', () => {
     const run = buildRun({
       sessionId: 'session-1',
       cwd: '/tmp/share/session-1',
@@ -199,11 +222,14 @@ describe('buildRun の --mcp-config', () => {
       retries: 0,
       token: 'token-1',
     });
-    expect(allowedToolsOf('steering')).toContain('mcp__specworkflow');
-    expect(allowedToolsOf('steering')).toContain('mcp__stroke-board');
+    // 肯定で見る。フラグが1本だけ在り、自前ツールは載っている
     expect(run.launch.args.filter(arg => arg === '--allowedTools')).toHaveLength(1);
+    expect(allowedToolsOf('steering')).toContain('mcp__stroke-board');
+    // その上で、本家 MCP は載っていないことを見る
+    expect(allowedToolsOf('steering')).not.toContain('mcp__specworkflow');
 
-    // 本家 MCP は `--mcp-config` の mcpServers にも同じ名前で並ぶ（名前がずれると許可が効かない）
+    // 本家 MCP は `--mcp-config` の mcpServers には引き続き並ぶ（配線は続けるため）。
+    // 許可（--allowedTools）と配線（--mcp-config）が別であることが、テストの上でも読める
     const configAt = run.launch.args.indexOf('--mcp-config');
     const config = JSON.parse(run.launch.args[configAt + 1]!) as { mcpServers: Record<string, unknown> };
     expect(Object.keys(config.mcpServers)).toContain('specworkflow');
@@ -224,65 +250,165 @@ describe('buildRun の --mcp-config', () => {
   });
 });
 
+/**
+ * `buildRun` が渡す `didWork` の読み先（fix-steering-empty-completion）。
+ *
+ * steering は本家 REST へ直接届くため対象の id に結びつける経路が無く、この起動の
+ * token を単位にした記録（`submission-signal.ts` の `recordLaunchSubmission` /
+ * `hasLaunchSubmission`）を読む。flontier は既存どおり対象の `sessionId` で数える
+ * （`notifySubmission` / `submissionCount`）——ここが変わっていないことも合わせて見る。
+ */
+describe('buildRun の didWork', () => {
+  afterEach(() => {
+    forgetSubmissions('session-1');
+    forgetLaunchSubmission('token-1');
+  });
+
+  it('steering の起動は起動単位（token）の提出記録を読む', () => {
+    const run = buildRun({
+      sessionId: 'project-a',
+      cwd: '/opt/projects/project-a',
+      kind: 'steering',
+      retries: 0,
+      token: 'token-1',
+    });
+
+    expect(run.didWork).toBeDefined();
+    // まだ何も受理されていない起動では false
+    expect(run.didWork!()).toBe(false);
+
+    // submit-document の steering 分岐が受理したときと同じ記録
+    recordLaunchSubmission('token-1');
+    expect(run.didWork!()).toBe(true);
+  });
+
+  it('flontier の起動は対象の sessionId で数える（変わっていない）', () => {
+    const run = buildRun({
+      sessionId: 'session-1',
+      cwd: '/tmp/share/session-1',
+      kind: 'stroke',
+      retries: 0,
+      token: 'token-1',
+    });
+
+    expect(run.didWork).toBeDefined();
+    expect(run.didWork!()).toBe(false);
+
+    // steering 用の起動単位の記録（token）を足しても flontier 側は反応しない
+    // ——2つのキーが混ざっていないことの裏返しの確認
+    recordLaunchSubmission('token-1');
+    expect(run.didWork!()).toBe(false);
+
+    notifySubmission('session-1');
+    expect(run.didWork!()).toBe(true);
+  });
+});
+
 describe('kick の接続表の後始末', () => {
   beforeEach(() => {
     config.broken = false;
     ai.invokeAi.mockReset();
-    ai.invokeAi.mockResolvedValue(undefined);
+    ai.invokeAi.mockReturnValue({ built: Promise.resolve(), settled: Promise.resolve() });
   });
 
   it('実行中はエントリが残る（消すのが早すぎない）', async () => {
     let finish = (): void => {};
-    ai.invokeAi.mockImplementationOnce(async () => await new Promise<void>((resolve) => { finish = resolve; }));
+    ai.invokeAi.mockImplementationOnce(() => ({
+      built: Promise.resolve(),
+      settled: new Promise<void>((resolve) => { finish = resolve; }),
+    }));
 
-    const running = kick({ sessionId: 'session-1', cwd: '/tmp/share/session-1', kind: 'stroke', retries: 0 });
+    const { settled } = kick({ sessionId: 'session-1', cwd: '/tmp/share/session-1', kind: 'stroke', retries: 0 });
     const token = issuedToken();
 
     // 起動が走っている間は、その token でツールを呼べなければならない
     expect(registered(token)).toEqual({ sessionId: 'session-1' });
 
     finish();
-    await running;
+    await settled;
     expect(registered(token)).toBeNull();
   });
 
   it('steering の起動は projectPath の文脈で登録される', async () => {
     let finish = (): void => {};
-    ai.invokeAi.mockImplementationOnce(async () => await new Promise<void>((resolve) => { finish = resolve; }));
+    ai.invokeAi.mockImplementationOnce(() => ({
+      built: Promise.resolve(),
+      settled: new Promise<void>((resolve) => { finish = resolve; }),
+    }));
 
-    const running = kick({ sessionId: 'project-a', cwd: '/opt/projects/project-a', kind: 'steering', retries: 0 });
+    const { settled } = kick({ sessionId: 'project-a', cwd: '/opt/projects/project-a', kind: 'steering', retries: 0 });
     const token = issuedToken();
 
     expect(registered(token)).toEqual({ projectPath: '/opt/projects/project-a' });
 
     finish();
-    await running;
+    await settled;
     expect(registered(token)).toBeNull();
   });
 
   it('正常終了でエントリが消える', async () => {
-    await kick({ sessionId: 'session-1', cwd: '/tmp/share/session-1', kind: 'stroke', retries: 0 });
+    const { settled } = kick({ sessionId: 'session-1', cwd: '/tmp/share/session-1', kind: 'stroke', retries: 0 });
+    await settled;
 
     expect(registered(issuedToken())).toBeNull();
   });
 
-  it('異常終了（invokeAi の reject）でもエントリが消える', async () => {
-    ai.invokeAi.mockRejectedValueOnce(new Error('起動できない'));
+  it('異常終了（settled の reject）でもエントリが消える', async () => {
+    ai.invokeAi.mockReturnValueOnce({ built: Promise.resolve(), settled: Promise.reject(new Error('起動できない')) });
 
-    await expect(kick({ sessionId: 'session-1', cwd: '/tmp/share/session-1', kind: 'stroke', retries: 0 }))
-      .rejects.toThrow('起動できない');
+    const { settled } = kick({ sessionId: 'session-1', cwd: '/tmp/share/session-1', kind: 'stroke', retries: 0 });
+    await expect(settled).rejects.toThrow('起動できない');
     expect(registered(issuedToken())).toBeNull();
   });
 
-  it('buildRun が同期的に throw してもエントリが消え、reject した promise が返る', async () => {
-    config.broken = true;
+  /**
+   * 組み立てに失敗しても（fix-idle-stuck-on-run-build-failure）、`kick` の役割は変わらない
+   * ——token の登録・削除は `settled` に紐づき、`built` が失敗を運ぶ。組み立てそのものが
+   * `failed`/`error` をどう書き分けるかは `invokeAi` の中（`ai.test.ts`）で見る。
+   */
+  it('組み立てに失敗しても、記録を書き終えたところ（settled）でエントリが消える', async () => {
+    ai.invokeAi.mockReturnValueOnce({
+      built: Promise.reject(new Error('設定を読めない')),
+      // invokeAi は組み立て失敗の記録を書き終えると settled を resolve する（reject しない）
+      settled: Promise.resolve(),
+    });
 
-    // 素の throw ではなく reject で返る（呼び出し元の `.catch()/.finally()` が付く）
-    const kicked = kick({ sessionId: 'session-1', cwd: '/tmp/share/session-1', kind: 'stroke', retries: 0 });
+    const { built, settled } = kick({ sessionId: 'session-1', cwd: '/tmp/share/session-1', kind: 'stroke', retries: 0 });
     const token = issuedToken();
 
-    await expect(kicked).rejects.toThrow('設定を読めない');
-    expect(ai.invokeAi).not.toHaveBeenCalled();
+    await expect(built).rejects.toThrow('設定を読めない');
+    await settled;
     expect(registered(token)).toBeNull();
+  });
+
+  it('実行が終わると起動単位の提出記録も片付く（次の起動が前の起動の提出を数えない）', async () => {
+    const { settled } = kick({ sessionId: 'project-a', cwd: '/opt/projects/project-a', kind: 'steering', retries: 0 });
+    const token = issuedToken();
+
+    // submit-document の steering 分岐が受理を記録した状況をシミュレートする
+    recordLaunchSubmission(token);
+    expect(hasLaunchSubmission(token)).toBe(true);
+
+    await settled;
+
+    // removeConnection(token) と同じ .finally で捨てる（design.md D1）
+    expect(hasLaunchSubmission(token)).toBe(false);
+  });
+
+  it('kick は組み立て方（build）を invokeAi へ渡すだけで、自分では呼ばない', () => {
+    config.broken = true;
+    let capturedBuild: (() => unknown) | undefined;
+    ai.invokeAi.mockImplementationOnce((_sessionId, _retries, build) => {
+      capturedBuild = build;
+      return { built: Promise.resolve(), settled: Promise.resolve() };
+    });
+
+    // config.broken の下でも kick 自体は同期的に throw しない
+    expect(() => kick({ sessionId: 'session-1', cwd: '/tmp/share/session-1', kind: 'stroke', retries: 0 }))
+      .not.toThrow();
+
+    // 渡された組み立て方を呼べば、buildRun と同じ理由で同期的に throw する
+    expect(capturedBuild).toBeDefined();
+    expect(() => capturedBuild!()).toThrow('設定を読めない');
   });
 });

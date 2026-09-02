@@ -6,6 +6,7 @@ import { readFetchFailure } from '../../utils/mcp/fetch-failure'
 import { resolveConnectionProjectPath, resolveConnectionSessionId } from '../../utils/mcp/require-connection'
 import { resolveProjectId } from '../../utils/mcp/resolve-project-id'
 import { classifySteeringFailure, upstreamFetch } from '../../utils/mcp/upstream-fetch'
+import { recordLaunchSubmission } from '../../utils/stroke/submission-signal'
 
 /** 数値キーの写像なので `Object.prototype` のメンバとは衝突しない（下の 404 の写像を参照）。 */
 const FLONTIER_ERROR_CODE_BY_STATUS: Record<number, string> = {
@@ -193,6 +194,12 @@ export default defineStrokeTool({
         z.unknown(),
         { method: 'PUT', body: { content: args.document } },
       )
+      // 本家が応答を返して受理した経路だけで記録する（design.md D2）。ここまで来た時点で
+      // `upstreamFetch` は例外を投げていない＝本家 PUT は 2xx で応答している。steering の
+      // 提出は stroke-board の endpoint を通らないので、この起動（token）を単位に、ここで
+      // しか記録できない（specs `mcp/tools/submit`「受理された steering の提出を、その
+      // 起動の作業として記録する」）。結果には項目を足さない（D5）。
+      recordLaunchSubmission(connection.token)
       return { status: response.status }
     } catch (error) {
       const failure = classifySteeringFailure(error)

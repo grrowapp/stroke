@@ -71,10 +71,11 @@ server/mcp/tools/.nuxtrc
 #
 # 資料の置き場は `docs/` と `openspec/` に限る（CLAUDE.md の Docs 節、docs/agents/issue-tracker.md）。
 # repo 直下 `specs/` はどちらの規約にも属さないので、丸ごと追跡しない。
+# **先頭の `/` は必須。** 無いと `docs/specs/` にも当たり、資料の正の置き場が丸ごと無視される。
 #
 # 残す価値のあるものは分解が終わった時点で移すこと。`create-module-markdown` の分解では、
 # epic.md にしか無かった「触らないと決めた契約」2件を ADR-0017 へ移してから消した（2026-09-01）。
-specs/
+/specs/
 
 # yarn の移行が残すバックアップ（node_modules.yarn-bak / .nuxt.yarn-bak）。
 # 生成物のコピーであって成果物ではない。一度 11,466 ファイル・307MB を履歴へ入れた

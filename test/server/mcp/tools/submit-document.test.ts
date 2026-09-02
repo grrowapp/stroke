@@ -18,6 +18,7 @@ const { default: submitDocumentTool } = await import('../../../../server/mcp/too
 const { issueConnectionToken, registerConnection, removeConnection } = await import('../../../../server/utils/mcp/connection-table');
 const { resolveProjectId } = await import('../../../../server/utils/mcp/resolve-project-id');
 const { upstreamFetch } = await import('../../../../server/utils/mcp/upstream-fetch');
+const { hasLaunchSubmission, forgetLaunchSubmission } = await import('../../../../server/utils/stroke/submission-signal');
 const { $fetch } = await import('#build/fetch.mjs') as unknown as {
   $fetch: ReturnType<typeof vi.fn> & { raw: ReturnType<typeof vi.fn> },
 };
@@ -314,6 +315,135 @@ describe('submit-document', () => {
         errorCode: 'upstream_error',
         error: 'Failed to save steering document: disk full',
       });
+      removeConnection(token);
+    });
+  });
+
+  /**
+   * 受理された steering の提出を、起動（token）の作業として記録する
+   * （fix-steering-empty-completion specs `mcp/tools/submit`）。
+   *
+   * 数えるのは本家 PUT が応答を返して受理した経路だけ——拒否・不達・手前で弾いた
+   * 提出・flontier の提出のいずれでも記録しない（design.md D2）。記録を足しても
+   * ツールの結果の形（`status`・`errorCode`・`error`）は変わらない（design.md D5）。
+   */
+  describe('起動単位の提出記録（steering）', () => {
+    it('本家が受理した提出は、その起動（token）の作業として記録される', async () => {
+      const token = issueConnectionToken();
+      registerConnection(token, { projectPath: '/opt/projects/example' });
+      resolveProjectIdMock.mockResolvedValue({ ok: true, projectId: 'PID1' });
+      upstreamFetchMock.mockResolvedValue({ status: 200, data: { success: true } });
+
+      expect(hasLaunchSubmission(token)).toBe(false);
+
+      const result = await submitDocumentHandler(
+        { type: 'steering', document: '# product', name: 'product' },
+        { 'x-stroke-token': token },
+      );
+
+      // 記録を足しても結果の形は変わらない（status だけ。項目は増えない）
+      expect(result).toEqual({ status: 200 });
+      expect(hasLaunchSubmission(token)).toBe(true);
+
+      forgetLaunchSubmission(token);
+      removeConnection(token);
+    });
+
+    it('本家が 2xx 以外で拒否した提出は記録しない', async () => {
+      const token = issueConnectionToken();
+      registerConnection(token, { projectPath: '/opt/projects/example' });
+      resolveProjectIdMock.mockResolvedValue({ ok: true, projectId: 'PID1' });
+      upstreamFetchMock.mockRejectedValue(fetchErrorWith(500, { error: 'Failed to save steering document: disk full' }));
+
+      const result = await submitDocumentHandler(
+        { type: 'steering', document: '# product', name: 'product' },
+        { 'x-stroke-token': token },
+      );
+
+      expect(result).toEqual({
+        status: 500,
+        errorCode: 'upstream_error',
+        error: 'Failed to save steering document: disk full',
+      });
+      expect(hasLaunchSubmission(token)).toBe(false);
+      removeConnection(token);
+    });
+
+    it('本家に届かなかった提出（unreachable）は記録しない', async () => {
+      const token = issueConnectionToken();
+      registerConnection(token, { projectPath: '/opt/projects/example' });
+      resolveProjectIdMock.mockResolvedValue({ ok: true, projectId: 'PID1' });
+      upstreamFetchMock.mockRejectedValue(new Error('connect ECONNREFUSED'));
+
+      await submitDocumentHandler(
+        { type: 'steering', document: '# product', name: 'product' },
+        { 'x-stroke-token': token },
+      );
+
+      expect(hasLaunchSubmission(token)).toBe(false);
+      removeConnection(token);
+    });
+
+    it('project_not_registered で終わった提出は記録しない（代行先へ要求を出していない）', async () => {
+      const token = issueConnectionToken();
+      registerConnection(token, { projectPath: '/opt/projects/example' });
+      resolveProjectIdMock.mockResolvedValue({
+        ok: false,
+        status: 404,
+        errorCode: 'project_not_registered',
+        error: '対象のプロジェクトが本家の一覧に無い。',
+      });
+
+      const result = await submitDocumentHandler(
+        { type: 'steering', document: '# product', name: 'product' },
+        { 'x-stroke-token': token },
+      );
+
+      expect(result.status).toBe(404);
+      expect(upstreamFetchMock).not.toHaveBeenCalled();
+      expect(hasLaunchSubmission(token)).toBe(false);
+      removeConnection(token);
+    });
+
+    it('手前で弾いた 400（文書名が本家のルートに届かない形）は記録しない', async () => {
+      const token = issueConnectionToken();
+      registerConnection(token, { projectPath: '/opt/projects/example' });
+
+      await submitDocumentHandler(
+        { type: 'steering', document: '# product', name: '..' },
+        { 'x-stroke-token': token },
+      );
+
+      expect(resolveProjectIdMock).not.toHaveBeenCalled();
+      expect(hasLaunchSubmission(token)).toBe(false);
+      removeConnection(token);
+    });
+
+    it('connection_mismatch（flontier 接続から type: steering）は記録しない', async () => {
+      const token = issueConnectionToken();
+      registerConnection(token, { sessionId: 'session-1' });
+
+      await submitDocumentHandler(
+        { type: 'steering', document: '# product', name: 'product' },
+        { 'x-stroke-token': token },
+      );
+
+      expect(hasLaunchSubmission(token)).toBe(false);
+      removeConnection(token);
+    });
+
+    it('flontier の提出は受理されても記録しない（受理を数えるのは A7 側。二重に数えない）', async () => {
+      const token = issueConnectionToken();
+      registerConnection(token, { sessionId: 'session-1' });
+      $fetch.raw.mockResolvedValueOnce({ status: 204 });
+
+      const result = await submitDocumentHandler(
+        { type: 'flontier', document: '# proposal' },
+        { 'x-stroke-token': token },
+      );
+
+      expect(result).toEqual({ status: 204 });
+      expect(hasLaunchSubmission(token)).toBe(false);
       removeConnection(token);
     });
   });

@@ -5,10 +5,17 @@ import { invokeAi, type AiRun } from '../../../../server/utils/stroke/ai'
 import type { ClaudeLaunch } from '../../../../server/utils/stroke/claude'
 
 /**
- * invokeAi は設定を引かない（openspec/specs/agent/invocation）。見るのは、
- * 渡した起動定義・定型・cwd がそのまま使われること、完了を **output stream** で
- * 検知すること、`invocation` の遷移がすべて `setInvocation`（A8）を通ること、
- * リトライ上限で `error`（終端）に倒れること。
+ * invokeAi は、組み立てに成功した後は設定を引かない（openspec/specs/agent/invocation）。
+ * 見るのは、渡した起動定義・定型・cwd がそのまま使われること、完了を **output stream** で
+ * 検知すること、`invocation` の遷移がすべて A8 を通ること、リトライ上限で `error`
+ * （終端）に倒れること——ここまでは組み立て済みの `AiRun` を渡す従来どおりの経路
+ * （`runInvoke` ヘルパー）。
+ *
+ * 組み立てに失敗する経路（fix-idle-stuck-on-run-build-failure）は別の `describe`
+ * に分けた。`build` に同期的に throw する関数を渡し、`invokeAi` 自身が
+ * `failed`/`error` を書き分けることを見る——`buildRun` の実装（`readStrokeConfig()` が
+ * throw する等の具体的な原因）は `invoke.test.ts` の責務で、ここでは当てない
+ * （design.md D5「テストも構造に当てる」）。
  */
 
 const { runClaude } = vi.hoisted(() => ({ runClaude: vi.fn() }))
@@ -17,6 +24,21 @@ vi.mock('../../../../server/utils/stroke/claude', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./claude')>()),
   runClaude,
 }))
+
+/** `readStrokeConfig` を組み立て失敗の経路だけで使う細工。maxRetries の読み出しを制御する */
+const strokeConfig = vi.hoisted(() => ({ maxRetries: 2, broken: false }))
+
+vi.mock('../../../../server/utils/stroke/config', () => ({
+  readStrokeConfig: () => {
+    if (strokeConfig.broken) throw new Error('設定を読めない')
+    return { claude: { maxRetries: strokeConfig.maxRetries } }
+  },
+}))
+
+/** 組み立て失敗の経路が書く A8（`$fetch`）。他の vi.hoisted の細工と同じ形で持つ。 */
+const $fetch = vi.hoisted(() => vi.fn())
+
+vi.mock('#build/fetch.mjs', () => ({ $fetch }))
 
 const LAUNCH: ClaudeLaunch = {
   command: 'my-claude',
@@ -56,6 +78,12 @@ function makeRun(overrides: Partial<AiRun> = {}): {
   return { run, calls, remembered }
 }
 
+/** 組み立てに成功した従来経路。`build` は常に成功して `run` を返す。 */
+async function runInvoke(run: AiRun): Promise<void> {
+  const { settled } = invokeAi(SESSION_ID, run.retries, () => run)
+  await settled
+}
+
 describe('invokeAi', () => {
   beforeEach(() => {
     runClaude.mockReset()
@@ -65,7 +93,7 @@ describe('invokeAi', () => {
     runClaude.mockResolvedValue({ ok: true, sessionId: 'abc' })
 
     const { run } = makeRun({ conversationId: 'fixed-id' })
-    await invokeAi(SESSION_ID, run)
+    await runInvoke(run)
 
     expect(runClaude).toHaveBeenCalledWith({
       sessionId: 'fixed-id',
@@ -82,7 +110,7 @@ describe('invokeAi', () => {
 
     // `retries` は「これまでに起こし直した回数」。初回のキックは 0 なので基準の長さそのもの
     const { run } = makeRun({ retries: 0, timeoutMs: 90000, timeoutStepMs: 30000 })
-    await invokeAi(SESSION_ID, run)
+    await runInvoke(run)
 
     expect(runClaude).toHaveBeenCalledWith(expect.objectContaining({ timeoutMs: 90000 }))
   })
@@ -91,13 +119,13 @@ describe('invokeAi', () => {
     runClaude.mockResolvedValue({ ok: true, sessionId: 'abc' })
 
     const { run } = makeRun({ retries: 1, timeoutMs: 90000, timeoutStepMs: 30000 })
-    await invokeAi(SESSION_ID, run)
+    await runInvoke(run)
     expect(runClaude).toHaveBeenCalledWith(expect.objectContaining({ timeoutMs: 120000 }))
 
     runClaude.mockClear()
 
     const { run: run2 } = makeRun({ retries: 2, timeoutMs: 90000, timeoutStepMs: 30000 })
-    await invokeAi(SESSION_ID, run2)
+    await runInvoke(run2)
     expect(runClaude).toHaveBeenCalledWith(expect.objectContaining({ timeoutMs: 150000 }))
   })
 
@@ -105,7 +133,7 @@ describe('invokeAi', () => {
     runClaude.mockResolvedValue({ ok: true, sessionId: 'abc' })
 
     const { run } = makeRun({ retries: 2, maxRetries: 5, timeoutMs: 90000, timeoutStepMs: 0 })
-    await invokeAi(SESSION_ID, run)
+    await runInvoke(run)
 
     expect(runClaude).toHaveBeenCalledWith(expect.objectContaining({ timeoutMs: 90000 }))
   })
@@ -114,7 +142,7 @@ describe('invokeAi', () => {
     runClaude.mockResolvedValue({ ok: true, sessionId: 'abc' })
 
     const { run } = makeRun({ hasConversation: async () => true, conversationId: 'abc' })
-    await invokeAi(SESSION_ID, run)
+    await runInvoke(run)
 
     expect(runClaude).toHaveBeenCalledWith(
       expect.objectContaining({ prompt: 'CONTINUE', mode: 'resume', sessionId: 'abc' }),
@@ -125,7 +153,7 @@ describe('invokeAi', () => {
     runClaude.mockResolvedValue({ ok: true, sessionId: 'generated-by-claude' })
 
     const { run, remembered } = makeRun({ conversationId: undefined })
-    await invokeAi(SESSION_ID, run)
+    await runInvoke(run)
 
     // `--session-id` も `--resume` も付けない
     expect(runClaude).toHaveBeenCalledWith(expect.objectContaining({ sessionId: undefined }))
@@ -137,7 +165,7 @@ describe('invokeAi', () => {
     runClaude.mockResolvedValue({ ok: true, sessionId: null })
 
     const { run, calls } = makeRun({ retries: 1 })
-    await invokeAi(SESSION_ID, run)
+    await runInvoke(run)
 
     expect(calls).toEqual([
       { invocation: 'running', retries: 2 },
@@ -145,22 +173,27 @@ describe('invokeAi', () => {
     ])
   })
 
-  it('提出を要らない用途では、プロセスの成功だけで idle にする', async () => {
-    // steering は endpoint へ何も提出しない。`didWork` を渡さないので成功として扱う
+  it('`didWork` を渡さない用途では、プロセスの成功だけで idle にする', async () => {
+    // 今はどの用途も didWork を渡すが、渡さない呼び出し元のための既定（安全弁）は残る
     runClaude.mockResolvedValue({ ok: true, sessionId: 'x' })
 
     const { run, calls } = makeRun({ didWork: undefined })
-    await invokeAi(SESSION_ID, run)
+    await runInvoke(run)
 
     expect(calls.at(-1)).toEqual({ invocation: 'idle', retries: 0 })
   })
 
   it('プロセスは成功したが作業をしていなければ failed にする', async () => {
-    // ストロークは必ず提出（A5・A7）で終わる。提出が無いのは何もせず終わったということ
+    // ai.ts は kind を知らず、渡された `didWork` の真偽値しか見ない。ストロークは
+    // 必ず提出（A5・A7）で終わるので提出が無ければ作業をしていない（invoke.ts の
+    // submittedSince）。steering は steering 文書の提出が代行先に受理されたかを
+    // 起動単位の記録で見る（invoke.ts の submittedByLaunch。
+    // fix-steering-empty-completion）。どちらも呼び出し側が渡す関数が false を返せば
+    // ここは同じく failed になる——この既存のケースは工程を問わず成立する（tasks 4.6）
     runClaude.mockResolvedValue({ ok: true, sessionId: 'x' })
 
     const { run, calls } = makeRun({ didWork: () => false })
-    await invokeAi(SESSION_ID, run)
+    await runInvoke(run)
 
     expect(calls.at(-1)).toEqual({ invocation: 'failed', retries: undefined })
   })
@@ -169,7 +202,7 @@ describe('invokeAi', () => {
     runClaude.mockResolvedValue({ ok: false, sessionMissing: false, detail: 'タイムアウト' })
 
     const { run } = makeRun({ retries: 0, maxRetries: 2 })
-    await invokeAi(SESSION_ID, run)
+    await runInvoke(run)
 
     expect(runClaude).toHaveBeenCalledTimes(1)
   })
@@ -178,7 +211,7 @@ describe('invokeAi', () => {
     runClaude.mockResolvedValue({ ok: true, sessionId: 'x' })
 
     const { run, calls } = makeRun({ retries: 2, maxRetries: 2 })
-    await invokeAi(SESSION_ID, run)
+    await runInvoke(run)
 
     expect(runClaude).toHaveBeenCalledTimes(1)
     expect(calls[0]).toEqual({ invocation: 'running', retries: 3 })
@@ -188,7 +221,7 @@ describe('invokeAi', () => {
     runClaude.mockResolvedValue({ ok: true, sessionId: 'x' })
 
     const { run } = makeRun({ retries: 0, maxRetries: 0 })
-    await invokeAi(SESSION_ID, run)
+    await runInvoke(run)
 
     expect(runClaude).toHaveBeenCalledTimes(1)
   })
@@ -197,14 +230,14 @@ describe('invokeAi', () => {
     runClaude.mockResolvedValue({ ok: false, sessionMissing: false, detail: 'タイムアウト' })
 
     const { run, calls } = makeRun()
-    await invokeAi(SESSION_ID, run)
+    await runInvoke(run)
 
     expect(calls.at(-1)).toEqual({ invocation: 'failed', retries: undefined })
   })
 
   it('リトライ上限を超えていたら起動せず error（終端）にする', async () => {
     const { run, calls } = makeRun({ retries: 3, maxRetries: 2 })
-    await invokeAi(SESSION_ID, run)
+    await runInvoke(run)
 
     expect(runClaude).not.toHaveBeenCalled()
     expect(calls).toEqual([{ invocation: 'error', retries: undefined }])
@@ -216,7 +249,7 @@ describe('invokeAi', () => {
         throw new Error('openspec init に失敗')
       },
     })
-    await invokeAi(SESSION_ID, run)
+    await runInvoke(run)
 
     expect(runClaude).not.toHaveBeenCalled()
     expect(calls.at(-1)).toEqual({ invocation: 'failed', retries: undefined })
@@ -226,9 +259,102 @@ describe('invokeAi', () => {
     runClaude.mockResolvedValue({ ok: false, sessionMissing: true, detail: '会話が無い' })
 
     const { run } = makeRun({ hasConversation: async () => true, conversationId: 'gone' })
-    await invokeAi(SESSION_ID, run)
+    await runInvoke(run)
 
     // 1回で打ち切る（新しい会話として送り直さない）
     expect(runClaude).toHaveBeenCalledTimes(1)
+  })
+
+  /**
+   * `built` は組み立ての成否だけを表し、AI の応答の完了を待たない
+   * （openspec/specs/api/session/invoke-agent）。ここでは `runClaude` を意図的に止めて、
+   * `built` が resolve した後もプロセスが終わっていなければ `settled` はまだ resolve
+   * していないことを確かめる——U13 が `built` だけを待ってよい根拠になる。
+   */
+  it('built は AI の応答の完了を待たずに resolve する', async () => {
+    let finishClaude = (): void => {}
+    runClaude.mockImplementationOnce(() => new Promise((resolve) => {
+      finishClaude = () => resolve({ ok: true, sessionId: 'x' })
+    }))
+
+    const { run } = makeRun()
+    const { built, settled } = invokeAi(SESSION_ID, run.retries, () => run)
+
+    await built
+
+    let settledResolved = false
+    void settled.then(() => { settledResolved = true })
+    // 1 マイクロタスクだけ回す。built が resolve しても settled はまだ先である
+    await Promise.resolve()
+    expect(settledResolved).toBe(false)
+
+    finishClaude()
+    await settled
+    expect(settledResolved).toBe(true)
+  })
+})
+
+/**
+ * 組み立てに失敗した経路（fix-idle-stuck-on-run-build-failure）。`build` が同期的に
+ * throw したとき、`invokeAi` が記録をどう書き分けるかだけを見る。`buildRun` の実装
+ * （何が throw の原因か）は当てない——`invoke.test.ts` の責務（design.md D5）。
+ */
+describe('invokeAi の組み立て失敗', () => {
+  const BUILD_ERROR = new Error('起動の材料を組み立てられない')
+  const build = (): AiRun => { throw BUILD_ERROR }
+
+  beforeEach(() => {
+    strokeConfig.maxRetries = 2
+    strokeConfig.broken = false
+    $fetch.mockReset()
+    $fetch.mockResolvedValue(undefined)
+  })
+
+  it('記録を1つも書かずに終わらない。built は組み立ての理由で reject する', async () => {
+    const { built, settled } = invokeAi(SESSION_ID, 0, build)
+
+    await expect(built).rejects.toBe(BUILD_ERROR)
+    await settled
+
+    // 巡回が拾える形（A8・submission）で必ず1回書かれている
+    expect($fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('上限内なら failed とし、起こし直した回数を1つ進めて書く', async () => {
+    const { settled } = invokeAi(SESSION_ID, 1, build)
+    await settled
+
+    expect($fetch).toHaveBeenCalledWith(
+      `/api/strokes/${SESSION_ID}/submission`,
+      { method: 'POST', body: { invocation: 'failed', retries: 2 } },
+    )
+  })
+
+  it('settled は組み立てに失敗しても reject しない（記録を書き終えて resolve する）', async () => {
+    const { settled } = invokeAi(SESSION_ID, 0, build)
+    await expect(settled).resolves.toBeUndefined()
+  })
+
+  it('上限に達していれば error にする', async () => {
+    strokeConfig.maxRetries = 2
+    const { settled } = invokeAi(SESSION_ID, 3, build)
+    await settled
+
+    expect($fetch).toHaveBeenCalledWith(
+      `/api/strokes/${SESSION_ID}/submission`,
+      { method: 'POST', body: { invocation: 'error' } },
+    )
+  })
+
+  it('上限そのものを読み出せなければ error にする', async () => {
+    strokeConfig.broken = true
+    // 上限内に収まるはずの回数でも、上限そのものが読めなければ error に倒す
+    const { settled } = invokeAi(SESSION_ID, 0, build)
+    await settled
+
+    expect($fetch).toHaveBeenCalledWith(
+      `/api/strokes/${SESSION_ID}/submission`,
+      { method: 'POST', body: { invocation: 'error' } },
+    )
   })
 })

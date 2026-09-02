@@ -1,13 +1,24 @@
 import type { Invocation } from '#shared/stroke'
 import { runClaude, type ClaudeLaunch, type ClaudeMode } from './claude'
+import { readStrokeConfig } from './config'
 import { LOG_PREFIX } from './log'
+import { submissionPath } from './submission-path'
 
 /**
  * 1回の呼び出しに要るものすべて。
  *
- * 起動定義・定型・作業場所は呼び出し側が設定から引いて渡す。invokeAi は設定を引かない
+ * 起動定義・定型・作業場所は呼び出し側が設定から引いて渡す。**組み立て済みの `AiRun` を
+ * 受け取った後の invokeAi は設定を引き直さない**
  * （openspec/specs/agent/invocation「起動処理の内部で設定値を引き直してはならない」）。
  * 用途の違い（ストロークの往復 / 承認後の steering）は、渡す値の違いだけで表す。
+ *
+ * **組み立てそのもの（`buildRun`）は invokeAi の内側で行う**
+ * （fix-idle-stuck-on-run-build-failure design.md D1）。組み立てに失敗した実行の記録
+ * （`failed`/`error`）を書くのも invokeAi であって、呼び出し側（`kick`）ではない——
+ * 「`invocation` を書くのは invokeAi だけ」という規定を保つためである。組み立てに
+ * 失敗すると `AiRun` そのものが存在しないので、上のスカラーで言う「設定を引き直さない」は
+ * この失敗記録の書き込みには及ばない（組み立ての失敗を判定するための最小限の読み出しは
+ * 別に持つ。下の `recordBuildFailure` を見よ）。
  */
 export interface AiRun {
   /** `claude` の起動定義。呼び出し側が要るフラグを足して渡してよい */
@@ -52,14 +63,36 @@ export interface AiRun {
    * その実行で**作業が行われたか**。完了の検知とは別の問いである。
    *
    * プロセスが正常終了しても、何もせずに終わっていることがある。ストロークは1回の
-   * 実行が必ず提出（A5・A7）で終わるので、提出が無ければ作業をしていない。渡さなければ
-   * 常に「行われた」とみなす（steering は endpoint へ何も提出しないため渡さない）。
+   * 実行が必ず提出（A5・A7）で終わるので、提出が無ければ作業をしていない。steering は
+   * 提出（steering 文書）が代行先（本家）に受理されたかを、起動単位の記録で見る
+   * （`invoke.ts` の `submittedByLaunch`。fix-steering-empty-completion）。渡さなければ
+   * 常に「行われた」とみなす——今はどの用途も渡すので、この既定は工程を問わない安全弁
+   * として残る。
    */
   didWork?: () => boolean
   /** 走った会話の id を覚える。続きが要る用途だけ渡す */
   remember?: (conversationId: string) => Promise<void>
   /** 初回と判定されたときに実行環境を整える。要らない用途では省く */
   prepare?: () => Promise<void>
+}
+
+/**
+ * `invokeAi` の戻り値。**2つの完結点を持つ**（fix-idle-stuck-on-run-build-failure
+ * design.md D1・D2）。
+ */
+export interface InvokeAiOutcome {
+  /**
+   * 組み立ての成否**だけ**を表す。組み立てに失敗すれば reject し、成功すれば resolve
+   * する。**AI の応答の完了は待たない。** 起動を要求した側（U13）はここまでだけを待って
+   * よい（openspec/specs/api/session/invoke-agent「応答が待つのはその成否まで」）。
+   */
+  built: Promise<void>
+  /**
+   * 実行全体の完了。busy ガード解除・接続表 token の削除はここに紐づける
+   * （呼び出し側 `kick` の docstring）。組み立てに失敗しても、その記録
+   * （`failed`/`error`）を書き終えたところで resolve する——reject しない。
+   */
+  settled: Promise<void>
 }
 
 /**
@@ -70,13 +103,95 @@ export interface AiRun {
  * `--output-format json` の成功エンベロープが出たらその実行は終わりで、`invocation` を
  * `idle` に変える。AI 自身に完了を告知させない。時間切れ・異常終了は `failed`。
  *
- * `invocation` の書き込みはすべて `setInvocation`（A8）を通る。起動で `running`、
- * 完了で `idle`、失敗で `failed`、リトライ上限に達したら起動せず `error`（終端）。
+ * `invocation` の書き込みはすべて A8 を通る。起動で `running`、完了で `idle`、失敗で
+ * `failed`、リトライ上限に達したら起動せず `error`（終端）。**起動の材料を組み立てられ
+ * ずに終わった実行も同じ扱いに含める**（fix-idle-stuck-on-run-build-failure）——組み立ては
+ * この関数の内側で行い、失敗すれば `failed`/`error` を書く。書き手を `invokeAi` の外へ
+ * 出さない。
  *
- * 呼び出し側は、この呼び出しを始める前に `beginRun(sessionId)` を済ませ、返ってきた
- * promise に `.finally(() => endRun(sessionId))` を付けること（busy ガードの対称性）。
+ * 呼び出し側は、`settled` に `.finally(() => endRun(sessionId))` を付けること
+ * （busy ガードの対称性）。`built` は応答の可否だけを見るためのもので、busy ガードには
+ * 使わない。
  */
-export async function invokeAi(sessionId: string, run: AiRun): Promise<void> {
+export function invokeAi(sessionId: string, retries: number, build: () => AiRun): InvokeAiOutcome {
+  let resolveBuilt!: () => void
+  let rejectBuilt!: (error: unknown) => void
+  const built = new Promise<void>((resolve, reject) => {
+    resolveBuilt = resolve
+    rejectBuilt = reject
+  })
+  // `built` の reject は呼び出し側（`kick` 経由で U13）が拾う。ここでも拾っておくのは、
+  // 拾い手が付く前の一瞬に unhandledRejection として騒がれないための保険であって、
+  // エラーを握りつぶす意図ではない（`settled` 側で記録・ログの両方を行う）。
+  built.catch(() => {})
+
+  const settled = (async () => {
+    let run: AiRun
+    try {
+      run = build()
+    } catch (error) {
+      rejectBuilt(error)
+      await recordBuildFailure(sessionId, retries, error)
+      return
+    }
+    resolveBuilt()
+    await runBuiltInvocation(sessionId, run)
+  })()
+
+  return { built, settled }
+}
+
+/**
+ * 起動の材料を組み立てられなかった実行を記録する。
+ *
+ * **この失敗も起こし直しの回数に数える**（`retries + 1`）。上限に達していなければ
+ * `failed`（巡回が拾う）、達しているか上限そのものを読み出せなければ `error`（終端）
+ * にする（design.md D3）。
+ *
+ * 組み立てが失敗した以上、その組み立てが読むはずだった `maxRetries` は
+ * `run.maxRetries` からは得られない。ここだけ独立して `readStrokeConfig()` を試す——
+ * 呼べて読めれば「上限に達している/いない」を判定でき、呼べなければ「上限そのものを
+ * 読み出せない」として `error` に倒す。`buildRun` を丸ごと再実行するわけではないので、
+ * 組み立てが2回走ることにはならない。
+ */
+async function recordBuildFailure(sessionId: string, retries: number, error: unknown): Promise<void> {
+  const detail = error instanceof Error ? error.message : String(error)
+  const nextRetries = retries + 1
+
+  let maxRetries: number | undefined
+  try {
+    maxRetries = readStrokeConfig().claude.maxRetries
+  } catch {
+    maxRetries = undefined
+  }
+
+  if (maxRetries !== undefined && retries <= maxRetries) {
+    console.warn(`${LOG_PREFIX} AI 呼び出しが失敗: ${sessionId}`, [`起動の材料を組み立てられない: ${detail}`])
+    await writeInvocation(sessionId, 'failed', nextRetries)
+    return
+  }
+
+  console.warn(
+    `${LOG_PREFIX} AI 呼び出しが失敗: ${sessionId}`,
+    [`起動の材料を組み立てられない（リトライ上限に達した、または上限を読み出せない）: ${detail}`],
+  )
+  await writeInvocation(sessionId, 'error')
+}
+
+/** A8 へ書く。組み立てに失敗した経路専用——`AiRun.setInvocation` は組み立てが成功した
+ * ときにしか手に入らないので、ここだけ独立した書き手を持つ。 */
+async function writeInvocation(sessionId: string, invocation: Invocation, retries?: number): Promise<void> {
+  await $fetch(submissionPath(sessionId), {
+    method: 'POST',
+    body: { invocation, ...(retries === undefined ? {} : { retries }) },
+  })
+}
+
+/**
+ * 組み立てられた材料で実際に起こす。組み立てが成功した後の処理はここに閉じる
+ * （かつての `invokeAi` の本体そのもの。成功経路の振る舞いは変えていない）。
+ */
+async function runBuiltInvocation(sessionId: string, run: AiRun): Promise<void> {
   const {
     launch, cwd, debugLogDir, prompts, maxRetries, retries, timeoutMs, timeoutStepMs,
     conversationId, hasConversation, setInvocation, remember, prepare, didWork,

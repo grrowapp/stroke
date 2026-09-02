@@ -2,7 +2,7 @@
 
 claude プロセスへの指示は2つに分かれる。**どの成果物を作るか**は openspec のワークフロースキーマにあり、スキーマを編集すればコード変更・再ビルド・再起動なしに次回の呼び出しから反映される（`openspec/specs/workflow-definition/spec.md`）。**どう進めるか**（手順）は MCP の案内ツール（`get-guide` / `get-steering-guide`）が返し、本文はツールのソースが持つ。
 
-操作（取得・提出）の入口は MCP ツールだけである。契約は `docs/specs/api/mcp-tools.md`。
+操作（取得・提出）の入口は MCP ツールだけである。契約は `docs/specs/mcp/tools.md`。
 
 store（マシン共有の登録簿）は使わない。**登録作業は不要**で、旧 `stroke-sessions` の登録が残っていても参照されない（unregister は任意）。
 
@@ -44,7 +44,7 @@ server/mcp/tools/                                      MCP ツール8本（フ�
 |---|---|---|
 | スキーマ名 | `runtimeConfig.claude.workflowSchema` | セッション作成時に `openspec/config.yaml` へ書かれる |
 | 手順の入口 | `runtimeConfig.claude.firstPrompt` ほか | 定型が案内ツール（`get-guide`）の名前を指す。手順の本文は定型に書かない |
-| 接続先 | `runtimeConfig.claude.apiBaseUrl` | 起動ごとに組み立てる `--mcp-config` の url（`<apiBaseUrl>/mcp`）。spawn 時の環境変数 `STROKE_BASEURL` としても渡るが、**読み手はもう居ない** |
+| 接続先 | `server/utils/stroke/listen-address.ts` | 起動ごとに組み立てる `--mcp-config` の url。**設定ではなく、サーバーが実際に bind したアドレスから作る**（かつての `claude.apiBaseUrl` は外した）。spawn 時の環境変数 `STROKE_BASEURL` としても渡るが、**読み手はもう居ない** |
 | どのセッションか | — | `--mcp-config` の `x-stroke-token`。接続表がセッション id へ引き当てる |
 | 工程ごとの公開ツール | `server/utils/mcp/exposed-tools.ts` | `--mcp-config` の `x-mcp-tools` |
 | 作業場所 | — | cwd だけ。`--add-dir` は渡さない |
@@ -95,8 +95,9 @@ invokeAi だけが行う（`openspec/specs/agent/invocation`）。
 stateDiagram-v2
     [*] --> idle: セッション作成
     idle --> running: U13 で起動
-    running --> idle: output stream で完了を検知
-    running --> failed: タイムアウト・起動失敗
+    running --> idle: 完了を検知（提出あり）
+    running --> failed: タイムアウト・起動失敗・提出なしの完了
+    running --> error: 起動時に後始末できない
     failed --> running: 巡回が起こし直す（上限内）
     failed --> error: 上限に達した状態で再キック
     error --> running: ユーザーの再実行（回数リセット）
@@ -105,8 +106,14 @@ stateDiagram-v2
 
 - `phase: 'approved'` の対象も `invocation` を持つ。昇格後は steering の実行が起こる
 - 上限（`runtimeConfig.claude.maxRetries`）の判定は invokeAi。巡回は `failed` だけを拾う
-- サーバー再起動で宙に浮いた `running` は、起動時に `failed` へ倒して巡回に拾わせる
-  （`server/plugins/01.reap-running.ts`）
+- **正常終了でも、その起動で提出が1つも受理されていなければ `failed` に倒す。** 提出は
+  flontier が問い・proposal、steering が steering 文書。空振りを `idle` にすると成功と
+  区別できず、誰も起こし直さない
+- サーバー再起動で宙に浮いた `running` は、**まずその claude を終了させてから** `failed` へ
+  倒して巡回に拾わせる（`server/plugins/01.reap-running.ts`）。終了させられない場合と、
+  自分が起こしたものか判定できない場合は `error` へ倒してユーザーに引き渡す
+- **他インスタンスが起こした実行には触らない。** `projectShareRoot` は複数のインスタンスで
+  共有されるため、後始末は起動の引数を照合して自分のものだけを対象にする
 
 ## 実測で確定していること
 

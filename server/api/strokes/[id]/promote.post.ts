@@ -1,12 +1,13 @@
 import { broadcastProjectCreation } from '../../../utils/control/board'
 import { readStrokeConfig } from '../../../utils/stroke/config'
 import { conflict } from '../../../utils/stroke/conflict'
-import { submissionPath } from '../../../utils/stroke/invoke'
 import { LOG_PREFIX } from '../../../utils/stroke/log'
 import { assertNameAvailable, promoteSessionToProject, revertPromotion } from '../../../utils/stroke/project'
+import { beginRun, endRun, sessionRunPath } from '../../../utils/stroke/running'
 import { requireSessionId } from '../../../utils/stroke/session-param'
 import { readState, writeState } from '../../../utils/stroke/session-store'
 import { forgetSubmissions } from '../../../utils/stroke/submission-signal'
+import { submissionPath } from '../../../utils/stroke/submission-path'
 
 /**
  * U14: 判断のあるセッションをプロジェクトへ昇格させる（openspec/specs/api/session/promote）。
@@ -47,6 +48,24 @@ import { forgetSubmissions } from '../../../utils/stroke/submission-signal'
  *
  * A8 が失敗しても昇格は巻き戻さない（後始末は段ごとに閉じる）。`idle` のまま残ると巡回が
  * 拾わないので、そのときは要求する側のキックだけが起動の道になる。
+ *
+ * ## busy ガードはここにある（fix-rename-during-running-session）
+ *
+ * **改名するのはこの段である。** 改名は inode を保つため、対象で claude が走っている最中に
+ * 改名すると、その呼び出しは改名先で生き続ける一方、自分を名乗る id は改名前のままになる。
+ * 以後その呼び出しの操作（問いの送信・文書の提出・実行の記録）はすべて対象を見つけられずに
+ * 落ち、成果はどこにも残らない。承認（U10）は判断を記録するだけで改名しないので対象では
+ * ない——対象になるのは改名するここだけである。
+ *
+ * 対象の作業場所を `beginRun` で占有してから「衝突確認 → 改名 → `phase` を書く」へ進み、
+ * `finally` で必ず解放する。**占有できなければ 409 busy を返し、何も変えずに終わる。**
+ *
+ * **解放は steering の起動（U13）を叩く前に置く。** U13 は呼び手（画面・巡回）がこの
+ * endpoint の成功応答を見た直後に叩き、同じキー（作業場所の実体）を取りに来る。解放を
+ * 後（配信や A8 への引き渡しの後）に回すと、自分がまだ持っている占有で U13 が 409 に
+ * なる。占有の区間は「衝突確認 → 改名 → `phase` 書き込み」だけに絞り、配信
+ * （`broadcastProjectCreation`）・提出記録の破棄（`forgetSubmissions`）・A8 への引き渡しは
+ * 解放の外側で行う。
  */
 export default defineEventHandler(async (event) => {
   const sessionId = await requireSessionId(event)
@@ -62,28 +81,42 @@ export default defineEventHandler(async (event) => {
 
   const shareRoot = readStrokeConfig().projectShareRoot
 
-  // 衝突確認は改名の**前**に通す。既にあれば何も動かさずに 409 で、セッションは
-  // `proposed`・判断つきのまま残る。
-  await assertNameAvailable(shareRoot, projectName)
+  // busy ガード。対象に実行中の呼び出しがあれば 409 busy で断り、**ここまでは何も
+  // 変えていない**。占有はここから、改名・phase 書き込みが終わった直後（steering の
+  // 起動を叩く前）まで——確認から改名の完了までを、起動が割り込めない1区間にする
+  // （fix-rename-during-running-session）。
+  const runKey = await beginRun(sessionRunPath(shareRoot, sessionId))
 
-  // **改名してから phase を書く。** 巻き戻しは対称で、書き込みに失敗したら改名を戻すだけ。
-  await promoteSessionToProject(shareRoot, sessionId, projectName)
-
-  // 昇格後も steering の実行が起こるので、`invocation` を持たせて引き継ぐ
-  // （openspec/specs/agent/invocation）。回数は新しい用途なので 0 から数え直す。
-  // **状態を作る書き込みであって遷移ではない**ので `idle` を置く。遷移（→ `failed`）は
-  // この後 A8 を通す。書き込み先は**改名後の場所**である。
   try {
-    await writeState(projectName, {
-      phase: 'approved',
-      projectName,
-      invocation: 'idle',
-      retries: 0,
-    })
-  } catch (error) {
-    // 昇格を確定させない。改名を戻して、セッションを元の名前・`proposed`・判断つきのまま残す。
-    await revertPromotion(shareRoot, projectName, sessionId)
-    throw error
+    // 衝突確認は改名の**前**に通す。既にあれば何も動かさずに 409 で、セッションは
+    // `proposed`・判断つきのまま残る。
+    await assertNameAvailable(shareRoot, projectName)
+
+    // **改名してから phase を書く。** 巻き戻しは対称で、書き込みに失敗したら改名を戻すだけ。
+    await promoteSessionToProject(shareRoot, sessionId, projectName)
+
+    // 昇格後も steering の実行が起こるので、`invocation` を持たせて引き継ぐ
+    // （openspec/specs/agent/invocation）。回数は新しい用途なので 0 から数え直す。
+    // **状態を作る書き込みであって遷移ではない**ので `idle` を置く。遷移（→ `failed`）は
+    // この後 A8 を通す。書き込み先は**改名後の場所**である。
+    try {
+      await writeState(projectName, {
+        phase: 'approved',
+        projectName,
+        invocation: 'idle',
+        retries: 0,
+      })
+    } catch (error) {
+      // 昇格を確定させない。改名を戻して、セッションを元の名前・`proposed`・判断つきのまま残す。
+      await revertPromotion(shareRoot, projectName, sessionId)
+      throw error
+    }
+  } finally {
+    // 占有の解放は成否によらず1箇所（`finally`）に集約する。既存の巻き戻し
+    // （`revertPromotion`）と二重にしない——巻き戻しは改名を戻すだけで、占有の解放は
+    // 別の関心である。**解放は steering の起動（U13）を叩く前に置く。** 改名後の U13 は
+    // 同じキー（作業場所の実体）を取りに来るため、解放前に叩くと自分の占有で 409 になる。
+    endRun(runKey)
   }
 
   // **昇格した瞬間に上層へ知らせる。** 昇格を要求した本人はこの直後に一覧へ戻る。開いたままの

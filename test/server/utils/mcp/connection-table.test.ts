@@ -17,7 +17,7 @@ describe('接続表', () => {
     const token = issueConnectionToken();
     registerConnection(token, { sessionId: 'session-1' });
 
-    expect(resolveConnection(headersWith(token))).toEqual({ ok: true, context: { sessionId: 'session-1' } });
+    expect(resolveConnection(headersWith(token))).toEqual({ ok: true, context: { sessionId: 'session-1' }, token });
 
     removeConnection(token);
     expect(resolveConnection(headersWith(token)).ok).toBe(false);
@@ -27,7 +27,7 @@ describe('接続表', () => {
     const token = issueConnectionToken();
     registerConnection(token, { projectPath: '/opt/projects/example' });
 
-    expect(resolveConnection(headersWith(token))).toEqual({ ok: true, context: { projectPath: '/opt/projects/example' } });
+    expect(resolveConnection(headersWith(token))).toEqual({ ok: true, context: { projectPath: '/opt/projects/example' }, token });
 
     removeConnection(token);
     expect(resolveConnection(headersWith(token)).ok).toBe(false);
@@ -43,13 +43,13 @@ describe('接続表', () => {
     registerConnection(tokenA, { sessionId: 'session-a' });
     registerConnection(tokenB, { projectPath: '/opt/projects/project-b' });
 
-    expect(resolveConnection(headersWith(tokenA))).toEqual({ ok: true, context: { sessionId: 'session-a' } });
-    expect(resolveConnection(headersWith(tokenB))).toEqual({ ok: true, context: { projectPath: '/opt/projects/project-b' } });
+    expect(resolveConnection(headersWith(tokenA))).toEqual({ ok: true, context: { sessionId: 'session-a' }, token: tokenA });
+    expect(resolveConnection(headersWith(tokenB))).toEqual({ ok: true, context: { projectPath: '/opt/projects/project-b' }, token: tokenB });
 
     removeConnection(tokenA);
     expect(resolveConnection(headersWith(tokenA)).ok).toBe(false);
     // A を消しても B の文脈はそのまま残る
-    expect(resolveConnection(headersWith(tokenB))).toEqual({ ok: true, context: { projectPath: '/opt/projects/project-b' } });
+    expect(resolveConnection(headersWith(tokenB))).toEqual({ ok: true, context: { projectPath: '/opt/projects/project-b' }, token: tokenB });
 
     removeConnection(tokenB);
   });
@@ -58,7 +58,7 @@ describe('接続表', () => {
     const token = issueConnectionToken();
     registerConnection(token, { sessionId: 'session-array' });
 
-    expect(resolveConnection({ 'x-stroke-token': [token] })).toEqual({ ok: true, context: { sessionId: 'session-array' } });
+    expect(resolveConnection({ 'x-stroke-token': [token] })).toEqual({ ok: true, context: { sessionId: 'session-array' }, token });
 
     removeConnection(token);
   });

@@ -11,9 +11,12 @@ import { readState } from '../../../utils/stroke/session-store'
  * U13: AI を起動する唯一の入口（specs/api/invoke-agent）。受理系 endpoint は起動を
  * 持たず、フロントが受理の成功応答の直後にここを GET で呼ぶ（design.md 決定6）。
  *
- * **応答は受理で即完結する。** `running` 化・起動・完了検知・タイムアウト・上限判定は
- * すべて非同期の invokeAi が担い、応答はそれを待たない
- * （openspec/specs/agent/invocation）。
+ * **応答は起動の材料を組み立てられたかまでで完結する。** `running` 化・起動・完了検知・
+ * タイムアウト・上限判定は非同期の invokeAi が担い、応答は AI の応答の完了を待たない
+ * （openspec/specs/agent/invocation）。組み立てに失敗したときだけは別で、その失敗は
+ * 待って 503 を返す——受理せずに終わったことを呼び出し側（画面・巡回・承認処理）が
+ * 応答から知れるようにするためである
+ * （fix-idle-stuck-on-run-build-failure・openspec/specs/api/session/invoke-agent）。
  *
  * **cwd はクエリ `cwd` で受け取る。** endpoint が自分で導出しない
  * （openspec/specs/api/session/invoke-agent・design.md D5）。渡されなければセッション
@@ -43,13 +46,16 @@ export default defineEventHandler(async (event) => {
 
   const state = await readState(sessionId)
 
-  // busy ガード。多重起動はここで止める（specs/api/invoke-agent）。
-  beginRun(sessionId)
-
   const query = getQuery(event)
   const cwd = typeof query.cwd === 'string' && query.cwd.trim() !== ''
     ? query.cwd
     : sessionDir(readStrokeConfig().projectShareRoot, sessionId)
+
+  // busy ガード。多重起動はここで止める（specs/api/invoke-agent）。**cwd を決めた後に
+  // その cwd からキーを引く。** キーは cwd の実体（`stat` の `dev`/`ino`）なので、承認による
+  // 改名の前後で同じ物理ディレクトリを指す呼び出しは同じキーになり、id 違いでの二重起動が
+  // 通らない（fix-rename-during-running-session）。
+  const runKey = await beginRun(cwd)
 
   // 承認後の対象は steering、それ以外はストロークの往復。渡す値だけが違う。
   const kind = state.phase === 'approved' ? 'steering' : 'stroke'
@@ -58,17 +64,34 @@ export default defineEventHandler(async (event) => {
   // （openspec/specs/agent/invocation「ユーザーが再実行する」）。巡回は付けない。
   const retries = query.reset === undefined ? (state.retries ?? 0) : 0
 
-  kick({
+  const { built, settled } = kick({
     sessionId,
     cwd,
     kind,
     retries,
     runId: state.phase === 'approved' ? state.runId : undefined,
   })
+
+  // busy ガード解除・接続表 token の削除は実行全体の完了（`settled`）に紐づける。
+  // 組み立てに失敗した実行も、その失敗を記録し終えるまでは「実行中」として扱う
+  // （design.md D4）。`settled` は組み立て失敗時も reject しないので、この `.catch`
+  // は他の予期しない失敗に対する保険である。
+  settled
     .catch((error) => {
       console.error(`${LOG_PREFIX} AI 呼び出しの管理に失敗: ${sessionId}`, error)
     })
-    .finally(() => endRun(sessionId))
+    .finally(() => endRun(runKey))
+
+  // 待つのは組み立ての成否まで。AI の応答の完了は待たない（design.md D2）。
+  try {
+    await built
+  } catch (error) {
+    throw createError({
+      statusCode: 503,
+      statusMessage: 'Service Unavailable',
+      message: `起動の材料を組み立てられない: ${error instanceof Error ? error.message : String(error)}`,
+    })
+  }
 
   setResponseStatus(event, 200)
   return {}

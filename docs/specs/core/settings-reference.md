@@ -32,7 +32,6 @@ const { projectShareRoot, claude } = config.runtimeConfig
 | キー | 既定値 |
 |---|---|
 | `projectShareRoot` | `/opt/projects` |
-| `claude.apiBaseUrl` | `http://127.0.0.1:<devServer.port>`（下の「ポートは2箇所にある」） |
 | `claude.workflowSchema` | `flontier-strokeflow` |
 | `claude.firstPrompt` | `get-guide` を読ませる1文 |
 | `claude.continuePrompt` | `get-guide` を読み直させ、続きを促す1文 |
@@ -67,13 +66,15 @@ const { projectShareRoot, claude } = config.runtimeConfig
 └── .spec-workflow-mcp/           本家のグローバル状態
 ```
 
-### `claude.apiBaseUrl` — ポートは2箇所にある
+### 接続先は設定ではない — 実際の待ち受けから作る
 
-エージェント向け endpoint の base URL。実質的な用途は、起動ごとに組み立てる `--mcp-config` の url（`<apiBaseUrl>/mcp`）である。
+エージェントへ渡す接続先（`--mcp-config` の url）は**設定に無い**。サーバーが実際に bind したアドレスから、起動のたびに組み立てる（`server/utils/stroke/listen-address.ts`）。
 
-**同じポートが2箇所にある。** ここと `nuxt.config.ts` の `devServer.port` で、**変えるときは必ず両方を揃えて変える**。片方だけ変えると、起動した claude は開いていないポートへ MCP 接続を試みる。
+**かつては `claude.apiBaseUrl` という設定だった。外した。** 理由は、その値が待ち受けを決めていなかったからである。待ち受けを決めるのは `nuxt.config.ts` の `devServer.port` と、起動コマンドの `--port` である。`claude.apiBaseUrl` はそれを書き写しただけの値で、一致する保証が無く、ずれても誰も検知しなかった。
 
-既定は **3399** で、並走させる worktree だけがずらす（実測 2026-08-31: `nuxt.config.ts` を持つチェックアウトのうち 3399 以外は pre5 の 3599 だけ）。**「固定値」ではなく「揃えるべき2箇所」として扱うこと。**`devServer.port` はビルド設定でありストローク側設定ではないので、この資料の対象は `claude.apiBaseUrl` の側だけである（実体は `nuxt.config.ts`）。
+**実測 2026-09-01**: `package.json` が `nuxt dev --port 3100` を持つようになった結果、サーバーは 3100 で待ち受け、設定は 3599 を指し、3599 は `ECONNREFUSED` を返した。起動した claude は MCP ツールへ1本も繋げなかった。
+
+以後、ポートをどこで変えても接続先は追随する。**揃えるべき2箇所は無くなった。**
 
 ### `claude.firstPrompt` ・ `claude.continuePrompt` ・ `claude.steeringPrompt`
 
@@ -142,7 +143,7 @@ AI へ渡す定型。**手順の本文をここに書かない。** 手順は MC
   "args": [
     "--setting-sources", "project",
     "--model", "sonnet",
-    "--allowedTools", "Skill Bash(openspec *) Read Edit Write",
+    "--allowedTools", "Skill Bash(openspec *) Read",
     "--disallowedTools", "Bash(cd *)",
     "--strict-mcp-config"
   ]
@@ -154,11 +155,21 @@ AI へ渡す定型。**手順の本文をここに書かない。** 手順は MC
 - **他人のセッションの全文**。`claude.debugLogDir` をリポジトリ配下に置くと、`--output-format stream-json` で概要・問い・proposal がそのまま残る。セッション A の claude が B のログを読めた
 - **開発者の権限とプラグイン**。ルート配下の `.claude/settings.json` が `--setting-sources project` で効き、`Agent` や `Bash(claude *)` が渡っていた
 
+### `--allowedTools`
+
+**許可するのは、実測で要ると確かめた道具だけとする。** 根拠なく残った道具は、MCP ツールを通さない経路を黙って開けたままにする。
+
+**成果物をファイルへ直接書ける道具を許可しない。** 取得・提出の入口は MCP ツールだけである（`docs/specs/mcp/tools.md`「操作の入口はこれだけである」）。`Write` / `Edit` はそれを迂回できるので外した——実測 2026-09-01（`yarn check:stroke --approve` を2周、計4実行）で呼び出しは0回、外した構成でも往復・承認・steering 3本が揃うことを実機で確かめている。
+
+**`Read` は残してある。** steering 工程には文脈を取る MCP ツールが無く（公開は `get-steering-guide` / `get-steering` / `submit-document` の3本）、同じ実測で `Read` は5回使われていた。読み取りの口を MCP へ寄せるのは change `adr0016-sub-add-steering-context-tools` の仕事で、**道具を用意する前に `Read` を外すと steering が成立しない。**
+
+**第三者の MCP のツールを許可に載せない。** steering 工程は本家 spec-workflow の MCP を `--mcp-config` に並べるが、その目的は起動時の登録簿への自己登録だけで、ツール呼び出しは1つも要らない（本家は transport を繋ぐ前に登録する）。`--allowedTools` は可視性を決めないので一覧には残る。呼ばせない責務は案内（`get-steering-guide`）が併せて負う。
+
 **`--strict-mcp-config` を外してはならない。** `--mcp-config` は「追加」であって「限定」ではないので、これが無いと開発者個人の MCP 設定が全部読み込まれる（実測 2026-08-30: 8サーバー・約80ツールが、許可されていないので呼べないまま実行に並んでいた）。
 
 `--setting-sources` から `project` を外してはならない（ADR 0001）。**ただし `--add-dir` を外した今、この指定は実効を持たない**——探索先は cwd だけで、そこに `.claude/` は無いのでロードされるスキルは0本である。案内を Skill として配り直したときに要る守りとして残してある。
 
-`-p` / `--output-format json` と、`--session-id` / `--resume` と会話 id、`--mcp-config`、**MCP ツール分の `--allowedTools`**（`mcp__stroke-board`。steering 工程では `mcp__specworkflow` も）、`--` 以降の prompt は**呼び出しごとに決まる**ため、この定義には含まれない。呼び出し側が `args` の後ろに足す。
+`-p` / `--output-format json` と、`--session-id` / `--resume` と会話 id、`--mcp-config`、**MCP ツール分の `--allowedTools`**（両工程とも `mcp__stroke-board` だけ。steering 工程の `--mcp-config` には本家 MCP も並ぶが、そのツールは許可に載せない——下の「`--allowedTools`」）、`--` 以降の prompt は**呼び出しごとに決まる**ため、この定義には含まれない。呼び出し側が `args` の後ろに足す。
 
 会話 id の与え方は用途で違う。
 
@@ -194,7 +205,7 @@ AI へ渡す定型。**手順の本文をここに書かない。** 手順は MC
 
 `STROKE_BASEURL` は**こちらが読む設定ではなく、子プロセスへ渡す名前**である。かつてはセッション API スキルがこの名前で接続先を読んでいたが、**読み手はもう居ない**——操作系スキルは `--add-dir` を外したうえで撤去され、`curl` / `printenv` も `--allowedTools` から落ちている。渡すのをやめるかどうかは別途判断する。
 
-いま子プロセスへ接続先が届く経路は `--mcp-config` の url（`<apiBaseUrl>/mcp`）である。
+いま子プロセスへ接続先が届く経路は `--mcp-config` の url である。その値は設定ではなく、サーバーが実際に bind したアドレスから作る（上の「接続先は設定ではない」）。
 
 ## ポータル側
 

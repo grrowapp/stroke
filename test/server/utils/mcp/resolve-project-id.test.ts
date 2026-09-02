@@ -82,12 +82,84 @@ describe('resolveProjectId', () => {
 
     const result = await resolveProjectId('/opt/projects/unknown');
 
-    expect(result).toEqual({
-      ok: false,
-      status: 404,
-      errorCode: 'project_not_registered',
-      error: '対象のプロジェクトが本家の一覧に無い。',
-    });
+    expect(result).toMatchObject({ ok: false, status: 404, errorCode: 'project_not_registered' });
+    expect((result as { error: string }).error).toContain('/opt/projects/unknown');
+    expect((result as { error: string }).error).toContain('other');
+    expect((result as { error: string }).error).toContain('/opt/projects/other');
+  });
+
+  it('一覧に `/opt/projects` だけがあるとき `/opt/projects/example` が引き当たる（本家が git のトップレベルへ解決した場合）', async () => {
+    upstreamClientMock.mockReturnValue(fakeUpstreamClient(vi.fn().mockResolvedValue({
+      ok: true,
+      value: [{ projectId: 'PID-ROOT', projectName: 'opt-projects', projectPath: '/opt/projects', instances: [] }],
+    })));
+
+    const result = await resolveProjectId('/opt/projects/example');
+
+    expect(result).toEqual({ ok: true, projectId: 'PID-ROOT' });
+  });
+
+  it('祖先が複数あるときは最も深い方を採る', async () => {
+    upstreamClientMock.mockReturnValue(fakeUpstreamClient(vi.fn().mockResolvedValue({
+      ok: true,
+      value: [
+        { projectId: 'PID-ROOT', projectName: 'opt-projects', projectPath: '/opt/projects', instances: [] },
+        { projectId: 'PID-EXAMPLE', projectName: 'example', projectPath: '/opt/projects/example', instances: [] },
+      ],
+    })));
+
+    const result = await resolveProjectId('/opt/projects/example/sub');
+
+    expect(result).toEqual({ ok: true, projectId: 'PID-EXAMPLE' });
+  });
+
+  it('名前が前方一致するだけのエントリは祖先として引き当てない', async () => {
+    upstreamClientMock.mockReturnValue(fakeUpstreamClient(vi.fn().mockResolvedValue({
+      ok: true,
+      value: [{ projectId: 'PID1', projectName: 'example', projectPath: '/opt/projects/example', instances: [] }],
+    })));
+
+    const result = await resolveProjectId('/opt/projects/example-2');
+
+    expect(result).toMatchObject({ ok: false, status: 404, errorCode: 'project_not_registered' });
+  });
+
+  it('候補があって外れたときの error に、要求パスと一覧のプロジェクト名・パスが含まれる', async () => {
+    upstreamClientMock.mockReturnValue(fakeUpstreamClient(vi.fn().mockResolvedValue({
+      ok: true,
+      value: [{ projectId: 'PID1', projectName: 'other', projectPath: '/opt/projects/other', instances: [] }],
+    })));
+
+    const result = await resolveProjectId('/opt/projects/unknown');
+
+    expect(result.ok).toBe(false);
+    const error = (result as { error: string }).error;
+    expect(error).toContain('/opt/projects/unknown');
+    expect(error).toContain('other');
+    expect(error).toContain('/opt/projects/other');
+  });
+
+  it('一覧が空のときの error は、候補があって外れたときの本文と区別できる', async () => {
+    upstreamClientMock.mockReturnValue(fakeUpstreamClient(vi.fn().mockResolvedValue({
+      ok: true,
+      value: [],
+    })));
+
+    const emptyResult = await resolveProjectId('/opt/projects/unknown');
+
+    upstreamClientMock.mockReturnValue(fakeUpstreamClient(vi.fn().mockResolvedValue({
+      ok: true,
+      value: [{ projectId: 'PID1', projectName: 'other', projectPath: '/opt/projects/other', instances: [] }],
+    })));
+
+    const candidateMismatchResult = await resolveProjectId('/opt/projects/unknown');
+
+    expect(emptyResult.ok).toBe(false);
+    expect(candidateMismatchResult.ok).toBe(false);
+    const emptyError = (emptyResult as { error: string }).error;
+    const mismatchError = (candidateMismatchResult as { error: string }).error;
+    expect(emptyError).not.toEqual(mismatchError);
+    expect(emptyError).toContain('/opt/projects/unknown');
   });
 
   it('本家が 500 を返したら、到達不能に潰さず実ステータスを返す', async () => {
