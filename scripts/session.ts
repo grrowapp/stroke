@@ -33,8 +33,15 @@ async function main(): Promise<void> {
       if (!arg?.trim()) fail(`概要が必要。\n${USAGE}`)
       // AI の呼び出しはここでは起きないので invocation は idle で書く（design.md 決定3）
       const sessionId = await createSessionCore(root, arg, 'idle')
-      // 返答は転送予定先（画面1）の URL。開けばセッションが進む
-      console.log(`${config.claude.apiBaseUrl}/strokes/${sessionId}`)
+      // 返答は転送予定先（画面1）の URL。開けばセッションが進む。
+      //
+      // **`claude.apiBaseUrl` はもう無い**（provide-operations-via-mcp 続き。claude に渡す
+      // MCP の url は実際の待ち受けから組み立てる方へ移した——`server/utils/stroke/listen-address.ts`）。
+      // このスクリプトはサーバの外（`tsx`）で動く独立プロセスなので、その実際の待ち受けを
+      // 観測する手段を持たない。`nuxt.config.ts` の `devServer` から**近似**を組み立てる
+      // （`package.json` の `dev` スクリプトが `--port` で上書きしていれば、この値とはずれる。
+      // 既知の限界——最終報告に書いた）
+      console.log(`${displayUrl(nuxtConfig.devServer)}/strokes/${sessionId}`)
       return
     }
     case 'delete': {
@@ -64,6 +71,20 @@ async function main(): Promise<void> {
 function fail(message: string): never {
   console.error(message)
   process.exit(1)
+}
+
+/**
+ * `nuxt.config.ts` の `devServer` から人が開けるブラウザ URL を組み立てる。
+ *
+ * `host: '0.0.0.0'` は「全インタフェースで待つ」という bind 用の意味で、ブラウザに
+ * 打ち込める宛先ではない。`localhost` に丸める（`::`/`::0` も同様）。
+ */
+function displayUrl(devServer: { host?: string, port: number }): string {
+  const host = devServer.host
+  const normalized = host === undefined || host === '0.0.0.0' || host === '::' || host === '::0'
+    ? 'localhost'
+    : host
+  return `http://${normalized}:${devServer.port}`
 }
 
 main().catch((error) => {

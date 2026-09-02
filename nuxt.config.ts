@@ -1,6 +1,7 @@
 import { defineNuxtConfig } from 'nuxt/config';
 
 import { sbIcons, upstreamIcons } from './app/assets/icons';
+import { recordDevListenAddress } from './server/utils/stroke/listen-address';
 
 /**
  * ADR 0001 がスキルのロードに要ると定めた値。**ただし、いまはロードされるスキルが0本である。**
@@ -76,8 +77,12 @@ export default defineNuxtConfig({
 
   typescript: { typeCheck: false, strict: true },
 
-  // 起動の待ち受け。3000 はこのマシンで別のプロセスが使っているのでずらしてある。
-  // 3599 はストロークの `claude.apiBaseUrl` と揃える値（変えるなら両方揃えて変える）。
+  // 起動の待ち受けの既定値。3000 はこのマシンで別のプロセスが使っているのでずらしてある。
+  // `package.json` の `dev` スクリプト（`nuxt dev --port 3100`）がこの `port` を上書きする
+  // ので、実際に listen するポートはそちら——ここは `--port` を渡さず起こしたときの既定に
+  // すぎない。**claude に渡す MCP の url とはもう連動しない**（`listen-address.ts` が実際の
+  // 待ち受けから組み立てるので、ここを変えても揃えて変える必要はない。
+  // provide-operations-via-mcp 続き）。
   // 別マシンのブラウザから開くため、localhost ではなく全インタフェースで待つ
   devServer: { host: '0.0.0.0', port: 3599 },
 
@@ -113,6 +118,12 @@ export default defineNuxtConfig({
      * （実測: `.output` を grep して該当なし）。
      */
     listen(server) {
+      // 実際に bind されたポートを覚える（provide-operations-via-mcp 続き）。claude に
+      // 渡す MCP の url はここから組み立てる——設定の固定値だと、待ち受けを変えた瞬間に
+      // 届かなくなる（実測 2026-09-01: yarn dev は 3100 で listen するのに設定は 3599
+      // を指し ECONNREFUSED）。詳細は `server/utils/stroke/listen-address.ts` の docblock。
+      recordDevListenAddress(server);
+
       // upgrade した socket に `'error'` の受け手を置く。受け手が無いと EventEmitter が
       // throw するため、まずここで throw の芽を摘む。
       // 再起動のたびに登録し直されるが、上流が `close` フックで `removeAllListeners('upgrade')`
@@ -291,16 +302,15 @@ export default defineNuxtConfig({
         '--strict-mcp-config',
       ],
 
-      // エージェント向け endpoint の base URL。prompt には載せない（design.md 決定7）。
+      // エージェント向け endpoint の base URL（`claude.apiBaseUrl`）は**設定から外した**
+      // （provide-operations-via-mcp 続き）。待ち受けを決めるのは `devServer.port` /
+      // `package.json` の `nuxt dev --port` であって、ここに手で書いた値ではない——
+      // 一致する保証が無く、実測 2026-09-01 で ECONNREFUSED になっていた。
       //
-      // いまの実質的な用途は、起動ごとに組み立てる `--mcp-config` の url
-      // （`${apiBaseUrl}/mcp`）である（`server/utils/stroke/invoke.ts`）。
-      //
-      // spawn 時に環境変数 STROKE_BASEURL としても渡してはいる
-      // （`server/utils/stroke/claude.ts`）が、**読み手はもう居ない**。これを読んでいた
-      // セッション API スキルは `--add-dir` から外れたうえに撤去され、curl / printenv も
-      // `--allowedTools` から落ちた
-      apiBaseUrl: 'http://127.0.0.1:3599',
+      // 起動ごとに組み立てる `--mcp-config` の url（`${apiBaseUrl}/mcp`）と、spawn 時の
+      // 環境変数 STROKE_BASEURL（`server/utils/stroke/claude.ts`。読み手は今は居ない）は、
+      // どちらも実際の待ち受けから `server/utils/stroke/listen-address.ts` が組み立てる
+      // （`server/utils/stroke/invoke.ts` の `buildRun`）
 
       // セッションの openspec/config.yaml に書くワークフロースキーマ名。実体は
       // user レベル（~/.local/share/openspec/schemas/）に配置されたものが解決される

@@ -44,7 +44,7 @@ server/mcp/tools/                                      MCP ツール8本（フ�
 |---|---|---|
 | スキーマ名 | `runtimeConfig.claude.workflowSchema` | セッション作成時に `openspec/config.yaml` へ書かれる |
 | 手順の入口 | `runtimeConfig.claude.firstPrompt` ほか | 定型が案内ツール（`get-guide`）の名前を指す。手順の本文は定型に書かない |
-| 接続先 | `runtimeConfig.claude.apiBaseUrl` | 起動ごとに組み立てる `--mcp-config` の url（`<apiBaseUrl>/mcp`）。spawn 時の環境変数 `STROKE_BASEURL` としても渡るが、**読み手はもう居ない** |
+| 接続先 | `server/utils/stroke/listen-address.ts` | 起動ごとに組み立てる `--mcp-config` の url。**設定ではなく、サーバーが実際に bind したアドレスから作る**（かつての `claude.apiBaseUrl` は外した）。spawn 時の環境変数 `STROKE_BASEURL` としても渡るが、**読み手はもう居ない** |
 | どのセッションか | — | `--mcp-config` の `x-stroke-token`。接続表がセッション id へ引き当てる |
 | 工程ごとの公開ツール | `server/utils/mcp/exposed-tools.ts` | `--mcp-config` の `x-mcp-tools` |
 | 作業場所 | — | cwd だけ。`--add-dir` は渡さない |

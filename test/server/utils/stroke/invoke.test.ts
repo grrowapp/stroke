@@ -25,7 +25,6 @@ vi.mock('../../../../server/utils/stroke/config', () => ({
       claude: {
         command: 'claude',
         args: ['--setting-sources', 'project'],
-        apiBaseUrl: 'http://example.test:3399',
         workflowSchema: 'flontier-strokeflow',
         firstPrompt: 'first',
         continuePrompt: 'continue',
@@ -39,6 +38,15 @@ vi.mock('../../../../server/utils/stroke/config', () => ({
       wsPathPattern: '/ws/{channel}',
     };
   },
+}));
+
+/**
+ * MCP の url に使う base URL は実際の待ち受けから組み立てる（provide-operations-via-mcp
+ * 続き。`listen-address.ts`）。ここで見たいのは buildRun がその値をそのまま url・
+ * STROKE_BASEURL に使うことだけなので、固定値を返す細工で足りる。
+ */
+vi.mock('../../../../server/utils/stroke/listen-address', () => ({
+  currentApiBaseUrl: () => 'http://example.test:3399',
 }));
 
 /**

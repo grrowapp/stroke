@@ -13,6 +13,7 @@ import {
 import { readServerConfig } from '../config'
 import { issueConnectionToken, registerConnection, removeConnection } from '../mcp/connection-table'
 import { exposedToolsHeaderValue, MCP_TOOLS_HEADER, type McpToolPhase } from '../mcp/exposed-tools'
+import { currentApiBaseUrl } from './listen-address'
 
 /**
  * 起動の材料を設定から組み立てる端。
@@ -116,6 +117,12 @@ export function buildRun(options: {
   // （openspec/specs/debug/logging「出力先の設定があるときだけ書かれる」）
   const debugLogDir = claude.debugLogDir === '' ? undefined : claude.debugLogDir
 
+  // MCP の url・STROKE_BASEURL に使う base URL。**設定の固定値ではなく実際の待ち受けから
+  // 組み立てる**（provide-operations-via-mcp 続き。`listen-address.ts` の docblock）。
+  // dev で listen 前に呼ばれれば throw し、組み立て失敗として `failed` に倒れる
+  // （呼び出し元 `invokeAi` の組み立て失敗経路）——巡回が拾い直すころには listen は済んでいる。
+  const apiBaseUrl = currentApiBaseUrl()
+
   if (kind === 'steering') {
     return {
       launch: {
@@ -134,9 +141,9 @@ export function buildRun(options: {
         args: [
           ...withMcpToolsAllowed(claude.args),
           '--mcp-config',
-          mcpConfigFor(cwd, token, claude.apiBaseUrl),
+          mcpConfigFor(cwd, token, apiBaseUrl),
         ],
-        apiBaseUrl: claude.apiBaseUrl,
+        apiBaseUrl,
       },
       cwd,
       debugLogDir,
@@ -171,9 +178,9 @@ export function buildRun(options: {
       args: [
         ...withMcpToolsAllowed(claude.args),
         '--mcp-config',
-        mcpToolConfigFor(token, claude.apiBaseUrl),
+        mcpToolConfigFor(token, apiBaseUrl),
       ],
-      apiBaseUrl: claude.apiBaseUrl,
+      apiBaseUrl,
     },
     cwd,
     debugLogDir,
@@ -213,9 +220,9 @@ export function buildRun(options: {
 /**
  * 自前 MCP サーバー（provide-operations-via-mcp）を起こす `--mcp-config` の1エントリ。
  *
- * url は `runtimeConfig.claude.apiBaseUrl` から組み立てる（design.md「MCP の url は
- * 既存設定から組み立てる」。新しい設定は増やさない）。token はこの起動専用の一時値
- * （接続表 `server/utils/mcp/connection-table.ts`）。
+ * url は `buildRun` が実際の待ち受けから組み立てた `apiBaseUrl`（`listen-address.ts`）を
+ * 渡り受けて組み立てる。設定の固定値は使わない（provide-operations-via-mcp 続き）。
+ * token はこの起動専用の一時値（接続表 `server/utils/mcp/connection-table.ts`）。
  *
  * 工程は url ではなくヘッダで分ける。`x-mcp-tools` に載せた名前のツールだけが claude の
  * tools 一覧に載るので、その工程で呼べないツールは初めから見えない

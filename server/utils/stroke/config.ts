@@ -22,8 +22,6 @@ const schema = z.object({
     command: z.string().trim().min(1),
     /** 呼び出しに依らないフラグ一式。ADR 0001 の検査は `describeClaudeArgsError` */
     args: z.array(z.string()).min(1),
-    /** エージェント向け endpoint の base URL。`STROKE_BASEURL` として子へ渡る */
-    apiBaseUrl: z.string().trim().min(1),
     /** セッションの openspec/config.yaml に書くワークフロースキーマ名 */
     workflowSchema: z.string().trim().min(1),
     /** 初回（`--session-id` での新規起動）で渡す定型 */

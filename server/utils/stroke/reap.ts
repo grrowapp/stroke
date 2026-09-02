@@ -27,7 +27,10 @@ const TERMINATION_POLL_ATTEMPTS = 100
 export interface ReapDeps {
   /** 走っているプロセスの一覧。取れなければ `null`（`live-processes.ts`）。 */
   listProcesses: () => Promise<LiveProcess[] | null>
-  /** このインスタンスの `claude.apiBaseUrl`。自分が起こしたかの手がかり（Decision 2）。 */
+  /**
+   * このインスタンスが claude に渡す MCP の base URL（実際の待ち受けから組み立てた値。
+   * `server/utils/stroke/listen-address.ts`）。自分が起こしたかの手がかり（Decision 2）。
+   */
   apiBaseUrl: string
   /**
    * pid を `SIGKILL` で終了させ、終了したことを確かめて `true` を返す。
@@ -125,9 +128,10 @@ function targetOf(session: SessionSummary): ReapTarget | undefined {
  * pid を `SIGKILL` で終了させ、終了したことを確かめる。
  *
  * `runClaude` のタイムアウトが使うシグナルと同じ（design.md Decision 5）。**確かめてから
- * `failed` を書く**（openspec/specs/server/session-management「終了したことを確かめてから
- * invocation を failed へ変える」）——signal を送っただけでは、まだ終了処理の途中の
- * claude が MCP を呼んで記録を上書きし得る。
+ * `failed` を書く**（`fix-orphan-run-on-restart` が `openspec/specs/agent/invocation`
+ * へ足す Requirement「終了したことを確かめてから invocation を failed へ変える」。
+ * 同 change archive 後は canonical `agent/invocation` を参照）——signal を送っただけでは、
+ * まだ終了処理の途中の claude が MCP を呼んで記録を上書きし得る。
  */
 export async function terminateProcess(pid: number): Promise<boolean> {
   try {

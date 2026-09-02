@@ -3,7 +3,6 @@ import { defineNitroPlugin } from 'nitropack/runtime'
 import type { SessionSummary } from '#shared/stroke'
 import { invokePath } from '../utils/stroke/invoke'
 import { LOG_PREFIX } from '../utils/stroke/log'
-import { awaitReap } from '../utils/stroke/reap-gate'
 import { shouldRetry } from '../utils/stroke/sweep'
 
 /**
@@ -31,13 +30,10 @@ import { shouldRetry } from '../utils/stroke/sweep'
  * **参照は API の応答から得て、書き込みは A8 を通す**（openspec/specs/agent/invocation
  * の MUST NOT: ファイルを直接読んで実行状態を判定してはならない）。
  *
- * ## 最初の周回は後始末の完了を待つ
- *
- * 後始末（`01.reap-running.ts`）が済む前に巡回が `failed` を起こし直すと、後始末が
- * まだ倒していない `running` の対象へ2つ目の claude を立てかねない
- * （openspec/specs/agent/invocation「後始末より先に起こし直さない」）。待ち合わせは
- * `reap-gate.ts` の門を通す——後始末が失敗して終わっても門は開くので、巡回が永久に
- * 止まることはない（design.md tasks 3.2）。
+ * 起動時の後始末（`01.reap-running.ts`）と巡回の間に、呼び出し順序の取り決めは持たない
+ * （openspec/specs/agent/invocation「起動時の後始末と巡回は、互いの完了を待たない」）。
+ * 対象1件ごとの順序——後始末は終了を確かめてから `failed` を書く——だけで二重起動は
+ * 防げているため、待ち合わせの仕組みは不要である。
  */
 
 /** 巡回の間隔。設定ではない（docs/specs/core/settings-reference.md）。 */
@@ -66,15 +62,7 @@ export default defineNitroPlugin((nitro) => {
     }
   }
 
-  // 最初の1回も後始末の完了後に走らせる。プラグインの初期化中はまだ自分の endpoint が
-  // 応答しないので、いずれにせよ今のティックを抜けてから叩く必要はあったが、
-  // それだけでは後始末の完了を待てない（Nitro のプラグイン実行順は保証されない）ため
-  // `awaitReap()` で明示的に待ち合わせる。
-  const kickoff = (async () => {
-    await awaitReap()
-    await sweep()
-  })()
-  kickoff.catch(() => {})
+  void sweep()
 
   const timer = setInterval(() => void sweep(), SWEEP_INTERVAL_MS)
 

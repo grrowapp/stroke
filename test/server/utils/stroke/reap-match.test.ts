@@ -67,7 +67,6 @@ vi.mock('../../../../server/utils/stroke/config', () => ({
     claude: {
       command: 'node',
       args: ['--setting-sources', 'project'],
-      apiBaseUrl: 'http://example.test:3599',
       workflowSchema: 'flontier-strokeflow',
       firstPrompt: 'first',
       continuePrompt: 'continue',
@@ -80,6 +79,16 @@ vi.mock('../../../../server/utils/stroke/config', () => ({
     openspec: { bin: 'openspec', initArgs: 'init --yes' },
     wsPathPattern: '/ws/{channel}',
   }),
+}))
+
+/**
+ * MCP の url に使う base URL は実際の待ち受けから組み立てる（provide-operations-via-mcp
+ * 続き。`listen-address.ts`）。ここで見たいのは、`buildRun` が組み立てたものと
+ * `isOwnLaunch` の照合が**同じ事実（同じ apiBaseUrl）を指していること**なので、固定値の
+ * 細工で足りる——`OWN_API_BASE_URL` と揃える。
+ */
+vi.mock('../../../../server/utils/stroke/listen-address', () => ({
+  currentApiBaseUrl: () => 'http://example.test:3599',
 }))
 
 vi.mock('../../../../server/utils/config', () => ({
