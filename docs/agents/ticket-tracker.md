@@ -42,8 +42,8 @@ artifact を書いている列。artifactの作成に着手したら status に 
 
 ### Doing
 
-実装している列。**`openspec apply <change-id>` を実行するとき、その最初に ticket の `status` へ `Doing` と書く。** 書き換えは apply の手順の一部であり、タスクの消化状況から後で推定するものではない。
+実装している列。**tasks.md の先頭タスクとして ticket の `status` へ `Doing` と書く。** 書き換えは tasks の一部であり、タスクの消化状況から後で推定するものではない。
 
 ### Wait-for-archive
 
-`openspec list` で change の tasks が A/B で A = B になったら status に `Wait-for-archive` と書く。`openspec archive <change-id>` を実行するまでこの値のまま置き、archive したら ticket を `openspec/tickets/.archive/` へ移す。
+tasks.md の末尾タスクでユーザーから完了承認を得たら、同じタスクの中で status に `Wait-for-archive` と書く。`openspec archive <change-id>` を実行するまでこの値のまま置き、archive したら ticket を `openspec/tickets/.archive/` へ移す。
