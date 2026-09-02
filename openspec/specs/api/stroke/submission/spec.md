@@ -1,5 +1,7 @@
 # api/stroke/submission Specification
 
+> **この capability の性格は未確定である（2026-09-02）。** ユーザーが承認したのは「`submission` で proposal も steering も提出する。`proposal`（A7）は無くなる」形であり、以下の「`invocation` を操作する」という規定はそれと食い違う。エージェントが archive 済みの design.md を承認の証拠として扱い、ユーザーの判断を捻じ曲げた結果である（`docs/adr/0019-approval-is-not-inferred-from-archive.md`）。**以下を正として扱わないこと。**
+
 ## Purpose
 `invocation` を操作する endpoint（A8）を規定する。実行の記録の書き込みをこの1口に集め、起動・完了・失敗・終端のどの遷移も同じ形式で行わせる。
 

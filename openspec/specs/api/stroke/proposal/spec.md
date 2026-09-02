@@ -1,5 +1,7 @@
 # api/stroke/proposal Specification
 
+> **この capability の存在自体が未確定である（2026-09-02）。** ユーザーが承認したのは「提出は `submission` へ寄せ、**`proposal`（A7）は無くなる**」形である。この spec が在ること自体がそれと食い違う。エージェントが archive 済みの design.md を承認の証拠として扱い、ユーザーの判断を捻じ曲げた結果である（`docs/adr/0019-approval-is-not-inferred-from-archive.md`）。**以下を正として扱わないこと。**
+
 ## Purpose
 エージェントが proposal の全文を提出する endpoint（A7）を規定する。ユーザーに表示するための本文とプロジェクト名の候補の受け取りを担う。
 
