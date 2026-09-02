@@ -1156,6 +1156,19 @@ body {
   }
 
   /*
+   * 開閉の口（本家 Close Review）。決める操作の並びの先頭に置く。
+   * 実測（稼働中の本家・2026-09-02）で決定の3つ（#6366f1）より一段明るい #818cf8。
+   * blur しても変わらない＝focus ではなく地の色で、開閉と決定を明度で分けている。
+   */
+  .sb-action-light {
+    background: #818cf8;
+  }
+
+  .sb-action-light:hover {
+    background: var(--interactive-primary);
+  }
+
+  /*
    * 承認と却下の色。
    *
    * 本家の JSX には `btn bg-green-600` / `btn bg-red-600` と書いてあるが、本家自身の

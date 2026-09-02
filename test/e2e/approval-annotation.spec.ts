@@ -10,7 +10,8 @@ import { ALPHA, addSelectionComment, painted, resetBoard, selectIn, stub } from 
  * `comments` の3つのフィールドとして承認リクエストと同じファイルに書かれる。1本のテキストに
  * 畳まないので、箇所と指摘の対応が残る。
  *
- * 承認・却下は指摘を運ばない。それらは承認一覧の側にあり、`workspace.spec.ts` が見る。
+ * 即時承認・即時却下は指摘を運ばない。決める操作の帯（操作行）は下の
+ * 「決める操作の帯」describe が見る。承認一覧のカード側は `workspace.spec.ts` が見る。
  */
 
 const APPROVAL = `/projects/${ALPHA}/approvals/an1`;
@@ -54,7 +55,8 @@ test.describe('承認画面の2つの面', () => {
     await page.goto(APPROVAL);
 
     await expect(page.getByTestId('approval-mode-preview')).toHaveText('プレビュー');
-    await expect(page.getByTestId('approval-mode-annotate')).toHaveText('生テキスト');
+    // ラベルは「注釈」（ユーザー決定 2026-09-02。「生テキスト」への改名は取り消された）
+    await expect(page.getByTestId('approval-mode-annotate')).toHaveText('注釈');
     await expect(page.getByTestId('approval-modes').getByRole('button')).toHaveCount(2);
     await expect(page.getByTestId('approval-mode-side-by-side')).toHaveCount(0);
   });
@@ -120,8 +122,10 @@ test.describe('コメント欄をしまう', () => {
     await expect(comments).toHaveCSS('width', TUCKED);
     await expect(page.getByTestId('approval-comments-handle')).toBeVisible();
 
-    // 一覧の中身（見出し・差し戻し）は畳まれている
-    await expect(page.getByTestId('approval-revision')).toHaveCount(0);
+    // 一覧の中身（全体へのコメントの口）は畳まれている
+    await expect(page.getByTestId('approval-add-general')).toHaveCount(0);
+    // 決める操作は欄の外（操作行）に居るので、しまっても見えたまま（design 決定2）
+    await expect(page.getByTestId('approval-revision')).toBeVisible();
 
     // 空いた幅は本文が取る
     const after = await widthOf(page, 'approval-main');
@@ -420,8 +424,112 @@ test.describe('指摘を付ける', () => {
 });
 
 /**
- * 差し戻しは本家の `POST /approvals/:id/needs-revision` を呼ぶ。承認・却下とは別経路で、
- * 指摘を運ぶのはこれだけである。
+ * 決める操作は画面上部の操作行に集まる（specs/project/ui「決める操作は1つの並びに集める」）。
+ * 並びは本家の写し: レビューを閉じる / 即時承認 / 即時却下 / 修正を依頼。読んで判断した場で
+ * 終わらせられ、即時却下の理由は本文の上に重なるモーダルで求める（同「理由を求める入力は
+ * 本文の上に重ねて出す」）。
+ */
+test.describe('決める操作の帯', () => {
+  test.beforeEach(async ({ page }) => {
+    await resetBoard(page);
+    await stub.requestApproval(ALPHA, {
+      id: 'an1',
+      title: TITLE,
+      filePath: '.spec-workflow/steering/product.md',
+      category: 'steering',
+      categoryName: 'steering',
+    });
+    await page.goto(APPROVAL);
+  });
+
+  test('操作行が面の切替より上に1つの並びで出る', async ({ page }) => {
+    const decisions = page.getByTestId('approval-decisions');
+    await expect(decisions.getByTestId('approval-close')).toContainText('レビューを閉じる');
+    await expect(decisions.getByTestId('approval-approve')).toContainText('即時承認');
+    await expect(decisions.getByTestId('approval-reject')).toContainText('即時却下');
+    await expect(decisions.getByTestId('approval-revision')).toContainText('修正を依頼');
+
+    // 面の切替はその下の別の並び。切替の並びに決める操作は混ざらない
+    const modes = page.getByTestId('approval-modes');
+    await expect(modes.getByRole('button')).toHaveCount(2);
+    const modesTop = await modes.evaluate((element) => element.getBoundingClientRect().top);
+    const decisionsBottom = await decisions.evaluate(
+      (element) => element.getBoundingClientRect().bottom,
+    );
+    expect(decisionsBottom).toBeLessThanOrEqual(modesTop);
+  });
+
+  test('読んで判断した場で即時承認できる', async ({ page }) => {
+    await page.getByTestId('approval-approve').click();
+
+    await expect(page).toHaveURL(new RegExp(`/projects/${ALPHA}/approvals$`));
+    await expect(page.getByTestId('approvals-empty')).toBeVisible();
+
+    const { lastApprovalAction } = await stub.stats();
+    expect(lastApprovalAction?.action).toBe('approve');
+    expect(lastApprovalAction?.id).toBe('an1');
+  });
+
+  test('読んで判断した場で即時却下できる。理由は重なるモーダルで求め、空では送れない', async ({
+    page,
+  }) => {
+    await page.getByTestId('approval-reject').click();
+    await expect(page.getByTestId('approval-reject-form')).toBeVisible();
+    await expect(page.getByTestId('approval-reject-submit')).toBeDisabled();
+
+    await page.getByTestId('approval-reject-reason').fill('観点が足りない');
+    await page.getByTestId('approval-reject-submit').click();
+
+    await expect(page).toHaveURL(new RegExp(`/projects/${ALPHA}/approvals$`));
+
+    const { lastApprovalAction } = await stub.stats();
+    expect(lastApprovalAction?.action).toBe('reject');
+    expect(lastApprovalAction?.response).toBe('観点が足りない');
+  });
+
+  test('理由を入れずにやめると、面が閉じて何も送られない', async ({ page }) => {
+    await page.getByTestId('approval-reject').click();
+    await expect(page.getByTestId('approval-reject-form')).toBeVisible();
+
+    await page.getByTestId('approval-reject-cancel').click();
+    await expect(page.getByTestId('approval-reject-form')).toHaveCount(0);
+    await expect(page).toHaveURL(new RegExp(`${APPROVAL}$`));
+
+    const { lastApprovalAction } = await stub.stats();
+    expect(lastApprovalAction).toBeNull();
+  });
+
+  test('コメントが有る状態の即時承認は警告で止まり、送られない', async ({ page }) => {
+    await page.getByTestId('approval-add-general').click();
+    const modal = page.getByRole('dialog');
+    await modal.getByRole('textbox').fill('全体の構成を見直してほしい');
+    await modal.getByRole('button', { name: '付ける' }).click();
+    await expect(page.getByTestId('approval-comment-count')).toHaveText('1');
+
+    // 件数はコメントが有るときだけ付く（本家の Request Revisions (N)）
+    await expect(page.getByTestId('approval-revision')).toContainText('修正を依頼（1）');
+
+    await page.getByTestId('approval-approve').click();
+    await expect(page.getByTestId('approval-approve-blocked')).toBeVisible();
+
+    const { lastApprovalAction } = await stub.stats();
+    expect(lastApprovalAction).toBeNull();
+  });
+
+  test('レビューを閉じると一覧へ戻る。何も送らない', async ({ page }) => {
+    await page.getByTestId('approval-close').click();
+
+    await expect(page).toHaveURL(new RegExp(`/projects/${ALPHA}/approvals$`));
+    await expect(page.getByTestId('record-row')).toHaveCount(1);
+
+    const { lastApprovalAction } = await stub.stats();
+    expect(lastApprovalAction).toBeNull();
+  });
+});
+
+/**
+ * 修正依頼は本家の `POST /approvals/:id/needs-revision` を呼ぶ。即時承認・即時却下とは
+ * 別経路で、指摘を運ぶのはこれだけである。
  */
 test.describe('差し戻す', () => {
   test.beforeEach(async ({ page }) => {
@@ -436,10 +544,11 @@ test.describe('差し戻す', () => {
     await page.goto(APPROVAL);
   });
 
-  test('コメントが1件も無いと差し戻せない', async ({ page }) => {
-    await page.getByTestId('approval-revision').click();
-
-    await expect(page.getByTestId('approval-revision-failure')).toBeVisible();
+  test('コメントが1件も無いと修正を依頼できない', async ({ page }) => {
+    // 本家どおり disabled。件数（N）はコメントが有るときだけ付く
+    const revision = page.getByTestId('approval-revision');
+    await expect(revision).toBeDisabled();
+    await expect(revision).not.toContainText('（');
 
     // 本家には何も届いていない
     const { lastApprovalAction } = await stub.stats();

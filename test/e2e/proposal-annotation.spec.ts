@@ -58,7 +58,8 @@ test.describe('proposal 確認画面の2つの面', () => {
     await expect(page.getByTestId('proposal-preview')).toContainText('モモンガ');
 
     await expect(page.getByRole('button', { name: 'プレビュー' })).toBeVisible();
-    await expect(page.getByRole('button', { name: '生テキスト' })).toBeVisible();
+    // ラベルは「注釈」（ユーザー決定 2026-09-02。「生テキスト」への改名は取り消された）
+    await expect(page.getByRole('button', { name: '注釈' })).toBeVisible();
     await expect(page.getByRole('button', { name: '左右' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: '並列表示' })).toHaveCount(0);
   });
@@ -84,7 +85,7 @@ test.describe('proposal 確認画面の2つの面', () => {
     await expect.poll(() => painted(page)).toEqual(['モモンガ']);
 
     // 生テキストの面へ切り替えても、一覧はそのままで、同じ注釈が対応する箇所に出る
-    await page.getByRole('button', { name: '生テキスト' }).click();
+    await page.getByRole('button', { name: '注釈' }).click();
     await expect(page.getByTestId('proposal-source')).toBeVisible();
     await expect(page.getByTestId('proposal-source')).toContainText('**強調されたモモンガ**');
     await expect(page.getByText('コメント(1)')).toBeVisible();
