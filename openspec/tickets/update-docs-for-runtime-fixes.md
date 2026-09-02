@@ -29,6 +29,8 @@ triage:
 | `反映済` | `docs/` を書き換えた |
 | `見送り` | 直さないと決まった。食い違いが残ることを承知の上 |
 
+**2026-09-02 追記**: `R1` / `R2` / `R3` はユーザー承認を得て反映済み。あわせて `claude.apiBaseUrl` の廃止に伴う記述（`settings-reference.md` の設定表と「ポートは2箇所にある」の節、`CLAUDE.md` のポート規定、`session-workflow.md:47`）も反映した——**この一覧には無かった項目**で、`apiBaseUrl` を設定から外したことで規則そのものが消えたためである。
+
 ### docs/specs/api/contract.md（5件）
 
 | # | status | どこ | 現在 → 提案 | 提案元 |
@@ -52,9 +54,9 @@ triage:
 
 | # | status | どこ | 現在 → 提案 | 提案元 |
 |---|---|---|---|---|
-| R1 | 未承認 | `claude.args` の `--allowedTools` の説明 | 「steering 工程では `mcp__specworkflow` も」 → **「両工程とも `mcp__stroke-board` だけ。steering に並ぶ本家 MCP のツールは載せない」**とし `mcp-tools.md` へリンク | adr0016-sub-fix-upstream-mcp-allowance |
-| R2 | 未承認 | `claude.args` の JSON 値（145行） | `"Skill Bash(openspec *) Read Edit Write"` → **`"Skill Bash(openspec *) Read"`**（実測 2026-09-01 で `Write`/`Edit` は4実行とも0回。外した構成で1周通ることを確認済み） | adr0016-sub-fix-direct-write-allowance |
-| R3 | 未承認 | `--allowedTools` の根拠段落 | **段落そのものが無い**（`--add-dir` / `--strict-mcp-config` / `--setting-sources` には在る）→ 「許可するのは実測で要ると確かめた道具だけ」「取得・提出は MCP ツールが唯一の入口で、直接書ける道具は許可しない」を新設 | adr0016-sub-fix-direct-write-allowance |
+| R1 | 反映済 | `claude.args` の `--allowedTools` の説明 | 「steering 工程では `mcp__specworkflow` も」 → **「両工程とも `mcp__stroke-board` だけ。steering に並ぶ本家 MCP のツールは載せない」**とし `mcp-tools.md` へリンク | adr0016-sub-fix-upstream-mcp-allowance |
+| R2 | 反映済 | `claude.args` の JSON 値（145行） | `"Skill Bash(openspec *) Read Edit Write"` → **`"Skill Bash(openspec *) Read"`**（実測 2026-09-01 で `Write`/`Edit` は4実行とも0回。外した構成で1周通ることを確認済み） | adr0016-sub-fix-direct-write-allowance |
+| R3 | 反映済 | `--allowedTools` の根拠段落 | **段落そのものが無い**（`--add-dir` / `--strict-mcp-config` / `--setting-sources` には在る）→ 「許可するのは実測で要ると確かめた道具だけ」「取得・提出は MCP ツールが唯一の入口で、直接書ける道具は許可しない」を新設 | adr0016-sub-fix-direct-write-allowance |
 
 ### docs/specs/api/mcp-tools.md（2件）
 

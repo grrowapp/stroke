@@ -1,7 +1,7 @@
 # api/session/approve Specification
 
 ## Purpose
-承認を受理する endpoint（U10）を規定する。確定された名前の受け取りから、昇格の実行、次の実行の起こしまでを担い、応答は次の実行の完了を待たない。
+承認の判断を記録する endpoint（U10）と、その取り消し（DELETE）を規定する。U10 は確定された名前で判断を記録するだけであり、昇格（U14 promote）も steering の起こし（U13）も行わない。判断は昇格の前なら取り消せる。
 
 ## Requirements
 
