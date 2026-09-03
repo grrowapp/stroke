@@ -1,7 +1,7 @@
 import { mkdir, readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { z } from 'zod'
-import type { Answer, Invocation, Question, SendBackPayload, Stroke } from '#shared/stroke'
+import { isPromotedPhase, type Answer, type Invocation, type Phase, type Question, type SendBackPayload, type Stroke } from '#shared/stroke'
 import type { ProjectCreationOutcome } from '#shared/types'
 import { broadcastProjectCreation } from '../control/board'
 import { conflict } from './conflict'
@@ -35,16 +35,21 @@ function shareRoot(): string {
  * proposal 本文は `proposal.md` を読めば得られるため、状態には持たない。
  *
  * `stroking` / `proposed` は「今の1問」を持つ点で同じ形（design.md 決定3・決定4: 問いと
- * 問い返しを区別せず、phase で受理の動きを変えない）。`approved` は問いを持たない。
+ * 問い返しを区別せず、phase で受理の動きを変えない）。昇格後（`approved` / `activated`）は
+ * 問いを持たない。
  *
- * **`invocation` と `retries` は3つの phase すべてが持つ。** 承認で昇格したプロジェクトでも
- * steering の実行が起こるため、実行の記録は `approved` でも要る
- * （openspec/specs/agent/invocation「phase が `approved` の対象も `invocation` を持つ」）。
+ * **`invocation` と `retries` はすべての phase が持つ。** 承認で昇格したプロジェクトでも
+ * steering の実行が起こるため、実行の記録は昇格後でも要る
+ * （openspec/specs/agent/invocation「承認以降の局面の対象も `invocation` を持つ」）。
  *
  * **承認の判断は `proposed` の中で持つ（`decision`）。** 判断は局面ではなく、局面の中の印である
  * ——判断が下りてもセッションはセッションのままで、昇格（改名と `approved` の書き込み）は
  * 別の段（U14）が行う（openspec/specs/api/session/approve・api/session/promote）。
- * `phase` の値は増やさない。
+ *
+ * **昇格後の形は `approved` と `activated` で同じ。** 違うのは phase の値だけで、完成の記録
+ * （U15）は `phase` を `activated` に変えるだけで他のフィールドに触れない
+ * （openspec/changes/add-activated-phase design D2）。値の集合は `shared/stroke.ts` の
+ * `PHASES` が持ち、ここに literal を増やすだけでは読めるようにならない。
  */
 
 /** 承認の判断。proposal を読んだユーザーが確定した名前を持つ。 */
@@ -76,25 +81,31 @@ export interface ProposedState extends ActiveFields {
   decision?: ApprovalDecision
 }
 
+/**
+ * 昇格後（プロジェクト）の局面。`approved`（生成中）と `activated`（完成）で形は同じ。
+ */
+export interface PromotedState {
+  phase: 'approved' | 'activated'
+  /** 承認の判断で確定し、昇格の改名に使った名前 */
+  projectName: string
+  invocation: Invocation
+  retries?: number
+  /**
+   * steering の会話 id。
+   *
+   * ストロークと違い自前採番しない——ディレクトリ名がプロジェクト名になっており
+   * uuid ではないためで、`--session-id` は uuid しか受け付けない（実測）。初回は
+   * claude に採番させ、output stream から拾った id をここに覚えて次から `--resume`
+   * する。**あるかどうかが初回/継続の判定でもある。** 完成の記録で消えない——完成後の
+   * 起こし直しも会話の続きから始まる。
+   */
+  runId?: string
+}
+
 export type SessionState =
   | (ActiveFields & { phase: 'stroking' })
   | ProposedState
-  | {
-      phase: 'approved'
-      /** 承認の判断で確定し、昇格の改名に使った名前 */
-      projectName: string
-      invocation: Invocation
-      retries?: number
-      /**
-       * steering の会話 id。
-       *
-       * ストロークと違い自前採番しない——ディレクトリ名がプロジェクト名になっており
-       * uuid ではないためで、`--session-id` は uuid しか受け付けない（実測）。初回は
-       * claude に採番させ、output stream から拾った id をここに覚えて次から `--resume`
-       * する。**あるかどうかが初回/継続の判定でもある。**
-       */
-      runId?: string
-    }
+  | PromotedState
 
 const projectNameSchema = z.string().trim().min(1)
 const invocationSchema = z.enum(['running', 'idle', 'failed', 'error'])
@@ -107,6 +118,15 @@ const activeStateFields = {
   retries: retriesSchema,
 }
 
+/** 昇格後の2つの局面が共有するフィールド。literal は分岐ごとに要るので、ここには置かない。 */
+const promotedStateFields = {
+  projectName: projectNameSchema,
+  // 既存の `approved` は `invocation` を持たないので、読めるように既定値を与える
+  invocation: invocationSchema.default('idle'),
+  retries: retriesSchema,
+  runId: z.string().trim().min(1).optional(),
+}
+
 /** 承認の判断。名前はユーザーが確定したもので、空は判断として成立しない。 */
 const decisionSchema = z.object({ projectName: projectNameSchema })
 
@@ -117,15 +137,43 @@ const stateSchema = z.discriminatedUnion('phase', [
   // `decision` は黙って消える（実測 2026-09-01・zod 4.4.3）。消えても proposal も
   // 往復の記録も無事で、承認からやり直せる（design.md Migration Plan）
   z.object({ phase: z.literal('proposed'), ...activeStateFields, decision: decisionSchema.optional() }),
-  z.object({
-    phase: z.literal('approved'),
-    projectName: projectNameSchema,
-    // 既存の `approved` は `invocation` を持たないので、読めるように既定値を与える
-    invocation: invocationSchema.default('idle'),
-    retries: retriesSchema,
-    runId: z.string().trim().min(1).optional(),
-  }),
+  z.object({ phase: z.literal('approved'), ...promotedStateFields }),
+  z.object({ phase: z.literal('activated'), ...promotedStateFields }),
 ])
+
+// zod の分岐の集合と `PHASES` が両方向で一致することを型で止める（値の集合はあちらが持つ）。
+// `PHASES` に値を足して分岐を足し忘れても、分岐に知らない literal を書いても、ここで落ちる
+type ZodPhase = (typeof stateSchema)['options'][number]['shape']['phase']['value']
+const _phaseCoverage: [ZodPhase] extends [Phase] ? ([Phase] extends [ZodPhase] ? true : never) : never = true
+void _phaseCoverage
+
+/**
+ * `state.json` の read-modify-write をセッション単位で直列化する。
+ *
+ * `writeState` の1回は原子的（temp + rename）だが、「読んで書く」の2手は原子的ではない。
+ * 起動時は後始末（A8 で `invocation`）と書き上げ（U15 で `phase`）が同じ対象に同時に触れ、
+ * 互いの書き込みを古い写しで上書きしうる（add-activated-phase レビュー指摘 2026-09-02）。
+ * 同一プロセス内の書き手はすべてここを通るので、プロセス内の待ち行列で足りる。
+ */
+const stateLocks = new Map<string, Promise<void>>()
+
+export async function withStateLock<T>(sessionId: string, run: () => Promise<T>): Promise<T> {
+  const previous = stateLocks.get(sessionId) ?? Promise.resolve()
+  let release!: () => void
+  const current = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const chained = previous.then(() => current)
+  stateLocks.set(sessionId, chained)
+
+  await previous
+  try {
+    return await run()
+  } finally {
+    release()
+    if (stateLocks.get(sessionId) === chained) stateLocks.delete(sessionId)
+  }
+}
 
 const answerSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('option'), value: z.string().min(1) }),
@@ -201,24 +249,28 @@ export async function writeInvocation(
   invocation: Invocation,
   retries?: number,
 ): Promise<void> {
-  const state = await readState(sessionId)
-  await writeState(sessionId, {
-    ...state,
-    invocation,
-    ...(retries === undefined ? {} : { retries }),
+  // 読んで書くの2手を直列化する。完成の記録（U15）と同じ対象に同時に触れうる
+  const state = await withStateLock(sessionId, async () => {
+    const current = await readState(sessionId)
+    await writeState(sessionId, {
+      ...current,
+      invocation,
+      ...(retries === undefined ? {} : { retries }),
+    })
+    return current
   })
 
-  // 昇格したプロジェクトの実行だけが上層に関係する。ストロークのセッション（uuid）の
-  // 実行は一覧に出ないので流さない。
+  // 生成中のプロジェクトの実行が終端（`error`）に達したときだけ、失敗の決着を流す。
   //
   // **ここに置くのは、`invocation` の書き込みが必ずここを通るからである**（A8 の endpoint も
   // invokeAi へ渡す書き込み口も、同じこの実体を呼ぶ）。呼び出し側それぞれに置くと、書いたのに
   // 流れない経路が生まれる。
   //
-  // **流すのは合図であって、行の状態ではない。** 一覧の行が生成中か完了かは
-  // ファイルシステム（`.spec-workflow/` の有無）から毎回導く（design.md D7）。ここは
-  // 「何かが決着したから取り直せ」と、モーダルを出す引き金を伝えるだけである。だから
-  // `invocation` を合図の材料に使っても、行の判定が `invocation` に依存することはない。
+  // **成功の決着はここから流さない。** `invocation` は実行の記録であって完成の記録ではなく、
+  // `idle` は「終わった」であって「できた」ではない。成功の決着（`done`）を出すのは完成の
+  // 記録（U15 `activate.post.ts`）だけである（openspec/specs/api/session/activate・
+  // add-activated-phase design D7）。行の判定も `invocation` を見ず、`state.json` の phase
+  // だけで決まる（`control/directory.ts`）。
   const outcome = creationOutcomeOf(state.phase, invocation)
   if (outcome !== null) broadcastProjectCreation(sessionId, outcome)
 }
@@ -229,7 +281,11 @@ export async function writeInvocation(
  * **判定だけを切り出してある。** 書き込みの副作用と混ぜると、条件を確かめるのに保存先と
  * Nitro の設定が要る。ここは phase と `invocation` だけを見る。
  *
- * - 昇格していない（ストロークのセッション）→ 流さない。一覧に出ないので上層に関係がない
+ * - 生成中（`approved`）でない → 流さない。ストロークのセッションは一覧に出ず、完成済み
+ *   （`activated`）の起こし直しの失敗は生成の決着ではない（失敗のモーダルが出す「破棄する」は
+ *   完成済みを消せない。design D7）
+ * - `error` → `failed`。終端に達した。失敗の決着はこれだけ
+ * - `idle` → 流さない。完了は完成の記録が流す
  * - `failed` → 流さない。巡回が起こし直す途中で、決着ではない。流すと勝手に直る行ができる
  * - `running` → 流さない。始まっただけで、決着ではない
  */
@@ -238,7 +294,6 @@ export function creationOutcomeOf(
   invocation: Invocation,
 ): ProjectCreationOutcome | null {
   if (phase !== 'approved') return null
-  if (invocation === 'idle') return 'done'
   if (invocation === 'error') return 'failed'
   return null
 }
@@ -255,6 +310,15 @@ export async function writeState(sessionId: string, state: SessionState): Promis
  */
 export function decisionOf(state: SessionState): ApprovalDecision | undefined {
   return state.phase === 'proposed' ? state.decision : undefined
+}
+
+/**
+ * 昇格済み（もうプロジェクト）か。`approved` と `activated` の両方。
+ *
+ * 値の判定は `shared/stroke.ts` の `isPromotedPhase` で、ここは型の絞り込みを足すだけ。
+ */
+export function isPromotedState(state: SessionState): state is PromotedState {
+  return isPromotedPhase(state.phase)
 }
 
 /**

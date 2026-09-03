@@ -110,6 +110,16 @@ describe('DELETE /api/strokes/:id/approve', () => {
     expect(writeStateMock).not.toHaveBeenCalled();
   });
 
+  it('完成した（activated）対象への取り消しも受理しない', async () => {
+    readStateMock.mockResolvedValueOnce({ phase: 'activated', projectName: 'made', invocation: 'idle' });
+
+    await expect(cancelHandler(fakeEvent('made', undefined) as never)).rejects.toMatchObject({
+      statusCode: 409,
+      message: expect.stringContaining('昇格した後は取り消せない'),
+    });
+    expect(writeStateMock).not.toHaveBeenCalled();
+  });
+
   it('判断が無いセッションへの取り消しは何も変えない（204）', async () => {
     readStateMock.mockResolvedValueOnce({ phase: 'proposed', currentQuestion: null, invocation: 'idle' });
 

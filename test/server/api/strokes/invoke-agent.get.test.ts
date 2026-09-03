@@ -23,7 +23,8 @@ vi.mock('../../../../server/utils/readiness', () => ({
   missingPrerequisites: vi.fn(async () => []),
 }));
 
-vi.mock('../../../../server/utils/stroke/session-store', () => ({
+vi.mock('../../../../server/utils/stroke/session-store', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../server/utils/stroke/session-store')>()),
   readState: vi.fn(async () => ({ phase: 'stroking', invocation: 'idle', retries: 0 })),
   sessionExists: vi.fn(async () => true),
 }));
@@ -123,6 +124,42 @@ describe('U13 GET /api/strokes/:id/invoke-agent', () => {
     await Promise.resolve();
     await Promise.resolve();
     expect(running.endRun).toHaveBeenCalledWith('key:/tmp/share/session-1');
+  });
+
+  /**
+   * U13 は phase を渡すだけで、定型の選び分けも完成の記録の要否も持たない
+   * （add-activated-phase design D4）。完成済み（`activated`）の対象も同じ口で受理される。
+   */
+  it('完成した（activated）対象への起動を受理し、phase と会話の続き先を kick に渡す', async () => {
+    readStateMock.mockResolvedValueOnce({
+      phase: 'activated',
+      projectName: 'made-app',
+      invocation: 'idle',
+      retries: 0,
+      runId: 'run-1',
+    } as never);
+    invoke.kick.mockReturnValueOnce(kickResult(Promise.resolve(), Promise.resolve()));
+
+    const event = eventWithQuery('made-app', { cwd: '/tmp/share/made-app' });
+    await invokeAgentHandler(event as never);
+
+    expect(event.status).toBe(200);
+    expect(invoke.kick).toHaveBeenCalledWith({
+      sessionId: 'made-app',
+      cwd: '/tmp/share/made-app',
+      phase: 'activated',
+      retries: 0,
+      runId: 'run-1',
+    });
+  });
+
+  it('ストロークのセッションでは会話の続き先を渡さない', async () => {
+    invoke.kick.mockReturnValueOnce(kickResult(Promise.resolve(), Promise.resolve()));
+
+    const event = eventWithQuery('session-1', { cwd: '/tmp/share/session-1' });
+    await invokeAgentHandler(event as never);
+
+    expect(invoke.kick).toHaveBeenCalledWith(expect.objectContaining({ phase: 'stroking', runId: undefined }));
   });
 
   it('前提が欠けていれば kick を呼ばず 503 を返す', async () => {

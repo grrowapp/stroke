@@ -15,7 +15,8 @@ vi.mock('#app/composables/ssr', () => ({
   },
 }));
 
-vi.mock('../../../../server/utils/stroke/session-store', () => ({
+vi.mock('../../../../server/utils/stroke/session-store', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../server/utils/stroke/session-store')>()),
   sessionExists: vi.fn(async () => true),
   readState: vi.fn(async () => ({ phase: 'stroking', currentQuestion: null, invocation: 'idle' })),
   writeState: vi.fn(async () => undefined),
@@ -90,5 +91,13 @@ describe('A5 POST /api/strokes/:id/question', () => {
     await expect(questionHandler(event as never)).rejects.toThrow('承認済みのセッションには提出できない。');
     expect(writeStateMock).not.toHaveBeenCalled();
     expect(event.status).toBeUndefined();
+  });
+
+  it('完成した（activated）プロジェクトにも 409 を返し、state を書かない', async () => {
+    readStateMock.mockResolvedValueOnce({ phase: 'activated', projectName: 'example', invocation: 'idle' });
+    const event = fakeEvent('session-1', QUESTION);
+
+    await expect(questionHandler(event as never)).rejects.toThrow('承認済みのセッションには提出できない。');
+    expect(writeStateMock).not.toHaveBeenCalled();
   });
 });

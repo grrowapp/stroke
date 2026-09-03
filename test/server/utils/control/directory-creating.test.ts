@@ -10,9 +10,10 @@ import type { ProjectSummary } from '../../../../shared/types';
 /**
  * 生成中のプロジェクトの重ね方。
  *
- * 判定は**ファイルシステムの事実だけ**で決まる（design.md D7）。走査に出れば完了、
- * 出なければ生成中。`invocation` は見ない——あれは `state.json` に書かれる永続値で、
- * サーバーが落ちると `running` のまま誰も戻さないためである。
+ * 行が生成中か完了かは **`state.json` の phase だけ**で決まる（specs/project/generation・
+ * add-activated-phase design D8）。`approved` は生成中、`activated` は完了。走査に出るか
+ * どうか（`.spec-workflow/` の有無）は母集合を作るためにだけ使い、判定には使わない——
+ * そのディレクトリは本家 MCP が接続した瞬間にできる。`invocation` も見ない。
  */
 
 const SCANNED_AT = '2026-08-21T09:00:00.000Z';
@@ -29,8 +30,8 @@ function scanned(...names: string[]): ScanResult {
   };
 }
 
-function promoted(name: string): PromotedProject {
-  return { name, path: `/opt/projects/${name}` };
+function promoted(name: string, phase: PromotedProject['phase'] = 'approved'): PromotedProject {
+  return { name, path: `/opt/projects/${name}`, phase };
 }
 
 function active(name: string): RegistryEntry {
@@ -56,8 +57,8 @@ function byName(projects: ProjectSummary[], name: string): ProjectSummary {
 }
 
 describe('生成中のプロジェクトを一覧に重ねる', () => {
-  describe('走査に出てこない昇格分は生成中', () => {
-    it('承認した直後は生成中として一覧に載る', () => {
+  describe('走査に出てこない昇格分（承認した直後）', () => {
+    it('生成中として一覧に載る', () => {
       const projects = build(scanned(), [], [promoted('memo-app')]);
 
       expect(projects).toHaveLength(1);
@@ -88,26 +89,65 @@ describe('生成中のプロジェクトを一覧に重ねる', () => {
     });
   });
 
-  describe('走査に出てきたら完了', () => {
-    it('`.spec-workflow` が現れた時点で通常の行になる', () => {
-      const projects = build(scanned('memo-app'), [], [promoted('memo-app')]);
+  describe('走査に出ても、完成の記録が無ければ生成中のまま', () => {
+    it('`.spec-workflow` ができただけでは完了にならない', () => {
+      const projects = build(scanned('memo-app'), [], [promoted('memo-app', 'approved')]);
 
       expect(projects).toHaveLength(1);
-      expect(byName(projects, 'memo-app').creation).toBe('done');
-      expect(byName(projects, 'memo-app').lastModified).toBe(SCANNED_AT);
+      expect(byName(projects, 'memo-app').creation).toBe('in-progress');
     });
 
-    it('完了していれば本家のアクティブ判定を通す', () => {
-      const projects = build(scanned('memo-app'), [active('memo-app')], [promoted('memo-app')]);
+    it('本家に載っていてもアクティブにしない。入場のガード（connection）が効いたまま', () => {
+      const projects = build(scanned('memo-app'), [active('memo-app')], [promoted('memo-app', 'approved')]);
+      const row = byName(projects, 'memo-app');
 
-      expect(byName(projects, 'memo-app').creation).toBe('done');
-      expect(byName(projects, 'memo-app').connection).toBe('active');
-      expect(byName(projects, 'memo-app').pid).toBe(1);
+      expect(row.creation).toBe('in-progress');
+      expect(row.connection).toBe('disconnected');
+      expect(row.pid).toBeNull();
+    });
+
+    it('走査で拾えても最終更新と承認依頼の件数は埋めない', () => {
+      const projects = build(scanned('memo-app'), [active('memo-app')], [promoted('memo-app', 'approved')]);
+      const row = byName(projects, 'memo-app');
+
+      expect(row.lastModified).toBeNull();
+      expect(row.pendingApprovals).toBeNull();
+      expect(row.projectId).toBe(deriveProjectId('/opt/projects/memo-app'));
     });
 
     it('同じ名前が二重に並ばない', () => {
       const projects = build(scanned('memo-app'), [], [promoted('memo-app')]);
       expect(projects.filter((project) => project.name === 'memo-app')).toHaveLength(1);
+    });
+  });
+
+  describe('完成の記録（activated）が在れば完了', () => {
+    it('通常の行になり、走査の最終更新を持つ', () => {
+      const projects = build(scanned('memo-app'), [], [promoted('memo-app', 'activated')]);
+
+      expect(byName(projects, 'memo-app').creation).toBe('done');
+      expect(byName(projects, 'memo-app').lastModified).toBe(SCANNED_AT);
+    });
+
+    it('本家のアクティブ判定を通す', () => {
+      const projects = build(scanned('memo-app'), [active('memo-app')], [promoted('memo-app', 'activated')]);
+
+      expect(byName(projects, 'memo-app').connection).toBe('active');
+      expect(byName(projects, 'memo-app').pid).toBe(1);
+    });
+
+    it('registry に無くても projectId を導出で埋める（決着の直後に承認画面を開くため）', () => {
+      const projects = build(scanned('memo-app'), [], [promoted('memo-app', 'activated')]);
+
+      expect(byName(projects, 'memo-app').projectId).toBe(deriveProjectId('/opt/projects/memo-app'));
+    });
+
+    it('走査に出ない activated は起こりえないが、落とさず完了・未接続として出す', () => {
+      const projects = build(scanned(), [], [promoted('memo-app', 'activated')]);
+      const row = byName(projects, 'memo-app');
+
+      expect(row.creation).toBe('done');
+      expect(row.connection).toBe('disconnected');
     });
   });
 
@@ -143,8 +183,8 @@ describe('生成中のプロジェクトを一覧に重ねる', () => {
       expect(projects.map((project) => project.name)).toEqual(['live', 'alpha', 'zebra']);
     });
 
-    it('完了したものは最下部から抜けて、通常の並びに戻る', () => {
-      const projects = build(scanned('memo-app', 'zzz-offline'), [], [promoted('memo-app')]);
+    it('完成したものは最下部から抜けて、通常の並びに戻る', () => {
+      const projects = build(scanned('memo-app', 'zzz-offline'), [], [promoted('memo-app', 'activated')]);
 
       expect(projects.map((project) => project.name)).toEqual(['memo-app', 'zzz-offline']);
     });

@@ -5,7 +5,7 @@
 import MarkdownSource from '#markdown/render/MarkdownSource.vue'
 import MarkdownView from '#markdown/render/MarkdownView.vue'
 
-import type { Phase, SessionStatus, Stroke } from '#shared/stroke'
+import { isPromotedPhase, type Phase, type SessionStatus, type Stroke } from '#shared/stroke'
 
 // 器は `stroke` レイアウト（fullscreen の UModal・閉じ操作なし）。承認すると
 // モーダルごと閉じて一覧へ戻る。
@@ -65,7 +65,9 @@ const {
 } = review
 
 const hasProposal = computed(() => !!proposal.value)
-const approved = computed(() => phase.value === 'approved')
+// 昇格後（`approved` / `activated`）は承認済みの見せ方。画面2が扱うのは `proposed` までで、
+// 昇格後の URL に来たときの読み取り専用の面である（specs/stroke/frontier）
+const approved = computed(() => phase.value != null && isPromotedPhase(phase.value))
 
 // 承認後は注釈も差し戻しもしないため、整形されたプレビューだけを見せる
 const shownMode = computed(() => (approved.value ? 'preview' : viewMode.value))

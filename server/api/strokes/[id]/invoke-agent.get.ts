@@ -5,7 +5,7 @@ import { LOG_PREFIX } from '../../../utils/stroke/log'
 import { sessionDir } from '../../../utils/stroke/paths'
 import { beginRun, endRun } from '../../../utils/stroke/running'
 import { requireSessionId } from '../../../utils/stroke/session-param'
-import { readState } from '../../../utils/stroke/session-store'
+import { isPromotedState, readState } from '../../../utils/stroke/session-store'
 
 /**
  * U13: AI を起動する唯一の入口（specs/api/invoke-agent）。受理系 endpoint は起動を
@@ -26,8 +26,10 @@ import { readState } from '../../../utils/stroke/session-store'
  * クエリ `reset` はユーザーの再実行。リトライ回数を戻してから起こす。**`invocation` を
  * 画面が直接書かない**ため（A8 を叩けるのは invokeAi だけ）、回数のリセットもここで行う。
  *
- * 承認済み（`approved`）でも受け付ける。昇格したプロジェクトでは steering の実行が
- * 起こるためで、渡す定型と cwd だけが変わる。
+ * 承認以降（`approved` / `activated`）でも受け付ける。昇格したプロジェクトでは steering の
+ * 実行が起こるためで、渡す定型と cwd だけが変わる。**どの定型にするか・完成の記録を試みるか
+ * は phase から `invoke.ts` が導く。** ここは phase を渡すだけで判定を持たない
+ * （add-activated-phase design D4）。
  */
 export default defineEventHandler(async (event) => {
   const sessionId = await requireSessionId(event)
@@ -57,9 +59,6 @@ export default defineEventHandler(async (event) => {
   // 通らない（fix-rename-during-running-session）。
   const runKey = await beginRun(cwd)
 
-  // 承認後の対象は steering、それ以外はストロークの往復。渡す値だけが違う。
-  const kind = state.phase === 'approved' ? 'steering' : 'stroke'
-
   // `reset` はユーザーの再実行。リトライ回数を戻してから起こす
   // （openspec/specs/agent/invocation「ユーザーが再実行する」）。巡回は付けない。
   const retries = query.reset === undefined ? (state.retries ?? 0) : 0
@@ -67,9 +66,10 @@ export default defineEventHandler(async (event) => {
   const { built, settled } = kick({
     sessionId,
     cwd,
-    kind,
+    phase: state.phase,
     retries,
-    runId: state.phase === 'approved' ? state.runId : undefined,
+    // 会話の続き先を持つのは昇格後の対象だけ
+    runId: isPromotedState(state) ? state.runId : undefined,
   })
 
   // busy ガード解除・接続表 token の削除は実行全体の完了（`settled`）に紐づける。

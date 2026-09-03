@@ -25,9 +25,13 @@
   記録する。
 - HTTP はステートレス。POST は受理・返却して即完結し、AI の呼び出し結果を待たない。結果は
   エージェントの提出（A5・A7）を受理した瞬間、サーバが WS（W1・W2）でブラウザへ中継する。
-- **AI の起動は U13 が唯一の入口。** 受理系（U1・U7・U9・U10・U14）は受理と記録で完結し、
+- **AI の起動は U13 が唯一の入口。** 受理系（U1・U7・U9・U10・U14・U15）は受理と記録で完結し、
   AI を起動しない。画面は受理の成功応答の直後に U13 を呼ぶ（specs/api/invoke-agent）。承認の
-  流れは U10（判断）→ U14（昇格）→ U13（steering の起こし）の3段で、U13 が届かなければ巡回が拾う。
+  流れは U10（判断）→ U14（昇格）→ U13（steering の起こし）→ U15（完成の記録）の4段で、U13 が
+  届かなければ巡回が拾う。U15 は画面ではなく invokeAi が叩く（[sessions/activate.md](./sessions/activate.md)）。
+- **phase は `stroking → proposed → approved → activated` の一方向。** 値の集合は `shared/stroke.ts` の
+  `PHASES` が1つ持つ。`approved` は生成中、`activated` は完成（steering が承認依頼を出した）。
+  生成中か完了かは phase だけで決まり、`.spec-workflow/` の有無も `invocation` も見ない。
 
 ## 各 endpoint の入出力
 
@@ -38,12 +42,12 @@
 
 ### U2 `GET /api/strokes/:id`
 
-- output: `{ phase: 'stroking' | 'proposed' | 'approved', invocation: 'running' | 'idle' | 'failed' | 'error', path: string }`
+- output: `{ phase: 'stroking' | 'proposed' | 'approved' | 'activated', invocation: 'running' | 'idle' | 'failed' | 'error', path: string }`
 - `path` は対象のディレクトリ。画面はこれを cwd として U13 に渡す（endpoint に導出させない）
 - リロード時に1回読み、画面の行き先（`stroking`=画面1 / `proposed` 以降=画面2）と
   待機・失敗表示を決める。**回答や差し戻しを送って待っている間だけ**、数秒おきに読み直す。
-- `phase: 'approved'` も `invocation` を持つ。昇格したプロジェクトでは steering の実行が
-  起こるためで、`idle` に潰さずそのまま返す。
+- 昇格後（`approved` / `activated`）も `invocation` を持つ。昇格したプロジェクトでは steering の
+  実行が起こるためで、`idle` に潰さずそのまま返す。`activated` は完成の記録（U15）だけが書く。
 - `failed` のとき、ユーザーの再試行は同じ入力 POST（U7 / U9）の再送と、その成功応答後の U13。
   巡回（`server/plugins/02.retry-failed.ts`）も `failed` を拾って起こし直す。
 - `error` はリトライ上限に達した**終端**。システムは自動では何もしない。画面は再実行
@@ -62,7 +66,7 @@
 - input: `Answer`（`{ kind: 'option' | 'free', value: string }`）
 - output: 本文なし（204）
 - 実行中でも受理する（busy は見ない。多重起動は U13 が止める）
-- エラー: 400 形式不正 / 404 / 409 phase（`approved`・答えるべき問いが無い）
+- エラー: 400 形式不正 / 404 / 409 phase（承認以降＝`approved` / `activated`・答えるべき問いが無い）
 
 ### U9 `POST /api/strokes/:id/send-back`
 
@@ -82,8 +86,9 @@
   載る。**作成直後（初回起動前）のセッションはまだ載らない**。U13 はこの符合で初回か継続かを
   判定する
 - **承認で昇格した対象も載る。** 昇格後は id がプロジェクト名に変わるが、steering の
-  巡回・再キックの対象になるため一覧から外さない。`state.json` を持たないディレクトリは
-  載らない
+  巡回・再キックの対象になるため一覧から外さない。完成した対象は `phase: 'activated'` で
+  載る（起動時の書き上げはこの一覧の `approved` を拾って U15 を叩く）。`state.json` を
+  持たないディレクトリは載らない
 - サーバが動いていないときの削除・一覧・作成は `yarn session`（`docs/specs/architecture/session-workflow.md`）
 
 ### A1 `GET /api/strokes/:id/overview`
@@ -100,7 +105,7 @@
 
 - input: `Question`（`header` / `detail` / `question` / `options[]`）
 - output: 本文なし（204）
-- エラー: 400 スキーマ不適合 / 404 / 409 phase（`approved` は拒否）
+- エラー: 400 スキーマ不適合 / 404 / 409 phase（承認以降＝`approved` / `activated` は拒否）
 
 ### A7 `POST /api/strokes/:id/proposal`
 
@@ -112,7 +117,7 @@
 - **残せなければ受理しない。** 書けなかったときは失敗を返し、phase も進めず W2 へも
   配信しない。受理したのに残っていない状態を作らない。
 - 順序は「残す → phase を進める → W2 配信」。
-- エラー: 400 本文が空 / 404 / 409 phase（`approved` は拒否）/ 500 残せなかった
+- エラー: 400 本文が空 / 404 / 409 phase（承認以降＝`approved` / `activated` は拒否）/ 500 残せなかった
 
 ### A8 `POST /api/strokes/:id/submission`
 
@@ -123,6 +128,8 @@
   A5・A7 も `invocation` に触れない。
 - 値の意味づけも遷移の判定もここでは持たない。`retries` は渡されたときだけ上書きする
   （`error` からの再実行で 0 に戻すのに使う）。
+- **成功の決着は流さない。** `idle` は「終わった」であって「できた」ではなく、`done` を配信するのは
+  完成の記録（U15）だけ。生成中（`approved`）の対象が `error` に達したときの `failed` だけをここから流す。
 - エラー: 400 形式不正 / 404 セッションなし
 
 ### W1 `/api/strokes/:id/ws/question`

@@ -3,7 +3,7 @@ import { conflict } from '../../../utils/stroke/conflict'
 import { assertNameAvailable } from '../../../utils/stroke/project'
 import { approveBody, parseBody } from '../../../utils/stroke/request-schemas'
 import { requireSessionId } from '../../../utils/stroke/session-param'
-import { readState, sessionProposal, withDecision, writeState } from '../../../utils/stroke/session-store'
+import { isPromotedState, readState, sessionProposal, withDecision, writeState } from '../../../utils/stroke/session-store'
 
 /**
  * U10: 承認の判断を受理して記録する（openspec/specs/api/session/approve）。
@@ -27,7 +27,8 @@ export default defineEventHandler(async (event) => {
   const { projectName } = parseBody(approveBody, await readBody(event))
 
   const state = await readState(sessionId)
-  if (state.phase === 'approved') {
+  // 昇格後（`approved` / `activated`）はもうプロジェクト。判断を下し直す対象ではない
+  if (isPromotedState(state)) {
     throw conflict('phase', 'このセッションは既に承認済み。')
   }
   if (state.phase !== 'proposed') {

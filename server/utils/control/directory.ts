@@ -35,7 +35,13 @@ export type PendingApprovalCounts = ReadonlyMap<string, number>;
  * 並びはアクティブが上、未接続が下、生成中が最下部。同じ区分の中では名前順にして、
  * 走査の返り順に依存しないようにする（specs/project/directory）。
  *
- * 昇格したプロジェクト（`promoted`）は走査と**ディレクトリ名**で突き合わせる。生成中のものは
+ * **走査は母集合を作るだけで、行が生成中か完了かは決めない。** それは昇格の記録
+ * （`promoted`）の phase が決める——`approved` は生成中、`activated` は完了。走査に出ている
+ * （`.spec-workflow/` が在る）ことを完了の根拠にしない。そのディレクトリは本家 MCP が接続した
+ * 瞬間にでき、成果物が1つも無いうちからできている（specs/project/generation・
+ * add-activated-phase design D8）。
+ *
+ * 昇格したプロジェクトは走査と**ディレクトリ名**で突き合わせる。承認した直後は
  * `.spec-workflow` を持たないため `workflowRootPath` が定まらず、走査側のキーが使えない
  * （design.md D1）。
  */
@@ -55,9 +61,17 @@ export function buildProjectDirectory(
   const promotedByName = new Map(promoted.map((entry) => [entry.name, entry]));
 
   const projects: ProjectSummary[] = scan.projects.map((project) => {
-    // 走査に出ている＝`.spec-workflow/` が在る＝完了。昇格の記録は突き合わせたら落とす。
-    // **承認で作ったものかどうか**は、落とす前のここでしか分からない
-    const promotedHere = promotedByName.delete(project.name);
+    // 昇格の記録は突き合わせたら落とす。**承認で作ったものかどうか**と**生成中かどうか**は、
+    // 落とす前のここでしか分からない
+    const promotedHere = promotedByName.get(project.name);
+    promotedByName.delete(project.name);
+
+    // 生成中（`approved`）の行は、走査に出ていても registry に載っていても生成中のまま。
+    // 接続の判定に掛けない——掛けると成果物が無いまま入場できる行になる
+    // （specs/project/directory「アクティブと未接続を判定して示す」）
+    if (promotedHere?.phase === 'approved') {
+      return unfinished(project.name, project.workflowRootPath);
+    }
 
     const entry = activeByWorkflowRoot.get(project.workflowRootPath);
 
@@ -74,7 +88,7 @@ export function buildProjectDirectory(
       // 本家の id と別物になる（design.md D13）。null のままにして「本家に載っていない」ことを
       // 保つ——`enter()` と `unread()` はその null を見ている
       projectId:
-        entry?.projectId ?? (promotedHere ? deriveProjectId(project.workflowRootPath) : null),
+        entry?.projectId ?? (promotedHere !== undefined ? deriveProjectId(project.workflowRootPath) : null),
       // アクティブの実体は生きた PID なので、その値をそのまま出す
       pid: entry?.instances[0]?.pid ?? null,
       lastModified: project.lastModified,
@@ -83,10 +97,11 @@ export function buildProjectDirectory(
     };
   });
 
-  // 走査に出てこなかった昇格分＝`.spec-workflow/` がまだ無い＝生成中。
-  // 承認した直後はここに落ちる
+  // 走査に出てこなかった昇格分＝`.spec-workflow/` がまだ無い。承認した直後はここに落ちる。
+  // 完成の記録（`activated`）が在るのに走査に出ないことは起こりえない（承認依頼が在れば
+  // `.spec-workflow/` も在る）。起きたら完了・未接続として出す（design D8）
   for (const entry of promotedByName.values()) {
-    projects.push(unfinished(entry.name, entry.path));
+    projects.push(entry.phase === 'approved' ? unfinished(entry.name, entry.path) : completedUnscanned(entry.name, entry.path));
   }
 
   projects.sort(compareProjects);
@@ -100,11 +115,12 @@ export function buildProjectDirectory(
 }
 
 /**
- * 生成中の行。本家に登録されようがないので、本家から来る値は null。
- * 接続の判定の対象にもしない（specs/project/directory「アクティブと未接続を判定して示す」）。
+ * 生成中の行。本家から来る値は持たず、接続の判定の対象にもしない
+ * （specs/project/directory「アクティブと未接続を判定して示す」）。本家に載っていても
+ * `active` にしない——`connection` が `disconnected` であることが入場のガードの根拠である。
  *
  * **`projectId` だけは導出して入れる。** 破棄のリクエストは `projectId` で組むが
- * （`DELETE /api/projects/:projectId`）、registry には載っていない。本家と同じ式で
+ * （`DELETE /api/projects/:projectId`）、registry には載っていないことがある。本家と同じ式で
  * workspace のパスから作る（`upstream/project-id.ts`）。画面は受け取った値を使うだけで、
  * id の作り方を知らない。
  */
@@ -116,10 +132,15 @@ function unfinished(name: string, workflowRootPath: string): ProjectSummary {
     creation: 'in-progress',
     projectId: deriveProjectId(workflowRootPath),
     pid: null,
-    // `.spec-workflow` が無い、または中身がまだ揃っていない。承認時刻などで埋めない
+    // 走査で拾えても埋めない。生成中に本家の値を見せない
     lastModified: null,
     pendingApprovals: null,
   };
+}
+
+/** 完成の記録は在るが走査に出ない行。起こりえないが、落とさずに完了・未接続として出す */
+function completedUnscanned(name: string, workflowRootPath: string): ProjectSummary {
+  return { ...unfinished(name, workflowRootPath), creation: 'done' };
 }
 
 /**

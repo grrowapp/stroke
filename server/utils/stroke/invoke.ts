@@ -1,10 +1,11 @@
-import type { Invocation, SessionSummary } from '#shared/stroke'
+import { isPromotedPhase, type Invocation, type Phase, type SessionSummary } from '#shared/stroke'
 import { invokeAi, type AiRun, type InvokeAiOutcome } from './ai'
 import { readStrokeConfig } from './config'
+import { LOG_PREFIX } from './log'
 import { initSessionOpenspec } from './openspec'
-import { readState, sessionExists, writeState } from './session-store'
+import { isPromotedState, readState, sessionExists, withStateLock, writeState } from './session-store'
 import { forgetLaunchSubmission, hasLaunchSubmission, submissionCount } from './submission-signal'
-import { submissionPath } from './submission-path'
+import { activatePath, submissionPath } from './submission-path'
 import {
   MCP_SERVER_NAME,
   UPSTREAM_MCP_SERVER_NAME,
@@ -24,6 +25,15 @@ import { currentApiBaseUrl } from './listen-address'
 
 /** どの用途で起こすか。渡す値の決め方だけが違う。 */
 export type RunKind = 'stroke' | 'steering'
+
+/**
+ * phase から用途を導く。**phase を見て渡す値を決めるのはここ1箇所**
+ * （add-activated-phase design D4）。昇格後（`approved` / `activated`）は steering、
+ * それ以外はストロークの往復。
+ */
+export function kindOf(phase: Phase): RunKind {
+  return isPromotedPhase(phase) ? 'steering' : 'stroke'
+}
 
 /**
  * サーバー内から U13 を叩く path。cwd を添える（endpoint に導出させない・design.md D5）。
@@ -83,12 +93,53 @@ function submittedByLaunch(token: string): () => boolean {
   return () => hasLaunchSubmission(token)
 }
 
-/** steering の会話 id を `state.json` に覚える。次のキックの続き先になる。 */
+/**
+ * steering の会話 id を `state.json` に覚える。次のキックの続き先になる。
+ * 完成の記録（`activated`）をまたいでも同じ会話を続けるので、昇格後ならどちらの局面でも書く。
+ */
 function conversationWriter(sessionId: string) {
   return async (runId: string): Promise<void> => {
-    const state = await readState(sessionId)
-    if (state.phase !== 'approved') return
-    await writeState(sessionId, { ...state, runId })
+    // 読んで書くの2手は直列化する（A8・U15 と同じ待ち行列）
+    await withStateLock(sessionId, async () => {
+      const state = await readState(sessionId)
+      if (!isPromotedState(state)) return
+      await writeState(sessionId, { ...state, runId })
+    })
+  }
+}
+
+/**
+ * 完成の記録（U15）を叩く。**A8 と同じく endpoint を通す**——判定は U15 の1箇所に閉じ、
+ * ここは受理されたかどうかを true / false に写すだけ。
+ *
+ * 2xx 以外は「記録できていない」であり、記録できていないものを完成と扱わない。false を
+ * 受けた invokeAi は `failed` に倒し、巡回の起こし直しが続きの実行の完了時にもう一度
+ * ここを通る（add-activated-phase design D4・Risks「U15 の不達」）。
+ *
+ * **例外は、既に完成が記録されている場合だけ。** この実行の起動後に別の書き手（起動時の
+ * 書き上げ）が `activated` を書いていると、U15 は「既に完成している」で断る。目的
+ * （完成の記録）は果たされているので受理と同じに扱う——断られたら phase を読み直して決める。
+ * 判定を U15 の応答の文言に頼らない。
+ */
+function completionRecorder(sessionId: string) {
+  return async (): Promise<boolean> => {
+    try {
+      await $fetch(activatePath(sessionId), { method: 'POST' })
+      return true
+    } catch (error) {
+      if (await isAlreadyActivated(sessionId)) return true
+      console.warn(`${LOG_PREFIX} 完成を記録できない: ${sessionId}`, error instanceof Error ? error.message : error)
+      return false
+    }
+  }
+}
+
+/** 既に完成が記録されているか。読めなければ「記録されていない」に倒す */
+async function isAlreadyActivated(sessionId: string): Promise<boolean> {
+  try {
+    return (await readState(sessionId)).phase === 'activated'
+  } catch {
+    return false
   }
 }
 
@@ -97,7 +148,8 @@ function conversationWriter(sessionId: string) {
  *
  * @param sessionId  対象の id（昇格後はプロジェクト名がこれにあたる）
  * @param cwd        実行する場所。キックする側が渡す（design.md D5）
- * @param kind       ストロークの往復か、承認後の steering か
+ * @param phase      対象の局面。用途（ストロークの往復か steering か）と、完成の記録を
+ *                   試みるか（生成中の steering だけ）はここから導く（design D4）
  * @param retries    これまでに起こし直した回数
  * @param runId      steering の会話 id。まだ無ければ undefined
  * @param token      この起動の接続表 token（provide-operations-via-mcp design.md「接続の担保」）
@@ -105,12 +157,13 @@ function conversationWriter(sessionId: string) {
 export function buildRun(options: {
   sessionId: string
   cwd: string
-  kind: RunKind
+  phase: Phase
   retries: number
   runId?: string
   token: string
 }): AiRun {
-  const { sessionId, cwd, kind, retries, runId, token } = options
+  const { sessionId, cwd, phase, retries, runId, token } = options
+  const kind = kindOf(phase)
   const { claude, openspec } = readStrokeConfig()
 
   // 空 = 無効。無効を undefined へ写すのは設定を引いた端のここで行う
@@ -164,6 +217,10 @@ export function buildRun(options: {
       // steering の提出は stroke-board の endpoint を通らないため、対象の id ではなく
       // 起動そのものを単位に数える（design.md D1）。
       didWork: submittedByLaunch(token),
+      // 生成中（`approved`）の steering だけが完成を記録する。完成済み（`activated`）の
+      // 起こし直しは記録を試みない——完成は一度だけ起こる出来事で、U15 も受理しない
+      // （openspec/specs/api/session/activate「既に完成した対象には記録しない」）。
+      recordCompletion: phase === 'approved' ? completionRecorder(sessionId) : undefined,
       remember: conversationWriter(sessionId),
       // 作業場所は昇格済みのプロジェクト。`.spec-workflow/` の内部構造は本家 MCP が作る
       prepare: undefined,
@@ -314,14 +371,14 @@ function mcpConfigFor(cwd: string, token: string, apiBaseUrl: string): string {
 export function kick(options: {
   sessionId: string
   cwd: string
-  kind: RunKind
+  phase: Phase
   retries: number
   runId?: string
 }): InvokeAiOutcome {
   const token = issueConnectionToken()
   registerConnection(
     token,
-    options.kind === 'steering' ? { projectPath: options.cwd } : { sessionId: options.sessionId },
+    kindOf(options.phase) === 'steering' ? { projectPath: options.cwd } : { sessionId: options.sessionId },
   )
 
   const { built, settled } = invokeAi(

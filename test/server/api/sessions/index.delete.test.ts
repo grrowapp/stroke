@@ -8,9 +8,15 @@ import { fakeEvent, stubNitroGlobals } from '../support';
 /**
  * 対象は `server/api/sessions/[id]/index.delete.ts`（U11）。
  *
- * 見るのは、busy 判定が U13（起動）・P1（プロジェクト削除）・U10（承認）と同じ事実
+ * 見るのは2つ。busy 判定が U13（起動）・P1（プロジェクト削除）・U10（承認）と同じ事実
  * （作業場所ディレクトリの実体）を見ていること（fix-rename-during-running-session）。
- * `running.ts` は実物のまま使い、`beginRun` で枠を占有した状態から確かめる。
+ * そして受理範囲——承認より前（`stroking` / `proposed`）だけを消し、昇格済み
+ * （`approved` / `activated`）と壊れた `state.json` は消さないこと（add-activated-phase
+ * design D5）。
+ *
+ * `running.ts` と `session-store.ts` は実物のまま使う。`readState` は `useRuntimeConfig` を
+ * 通るので、差し込み先を差し替えて保存先を一時ディレクトリへ向ける
+ * （`session-decision.test.ts` と同じ）。
  */
 
 const config = vi.hoisted(() => ({ root: '' }));
@@ -19,27 +25,14 @@ vi.mock('../../../../server/utils/stroke/config', () => ({
   readStrokeConfig: () => ({ projectShareRoot: config.root }),
 }));
 
+vi.mock('#app/nuxt', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useRuntimeConfig: () => ({ projectShareRoot: config.root }),
+}));
+
 vi.mock('../../../../server/utils/stroke/submission-signal', () => ({
   forgetSubmissions: vi.fn(),
 }));
-
-// `requireSessionId`（`session-param.ts`）は `session-store.ts` の `sessionExists` を
-// 呼ぶ。実体は `useRuntimeConfig()` を通るため（Nitro の外では解決できない）モックし、
-// このテストの `root` の下に対象があるかどうかで答える。
-vi.mock('../../../../server/utils/stroke/session-store', async () => {
-  const { access: fsAccess } = await import('node:fs/promises');
-  const { join: pathJoin } = await import('node:path');
-  return {
-    sessionExists: async (id: string) => {
-      try {
-        await fsAccess(pathJoin(config.root, id, 'state.json'));
-        return true;
-      } catch {
-        return false;
-      }
-    },
-  };
-});
 
 stubNitroGlobals();
 
@@ -57,13 +50,18 @@ async function exists(path: string): Promise<boolean> {
   }
 }
 
+async function place(name: string, state: Record<string, unknown> | string): Promise<void> {
+  await mkdir(join(root, name), { recursive: true });
+  const body = typeof state === 'string' ? state : JSON.stringify(state);
+  await writeFile(join(root, name, 'state.json'), body, 'utf8');
+}
+
 let root: string;
 
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'delete-session-'));
   config.root = root;
-  await mkdir(join(root, SESSION_ID), { recursive: true });
-  await writeFile(join(root, SESSION_ID, 'state.json'), JSON.stringify({ phase: 'proposed' }), 'utf8');
+  await place(SESSION_ID, { phase: 'proposed', currentQuestion: null, invocation: 'idle' });
 });
 
 afterEach(async () => {
@@ -100,5 +98,53 @@ describe('U11 DELETE /api/sessions/:id — busy', () => {
     const event = fakeEvent('does-not-exist', undefined);
 
     await expect(deleteHandler(event as never)).rejects.toMatchObject({ statusCode: 404 });
+  });
+});
+
+describe('U11 DELETE /api/sessions/:id — 受理範囲', () => {
+  it('stroking も消せる', async () => {
+    await place('fresh', { phase: 'stroking', currentQuestion: null, invocation: 'idle' });
+
+    const response = await deleteHandler(fakeEvent('fresh', undefined) as never);
+
+    expect((response as Response).status).toBe(204);
+    expect(await exists(join(root, 'fresh'))).toBe(false);
+  });
+
+  it('昇格した（approved）ものは 409 phase で断り、何も消さない', async () => {
+    await place('made', { phase: 'approved', projectName: 'made', invocation: 'idle' });
+
+    await expect(deleteHandler(fakeEvent('made', undefined) as never)).rejects.toMatchObject({
+      statusCode: 409,
+      data: { reason: 'phase' },
+    });
+    expect(await exists(join(root, 'made'))).toBe(true);
+  });
+
+  it('完成した（activated）ものも 409 phase で断り、何も消さない', async () => {
+    await place('done', { phase: 'activated', projectName: 'done', invocation: 'idle' });
+
+    await expect(deleteHandler(fakeEvent('done', undefined) as never)).rejects.toMatchObject({
+      statusCode: 409,
+      data: { reason: 'phase' },
+    });
+    expect(await exists(join(root, 'done'))).toBe(true);
+  });
+
+  it('壊れた state.json は 409 phase で断り、消さない（分からないものを通さない）', async () => {
+    await place('broken', 'not json');
+
+    await expect(deleteHandler(fakeEvent('broken', undefined) as never)).rejects.toMatchObject({
+      statusCode: 409,
+      data: { reason: 'phase' },
+    });
+    expect(await exists(join(root, 'broken'))).toBe(true);
+  });
+
+  it('集合に無い phase も消さない', async () => {
+    await place('odd', { phase: 'nonsense', currentQuestion: null, invocation: 'idle' });
+
+    await expect(deleteHandler(fakeEvent('odd', undefined) as never)).rejects.toMatchObject({ statusCode: 409 });
+    expect(await exists(join(root, 'odd'))).toBe(true);
   });
 });

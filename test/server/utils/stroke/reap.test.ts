@@ -78,6 +78,16 @@ describe('reapRunning: 判定できない', () => {
     expect(written).toEqual([{ sessionId: SESSION_ID, invocation: 'error' }])
   })
 
+  it('完成した（activated）プロジェクトも steering の対象として組み立てられ、走っていなければ failed にする', async () => {
+    // `approved` だけを steering と見る形だと `activated` が unknown 扱いになり、後始末が
+    // 起こし直せない `error` へ倒れる（add-activated-phase）
+    const { deps, written } = baseDeps()
+    const counts = await reapRunning([strokeSession({ phase: 'activated', path: '/tmp/share/made' })], deps)
+
+    expect(counts).toEqual({ killed: 0, failed: 1, errored: 0 })
+    expect(written).toEqual([{ sessionId: SESSION_ID, invocation: 'failed' }])
+  })
+
   it('対象の種別を組み立てられなければ（phase が unknown）error にする', async () => {
     const { deps, written } = baseDeps({ listProcesses: async () => [] })
     const counts = await reapRunning([strokeSession({ phase: 'unknown' })], deps)

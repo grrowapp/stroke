@@ -82,7 +82,7 @@ describe('プロジェクト一覧の組み立て', () => {
       // 決着の直後は本家がまだ起動しておらず registry に載らない。そこで null にすると
       // 承認画面を開く選択肢が選べなくなる（specs/project/generation）
       const result = buildProjectDirectory(scanned('old-proto'), lookup(), new Map(), [
-        { name: 'old-proto', path: '/opt/projects/old-proto' },
+        { name: 'old-proto', path: '/opt/projects/old-proto', phase: 'activated' },
       ]);
 
       if (result.status !== 'ok') throw new Error('前提が崩れた');

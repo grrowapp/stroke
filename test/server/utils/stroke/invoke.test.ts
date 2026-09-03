@@ -75,6 +75,19 @@ const ai = vi.hoisted(() => ({
 
 vi.mock('../../../../server/utils/stroke/ai', () => ({ invokeAi: ai.invokeAi }));
 
+/** invoke.ts が叩く自分自身の endpoint（U15・U12）。`ai.test.ts` と同じ差し替え方 */
+const $fetch = vi.hoisted(() => vi.fn());
+
+vi.mock('#build/fetch.mjs', () => ({ $fetch }));
+
+/** U15 に断られたときに読み直す `state.json`。既定は読めない（= 記録されていない） */
+const store = vi.hoisted(() => ({ readState: vi.fn(async (): Promise<unknown> => { throw new Error('no state'); }) }));
+
+vi.mock('../../../../server/utils/stroke/session-store', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../server/utils/stroke/session-store')>()),
+  readState: store.readState,
+}));
+
 /**
  * 接続表の token は `randomBytes` から作られる（`server/utils/mcp/connection-table.ts`）。
  * `kick` が発行した token を外から知りたいので、乱数だけを予測可能な値に差し替える。
@@ -98,7 +111,10 @@ function registered(token: string): ConnectionContext | null {
   return resolved.ok ? resolved.context : null;
 }
 
-const { buildRun, kick } = await import('../../../../server/utils/stroke/invoke');
+const { buildRun, kick, kindOf } = await import('../../../../server/utils/stroke/invoke');
+
+/** 用途を phase で渡す（add-activated-phase design D4）。テストの語彙は kind のまま残す */
+const PHASE_OF = { stroke: 'stroking', steering: 'approved' } as const;
 const {
   notifySubmission,
   forgetSubmissions,
@@ -122,7 +138,7 @@ function mcpConfigOf(kind: 'stroke' | 'steering'): McpConfig {
   const run = buildRun({
     sessionId: 'session-1',
     cwd: '/tmp/share/session-1',
-    kind,
+    phase: PHASE_OF[kind],
     retries: 0,
     token: 'token-1',
   });
@@ -136,7 +152,7 @@ function mcpToolServerEntryOf(kind: 'stroke' | 'steering') {
   const run = buildRun({
     sessionId: 'session-1',
     cwd: '/tmp/share/session-1',
-    kind,
+    phase: PHASE_OF[kind],
     retries: 0,
     token: 'token-1',
   });
@@ -152,7 +168,7 @@ function allowedToolsOf(kind: 'stroke' | 'steering'): string[] {
   const run = buildRun({
     sessionId: 'session-1',
     cwd: '/tmp/share/session-1',
-    kind,
+    phase: PHASE_OF[kind],
     retries: 0,
     token: 'token-1',
   });
@@ -218,7 +234,7 @@ describe('buildRun の --mcp-config', () => {
     const run = buildRun({
       sessionId: 'session-1',
       cwd: '/tmp/share/session-1',
-      kind: 'steering',
+      phase: 'approved',
       retries: 0,
       token: 'token-1',
     });
@@ -268,7 +284,7 @@ describe('buildRun の didWork', () => {
     const run = buildRun({
       sessionId: 'project-a',
       cwd: '/opt/projects/project-a',
-      kind: 'steering',
+      phase: 'approved',
       retries: 0,
       token: 'token-1',
     });
@@ -286,7 +302,7 @@ describe('buildRun の didWork', () => {
     const run = buildRun({
       sessionId: 'session-1',
       cwd: '/tmp/share/session-1',
-      kind: 'stroke',
+      phase: 'stroking',
       retries: 0,
       token: 'token-1',
     });
@@ -304,6 +320,118 @@ describe('buildRun の didWork', () => {
   });
 });
 
+/**
+ * phase から導くもの（add-activated-phase design D4）。用途（kind）・完成の記録
+ * （`recordCompletion`）・会話の続き先はすべて `invoke.ts` の1箇所で決まる。
+ */
+describe('buildRun の phase からの導出', () => {
+  it('昇格後（approved / activated）は steering、それ以外はストローク', () => {
+    expect(kindOf('stroking')).toBe('stroke');
+    expect(kindOf('proposed')).toBe('stroke');
+    expect(kindOf('approved')).toBe('steering');
+    expect(kindOf('activated')).toBe('steering');
+  });
+
+  it('生成中（approved）の steering だけが完成の記録を持つ', () => {
+    const generating = buildRun({
+      sessionId: 'project-a',
+      cwd: '/opt/projects/project-a',
+      phase: 'approved',
+      retries: 0,
+      token: 'token-1',
+    });
+    const completed = buildRun({
+      sessionId: 'project-a',
+      cwd: '/opt/projects/project-a',
+      phase: 'activated',
+      retries: 0,
+      runId: 'run-1',
+      token: 'token-1',
+    });
+    const stroke = buildRun({
+      sessionId: 'session-1',
+      cwd: '/tmp/share/session-1',
+      phase: 'stroking',
+      retries: 0,
+      token: 'token-1',
+    });
+
+    expect(generating.recordCompletion).toBeDefined();
+    expect(completed.recordCompletion).toBeUndefined();
+    expect(stroke.recordCompletion).toBeUndefined();
+  });
+
+  it('完成済み（activated）の起こし直しも steering の定型で、会話の続き先を引き継ぐ', async () => {
+    const run = buildRun({
+      sessionId: 'project-a',
+      cwd: '/opt/projects/project-a',
+      phase: 'activated',
+      retries: 0,
+      runId: 'run-1',
+      token: 'token-1',
+    });
+
+    expect(run.prompts).toEqual({ first: 'steering', continue: 'steering' });
+    expect(run.conversationId).toBe('run-1');
+    expect(await run.hasConversation()).toBe(true);
+  });
+
+  it('完成の記録は U15 を叩き、2xx なら true・それ以外は false', async () => {
+    $fetch.mockReset();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const run = buildRun({
+        sessionId: 'project-a',
+        cwd: '/opt/projects/project-a',
+        phase: 'approved',
+        retries: 0,
+        token: 'token-1',
+      });
+
+      $fetch.mockResolvedValueOnce(undefined);
+      expect(await run.recordCompletion!()).toBe(true);
+      expect($fetch).toHaveBeenCalledWith('/api/sessions/project-a/activate', { method: 'POST' });
+
+      // 409（承認依頼が無い）も不達も「記録できていない」
+      $fetch.mockRejectedValueOnce(Object.assign(new Error('まだ完成していない'), { statusCode: 409 }));
+      expect(await run.recordCompletion!()).toBe(false);
+      $fetch.mockRejectedValueOnce(new Error('fetch failed'));
+      expect(await run.recordCompletion!()).toBe(false);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('U15 に断られても、既に完成が記録されていれば受理と同じに扱う', async () => {
+    // 起動後に別の書き手（起動時の書き上げ）が activated を書いた。U15 は「既に完成している」で
+    // 断るが、目的は果たされている。断られたら phase を読み直して決め、文言には頼らない
+    $fetch.mockReset();
+    store.readState.mockReset();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const run = buildRun({
+        sessionId: 'project-a',
+        cwd: '/opt/projects/project-a',
+        phase: 'approved',
+        retries: 0,
+        token: 'token-1',
+      });
+
+      $fetch.mockRejectedValueOnce(Object.assign(new Error('既に完成している'), { statusCode: 409 }));
+      store.readState.mockResolvedValueOnce({ phase: 'activated', projectName: 'project-a', invocation: 'running' });
+      expect(await run.recordCompletion!()).toBe(true);
+
+      // まだ approved のままなら、断られたとおり false
+      $fetch.mockRejectedValueOnce(Object.assign(new Error('まだ完成していない'), { statusCode: 409 }));
+      store.readState.mockResolvedValueOnce({ phase: 'approved', projectName: 'project-a', invocation: 'running' });
+      expect(await run.recordCompletion!()).toBe(false);
+    } finally {
+      store.readState.mockReset().mockImplementation(async () => { throw new Error('no state'); });
+      warn.mockRestore();
+    }
+  });
+});
+
 describe('kick の接続表の後始末', () => {
   beforeEach(() => {
     config.broken = false;
@@ -318,7 +446,7 @@ describe('kick の接続表の後始末', () => {
       settled: new Promise<void>((resolve) => { finish = resolve; }),
     }));
 
-    const { settled } = kick({ sessionId: 'session-1', cwd: '/tmp/share/session-1', kind: 'stroke', retries: 0 });
+    const { settled } = kick({ sessionId: 'session-1', cwd: '/tmp/share/session-1', phase: 'stroking', retries: 0 });
     const token = issuedToken();
 
     // 起動が走っている間は、その token でツールを呼べなければならない
@@ -336,7 +464,7 @@ describe('kick の接続表の後始末', () => {
       settled: new Promise<void>((resolve) => { finish = resolve; }),
     }));
 
-    const { settled } = kick({ sessionId: 'project-a', cwd: '/opt/projects/project-a', kind: 'steering', retries: 0 });
+    const { settled } = kick({ sessionId: 'project-a', cwd: '/opt/projects/project-a', phase: 'approved', retries: 0 });
     const token = issuedToken();
 
     expect(registered(token)).toEqual({ projectPath: '/opt/projects/project-a' });
@@ -347,7 +475,7 @@ describe('kick の接続表の後始末', () => {
   });
 
   it('正常終了でエントリが消える', async () => {
-    const { settled } = kick({ sessionId: 'session-1', cwd: '/tmp/share/session-1', kind: 'stroke', retries: 0 });
+    const { settled } = kick({ sessionId: 'session-1', cwd: '/tmp/share/session-1', phase: 'stroking', retries: 0 });
     await settled;
 
     expect(registered(issuedToken())).toBeNull();
@@ -356,7 +484,7 @@ describe('kick の接続表の後始末', () => {
   it('異常終了（settled の reject）でもエントリが消える', async () => {
     ai.invokeAi.mockReturnValueOnce({ built: Promise.resolve(), settled: Promise.reject(new Error('起動できない')) });
 
-    const { settled } = kick({ sessionId: 'session-1', cwd: '/tmp/share/session-1', kind: 'stroke', retries: 0 });
+    const { settled } = kick({ sessionId: 'session-1', cwd: '/tmp/share/session-1', phase: 'stroking', retries: 0 });
     await expect(settled).rejects.toThrow('起動できない');
     expect(registered(issuedToken())).toBeNull();
   });
@@ -373,7 +501,7 @@ describe('kick の接続表の後始末', () => {
       settled: Promise.resolve(),
     });
 
-    const { built, settled } = kick({ sessionId: 'session-1', cwd: '/tmp/share/session-1', kind: 'stroke', retries: 0 });
+    const { built, settled } = kick({ sessionId: 'session-1', cwd: '/tmp/share/session-1', phase: 'stroking', retries: 0 });
     const token = issuedToken();
 
     await expect(built).rejects.toThrow('設定を読めない');
@@ -382,7 +510,7 @@ describe('kick の接続表の後始末', () => {
   });
 
   it('実行が終わると起動単位の提出記録も片付く（次の起動が前の起動の提出を数えない）', async () => {
-    const { settled } = kick({ sessionId: 'project-a', cwd: '/opt/projects/project-a', kind: 'steering', retries: 0 });
+    const { settled } = kick({ sessionId: 'project-a', cwd: '/opt/projects/project-a', phase: 'approved', retries: 0 });
     const token = issuedToken();
 
     // submit-document の steering 分岐が受理を記録した状況をシミュレートする
@@ -404,7 +532,7 @@ describe('kick の接続表の後始末', () => {
     });
 
     // config.broken の下でも kick 自体は同期的に throw しない
-    expect(() => kick({ sessionId: 'session-1', cwd: '/tmp/share/session-1', kind: 'stroke', retries: 0 }))
+    expect(() => kick({ sessionId: 'session-1', cwd: '/tmp/share/session-1', phase: 'stroking', retries: 0 }))
       .not.toThrow();
 
     // 渡された組み立て方を呼べば、buildRun と同じ理由で同期的に throw する

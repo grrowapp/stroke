@@ -79,6 +79,22 @@ describe('listSessionsCore', () => {
     expect(broken?.phase).toBe('unknown')
   })
 
+  it('完成した（activated）プロジェクトも activated のまま載せる', async () => {
+    await place(PROJECT_NAME, 'activated')
+
+    const project = (await listSessionsCore(root)).find(s => s.id === PROJECT_NAME)
+
+    expect(project?.phase).toBe('activated')
+  })
+
+  it('集合に無い phase は unknown に倒す（一覧は壊れた1件で全体を落とさない）', async () => {
+    await place('odd', 'nonsense')
+
+    const odd = (await listSessionsCore(root)).find(s => s.id === 'odd')
+
+    expect(odd?.phase).toBe('unknown')
+  })
+
   it('openspec ルートが無いディレクトリは載せない', async () => {
     await mkdir(join(root, 'bare'), { recursive: true })
     await writeFile(join(root, 'bare', 'state.json'), '{"phase":"stroking"}\n', 'utf8')
