@@ -27,7 +27,7 @@
 - [x] 4.2 `server/utils/readiness.ts` の `missingPrerequisites()` は**残す**。`server/api/strokes/[id]/invoke-agent.get.ts:38` が使っており、そちらは `api/session/invoke-agent` が規定している。docblock から `specs/startup-readiness` と `design.md 決定2` への参照を消す
 - [x] 4.3 `openspec/specs/api/session/invoke-agent/spec.md` 47行目の「前提（startup-readiness）」から、消える capability への参照を外す
 - [x] 4.4 `docs/adr/0010-create-button-always-enabled.md` の2箇所（13行目・25行目）の `startup-readiness` への参照を外す
-- [ ] 4.5 進行中 change `scope-storage-requirements`（proposal.md・specs/configuration/spec.md）と `align-settings-conventions`（design.md）の参照を外す
+- [x] 4.5 進行中 change 2件の参照を外す。`scope-storage-requirements` は起票の前提が成立していなかったため、`align-settings-conventions` は残タスク（`yarn check`）が他 change の delta 未作成で閉じられなかったため、どちらも change ごと削除した（2026-09-02、ユーザー指示）
 - [x] 4.6 `docs/adr/0003-settings-precedence.md` 48行目「倒れたことは起動時チェック（`server/plugins/00.startup-checks.ts`）が示す」を直す。示す場所が AI の起動要求の応答に移る
 - [x] 4.7 `docs/specs/core/server-structure.md` 14行目の `readiness`（直下）の記載を確かめる。関数は残るので変更不要の見込み
 - [x] 4.8 `00.startup-checks.ts` を対象にしたテストが在れば消す。`missingPrerequisites()` のテストは残す（`test/server/api/strokes/invoke-agent.get.test.ts`・`invoke-agent.multiplex.test.ts` は invoke-agent 経由なので残る）
@@ -51,5 +51,5 @@
 
 ## 7. 完了
 
-- [ ] 7.1 変更の一式をこのブランチへコミットする
-- [ ] 7.2 ユーザーへ完了を報告し、承認を得る。承認を得たら ticket の `status` を `Wait-for-archive` に変える
+- [x] 7.1 変更の一式をこのブランチへコミットする
+- [x] 7.2 ユーザーへ完了を報告し、承認を得る。承認を得たら ticket の `status` を `Wait-for-archive` に変える

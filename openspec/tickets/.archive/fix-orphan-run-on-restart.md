@@ -1,5 +1,5 @@
 ---
-status: Doing
+status: Wait-for-archive
 change: fix-orphan-run-on-restart
 triage:
   - bug

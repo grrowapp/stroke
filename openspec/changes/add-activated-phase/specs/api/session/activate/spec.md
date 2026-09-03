@@ -26,7 +26,7 @@
 
 ### Requirement: 完成の根拠は承認依頼の存在とする
 
-システムは、対象のプロジェクトの `.spec-workflow/approvals/` 配下に承認依頼のファイルが1件以上在ることを、完成の唯一の根拠としなければならない（SHALL）。承認依頼の状態（保留・承認済み・却下済み）は問わない（SHALL）。
+システムは、対象のプロジェクトの `.spec-workflow/approvals/` 配下に承認依頼のファイルが1件以上在ることを、完成の唯一の根拠としなければならない（SHALL）。承認依頼のファイルとは、本家が category ごとのディレクトリ（`approvals/<category>/`）の直下に置く JSON ファイルを指し、category は問わない（SHALL）。隠しファイル・ディレクトリ（本家の `.snapshots/` など）や `approvals/` 直下のファイルは数えない（SHALL NOT）。承認依頼の状態（保留・承認済み・却下済み）は問わない（SHALL）。
 
 システムは、この判定のために本家 spec-workflow-mcp の REST を呼んではならない（MUST NOT）。本家が動いていなくても判定できなければならない。
 
@@ -67,7 +67,9 @@
 
 システムは、phase を `activated` に変えた直後に、そのプロジェクトの生成が成功で決着したことを、開いている一覧へ届けなければならない（SHALL）。届け方は `ws/delivery` の規約に従う。
 
-決着の合図を出すのはこの endpoint だけとする SHALL。実行の完了（`invocation` が `idle` になること）を成功の決着として届けてはならない（MUST NOT）。
+**成功の決着**の合図を出すのはこの endpoint だけとする SHALL。実行の完了（`invocation` が `idle` になること）を成功の決着として届けてはならない（MUST NOT）。実行の記録の口（`api/stroke/submission`、A8）が成功の決着を流す形を残してはならない（MUST NOT）。
+
+失敗の決着はこの endpoint が出すものではない。失敗は実行の記録が `error` に達したことから届く（`project/generation`「決着したら、知らせてから次を選ばせる」）。
 
 #### Scenario: 一覧を開いたまま完成する
 

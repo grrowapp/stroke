@@ -1,14 +1,15 @@
 ---
-status: Doing
+change: update-project-list-view
 triage:
   - bug
-change: update-project-list-view
 tags:
   - proposal
   - specs
   - ui
   - tasks
 order: -9.0
+status: Doing
+date: 2026-09-02
 ---
 
 # update-project-list-view

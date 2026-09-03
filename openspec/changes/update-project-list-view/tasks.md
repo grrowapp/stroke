@@ -1,8 +1,8 @@
 # update-project-list-view — tasks
 
-入れる値の正は `prototype/index.html`。写しは `ui.md` にある。触るのは `app/assets/css/main.css` の3宣言だけで、DOM もクラス名も変えない。
+入れる値の正は `prototype/index.html`。写しは `ui.md` にある。触るのは `app/assets/css/main.css` の宣言——当初は3つ、2.6 と 5.3 で `.sb-row-creating` と `@media (prefers-reduced-motion: reduce)` を加えて4つになった。DOM は変えない。クラス名は、最終更新の `td` から文字色のユーティリティ1つを外した（持ち主を `main.css` へ移すため。7.1）。
 
-**実装は pre6（`/home/vagrant/work/stroke-board/pre6`、ブランチ `move-conventions-to-steering`）で行う。**
+**実装は pre6（`/home/vagrant/work/stroke-board/pre6`、ブランチ `move-conventions-to-steering`）で行った。** 2026-08-31 に `64a2b8d1` でコミットし、`36470429` で develop へマージ済み。**6.3・8.1・8.2 は未実施のままマージされている**（本書のチェックがその記録）。
 
 ## 1. 実物と prototype を並べる
 
@@ -59,14 +59,14 @@
 
 - [x] 6.1 `yarn typecheck` を通す — 通過
 - [x] 6.2 `yarn test` を通す — 21ファイル / 211件 通過
-- [ ] 6.3 `yarn test:e2e` を通す。E2E は並列時に本家スタブの競合で落ちることがある（実測 2026-08-30）。落ちたら `--workers=1` で単独確認する
-- [x] 6.4 CSS だけの変更なので、既存のテストが状態の表示を文言で見ていることを確かめる。見た目の値をテストに固定しない — `.sb-chip` の実値を固定していたのは `design-token.spec.ts` の1件だけで、要件を見る形へ書き換えた。`notifications.spec.ts` の実値固定は通知画面の別テーブル（`sb-datarow-*`）が対象で `.sb-chip` は「存在しないこと」しか見ていない。`upstream-style.spec.ts` は本家との比較で無関係
+- [ ] 6.3 `yarn test:e2e` を通す。E2E は並列時に本家スタブの競合で落ちることがある（実測 2026-08-30）。落ちたら `--workers=1` で単独確認する — **未実施のままマージされた。** 実施の記録が無い。archive の前に通す
+- [x] 6.4 CSS だけの変更なので、既存のテストが状態の表示を文言で見ていることを確かめる。見た目の値をテストに固定しない — `.sb-chip` の実値を固定していたのは `design-token.spec.ts` の1件だけで、要件を見る形へ書き換えた（書き換え時は `e2e/`、マージ後の `79afcbb9` で `test/e2e/` へ移った）。`notifications.spec.ts` の実値固定は通知画面の別テーブル（`sb-datarow-*`）が対象で `.sb-chip` は「存在しないこと」しか見ていない。`upstream-style.spec.ts` は本家との比較で無関係
 
 ## 7. コミット
 
-- [ ] 7.1 pre6 のブランチへ直接コミットする（`CLAUDE.md`「change の実装（apply）は、この worktree のブランチへ直接コミットする」）。コミットメッセージに、直した3宣言を1行で残す
+- [x] 7.1 pre6 のブランチへ直接コミットする（`CLAUDE.md`「change の実装（apply）は、この worktree のブランチへ直接コミットする」）。コミットメッセージに、直した3宣言を1行で残す — `64a2b8d1`「fix: 一覧の状態を ui.md の確定値どおりに出す」（2026-08-31）。`36470429` で develop へマージ。触ったのは `main.css`・`app/pages/projects/index.vue`（最終更新の `td` から文字色ユーティリティを外し、持ち主を `main.css` の `.sb-table td:nth-child(4)` へ一本化）・`design-token.spec.ts`。**同じコミットに `playwright.config.ts` と `CLAUDE.md`（E2E ポートを 50000 から上へ空きを探す方式へ）が同乗している。** この change の対象外で、proposal の決定の記録に残した
 
 ## 8. レビューと完了承認
 
-- [ ] 8.1 `typescript-reviewer` エージェントに `/santa-method` でレビューを実行する。対象はこの change の成果物（`main.css` の3宣言・delta spec・`ui.md`・`prototype/index.html`）と、`prototype` / `ui.md` / 実装の3者で値が一致しているかの整合。レビューが完全にパスするまで続ける
+- [ ] 8.1 `typescript-reviewer` エージェントに `/santa-method` でレビューを実行する。対象はこの change の成果物（`main.css` の4宣言・delta spec・`ui.md`・`prototype/index.html`）と、`prototype` / `ui.md` / 実装の3者で値が一致しているかの整合。レビューが完全にパスするまで続ける
 - [ ] 8.2 ユーザーから完了承認を得る

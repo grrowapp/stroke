@@ -1,5 +1,6 @@
 schema: specs-with-grill
 created: 2026-08-24
+skip_specs: true
 note: |
   app/assets/css/stroke.css（セッション画面だけに効くスタイル）を、design token の統合とあわせて畳む。
   アプリ全体のスタイルは main.css の1本に保ち、1つのアプリの中で見た目が割れないようにする。

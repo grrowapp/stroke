@@ -6,13 +6,18 @@
 
 ## 何を直すか
 
-3つの CSS 宣言だけを直す。DOM もクラス名も変えない。
+CSS の宣言を直す。当初は3つの予定だったが、実装中に同じ欠陥が2箇所で見つかり（tasks 2.6・5.3）、4つになった。
 
 ```
-.sb-row-off    行ごとの opacity をやめ、状態列以外を薄める形にする
-.sb-chip       ガラスの質感（面の3段・上辺の照り・下辺の落ち込み・文字の混色）を入れる
-.sb-chip-on    アクティブの発光（文字のにじみ・外へのにじみ2枚）を入れる
+.sb-row-off       行ごとの opacity をやめ、状態列以外を薄める形にする
+.sb-row-creating  同上。ただし名前セルはローダーを内包するため opacity では戻せず、文字色で弱める
+.sb-chip          ガラスの質感（面の3段・上辺の照り・下辺の落ち込み・文字の混色）を入れる
+.sb-chip-on       アクティブの発光（文字のにじみ・外へのにじみ2枚）を入れる
 ```
+
+これに加えて `@media (prefers-reduced-motion: reduce)` の中にあった `.sb-row-creating { opacity: 0.45 }` を落とした（「動きを抑える設定」）。
+
+DOM は変えない。クラス名は1つだけ外した——最終更新の `td` にあった文字色のユーティリティ（`text-[var(--text-secondary)]`）。行の状態で沈める指定を `main.css` の `@layer components` に置く一方、ユーティリティはより後のレイヤーに載るため、沈める側が必ず負けていた。基準の色も `main.css` の `.sb-table td:nth-child(4)` へ移し、1つの property に持ち主を2人置かない形にした。
 
 **順序に意味がある。** `.sb-row-off` を先に直さないと、チップにガラスを入れても行ごと沈んで見えない。
 
@@ -33,6 +38,26 @@
 | 2 状態 | **薄めない** |
 | 3 未処理の通知 | 子要素に `opacity: 0.45` |
 | 4 最終更新 | 文字色を `--text-secondary` 45% で `--surface-panel` と混ぜる |
+
+## 生成中の行
+
+未接続の行と**同じ薄さ**にする。ただし薄め方が違う。名前セルはローダーと名前を1つの `span` に収めており、その親へ `opacity` を掛けるとローダーまで沈む。`opacity` はグループを作るので、子を親より濃くして戻すことができない。そのため**文字色で弱める**。ローダーは `conic-gradient` の背景なので文字色の影響を受けず、チップは自分の文字色を持つので影響を受けない。
+
+```css
+/* 弱めるのは文字色。opacity は掛けない。状態列（2列目）は触らない */
+.row-creating td:nth-child(1),
+.row-creating td:nth-child(3) { color: color-mix(in srgb, var(--text-primary) 45%, var(--surface-panel)); }
+.row-creating td:nth-child(4) { color: color-mix(in srgb, var(--text-secondary) 45%, var(--surface-panel)); }
+```
+
+| 列 | 薄め方 |
+| --- | --- |
+| 1 プロジェクト | 文字色を `--text-primary` 45% で `--surface-panel` と混ぜる。ローダーは沈まない |
+| 2 状態 | **薄めない** |
+| 3 未処理の通知 | 文字色を `--text-primary` 45% で `--surface-panel` と混ぜる |
+| 4 最終更新 | 未接続と同じ。`--text-secondary` 45% で `--surface-panel` と混ぜる |
+
+行の地（`#161f32` の重ね）はそのまま残す。薄くするのは中身だけで、生成中を「薄いだけの行」にしない。
 
 ## チップ（既定 — 未接続・生成中）
 
@@ -86,4 +111,6 @@
 
 ## 動きを抑える設定
 
-既存の `@media (prefers-reduced-motion: reduce)` は変えない。この change が入れるのは静的な質感だけで、動きを足さない。
+この change は動きを足さない。`animation: none` の指定は既存のまま残す。
+
+ただし `@media (prefers-reduced-motion: reduce)` の中に `.sb-row-creating { opacity: 0.45 }` があり、動きを抑える設定のときだけ行ごと沈んで状態の列が読めなくなっていた（tasks 5.3）。**弱め方は動きの設定に関わらず同じ**であるべきで、上の「生成中の行」の文字色の指定が常に効いていればよい。この `opacity` を落とした。

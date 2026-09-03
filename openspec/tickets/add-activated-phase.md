@@ -1,8 +1,11 @@
 ---
-status: Planning
+status: Doing
 tags:
   - proposal
   - specs
+  - design
+  - tasks
+  - add-activated-phase/10084104-7036-45cc-a9bb-e7df8f879f59
 triage:
   - bug
 change: add-activated-phase
@@ -135,6 +138,12 @@ date: 2026-09-02
 | `invoke-agent.get.ts:61`（U13）の `kind` 導出 | `phase === 'approved' ? 'steering' : 'stroke'` | 完成したプロジェクトを起こし直すと**ストロークの定型**で走り、steering の MCP も渡らない |
 | `invoke-agent.get.ts:72` の `runId` | `phase === 'approved' ? state.runId : undefined` | 会話の続き先を失い、初回として走り直す |
 | `promote.post.ts`（U14）の受理判定 | `phase === 'approved'` なら「既に昇格している」 | そのままでよい。`activated` も昇格済みなので同じ 409 に落ちるべき |
+| **`answer.post.ts:29`（U7）の門** | `phase === 'approved'` なら「承認済みには回答できない」 | `activated` が素通りし、次の「答えるべき問いが無い」の 409 に落ちる。理由が変わるだけで壊れはしないが、承認以降を1つの門で断つべき。起票時に数えていなかった6箇所目（2026-09-02） |
+| **`creating.ts` の `isApproved`** | `state.json` を生読みして `phase === 'approved'` の真偽だけ返す | `activated` を昇格済みとして拾わなくなり、走査に `.spec-workflow` が無い間は一覧から消える。読みも `readState` へ寄せる |
+
+### A8 が成功の決着を兼ねている（2026-09-02 の棚卸し）
+
+`writeInvocation`（A8 `submission.post.ts` の実体）が `creationOutcomeOf` で「`approved` かつ `idle` なら `done`」を流している。**実行の記録の口が完成の合図を出している**のがこの ticket の症状の配信側の実体で、`done` は U15 だけが流す形に改める。`error → failed` はそのまま残す。棚卸しの全体は proposal「競合の棚卸し」。
 
 ### 既存の `state.json` の移行が要る
 

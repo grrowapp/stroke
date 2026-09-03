@@ -1,9 +1,10 @@
 ---
-status: Open
+order: -10.0
+status: Doing
 change: fold-stroke-css
 triage:
   - enhancement
-order: -2.0
+date: 2026-09-02
 ---
 
 # fold-stroke-css

@@ -30,7 +30,7 @@ approved ──────────── 生成中 ────────
 
 - **`Phase` に `activated` を足す。** steering の**初回の承認依頼が提出された**ときに書く。ここから先が、本当の意味でプロジェクトインスタンスが準備された状態である
 - **`activated` を書く endpoint をサーバに足す。** 提出を受けて立てる
-- **`invocation` から失敗の応答を出せるようにし、WS の通知パターンに失敗を入れる。** claude の処理がエラーなら、ユーザー側にプロジェクト作成失敗のアクションを出す
+- **成功の決着を A8 から U15 へ移す。** いまは A8 の実体 `writeInvocation` が「`approved` で `idle` になった」瞬間に `done` を流しており、実行の記録の口が完成の合図を兼ねている。これをやめ、`done` は U15 だけが流す。失敗の決着（`error` → `failed`）は今の経路のまま残す。画面側（知らせる面・モーダル・やり直す・破棄する）は実装済みで、変えない
 
 始点（`approved`）と終点（`activated`）が確定した1点になるので、**生成中の判定が区間の内外だけになる**。走査（`.spec-workflow` の有無）もプロセスの状態（`invocation`）も見ない。
 
@@ -44,6 +44,7 @@ approved ──────────── 生成中 ────────
 
 - `/write-steering-v2` が存在しない件（[`fix-missing-write-steering-skill`](../../tickets/fix-missing-write-steering-skill.md)）。スキルを置くのはあちらの仕事である。**この change が受け持つのは、スキルの有無にかかわらず、steering の作成が完了しなかったときにプロジェクトの生成が失敗したという状態が現れること**である
 - 承認 endpoint が3つの仕事を1回でやっている件（`separate-approval-decision-from-promotion`）。段の分割はこの change では扱わない
+- 「その実行で作業が行われたか」（`didWork`）の判定そのもの（`fix-steering-empty-completion`、実装済み・archive 前）。あちらは `agent/invocation` の同じ Requirement「完了は output stream で検知して idle に変える」を MODIFIED しており、後に archive した方が main を上書きする。**この change の delta はあちらの文を含めて書いてあるので、archive はあちらを先にする。** あちらの ADDED Requirement「作業が行われたかの判定を工程ごとに持つ」はあちらに残し、ここへ写さない
 
 ## Capabilities
 
@@ -57,6 +58,9 @@ approved ──────────── 生成中 ────────
 - `agent/invocation` — 承認以降の局面に `activated` を含める。生成中の steering の完了時に完成の記録を試み、受理されなければ `failed` にする
 - `api/session/get` — 返す phase の値に `activated` を足す
 - `stroke/frontier` — 保持する phase の値に `activated` を足す
+- `project/directory` — 生成中の定義を「昇格したが `.spec-workflow` をまだ持たない」から phase（`approved`）へ改める。走査は母集合にだけ使う。生成中の行を接続の判定から外す理由を「まだ `.spec-workflow` を持たず登録されようがない」から「phase が生成中である」へ移す（`.spec-workflow` は本家 MCP の接続時にでき、registry にも載る）。**delta は未作成**
+- `api/project/delete` — 「中身のある本物のプロジェクトは消さない」の根拠を `.spec-workflow/` の有無から phase（`activated`）へ移す。接続時に `.spec-workflow/` ができた作りきれなかったプロジェクトを「破棄する」で消せるようにする。**delta は未作成**
+- `api/session/answer` — 回答を受理しない局面を「`approved`」から承認以降（`approved` / `activated`）へ広げる。**delta は未作成**
 
 **追記 2026-09-02。** 起票の時点では「`activated` を立てる endpoint をサーバに足す」としか書いておらず、その endpoint を capability として立てていなかった。`separate-approval-decision-from-promotion` が develop へ入り、**承認の各段がそれぞれ capability を持つ形**（`api/session/approve` / `api/session/promote`）になったため、完成の記録も同じ形で並べる。
 
@@ -66,14 +70,15 @@ approved ──────────── 生成中 ────────
 | --- | --- |
 | `shared/stroke.ts` | `Phase` に `activated` を足す。値の一覧を1つ持つ形にする |
 | `server/handler/phase.ts` | **没にする。** 生読みの `readPhase` と承認軸の述語（`isBeforeApproval` / `isAfterApproval`）をやめる |
-| `server/api/sessions/[id]/index.delete.ts` / `server/api/projects/[projectId]/index.delete.ts` | `handler/phase.ts` の代わりに `readState` で phase を読み、受理範囲を自分で持つ |
+| `server/api/sessions/[id]/index.delete.ts` / `server/api/projects/[projectId]/index.delete.ts` | `handler/phase.ts` の代わりに `readState` で phase を読み、受理範囲を自分で持つ。P1 の「本物は消さない」の根拠を `.spec-workflow/` の有無から `activated` へ移す |
 | `server/utils/stroke/session-core.ts` | **もう1つの `readPhase`**（起票時に数えていなかった5箇所目） |
-| `server/utils/stroke/session-store.ts` | zod の枝、`creationOutcomeOf` の判定 |
-| `server/utils/control/creating.ts` | `phase` を持ち帰る（いまは `approved` かの真偽だけ） |
-| `server/utils/control/directory.ts` | 行の `creation` を phase から引く。生成中を接続の判定から外す |
-| `server/api/sessions/[id]/activate.post.ts`（新規） | `activated` を立てる endpoint（U15、`POST /api/sessions/:id/activate`） |
+| `server/utils/stroke/session-store.ts` | zod の枝。`creationOutcomeOf` から `idle → done` を外し、`error → failed` だけ残す（`done` は U15 が流す） |
+| `server/utils/control/creating.ts` | `phase` を持ち帰る（いまは `approved` かの真偽だけ）。`state.json` を zod を通さず生読みしている点も `readState` へ寄せる |
+| `server/utils/control/directory.ts` | 行の `creation` を phase から引く。生成中を接続の判定から外す（registry に載っていても `active` にしない） |
+| `server/api/strokes/[id]/answer.post.ts` | `phase === 'approved'` の門を承認以降へ広げる（起票時に数えていなかった6箇所目。いまは `activated` が素通りして「答えるべき問いが無い」の 409 に落ちる） |
+| `server/api/sessions/[id]/activate.post.ts`（新規） | `activated` を立てる endpoint（U15、`POST /api/sessions/:id/activate`）。`done` を流すのはここ |
 | `server/api/sessions/[id]/invoke-agent.get.ts` | 起こす定型と `runId` の選び分けに `activated` を通す。実装はいま `server/api/strokes/[id]/` に置かれているが、docs の定義は `/api/sessions/` である（ticket「見つけた課題」） |
-| `server/utils/stroke/ai.ts` | 成功の分岐から U15 を叩く。steering にも `didWork` を渡す |
+| `server/utils/stroke/ai.ts` | 作業ありの分岐から U15 を叩く。steering の `didWork` は `fix-steering-empty-completion` で既に渡っている |
 | `server/plugins/` | 起動時に一度だけ、`approved` の対象それぞれに U15 を叩いて既存の `state.json` を書き上げる |
 
 ### phase の値がばら撒かれている現状
@@ -86,11 +91,13 @@ handler/phase.ts            readPhase（生読み）の `=== 'stroking' || === '
 session-core.ts             もう1つの readPhase（生読み）。同じ連鎖で、外れた値を 'unknown' に倒す
 session-store.ts            zod の literal 3本（readState）
 session-store.ts            creationOutcomeOf の `phase !== 'approved'`
+creating.ts                 isApproved（生読み）の `phase === 'approved'`
+answer.post.ts              回答を断る門の `phase === 'approved'`
 ```
 
 `handler/phase.ts` はこの change で没にする（上の Impact）。`docs/specs/api/projects/delete.md` が「どの局面のものを許すかは各 endpoint が持つ」と定めているのに、承認を軸にした述語を endpoint の外に置き、zod を通さない読みを増やしているためである。
 
-イコール比較を各所へ足していく形は取らない。値は `shared/stroke.ts` に1つ置き、読みは `readState` に1本化する。
+イコール比較を各所へ足していく形は取らない。値は `shared/stroke.ts` に1つ置き、サーバ層の読みは `readState` に1本化する。Nitro を持てない core 層（`session-core.ts`）の一覧用の軽い読みだけは残し、値の判定を `shared/stroke.ts` の集合から引く（design D6）。
 
 ## 決定の記録
 
@@ -118,7 +125,7 @@ session-store.ts            creationOutcomeOf の `phase !== 'approved'`
 
 ### `didWork` では足りない理由
 
-`didWork` は既にある（`invoke.ts:148`、ストローク側のみ。steering には渡っていない）。しかしその結果は `invocation` へ書かれる。
+`didWork` は既にある（`invoke.ts`。`fix-steering-empty-completion` で steering にも渡り、文書を1本も提出しない実行は `failed` になる）。しかしその結果は `invocation` へ書かれる。
 
 ```
 invocation   running / idle / failed / error
@@ -127,7 +134,7 @@ invocation   running / idle / failed / error
 phase        消えない。区間の端として残る
 ```
 
-**同じ判定でも、行き先が `invocation` か `phase` かで意味が変わる。** `didWork` を steering にも渡せば失敗は拾えるようになるが、それだけでは「完成した」を記録する場所が無いままで、境界は引けない。`activated` が要るのはそのためである。
+**同じ判定でも、行き先が `invocation` か `phase` かで意味が変わる。** steering の `didWork` が数えるのは文書の提出であって承認依頼ではない——文書は書いたが承認依頼を出さずに終わった実行は今も `idle` になり、「レビューする」の先が空になる経路は残っている。仮に承認依頼を数えたとしても、行き先が `invocation` である限り「完成した」を記録する場所は無いままで、境界は引けない。`activated` が要るのはそのためである。
 
 ### U15 と ADR-0014 の関係
 
@@ -136,3 +143,29 @@ ADR-0014「API は暗黙の状態分岐を持たない」は、**判定の材料
 ### 「初回の」の見分け方
 
 `activated` は一方向の遷移で、U15 は対象が `approved` のときだけ立てる。`activated` の対象への U15 は受理しない。完成済みプロジェクトの steering を起こし直しても、完了時に U15 は呼ばない。これで「初回」は定義から決まる。
+
+## 競合の棚卸し（2026-09-02、この change を正とする）
+
+完成の判定に近い役割を、既に別の場所が持っている。設計の経緯が資料に残っていないものは、**この change を正として取り込み、規定を1箇所にする**。specs の重複は残さない。
+
+| 場所 | いまの役割 | この change での扱い |
+| --- | --- | --- |
+| A8 `submission.post.ts` → `writeInvocation` → `creationOutcomeOf` | `approved` で `idle` を書いた瞬間に `done` を流す。**実行の記録の口が成功の決着を兼ねている** | `done` を外す。成功の決着は U15 だけが流す。`error → failed` は残す |
+| `directory.ts` の `creation` | 走査で `.spec-workflow` が有れば `done`、`creating.ts` から来た昇格済みは `in-progress` | phase から引く。`.spec-workflow` は母集合にだけ使う |
+| `creating.ts` の `isApproved` | `state.json` を生読みし `approved` かの真偽だけ返す | phase を持ち帰る。読みは `readState` へ |
+| `fix-steering-empty-completion` の `didWork`（steering） | 文書を1本も提出しない実行を `failed` に倒す | 残す。完成の記録とは別の判定として、この change の delta に文ごと含める（上「対象外」） |
+| `openspec/specs/project/directory` | 生成中を「`.spec-workflow` をまだ持たない」で定義し、接続の判定から外す理由も同じ | MODIFIED delta を足す（未作成）。`project/generation` の delta は directory を参照し、規定を写さない |
+| `openspec/specs/api/project/delete` | `.spec-workflow/` を持つものは消さない | MODIFIED delta を足す（未作成）。根拠を `activated` へ |
+
+### 上位資料への整合反映（apply で行う）
+
+`docs/agents/issue-tracker.md`「更新対応」により、**design.md で提案してユーザーの承認を得てから書き換える**。ticket「上位資料との食い違い」の表に、棚卸しで見つけた分を足したものが宛先である。
+
+| 資料 | 直す点 |
+| --- | --- |
+| `docs/specs/api/contract.md` | U2 / U12 の phase の値に `activated` を足す。A8 の説明に「成功の決着は流さない」を足す |
+| `docs/specs/api/overview.md`・`sessions/` | U15 を目録と個別ファイルに足す。U13 の定型の選び分けに `activated` を通す |
+| `docs/specs/api/ws/delivery.md` | `project-creation` の `done` の出どころを「実行の完了」から「完成の記録（U15）」へ |
+| `docs/specs/api/projects/delete.md` | 「`.spec-workflow/` を持つものは拒否する」を「`activated` は拒否する」へ。「生成中・失敗した行は本家に登録されておらず」は事実と違う（接続時に載る）ので直す |
+| `CONTEXT.md`「生成中」 | 「終わりは `.spec-workflow/` が出来たとき」を「終わりは完成の記録（steering が承認依頼を出したこと）」へ。定義本体は変えない |
+| `docs/specs/plan/portal-stroke-exit.md` | 図の「`.spec-workflow/` ができる → 実行が終わったら done を配信」を U15 経由へ |
