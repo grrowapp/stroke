@@ -44,7 +44,7 @@
 | 対象 | 影響 |
 | --- | --- |
 | `app/assets/css/stroke.css` | 削除 |
-| `app/assets/css/main.css` | ストロークの区画へ +14 行程度。冒頭 3 行目のコメントから `stroke.css` の名を外す |
+| `app/assets/css/main.css` | ストロークの区画へ +36 行。うち 16 行は design 決定3 が求めるコメント（2つの明滅が別々に在る理由）。冒頭 3 行目のコメントから `stroke.css` の名を外す |
 | `nuxt.config.ts` | `css` 配列が1要素になる |
 | `app/components/WaitingIndicator.vue` | class 1箇所 |
 | `app/pages/strokes/[sessionId]/proposal.vue` | class 1箇所（問い返しの帯） |

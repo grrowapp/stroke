@@ -168,6 +168,25 @@ date: 2026-09-02
 
 **U 系の endpoint が実装では `/api/strokes/` に在る。** docs（`docs/specs/api/overview.md`、`sessions/*.md`）は `/api/sessions/` と定めており、実装が間違いである。この ticket の表記は docs に合わせて `/api/sessions/` で書いている。直す作業は [[fix-session-api-path]] に起票した。U15 `POST /api/sessions/:id/activate` は、あちらの完了を待たず `server/api/sessions/[id]/` に置く。
 
+### 取り込んだ ticket の事実（2026-09-04）
+
+ユーザーの判断で、`fix-missing-write-steering-skill` と `fix-approved-project-not-listed` の2本を change ごと削除し、この change に取り込んだ。どちらも内容がこの change と被っており、この change の通し確認が通れば別に対応する必要が無く、通らなければこの change の問題として扱う。以下は削除した ticket が載せていた事実である。
+
+**`fix-missing-write-steering-skill`（実測 2026-08-30）**
+
+- 承認後の steering の起動が `/write-steering-v2` を呼んでいた。claude はこのスキルを `Unknown command` として弾き、MCP ツールを1つも呼ばずに正常終了した（`.stroke-check/debug-log/dbd9d469-….json`）。`invocation` は `idle` になり、巡回は拾わなかった
+- そのスキルは repo に無い。`.gitignore` の `.claude/*` により `.claude/skills/` は追跡外で、親の checkout にだけ実体が在る。`docs/specs/core/settings-reference.md` は「このリポジトリの `.claude/skills/` に在り `--add-dir` で読み込む」と書いている
+- 検証者は、定型を「`get-steering` で現状を見て `submit-document` で type=steering を3本提出する」指示に一時的に差し替えて通し、ツールが呼ばれて3本書き上がることを確かめた
+- いまの `nuxt.config.ts` の `steeringPrompt` は `get-steering-guide` を指しており、スキルを参照しない（2026-09-04 に確認）
+- 通し確認では、`nuxt.config.ts` の環境別の上書きで `steeringPrompt` を「steering の承認依頼だけを出す」指示に一時的に差し替え、フローが動くことだけを確かめる。本体には手を入れない（ユーザー指示 2026-09-04）
+
+**`fix-approved-project-not-listed`（実測 2026-08-30）**
+
+- `yarn check:stroke --approve` で承認まで通したプロジェクト `check-stroke-20260830-163107` は、`state.json` と `.spec-workflow/` のひな型が正しくできていた
+- steering の実行は `get-steering` と `submit-document` を呼んだが、6回すべてが `404 upstream_error`「対象のプロジェクトが本家の一覧に無い。」で弾かれた。claude は product / tech / structure の3本を書き上げて提出しようとしていたので、成果物側の欠陥ではない
+- 起票者の仮説は、承認（当時の U10）が `projectShareRoot` の下でディレクトリを改名するだけで本家へ登録しないこと。切り分けの論点は、本家が一覧をどこから作るか（`SPEC_WORKFLOW_HOME` のグローバル状態か走査か）、載るために何が要るか、承認時と steering 起動時のどちらで行うか
+- この change の proposal（2026-09-02）は「`.spec-workflow/` は本家 MCP の接続時にでき、registry にも載る」と観測しており、起票後に解消している可能性がある。通し確認で 404 が出るかを確かめる
+
 ### 上位資料との食い違い（未反映）
 
 `docs/agents/issue-tracker.md`「更新対応」により、**design.md で提案してユーザーの承認を得るまで書き換えない**。artifact を作り直すときに改めて提案する。

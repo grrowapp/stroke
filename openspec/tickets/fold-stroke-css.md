@@ -2,6 +2,11 @@
 order: -10.0
 status: Doing
 change: fold-stroke-css
+tags:
+  - proposal
+  - design
+  - tasks
+  - adopt-upstream-design-tokens/34bfebba-027b-4c46-8e7a-f8145c78ff8a
 triage:
   - enhancement
 date: 2026-09-02

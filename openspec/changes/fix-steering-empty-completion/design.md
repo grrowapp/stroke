@@ -14,6 +14,15 @@
 - token は `kick` が起動ごとに発行し、`invokeAi(...).finally(() => removeConnection(token))` で実行の終わりに失効する（`server/utils/stroke/invoke.ts`）。**token の寿命 = その起動の寿命**であり、これは `server/session-management` が既に規定している
 - 巡回（`server/plugins/01.retry-failed.ts`）は `shouldRetry`（`sweep.ts`）で `failed` だけを拾う。**この判定は変える必要が無い**——空振りが `failed` になれば、そのまま既存の経路に乗る
 
+### 追記（2026-09-04）— `add-activated-phase` が入った後の現状
+
+Context の記述は 2026-09-01 に読んだ実装のもので、その後 `add-activated-phase` が develop へ入って**成功経路の順序が変わっている**。実機確認（tasks 5.1〜5.3）と santa-method のレビューで確かめた事実を足す。
+
+- `server/utils/stroke/ai.ts` の成功経路は `recordCompletion` を先に見て、渡されていればそこで決着する（`didWork` は評価されない）。`invoke.ts` は生成中（phase が `approved`）の steering にだけ `recordCompletion` を渡す
+- したがって**この change の `didWork` が実行の行き先を決めるのは、ストロークと、完成済み（`activated`）のプロジェクトの steering の起こし直しである**。生成中の steering は完成の記録（U15）の受理で決まる。delta spec（`specs/agent/invocation`）の Scenario はこの形に直した
+- Risks の「3本すでに揃っている対象を起こすと、空振りとして `failed` になる」も、生成中の局面では成り立たない——承認依頼が在れば完成が記録されて `idle` になる（実測 2026-09-04）
+- **実測で見つかった別の穴**（この change の範囲外）: steering 工程には承認依頼を出す道が無い（本家の `request-approval` は `--allowedTools` に載っておらず、`get-steering-guide` も呼ぶなと書いている）。そのため生成中の steering は文書を提出しても U15 が受理せず `failed` に倒れ、上限まで起こし直してから `error` になる。`add-activated-phase` 側の論点として報告する
+
 ## Goals / Non-Goals
 
 **Goals:**

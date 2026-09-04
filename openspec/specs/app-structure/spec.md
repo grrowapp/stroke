@@ -7,13 +7,13 @@
 
 ### Requirement: 階層を表すディレクトリでモジュールを分ける
 
-`app/components/` の配下は、**構造の規範（`docs/specs/core/system-structure.md`）が定める区切り**で分けられていなければならない（SHALL）。
+`app/components/` の配下は、**構造の規範（`docs/specs/structure/system-structure.md`。以下「規範」）が定める区切り**で分けられていなければならない（SHALL）。
 
 コンポーネントを `app/components/` の直下に、区切りのディレクトリを介さず直接置いてはならない（MUST NOT）。
 
 **`app/composables/` は本要件の対象外である。** composable は関心単位の `useXxx` を `app/composables/` の直下に平置きし、区切りのディレクトリを作ってはならない（MUST NOT）。正は規範の「composables は関心単位の `useXxx` を平置きにする。境界のディレクトリを作らない」。
 
-**区切りの名前をこの spec が持たない。** 構造の正は `docs/specs/core/system-structure.md` であり、そこが到達点を定める。ここに現状の区切りの名前を書くと、到達点へ動かす作業がそのたびにこの spec に反することになる。この spec が持つのは、**どう判定するか**だけである。
+**区切りの名前をこの spec が持たない。** 構造の正は規範であり、そこが到達点を定める。ここに現状の区切りの名前を書くと、到達点へ動かす作業がそのたびにこの spec に反することになる。この spec が持つのは、**どう判定するか**だけである。
 
 #### Scenario: 下層からだけ使うコンポーネントを追加する
 
@@ -37,7 +37,7 @@
 
 #### Scenario: 規範の区切りが変わる
 
-- **WHEN** `docs/specs/core/system-structure.md` が定める区切りが変わる
+- **WHEN** 規範が定める区切りが変わる
 - **THEN** この spec を書き換えずに、新しい区切りへ移す作業が行える
 
 ### Requirement: 配置は実際の参照範囲に従う
@@ -139,7 +139,7 @@
 
 ### Requirement: 構造の正はひとつに定める
 
-構造の正は `docs/specs/core/system-structure.md` でなければならない（SHALL）。この spec と規範が食い違った場合、規範が優先される（SHALL）。
+構造の正は規範（「階層を表すディレクトリでモジュールを分ける」で定めた1ファイル）でなければならない（SHALL）。この spec と規範が食い違った場合、規範が優先される（SHALL）。
 
 同じ対象について、区切りの名前や配置の到達点を2箇所で別々に定めてはならない（MUST NOT）。
 
@@ -148,7 +148,7 @@
 #### Scenario: 構造の判断に迷う
 
 - **WHEN** ファイルの置き場所に迷う
-- **THEN** `docs/specs/core/system-structure.md` を読めば決まる
+- **THEN** 規範を読めば決まる
 
 #### Scenario: 規範と現状に差がある
 

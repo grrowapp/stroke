@@ -33,11 +33,27 @@
 
 ## 5. 実機で確かめる
 
-- [ ] 5.1 承認から steering を起こし、文書を提出して終わる実行が `idle` になることを確かめる（`state.json` の `invocation`）
-- [ ] 5.2 何も提出せずに終わる実行（例: 本家 dashboard を止めて起こす）が `idle` にならず `failed` になり、巡回に拾われることを確かめる
-- [ ] 5.3 起こし直しが上限に達したら `error` になり、そこで自動の起こし直しが止まることを確かめる
-- [ ] 5.4 使ったプロセス・ポート・作った検証用セッションを片づける
+- [x] 5.1 承認から steering を起こし、文書を提出して終わる実行が `idle` になることを確かめる（`state.json` の `invocation`）
+  - 実測 2026-09-04（worktree `pre6` / ブランチ `add-activated-phase`）。`yarn dev` をポート **3100** で起動（PID 1244130→1244143、途中で定型を替えて再起動 1248782→1248797）。**`nuxt.config.ts` は書き換えていない**——`NUXT_PROJECT_SHARE_ROOT`（既存のセッションを巡回の対象に入れないため検証用の一時ディレクトリへ）・`NUXT_CLAUDE_DEBUG_LOG_DIR`・`NUXT_CLAUDE_STEERING_PROMPT` の3つを `yarn dev` の前に付けただけ
+  - 対象は U1 →A7 →U10（承認）→U14（昇格）で作った検証用プロジェクト `stroke-check-fix-steering-0904`（uuid セッション `5662a43d-9ad2-4b55-bbb2-1eed3e9e1c0f` が昇格して改名されたもの）
+  - **提出のある実行は `idle` になった。** 04:31:54 → 04:32:13 の実行（phase `activated`・定型は「`name=tech` を1本だけ提出して終われ」）で `submit-document`（type=steering）が 200、`.spec-workflow/steering/tech.md`（1564 バイト）が書かれ、`invocation` は `running`(retries 1) → **`idle`**(retries 0)
+  - **`approved` の局面では `didWork` を通らない。** add-activated-phase で `recordCompletion`（U15）が作業の判定に代わるため（`server/utils/stroke/ai.ts` の「完成の記録を渡された実行では…」）。実測でも、文書を1本提出した 04:21:56 → 04:22:38 の実行は U15 が 409（`まだ完成していない。承認依頼が1件も無い。`）で `failed` になった。承認依頼のファイルを1件置いてから巡回に起こし直させると U15 が受理し、phase `activated`・`invocation` `idle` になった（04:26:31 → 04:26:41）
+  - **付随して観測した事実（この change の範囲外）**: steering 工程に承認依頼を作る道が現状無い（本家の `request-approval` は `--allowedTools` に載っておらず、`get-steering-guide` も呼ぶなと書いている）。そのため `approved` の steering は文書を提出しても U15 が受理せず `failed` に倒れる。add-activated-phase 側の論点として報告する
+- [x] 5.2 何も提出せずに終わる実行（例: 本家 dashboard を止めて起こす）が `idle` にならず `failed` になり、巡回に拾われることを確かめる
+  - **本家 dashboard は止めていない**（ポート 5000 は他の作業と共有のため）。代わりに定型（`NUXT_CLAUDE_STEERING_PROMPT`）と会話の続きで「提出が1本も起きない実行」を作った
+  - 04:26:52 → 04:27:04 の実行（phase `activated`。`recordCompletion` を渡さない局面なので `didWork` が判定する）は、`get-steering-guide` と `get-steering` だけを呼び、`submit-document` を1度も呼ばずに正常終了した。サーバーログは `AI 呼び出しが失敗: … [ 'プロセスは成功したが提出が届かない' ]`、`invocation` は **`failed`**（retries 1）。`idle` にはならなかった
+  - 前の起動の提出は次の起動に持ち越されていない（04:21:56 の起動が product を提出済みでも、この起動は `failed` になった＝記録が起動 token 単位で捨てられている）
+  - 巡回（`server/plugins/01.retry-failed.ts`・60 秒間隔）が拾って起こし直した: 04:27:31 `running`(retries 2) → 04:27:40 `failed`(2)、04:28:31 `running`(3) → 04:28:35 `failed`(3)
+  - 手順上の注意: 一覧（U12）に載る条件は `<対象>/openspec/config.yaml` に `schema:` が在ること（`session-core.ts` の `passesListChecks`）。flontier の初回起動を経ていない検証用プロジェクトは、これを置くまで巡回に拾われなかった
+- [x] 5.3 起こし直しが上限に達したら `error` になり、そこで自動の起こし直しが止まることを確かめる
+  - 04:29:31 の巡回で `リトライ上限に達した: stroke-check-fix-steering-0904（3/2）` が出て、claude を起動しないまま `invocation` が **`error`**（終端）になった（`claude.maxRetries: 2`）
+  - 以後 04:30:31・04:31:31 の巡回でも `state.json` は変わらず、生出力（`debugLogDir`）の起動見出しの数も 5 のまま増えなかった＝自動の起こし直しが止まっている
+  - ひと続きの起こし直しで起きた claude は3回（04:26:52 / 04:27:31 / 04:28:31）で、「上限 + 1」と一致した
+- [x] 5.4 使ったプロセス・ポート・作った検証用セッションを片づける
   - （2026-09-01 追記: 使ったプロセス（`yarn dev` PID 379862）とポート（3599）は停止・解放を確認済み（`ss -tlnp` 該当なし、`ps -p` 該当なし）。ただし作った検証用セッション（`/opt/projects` 配下）の片付けはユーザー確認待ちのため未実施）
+  - 2026-09-04 追記: `yarn dev`（PID 1248782 / 1248797）を停止し、`ss -tlnp` で **3100 の待ち受けが無い**ことを確認。`pgrep -af claude` / `pgrep -af spec-workflow-mcp` に今回起こした子プロセスは残っていない（残っているのは別作業のもの。**ポート 5000 の本家 dashboard は停止していない**）。本家の登録簿（`/opt/projects/.spec-workflow-mcp/activeProjects.json`）にも検証用プロジェクトの登録は残っていない
+  - 消したもの: 検証用プロジェクト `stroke-check-fix-steering-0904`（＝セッション `5662a43d-…` の昇格後。作ったセッションはこの1本だけ）と、検証用の生出力ディレクトリ（`NUXT_CLAUDE_DEBUG_LOG_DIR` に指した一時ディレクトリ）。どちらも `/opt/projects` の外（検証用の一時親ディレクトリ）に作ってあり、`/opt/projects` 配下には何も作っていない
+  - 2026-09-01 の分（ユーザー確認待ち）: `/opt/projects` 配下に、その検証で作ったと同定できるものは見当たらない。残っているセッションは `3d2f1ac8-0d0b-43fe-8d5a-71d1f94a4bf3` の1件だが、作成は 2026-09-03 05:50、概要は旧既定の `## setai` で、この change の検証（2026-09-01）のものと同定できない。**消さずに残した**
 
 ## 6. 上位資料への整合反映（change update-docs-for-runtime-fixes へ委譲済み）
 
@@ -45,6 +61,8 @@
 
 ## 7. 仕上げ
 
-- [ ] 7.1 この change の成果物を commit する（`openspec/config.yaml` の apply guidance）
+- [x] 7.1 この change の成果物を commit する（`openspec/config.yaml` の apply guidance）
+  - この change のコードは develop のコミット **`c086907e`**「fix: 実行まわりの欠陥7件を直す」（2026-09-01）に入っている（`git log` で確認。同コミットは現ブランチ `add-activated-phase` の祖先）。含まれるのは `server/utils/stroke/submission-signal.ts`・`server/mcp/tools/submit-document.ts`・`server/utils/stroke/invoke.ts`・`server/utils/mcp/connection-table.ts`・`server/utils/stroke/ai.ts` と、対応するテスト（`test/server/utils/stroke/invoke.test.ts`・`test/server/mcp/tools/submit-document.test.ts`・`test/server/utils/stroke/ai.test.ts`・`test/server/utils/mcp/connection-table.test.ts`）
+  - **この change 単独のコミットではない**（7件の修正がまとまっている）。新しく commit するものは無いので、記録として残す
 - [ ] 7.2 `typescript-reviewer` エージェントに `/santa-method` でレビューさせ、**完全にパスするまで**指摘の修正とレビューを繰り返す
 - [ ] 7.3 ユーザーから完了承認を得る

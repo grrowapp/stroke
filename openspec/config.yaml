@@ -4,37 +4,37 @@ schema: specs-with-grill
 # This is shown to AI when creating artifacts.
 # Add your tech stack, conventions, style guides, domain knowledge, etc.
 context: |
+
   ## ***approval requst rule (MUST):***
   ユーザーからapprovalのrequestを求められたartifactはstatusでのapproval状態を
   必ず確認しろ。requestを求められてない場合を除きstatusがapprovalになる前に勝手に
   次のphaseへの着手は絶対禁止
 
-  ユーザーへ判断や承認を求める前に `openspec/tickets/<change-id>.md` の `origin`・
-  経緯・畳む方向を読み直し、問いに添えろ。選択肢は挙動の差で示せ。規定は
-  `docs/agents/ticket-tracker.md`「ユーザーへ判断を求めるとき」
+  ## artifact を書く前に、次の3つを必ず読むこと
+  - *** `docs/specs/` *** 
+    ユーザーとの合意を経て定義された ***真の仕様書*** 実装としての正しさはここにある
+    資料の内容との整合性でのみ担保される。
 
-  ## artifact を書く前に、次の3つを必ず読むこと。
-  - `.scratch/stroke-board-frontier/decisions.md`
-    grilling セッションで確定した決定事項。プロダクト・画面・生成物・技術の全決定と、
-    保留事項・未確認事項が入っている。ここに書かれた決定を覆す提案をしないこと。
   - `CONTEXT.md`
     ドメイン用語集。ストローク / 把握完了 / proposal / 差し戻し / 承認 など。
     artifact 内でドメイン概念を指すときは、この用語をそのまま使うこと。
-  - `docs/specs/`
-    ユーザーとの合意を経て定義された ***真の仕様書*** 実装としての正しさはここにある
-    資料の内容との整合性でのみ担保される。
+
   - `docs/adr/`
     後から変えにくい決定の記録。矛盾する提案をする場合は、その旨を明示すること。
-    決定内容はエージェントによる独断記述が含まれるため過信しない。adrを引き出しにする
-    場合は都度、その正しさをユーザーに確認しろ。食い違いがあれば修正を常に入れろ
+    決定内容はエージェントによる独断記述が含まれるため過信しない。
 
-  以下を ***Skill*** toolでロード（MUST)
+  ## ユーザーへの承認要求や質問の前に必ず実施
+  - ユーザーへ判断や承認を求める前に `openspec/tickets/<change-id>.md` を確認しろ
+    経緯・畳む方向を読み直し、問いに添えろ。選択肢は挙動の差で示せ。規定は
+    ***`docs/agents/ticket-tracker.md`*** 「ユーザーへ判断を求めるとき」
 
+  ## 以下を ***Skill*** toolでロード（MUST)
   - '/coding-standardst', '/contract-first', '/api-design' '/nuxt4-patterns'
 
 rules:
   proposal:
     - use '/AskUserQuestoin`(MUST)
+
   tasks:
     - >-
       先頭のタスクは必ず次の2つをこの順で入れる（MUST）。
@@ -43,10 +43,12 @@ rules:
       2. 同ファイルの `tags` に `<ブランチ名>/<セッション ID>` を追記する。
       既に同じ物があれば追記しない。`tags` は追記のみで既存の項目を消さない
       （規定は `docs/agents/issue-tracker.md`「ticket の起票」）
+
     - >-
       'typescript-reviewer' エージェントに '/santa-method' でレビュー実行を
       必ず末尾2タスクの直前に含めろ。レビューが完全にパスするまで続けろ。tasks実行
       の必須。いかなるルールよりも優先（MUST)
+
     - >-
       末尾のタスクは必ず次の2つをこの順で入れる（MUST）。
       1. change の成果物を commit する

@@ -1,6 +1,8 @@
 ## 1. 移す
 
-- [x] 1.1 `openspec/tickets/fold-stroke-css.md` の `status` へ `Doing` と書く（`docs/agents/ticket-tracker.md`）
+- [x] 1.1 `openspec/tickets/fold-stroke-css.md` の `status` へ `Doing` と書く（`docs/agents/ticket-tracker.md`）。
+      あわせて `tags` へ、書いた artifact の id（`proposal` / `design` / `tasks`）と
+      `<ブランチ名>/<セッション ID>` を追記する（`docs/agents/issue-tracker.md`「ticket の起票」）
 - [x] 1.2 `app/assets/css/main.css` のストロークの区画（`@layer components` のブロック、
       `.sb-stroke-card` の後ろ）へ `@keyframes sb-stroke-blink` と `.sb-stroke-blink` を置く。
       値は `stroke.css` の現物と同じ（`1.1s ease-in-out infinite` / `50% { opacity: 0.35 }`）——
