@@ -24,13 +24,10 @@
  * 起こし直す。これが無いと、`invocation` が `idle` のまま何も進まないセッションが残り、
  * 巡回（`failed` しか拾わない）も回収できない。
  *
- * **生成中のプロジェクト（phase が `approved`）の steering はこの記録では決まらない。**
- * その局面では完成の記録（U15）の受理が作業の判定に代わる（add-activated-phase。
- * `openspec/specs/agent/invocation`「完了は output stream で検知して idle に変える」）。
- * ここが効くのは、完成済み（`activated`）の steering の起こし直しである。
- *
  * 単一ユーザー・単一プロセスの MVP なのでメモリ上で足りる。
  */
+
+/** flontier（A5・A7）の提出の記録。キーは対象の `sessionId`、値はこれまでの提出数。 */
 const counts = new Map<string, number>()
 
 /** 提出を1つ数える。A5・A7 の受理が呼ぶ。 */
@@ -53,6 +50,11 @@ export function forgetSubmissions(sessionId: string): void {
  *
  * 数えるのは代行先（本家 spec-workflow）が受理した経路だけ——拒否・不達・手前で弾いた
  * 400 では記録しない（`submit-document.ts` の責務）。
+ *
+ * **生成中のプロジェクト（phase が `approved`）の steering はこの記録では決まらない。**
+ * その局面では完成の記録（U15）の受理が作業の判定に代わる（add-activated-phase。
+ * `openspec/specs/agent/invocation`「完了は output stream で検知して idle に変える」）。
+ * ここが効くのは、完成済み（`activated`）の steering の起こし直しである。
  *
  * **数ではなく有無で持つ（`Set`）。** 問いは「その起動で受理された提出が1つ以上あるか」
  * だけで、件数を読む者は居ない（`counts` 側は起動の前後で比べるので数が要る。こちらは
