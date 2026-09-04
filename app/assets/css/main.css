@@ -1,6 +1,6 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
-/* ストローク側（stroke.css / 画面2 の proposal 表示）が typography を使う */
+/* ストローク側（画面2 の proposal 表示）が typography を使う */
 @plugin "@tailwindcss/typography";
 
 /*
@@ -1306,6 +1306,41 @@ body {
     border-radius: var(--radius-lg);
     border: 1px solid var(--ui-border);
     background: color-mix(in oklab, var(--ui-bg-elevated) 50%, transparent);
+  }
+
+  /*
+   * 明滅。2つの場面で使う——次の問いを待っている間（`WaitingIndicator`）と、
+   * AI からの問い返しが届いたことを知らせる帯（`strokes/[sessionId]/proposal.vue`）。
+   * 前者は「まだ続いている」、後者は「あなたの番だ」を示す。
+   *
+   * **下層の `sb-loader-blink` と値が違う。揃えないこと。** あちらは生成中のローダーで、
+   * `linear` で明暗を長く保持する形が ui.md の確定値として出ている。こちらは用途が違い、
+   * 値の出どころも違う（ストロークには写す元が無い——`adopt-upstream-design-tokens`）。
+   * 名前が似ているだけで、重複ではない。
+   *
+   * 名前に `sb-stroke-` を付けているのは、`@keyframes` の名前空間が文書全体で1つで、
+   * 同じ `main.css` の中に `sb-loader-blink` が居るためである
+   * （change `fold-stroke-css` で `assets/css/stroke.css` から移した）。
+   */
+  @keyframes sb-stroke-blink {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.35;
+    }
+  }
+
+  .sb-stroke-blink {
+    animation: sb-stroke-blink 1.1s ease-in-out infinite;
+  }
+
+  /* 動きを抑える設定に従う。示す内容（待機・要注意）は文言が持つので、止めても伝わる */
+  @media (prefers-reduced-motion: reduce) {
+    .sb-stroke-blink {
+      animation: none;
+    }
   }
 }
 

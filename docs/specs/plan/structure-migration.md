@@ -11,6 +11,6 @@
 | `composables/useRelativeTime.ts` が `useXxx` を持たない | 中身は純関数 `formatRelativeTime` のみで、規範の「関心単位の `useXxx` を平置き」に当てはまらない。参照元は5ページ。**規範のツリーに純関数の置き場（`app/utils/` 等）が無い**ため、置き場の新設とあわせて決める |
 | auto-import が有効のまま | steering（`.spec-workflow/steering/structure.md` の Import Patterns）が定める明示 import に、実装が従っていない。`nuxt.config.ts` に `imports` の設定が無く、ストローク側は明示 import 無しで動いている（統一は `align-coding-conventions`） |
 | `server/utils/` が upstream / control / stroke | 関心単位へ再編（区分は server/utils の棚卸し） |
-| `assets/css/stroke.css` | design token の統合（`openspec/changes/adopt-upstream-design-tokens`）とあわせて畳む |
+| ~~`assets/css/stroke.css`~~ | **解消済み。** `main.css` のストロークの区画へ畳んだ |
 | `prompt/first-order.md`（1ファイルのための第1階層ディレクトリ） | 置き場を見直す（規範のツリーに含めない） |
 | ~~markdown 操作が `MarkdownNodes.ts`（defineComponent）と `DocumentView.vue` / `DocumentEditor.vue` に分散~~ | **解消済み。** まず `MarkdownNodes.ts` を削除し、描画を `@nuxtjs/mdc` の `<MDC :value>` 1方式へ寄せた。次に描画・編集・フェンスの後段・parse 設定・見た目をすべて `modules/markdown/` に閉じた（`MarkdownView` / `MarkdownSource` / `MarkdownEditor` / `MarkdownFence` / `MarkdownCode` / `MarkdownDiagram`、`index.ts`、`markdown.css`）。`app/components/` にも `nuxt.config.ts` にも markdown の実体は無い。全数は規範 §3 |

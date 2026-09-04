@@ -286,6 +286,6 @@ import { defaultHighlightColor, highlightColors } from '~/composables/useAnnotat
 
 - **置き場の区分の基準が混ざっている。** 直下は「共用」という**使われ方**、`review/` は「レビュー」という**役割**、`stroke/` は「画面1」という**場所**、`shared/` は「共用」、`workspace/` は「下層の作業画面」。「Nuxt が登録する場所」という**仕組みの要求**（`global/`）は、markdown のモジュール化で消えた
 - **`Modals.vue` だけ結合の仕方が違う。** 他は props と emit、これだけ composable の戻り値を丸ごと受ける
-- **`WaitingIndicator.vue` は 11 行。** props 1つで、`.blink` クラスを当てるだけ
+- **`WaitingIndicator.vue` は 11 行。** props 1つで、`.sb-stroke-blink` クラスを当てるだけ
 - **画面1の問いと画面2の問い返しの重複は解消済み。** かつては `stroke/QuestionCard.vue`（画面1の問い）と `review/FollowupModal.vue`（画面2の問い返し）が同じ「問いを出して答えを受ける」ことを別々に書いていた。`AgentQuestion.vue` 1本に統合し、両方がこれを使う。オーバーレイの外殻は持たず、画面1は素置き、画面2は `UModal` の body slot に置く。画面ごとに変わるのは `submitLabel` と `waitingMessage` の2つの文言だけ
 - **コンポーネントから composable への import が1件ある**（`CommentModal` → `useAnnotations` の色定義）。依存の向きとしては逆向き

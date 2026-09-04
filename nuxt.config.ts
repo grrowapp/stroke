@@ -37,7 +37,9 @@ export default defineNuxtConfig({
   },
 
   // ビルド時: CSS はバンドルに畳み込まれる
-  css: ['~/assets/css/main.css', '~/assets/css/stroke.css'],
+  // アプリのスタイルは main.css の1本。上層（prototype）／下層（本家写し）／ストロークの
+  // 3区画をその中で仕切って持つ（`app/assets/css/main.css` の区画のコメント）
+  css: ['~/assets/css/main.css'],
 
   // ビルド時: DevTools はビルドに組み込まれる。画面の上に自前のバーとボタンを重ね、
   // 見た目を突き合わせる邪魔になるので切っておく
