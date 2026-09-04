@@ -13,13 +13,13 @@
 ## 3. 完成の記録 U15（design D3）
 
 - [x] 3.1 `server/utils/stroke/submission-path.ts` に `activatePath(id)`（`/api/sessions/:id/activate`）を足す
-- [x] 3.2 `server/api/sessions/[id]/activate.post.ts` を置く。判定の順序は D3 の表のとおり: 404 → `readState` 失敗は 409 `phase` → `approved` 以外は 409 `phase`（未昇格／既に完成の2文言）→ 承認依頼なしは 409 `phase` → `writeState` で `activated` → `broadcastProjectCreation(name, 'done')`。busy を見ない。`invocation` に触れない
-- [x] 3.3 承認依頼の有無は `.spec-workflow/approvals/` の直下と1段下の通常ファイルを数えるだけで決める（中身を読まない・本家 REST を呼ばない）。実装前に本家 2.2.7 の実物の `approvals/` に category 以外のファイルが置かれるかを確かめ、必要なら `.json` に限る（design Open Question）。結果を handler の doc コメントに残す
-- [x] 3.4 `test/server/api/sessions/activate.post.test.ts` — spec `api/session/activate` の Scenario をすべて: 受理して `activated` になる／承認依頼なしは 409 で `approved` のまま／却下済みだけでも受理／未昇格は 409／既に完成は 409／存在しない id は 404／受理で `done` が配信される／`invocation` とディレクトリ名が変わらない
+- [x] 3.2 `server/api/sessions/[id]/activate.post.ts` を置く。判定の順序は D3 の表のとおり: 404 → `readState` 失敗は 409 `phase` → `approved` 以外は 409 `phase`（未昇格／既に完成の2文言）→ `writeState` で `activated` → `broadcastProjectCreation(name, 'done')`。busy を見ない。`invocation` に触れない（**14.1 で「承認依頼なしは 409」を外した**）
+- [x] 3.3 ~~承認依頼の有無を数える~~ → **14.1 で撤回。** U15 は完成の判定を持たず、ファイルシステムも本家 REST も読まない（ADR-0014・design D3）
+- [x] 3.4 `test/server/api/sessions/activate.post.test.ts` — spec `api/session/activate` の Scenario をすべて: 受理して `activated` になる／成果物の有無を見ない（`.spec-workflow/` が無い `approved` でも受理）／未昇格は 409／既に完成は 409／存在しない id は 404／受理で `done` が配信される／`invocation` とディレクトリ名が変わらない
 
 ## 4. invokeAi から U15 を叩く（design D4）
 
-- [x] 4.1 `server/utils/stroke/ai.ts` の `AiRun` に `recordCompletion?: () => Promise<boolean>` を足し、`runBuiltInvocation` の成功経路を「`didWork` false → `failed`／`recordCompletion` 無し → `idle`／在り → 呼んで true なら `idle`・false なら `failed`」にする。`invokeAi` の中に phase の判定を置かない
+- [x] 4.1 `server/utils/stroke/ai.ts` の `AiRun` に `recordCompletion?: () => Promise<boolean>` を足し、`runBuiltInvocation` の成功経路を「`didWork` false → `failed`（`recordCompletion` を呼ばない）／`didWork` true かつ `recordCompletion` 無し → `idle`／`didWork` true かつ在り → 呼んで true なら `idle`・false なら `failed`」にする。**`didWork` を先に見る**（完成の判定はこれ。14.2）。`invokeAi` の中に phase の判定を置かない
 - [x] 4.2 `server/utils/stroke/invoke.ts` の `kick` を `kind` ではなく `phase` を受ける形に変え、`kind`・`runId`・`recordCompletion` の導出を `invoke.ts` の1箇所に集める。`recordCompletion` は `phase === 'approved'` の steering にだけ渡し、実体は `$fetch(activatePath(id), { method: 'POST' })` の 2xx を true、それ以外（409・404・不達）を false にする
 - [x] 4.3 `server/api/strokes/[id]/invoke-agent.get.ts` から `=== 'approved'` の2箇所（`kind`・`runId`）を消し、`state.phase` を渡すだけにする。doc コメントの「承認済み（`approved`）でも受け付ける」を承認以降に直す
 - [x] 4.4 `test/server/utils/stroke/ai.test.ts` — 作業ありで `recordCompletion` が true → `idle`・回数 0／false → `failed`／`recordCompletion` 無し → `idle`／`didWork` false のとき `recordCompletion` は呼ばれない
@@ -55,10 +55,10 @@
 
 ## 9. 起動時の書き上げ（design D9）
 
-- [x] 9.1 書き上げの手順を `server/utils/stroke/activate-approved.ts` に純関数として置く（一覧の取得と U15 の呼び出しを注入で受け、2xx／409／その他の件数を返す。`reap.ts` と同じ作り）
+- [x] 9.1 書き上げの手順を `server/utils/stroke/activate-approved.ts` に純関数として置く（一覧の取得と U15 の呼び出しを注入で受け、2xx／409／その他の件数を返す。`reap.ts` と同じ作り）。対象は **`approved` かつ `invocation: 'idle'`** で選ぶ（14.3）
 - [x] 9.2 `server/plugins/01.activate-approved.ts` を置く。U12 を取れなければ警告して何もしない。件数を1行でログに出す。他のプラグインとの順序の取り決めを持たない
 - [x] 9.3 `test/server/utils/stroke/activate-approved.test.ts` — `approved` だけに U15 が叩かれる／409 は生成中のまま数える／1件の失敗で他の件が止まらない
-- [x] 9.4 `yarn dev` で起動し、実物の保存先の `approved` で承認依頼を持つものが `activated` に書き上がり、持たないものが `approved` のまま残ることを確かめる。確認後は dev サーバーを止め、ポートの解放を確かめる
+- [x] 9.4 `yarn dev` で起動し、実物の保存先の `approved` で実行の記録が `idle` のものが `activated` に書き上がり、`failed` / `error` / `running` のものが `approved` のまま残ることを確かめる。確認後は dev サーバーを止め、ポートの解放を確かめる
 
 ## 10. 上位資料への整合反映（proposal「上位資料への整合反映」）
 
@@ -76,8 +76,8 @@
 
 - [x] 11.1 `yarn typecheck`・`yarn lint`・`yarn test` が通る
 - [x] 11.2 `grep -rn "'approved'" server shared app` の結果を見て、`activated` を落とす `=== 'approved'` が残っていないことを確かめる（U14 の「既に昇格している」判定は `isPromotedPhase` に揃える）
-- [ ] 11.3 通し確認: proposal を承認 → 一覧で生成中 → 本家 MCP が接続して `.spec-workflow/` ができても生成中のまま・入場できない → steering が承認依頼を出して終わると `done` が届き、行が通常になる → 「レビューする」で承認依頼が見える。終わったら dev サーバーとプロセスを止める
-- [ ] 11.4 通し確認（失敗側）: 承認依頼を出さずに終わる steering で `failed` になり巡回が拾うこと。上限に達して `error` で失敗のモーダルが出て、「破棄する」で `.spec-workflow/` を持つプロジェクトが消えること
+- [ ] 11.3 通し確認: proposal を承認 → 一覧で生成中 → 本家 MCP が接続して `.spec-workflow/` ができても生成中のまま・入場できない → steering が文書を提出して終わると（`didWork` が true → U15 が受理）`done` が届き、行が通常になる → 「レビューする」で本家の画面に入れる。終わったら dev サーバーとプロセスを止める
+- [ ] 11.4 通し確認（失敗側）: 文書を1本も提出せずに終わる steering で `failed` になり巡回が拾うこと（U15 は叩かれない）。上限に達して `error` で失敗のモーダルが出て、「破棄する」で `.spec-workflow/` を持つプロジェクトが消えること
 
 ## 12. レビュー
 
@@ -87,3 +87,18 @@
 
 - [x] 13.1 change の成果物を commit する
 - [ ] 13.2 ユーザーから完了承認を得て、`openspec/tickets/add-activated-phase.md` の `status` を `Wait-for-archive` にする（`docs/agents/ticket-tracker.md`「ラベル設定」）
+
+## 14. U15 から判定を外す（2026-09-04）
+
+実運用の steering が、文書を提出しても U15 に 409 で断られて `failed` → 巡回 → `error` に倒れた（実機確認）。原因は2つ——**U15 が状態を判定していた**（ADR-0014 に反する）ことと、その根拠にした**承認依頼を steering 工程が出せない**こと（本家 `request-approval` は allowedTools に無い）。完成の判定を U15 から呼び手へ移す。設計の変更はこの3点だけで、`didWork` の定義・巡回の条件・endpoint の構成は変えない。
+
+- [x] 14.1 `server/api/sessions/[id]/activate.post.ts` から `hasApprovalRequest` / `hasApprovalFile` と `node:fs`・`paths` の import を消す。doc コメントの「完成の根拠は承認依頼のファイルの存在だけ」「実物の配置」の節を「判定を持たない（ADR-0014）」に書き直し、退けた案とその理由を残す
+- [x] 14.2 `server/utils/stroke/ai.ts` の成功経路を「`didWork` false → `failed`（`recordCompletion` を呼ばない）／true かつ記録なし → `idle`／true かつ記録あり → 呼んで true なら `idle`・false なら `failed`」に直す。`invoke.ts` の `recordCompletion` の導出（`phase === 'approved'` の steering にだけ渡す）は変えない
+- [x] 14.3 `server/utils/stroke/activate-approved.ts`・`server/plugins/01.activate-approved.ts` の対象を「`approved` かつ `invocation: 'idle'`」に直す。`failed` / `error` / `running` は生成中のまま残す。ファイルシステムを見る判定は置かない
+- [x] 14.4 テストを揃える: `test/server/api/sessions/activate.post.test.ts`（承認依頼のヘルパーと関連ケースを消し、「成果物の有無を見ない」「busy を見ない」を足す）・`test/server/utils/stroke/ai.test.ts`（`didWork` false なら `recordCompletion` を呼ばず `failed`）・`test/server/utils/stroke/activate-approved.test.ts`（`idle` だけが対象）・`test/server/utils/stroke/invoke.test.ts`・`test/e2e/stroke-exit.spec.ts`
+- [x] 14.5 delta spec 3本を直す: `api/session/activate`（Requirement「完成の根拠は承認依頼の存在とする」→「完成の判定を持たない」）・`agent/invocation`（作業あり → 記録を試みる／作業なし → `failed`、記録しない）・`project/generation`（起動時の書き上げは `approved` かつ `idle`）
+- [x] 14.6 `design.md`（Context・D3・D4・D8・D9・Risks・Open Questions）と `proposal.md`（What Changes・誰がいつどう書くか・`didWork` では足りない理由・U15 と ADR-0014 の関係・初回の見分け方・決定の記録）を直す。**退けた案の経緯を1箇所に残す**
+- [x] 14.7 上位資料を直す（apply で書き換え済みの範囲だけ）: `docs/specs/api/sessions/activate.md`・`docs/specs/api/contract.md`・`docs/specs/core/schema.md`・`docs/specs/plan/portal-stroke-exit.md`・`docs/specs/architecture/session-workflow.md`・`docs/specs/architecture/question-flow.md`・`CONTEXT.md`
+- [x] 14.8 コメントを直す（`ai.ts`・`invoke.ts`・`activate-approved.ts`・`01.activate-approved.ts`・`directory.ts`・`projects/[projectId]/index.delete.ts`・`shared/stroke.ts`）。`grep -rn "approvals\|承認依頼" server shared app test scripts` で漏れを洗う
+- [x] 14.9 ticket に「### 判定材料の見直し（2026-09-04）」を足す（「調べた事実」の表は当時の記録として残す）
+- [x] 14.10 `yarn typecheck`・`yarn test` を通し、`/santa-method` でレビューして指摘を直す

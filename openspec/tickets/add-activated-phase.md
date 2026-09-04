@@ -1,16 +1,16 @@
 ---
 status: Doing
+date: 2026-09-02
+triage:
+  - bug
 tags:
   - proposal
   - specs
   - design
   - tasks
   - add-activated-phase/10084104-7036-45cc-a9bb-e7df8f879f59
-triage:
-  - bug
+order: -11.0
 change: add-activated-phase
-order: 0.0
-date: 2026-09-02
 ---
 
 # add-activated-phase
@@ -123,6 +123,15 @@ date: 2026-09-02
 | 本家 REST の承認依頼一覧 | 難あり | 本家の稼働に依存する。取れなかったことと0件が混ざる（`docs/adr/0005`） |
 | 自前 MCP `submit-document`(steering) の呼び出し回数 | 不可 | **承認依頼はこのツールを通らない**。承認依頼を作るのは本家 `spec-workflow-mcp` の `request-approval` である。文書の PUT を数えても承認依頼の有無は分からない |
 | AI のプロセスの終了（`invocation === 'idle'`） | 不可 | 何も作らずに正常終了しうる（この ticket の「事実」節） |
+
+### 判定材料の見直し（2026-09-04）
+
+**上の表の「有力」は退けた。** 承認依頼を根拠にした U15 を実機で回したところ、steering は文書を提出しても U15 に 409 で断られ、`failed` → 巡回 → `error` に倒れた（2026-09-04 実機確認）。理由は2つ。
+
+- **steering 工程には承認依頼を出す手段が無い。** 本家 `request-approval` は allowedTools に載っておらず、`get-steering-guide` も呼ばせない。上の表は「承認依頼は自前 MCP を通らない」までは掴んでいたが、**そもそも steering の claude が承認依頼を出せない**ことを見落としていた。出せないものを根拠にすれば、正常に終わった実行が全部不受理になる
+- **API が状態を判定していた。** U15 は呼び出し側が渡していないファイルシステムの状態（`.spec-workflow/approvals/` の中身）を読んで受理の可否を変えていた。ADR-0014「API は暗黙の状態分岐を持たない」に反する
+
+**決定: U15 から判定を外し、完成の判定を invokeAi の `didWork` に置いた。** `didWork` は `fix-steering-empty-completion` が入れた「その起動で steering 文書の提出が本家に受理されたか」（起動単位の記録）で、上の表には無かった材料である。U15 は `approved` → `activated` の遷移を記録するだけになり、成果物もファイルシステムも本家 REST も `invocation` も読まない。起動時の書き上げ（導入前のものを畳む一度きりの処理）は、一覧が返す実行の記録（`approved` かつ `invocation: 'idle'`）で対象を選ぶ。
 
 ### `activated` を足すと落ちる分岐
 

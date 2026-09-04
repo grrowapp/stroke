@@ -1,6 +1,6 @@
 ## Purpose
 
-昇格したプロジェクトの完成——steering が初回の承認依頼を出したこと——を記録する endpoint（U15 `POST /api/sessions/:id/activate`）を規定する。承認の判断（U10）・昇格（U14）・起動（U13）と同じく、承認の流れの1段を1つの endpoint が受け持つ。起動も判断も昇格も受け持たない。
+昇格したプロジェクトの完成——呼び手が完成と判定したこと——を記録する endpoint（U15 `POST /api/sessions/:id/activate`）を規定する。承認の判断（U10）・昇格（U14）・起動（U13）と同じく、承認の流れの1段を1つの endpoint が受け持つ。起動も判断も昇格も受け持たない。**完成したかの判定も受け持たない。**
 
 ## ADDED Requirements
 
@@ -16,7 +16,7 @@
 
 #### Scenario: 完成を記録する
 
-- **WHEN** phase が `approved` で、承認依頼を1件以上持つプロジェクトの id に `POST /api/sessions/:id/activate` が届く
+- **WHEN** phase が `approved` のプロジェクトの id に `POST /api/sessions/:id/activate` が届く
 - **THEN** システムは受理し、phase は `activated` になる。ディレクトリ名も `invocation` も変わらず、AI は起動されない
 
 #### Scenario: 存在しない id で要求する
@@ -24,28 +24,28 @@
 - **WHEN** 存在しない id で完成の記録が要求される
 - **THEN** システムは受理せず、存在しないことを伝える。何も書かれない
 
-### Requirement: 完成の根拠は承認依頼の存在とする
+### Requirement: 完成の判定を持たない
 
-システムは、対象のプロジェクトの `.spec-workflow/approvals/` 配下に承認依頼のファイルが1件以上在ることを、完成の唯一の根拠としなければならない（SHALL）。承認依頼のファイルとは、本家が category ごとのディレクトリ（`approvals/<category>/`）の直下に置く JSON ファイルを指し、category は問わない（SHALL）。隠しファイル・ディレクトリ（本家の `.snapshots/` など）や `approvals/` 直下のファイルは数えない（SHALL NOT）。承認依頼の状態（保留・承認済み・却下済み）は問わない（SHALL）。
+システムは、この endpoint に完成したかの判定を持たせてはならない（MUST NOT）。**完成したかを決めるのは呼び手であり**、この endpoint は `approved` から `activated` への一方向の遷移を記録するだけとする SHALL。呼び手がどう決めるかは `agent/invocation`（実行ごとの判定）と `project/generation`（起動時の書き上げ）が定める。
 
-システムは、この判定のために本家 spec-workflow-mcp の REST を呼んではならない（MUST NOT）。本家が動いていなくても判定できなければならない。
+システムは、対象の成果物——`.spec-workflow/` 配下のファイル、steering 文書、承認依頼、その他の生成物——の有無や数を、受理の可否の材料にしてはならない（MUST NOT）。ファイルシステムを読んではならず（MUST NOT）、本家 spec-workflow-mcp の REST を呼んでもならない（MUST NOT）。AI の実行状態（`invocation`）も材料にしてはならない（MUST NOT）。
 
-システムは、AI の実行状態（`invocation`）や、steering 文書の提出の有無を、この判定の材料にしてはならない（MUST NOT）。文書を書いても承認依頼を出さずに終わった実行は、完成ではない。
+受理の可否を決めてよいのは、受け取った id に対して**この責務が成立しないこと**だけとする SHALL——対象が存在しない、`state.json` を読めない、phase が `approved` でない、の3つである。呼び出し側が渡していない内部状態を見て振る舞いを変えないためで、これは ADR-0014「API は暗黙の状態分岐を持たない」が対象外とする「責務の不成立」の分岐にあたる。
 
-#### Scenario: 承認依頼が無い
+#### Scenario: 成果物の有無を見ない
 
-- **WHEN** phase が `approved` だが承認依頼のファイルが1件も無いプロジェクトに完成の記録が要求される
-- **THEN** システムは受理せず、まだ完成していないことを伝える。phase は `approved` のまま残る
-
-#### Scenario: 却下済みの承認依頼だけが在る
-
-- **WHEN** 承認依頼のファイルが在るが、そのすべてが却下済みであるプロジェクトに完成の記録が要求される
+- **WHEN** phase が `approved` で、`.spec-workflow/` を1つも持たないプロジェクトに完成の記録が要求される
 - **THEN** システムは受理し、phase は `activated` になる
 
 #### Scenario: 本家が動いていない
 
-- **WHEN** 本家 spec-workflow-mcp が起動していない状態で、承認依頼のファイルを持つプロジェクトに完成の記録が要求される
-- **THEN** システムは受理し、phase は `activated` になる
+- **WHEN** 本家 spec-workflow-mcp が起動していない状態で完成の記録が要求される
+- **THEN** システムは受理し、phase は `activated` になる。本家に問い合わせない
+
+#### Scenario: 実行中の対象に記録する
+
+- **WHEN** `invocation` が `running` のまま——実行がまだ `idle` を書く前——の生成中のプロジェクトに完成の記録が要求される
+- **THEN** システムは受理し、phase は `activated` になる。実行の記録を受理の可否に使わない
 
 ### Requirement: 承認より前の局面と、既に完成した対象には記録しない
 
