@@ -109,9 +109,10 @@ stateDiagram-v2
 - **正常終了でも、その起動で提出が1つも受理されていなければ `failed` に倒す。** 提出は
   flontier が問い・proposal、steering が steering 文書。空振りを `idle` にすると成功と
   区別できず、誰も起こし直さない
-- **生成中（`approved`）の steering では、完成の記録（U15）の受理が完了の唯一の根拠で、提出の
-  判定はそれに代わる。** 承認依頼が在れば作業は済んでいる。起こし直しが文書を出さず承認依頼だけを
-  出した回でも、記録が受理されれば `idle` になる（`docs/specs/api/sessions/activate.md`）
+- **生成中（`approved`）の steering では、提出の判定（その起動で steering 文書の提出が本家に
+  受理されたか）が完成の判定そのものである。** 提出があった実行だけが完成の記録（U15）へ進み、
+  受理されて `idle` になる。記録に届かなければ `failed`。提出が無ければ記録を試みずに `failed` に
+  倒す——**U15 の側に判定は無い**（ADR-0014。`docs/specs/api/sessions/activate.md`）
 - サーバー再起動で宙に浮いた `running` は、**まずその claude を終了させてから** `failed` へ
   倒して巡回に拾わせる（`server/plugins/01.reap-running.ts`）。終了させられない場合と、
   走っているものを調べられない場合は `error` へ倒してユーザーに引き渡す

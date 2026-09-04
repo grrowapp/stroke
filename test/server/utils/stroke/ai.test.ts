@@ -199,12 +199,16 @@ describe('invokeAi', () => {
   })
 
   /**
-   * 完成の記録（add-activated-phase design D4）。`didWork` と同じ置き方で、渡されているとき
-   * だけ呼ぶ。ai.ts は phase を知らず、渡された関数の真偽値しか見ない。渡されているときは
-   * 作業の判定に代わる——完成の記録が受理されたなら作業は済んでいる。
+   * 完成の記録（add-activated-phase design D4）。`didWork` と同じ置き方で、渡されていて
+   * **かつ作業があったとき**だけ呼ぶ。ai.ts は phase を知らず、渡された関数の真偽値しか
+   * 見ない。
+   *
+   * **`didWork` を先に見る。** 完成したかを決めるのは `didWork`（その起動で steering 文書の
+   * 提出が本家に受理されたか）で、記録先の U15 は判定を持たない（ADR-0014）。記録の受理を
+   * 完成の判定に代える形は 2026-09-04 に退けた——U15 が承認依頼を数えていた時の理屈である。
    */
   describe('完成の記録（recordCompletion）', () => {
-    it('記録が受理されれば idle（回数は戻す）', async () => {
+    it('作業ありで記録が受理されれば idle（回数は戻す）', async () => {
       runClaude.mockResolvedValue({ ok: true, sessionId: 'x' })
       const recordCompletion = vi.fn(async () => true)
 
@@ -233,25 +237,16 @@ describe('invokeAi', () => {
       expect(calls.at(-1)).toEqual({ invocation: 'idle', retries: 0 })
     })
 
-    it('文書を出さない起こし直しでも、承認依頼が在って記録が受理されれば idle（作業の判定に代わる）', async () => {
-      // 前の実行で文書は済み、この実行は承認依頼だけを出した。didWork（文書の提出）は false だが
-      // 完成の記録が受理されるので完了。先に didWork を見ると上限まで failed を繰り返す
+    it('作業が無ければ記録を試みず failed（判定は didWork が持つ）', async () => {
+      // 提出が1つも受理されていない起動は完成ではない。ここで記録しに行くと、何も出して
+      // いない対象が完成として畳まれる
       runClaude.mockResolvedValue({ ok: true, sessionId: 'x' })
       const recordCompletion = vi.fn(async () => true)
 
       const { run, calls } = makeRun({ didWork: () => false, recordCompletion })
       await runInvoke(run)
 
-      expect(recordCompletion).toHaveBeenCalledTimes(1)
-      expect(calls.at(-1)).toEqual({ invocation: 'idle', retries: 0 })
-    })
-
-    it('何もせず、記録も受理されなければ failed', async () => {
-      runClaude.mockResolvedValue({ ok: true, sessionId: 'x' })
-
-      const { run, calls } = makeRun({ didWork: () => false, recordCompletion: async () => false })
-      await runInvoke(run)
-
+      expect(recordCompletion).not.toHaveBeenCalled()
       expect(calls.at(-1)).toEqual({ invocation: 'failed', retries: undefined })
     })
 

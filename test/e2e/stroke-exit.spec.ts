@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -203,18 +203,14 @@ test.describe('承認して一覧へ戻る', () => {
     await page.goto('/projects');
     await expect(page.getByTestId('projects-table')).toBeVisible();
 
-    mkdirSync(join(PROJECTS_PARENT, SEEDED_PROJECT_NAME, '.spec-workflow', 'approvals'), { recursive: true });
+    mkdirSync(join(PROJECTS_PARENT, SEEDED_PROJECT_NAME, '.spec-workflow', 'steering'), { recursive: true });
 
     const finished = await request.post(`/api/strokes/${SEEDED_PROJECT_NAME}/submission`, {
       data: { invocation: 'idle' },
     });
     expect(finished.ok()).toBe(true);
 
-    // 承認依頼が無いので完成の記録は受理されない
-    const refused = await request.post(`/api/sessions/${SEEDED_PROJECT_NAME}/activate`);
-    expect(refused.status()).toBe(409);
-
-    // 成功の決着は届かず、行は生成中のまま
+    // U15 は叩かれていない（invokeAi は E2E では走らない）。成功の決着は届かず、行は生成中のまま
     await page.waitForTimeout(1_500);
     await expect(page.getByTestId('project-creation-notice')).toHaveCount(0);
     const row = page.getByTestId('project-row').filter({ hasText: SEEDED_PROJECT_NAME });
@@ -231,17 +227,13 @@ test.describe('承認して一覧へ戻る', () => {
   /**
    * 完了が届くと、生成中の表現が外れて一度だけ祝う（specs/project/generation）。
    *
-   * 完了の実体は完成の記録——steering が承認依頼を出したことを U15 が phase に書くこと
-   * ——である（specs/api/session/activate）。steering は E2E では走らないので、承認依頼の
-   * ファイルを手で置き、U15 を叩く。U15 は invokeAi が完了時に叩く口そのものである。
+   * 完了の実体は完成の記録——呼び手が完成と判定したことを U15 が phase に書くこと——である
+   * （specs/api/session/activate）。**U15 は判定を持たない**（ADR-0014）ので、成果物を置く
+   * 必要は無い。invokeAi は E2E では走らないため、その呼び手の代わりに U15 を直接叩く。
    */
   test('完了が届くと通常の行に変わり、知らせてから選ばせる', async ({ page, request }) => {
     await page.goto('/projects');
     await expect(page.getByTestId('projects-table')).toBeVisible();
-
-    const approvals = join(PROJECTS_PARENT, SEEDED_PROJECT_NAME, '.spec-workflow', 'approvals', 'steering');
-    mkdirSync(approvals, { recursive: true });
-    writeFileSync(join(approvals, 'approval_1_e2e.json'), '{"status":"pending"}\n', 'utf8');
 
     const response = await request.post(`/api/sessions/${SEEDED_PROJECT_NAME}/activate`);
     expect(response.status()).toBe(204);

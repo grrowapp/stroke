@@ -105,8 +105,8 @@ export interface SendBackPayload {
  * （openspec/changes/add-activated-phase design D1）。イコール比較の連鎖をどこにも書かない。
  *
  * `stroking → proposed → approved → activated` の順で一方向に進む。
- * - `approved` — 承認で昇格したが、steering がまだ承認依頼を出していない（生成中）
- * - `activated` — steering が承認依頼を出した。完成の記録（U15）だけが書く
+ * - `approved` — 承認で昇格したが、steering がまだ生成を終えていない（生成中）
+ * - `activated` — steering が生成を終えた。完成の記録（U15）だけが書く
  */
 export const PHASES = ['stroking', 'proposed', 'approved', 'activated'] as const
 

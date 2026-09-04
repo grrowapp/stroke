@@ -46,7 +46,13 @@ const emit = defineEmits<{
       <template v-if="props.outcome === 'done'">
         <p class="sb-choice-title">ステアリングの結果をレビューしますか？</p>
         <p class="sb-choice-note">
-          {{ props.canReview ? '承認依頼を開いた状態で表示します。' : '承認依頼を開けません。' }}
+          <!--
+            承認依頼が1件も無いまま完成することがある。完成の記録は steering が文書を出し
+            終えたことを根拠にしており、承認依頼の有無を見ていない（add-activated-phase）。
+            「開いた状態で表示します」と断言すると、その経路で嘘になる
+            （`projects/index.vue` の `review()` は対象が無ければ承認の一覧へ落とす）。
+          -->
+          {{ props.canReview ? '承認画面へ移ります。対象があれば開いた状態で表示します。' : '承認画面を開けません。' }}
         </p>
         <p v-if="props.error" class="sb-choice-error" data-testid="project-creation-error">
           {{ props.error }}

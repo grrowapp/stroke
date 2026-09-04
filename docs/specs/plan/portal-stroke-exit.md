@@ -15,8 +15,8 @@ flowchart TB
   ren --> back["モーダルを閉じて<br>プロジェクト一覧 /projects に戻る"]
   ren --> show["サーバー: 上層へ <b>in-progress</b> を配信<br>一覧の最下部に<b>生成中の行</b>が出る"]
   ren --> launch["画面: U13 で steering 作成の claude を起こす<br>（届かなければ巡回が拾う）"]
-  launch --> steering["本家 spec-workflow MCP で<br>steering 文書を作成し、承認依頼を出す"]
-  steering --> record["実行が終わったら invokeAi が U15 を叩く<br>承認依頼が在れば phase = <b>activated</b>"]
+  launch --> steering["本家 spec-workflow MCP で<br>steering 文書を作成して提出する"]
+  steering --> record["提出が受理されて実行が終わったら<br>invokeAi が U15 を叩く → phase = <b>activated</b>"]
   record --> done["U15 が <b>done</b> を配信<br>生成中の表現が外れ、一度だけ祝う"]
 ```
 
@@ -71,7 +71,7 @@ flowchart TB
 
 1. **起動**: invokeAi が claude を起こし、`invocation` を `running` にする（A8 経由）
 2. **完了**: invokeAi が子プロセスの **output stream**（`--output-format json` の成功エンベロープ）で検知する。**AI 自身に告知させない**。作業が行われていなければ（提出が無ければ）`failed`
-3. **完成の記録**（生成中の steering だけ・change `add-activated-phase`）: `idle` にする前に U15 を叩く。承認依頼が在れば phase が `activated` になり `idle`、無ければ `failed`。この判定が 2 の「作業が行われたか」に代わる（承認依頼が在れば作業は済んでいる）。完成済みの起こし直しとストロークは U15 を叩かず、2 の判定で `idle` / `failed`
+3. **完成の記録**（生成中の steering だけ・change `add-activated-phase`）: **2 で作業ありと判定できたときだけ**、`idle` にする前に U15 を叩く。受理されれば phase が `activated` になり `idle`、断られるか届かなければ `failed`。**完成の判定は 2 の「作業が行われたか」そのもので、U15 は判定を持たない**（ADR-0014）。完成済みの起こし直しとストロークは U15 を叩かず、2 の判定で `idle` / `failed`
 4. **時間切れ**: タイムアウトで `failed` に変える
 5. **リトライ**: サーバーの巡回が `failed` の件だけを拾い、path を cwd に添えて U13 を叩く。巡回に他の判定は持たせない
 6. **終端**: リトライ上限に達したら起動せず `error`。回復はユーザーの再実行か削除だけ
@@ -79,11 +79,11 @@ flowchart TB
 ```mermaid
 flowchart TB
   launch["1. invokeAi が起動<br>invocation = <b>running</b>（A8 経由）"] --> watch["2. output stream を見る"]
-  watch -- "成功エンベロープ・生成中の steering" --> u15["3. U15 を叩く"]
-  u15 -- "承認依頼あり → activated" --> idle["<b>idle</b>（完了）"]
-  u15 -- "承認依頼なし・不達" --> f["<b>failed</b>"]
-  watch -- "成功エンベロープ・それ以外・作業あり" --> idle
-  watch -- "成功エンベロープ・それ以外・作業なし" --> f
+  watch -- "成功エンベロープ・作業あり・生成中の steering" --> u15["3. U15 を叩く"]
+  u15 -- "受理 → activated" --> idle["<b>idle</b>（完了）"]
+  u15 -- "断られた・不達" --> f["<b>failed</b>"]
+  watch -- "成功エンベロープ・作業あり・それ以外" --> idle
+  watch -- "成功エンベロープ・作業なし" --> f
   watch -- "timeout" --> f
   f --> crawl["5. サーバーの巡回"] --> fetch["failed の件だけを拾う"] --> relaunch["U13 を cwd 付きで叩く"] --> launch
   f -- "上限に達した状態で再キック" --> err["<b>error</b>（終端・ユーザーへ引き渡す）"]

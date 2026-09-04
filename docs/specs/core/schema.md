@@ -4,7 +4,7 @@
 
 | 項目 | 型 | 必須 | 中身 |
 |---|---|---|---|
-| `phase` | `"stroking"` \| `"proposed"` \| `"approved"` \| `"activated"` | 必須 | セッションの局面。`stroking → proposed → approved → activated` の一方向。値の集合は `shared/stroke.ts` の `PHASES` が持つ。`approved` は生成中、`activated` は完成（steering が承認依頼を出したことを U15 が記録した） |
+| `phase` | `"stroking"` \| `"proposed"` \| `"approved"` \| `"activated"` | 必須 | セッションの局面。`stroking → proposed → approved → activated` の一方向。値の集合は `shared/stroke.ts` の `PHASES` が持つ。`approved` は生成中、`activated` は完成（steering が文書を出し終えたことを U15 が記録した） |
 | `currentQuestion` | `Question` \| `null` | 昇格前（`stroking` / `proposed`）は必須 | 今ユーザーが答えるべき問い |
 | `invocation` | `"running"` \| `"idle"` \| `"failed"` \| `"error"` | 昇格前は必須。昇格後（`approved` / `activated`）は省略時 `idle` | 実行の記録。`error` はリトライ上限に達した終端（`docs/specs/architecture/session-workflow.md`「実行の記録」） |
 | `retries` | `number` | 任意 | これまでに起こし直した回数。上限とタイムアウトの判定が読む |

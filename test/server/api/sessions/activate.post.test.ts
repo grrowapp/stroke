@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -9,22 +9,25 @@ import { fakeEvent, stubNitroGlobals } from '../support';
  * 対象は `server/api/sessions/[id]/activate.post.ts`（U15）。
  * spec は openspec/specs/api/session/activate（add-activated-phase）。
  *
- * 完成の根拠は `.spec-workflow/approvals/<category>/*.json` の存在だけ。承認依頼の中身も
- * 状態も読まず、本家の REST も呼ばない。`invocation` に触れず、busy も見ない。
+ * **この endpoint は完成の判定を持たない**（ADR-0014）。成果物もファイルシステムも本家の
+ * REST も `invocation` も見ず、`approved` → `activated` の一方向の遷移を記録するだけである。
+ * 完成したかを決めるのは呼び手（invokeAi の `didWork`・起動時の書き上げ）で、その側の
+ * テストが持つ。ここで見るのは責務の不成立（404・読めない・局面が違う）と、
+ * **判定を持たないこと**——`.spec-workflow/` が無い `approved` でも受理すること——である。
  *
- * 承認依頼は実物のディレクトリで置く（判定がファイルシステムを読むため）。`state.json` の
- * 読み書きは差し替え、`writeState` に渡った形を見る。
+ * 対象のディレクトリは実物で置く（空のまま）。`state.json` の読み書きは差し替え、
+ * `writeState` に渡った形を見る。
  */
 
 const share = vi.hoisted(() => ({ root: '' }));
 
-const { broadcastProjectCreation } = vi.hoisted(() => ({
+const { broadcastProjectCreation, readStrokeConfig } = vi.hoisted(() => ({
   broadcastProjectCreation: vi.fn(() => undefined),
+  // 判定を持たない handler は保存先を知る必要が無い。**呼ばれないことを見るために置く**
+  readStrokeConfig: vi.fn(() => ({ projectShareRoot: share.root })),
 }));
 
-vi.mock('../../../../server/utils/stroke/config', () => ({
-  readStrokeConfig: () => ({ projectShareRoot: share.root }),
-}));
+vi.mock('../../../../server/utils/stroke/config', () => ({ readStrokeConfig }));
 
 vi.mock('../../../../server/utils/control/board', () => ({
   broadcastProjectCreation,
@@ -55,17 +58,10 @@ const NAME = 'made-app';
 const APPROVED = {
   phase: 'approved',
   projectName: NAME,
-  invocation: 'running',
+  invocation: 'idle',
   retries: 1,
   runId: 'run-1',
 } as const;
-
-/** 承認依頼のファイルを置く。category を問わない */
-async function placeApproval(category: string, file = 'approval_1_abc.json', body = '{}'): Promise<void> {
-  const dir = join(share.root, NAME, '.spec-workflow', 'approvals', category);
-  await mkdir(dir, { recursive: true });
-  await writeFile(join(dir, file), body, 'utf8');
-}
 
 async function placeDir(...segments: string[]): Promise<void> {
   await mkdir(join(share.root, NAME, ...segments), { recursive: true });
@@ -74,7 +70,9 @@ async function placeDir(...segments: string[]): Promise<void> {
 describe('U15 POST /api/sessions/:id/activate', () => {
   beforeEach(async () => {
     share.root = await mkdtemp(join(tmpdir(), 'activate-'));
+    await placeDir();
     broadcastProjectCreation.mockClear();
+    readStrokeConfig.mockClear();
     readStateMock.mockReset().mockResolvedValue(APPROVED);
     writeStateMock.mockReset().mockResolvedValue(undefined);
     sessionExistsMock.mockReset().mockResolvedValue(true);
@@ -84,9 +82,7 @@ describe('U15 POST /api/sessions/:id/activate', () => {
     await rm(share.root, { recursive: true, force: true });
   });
 
-  it('承認依頼を持つ approved の対象を受理し、phase だけを activated にして 204 を返す', async () => {
-    await placeApproval('steering');
-
+  it('approved の対象を受理し、phase だけを activated にして 204 を返す', async () => {
     const response = await activateHandler(fakeEvent(NAME, undefined) as never);
 
     expect((response as Response).status).toBe(204);
@@ -95,74 +91,74 @@ describe('U15 POST /api/sessions/:id/activate', () => {
   });
 
   it('受理したら成功の決着（done）を配信する。配信はここだけが出す', async () => {
-    await placeApproval('steering');
-
     await activateHandler(fakeEvent(NAME, undefined) as never);
 
     expect(broadcastProjectCreation).toHaveBeenCalledWith(NAME, 'done');
   });
 
-  it('承認依頼の状態は問わない。却下済みの本文でも受理する', async () => {
-    await placeApproval('steering', 'approval_2_rej.json', JSON.stringify({ status: 'rejected' }));
-
+  /**
+   * 判定を持たない（ADR-0014）。ここが成果物を数えていたころ、steering 工程には承認依頼を
+   * 出す手段が無いのに承認依頼の有無で断っていて、文書を出し終えた実行がすべて `failed` →
+   * `error` に倒れた（実機 2026-09-04）。完成したかは呼び手が決める。
+   */
+  it('成果物の有無を見ない。`.spec-workflow/` が1つも無い approved でも受理する', async () => {
+    // 対象のディレクトリは在るが中は空（本家 MCP がまだ接続していない状態）
     const response = await activateHandler(fakeEvent(NAME, undefined) as never);
 
     expect((response as Response).status).toBe(204);
+    expect(writeStateMock).toHaveBeenCalledWith(NAME, { ...APPROVED, phase: 'activated' });
   });
 
-  it('category は steering に限らない', async () => {
-    await placeApproval('some-spec');
+  /**
+   * 判定を持たないことの実証。成果物を数えるには保存先（`projectShareRoot`）が要るので、
+   * **handler 自身が設定を1度も引かないことが、成果物を数える経路を持たないことの裏付けに
+   * なる。** 成果物の有無で結果が変わらないことを見るだけでは、判定が別の材料で戻っても
+   * 気づけない。（`sessionExists` などの依存はここでは差し替えているので、この否定が見て
+   * いるのは handler が直接引き直す形の回帰である。）
+   */
+  it('保存先の設定を引かない。成果物を数える経路そのものを持たない', async () => {
+    // 成果物ゼロの場合と、`.spec-workflow/` が在る場合の両方で引かない
+    await activateHandler(fakeEvent(NAME, undefined) as never);
+    expect(readStrokeConfig).not.toHaveBeenCalled();
 
-    const response = await activateHandler(fakeEvent(NAME, undefined) as never);
-
-    expect((response as Response).status).toBe(204);
+    await placeDir('.spec-workflow', 'approvals', 'steering');
+    await activateHandler(fakeEvent(NAME, undefined) as never);
+    expect(readStrokeConfig).not.toHaveBeenCalled();
   });
 
-  it('承認依頼が無ければ 409 phase で断り、何も書かず配信しない', async () => {
-    // `.spec-workflow/` はできているが承認依頼は無い（本家 MCP が接続しただけの状態）
+  it('`.spec-workflow/` が空でも受理する。本家が動いていなくても判定は変わらない', async () => {
     await placeDir('.spec-workflow', 'approvals');
+    await placeDir('.spec-workflow', 'steering');
+
+    const response = await activateHandler(fakeEvent(NAME, undefined) as never);
+
+    expect((response as Response).status).toBe(204);
+  });
+
+  it('まだ昇格していない（proposed）対象は 409 phase で断り、何も書かず配信しない', async () => {
+    readStateMock.mockResolvedValueOnce({ phase: 'proposed', currentQuestion: null, invocation: 'idle' });
 
     await expect(activateHandler(fakeEvent(NAME, undefined) as never)).rejects.toMatchObject({
       statusCode: 409,
       data: { reason: 'phase' },
-      message: expect.stringContaining('まだ完成していない'),
+      message: expect.stringContaining('まだ昇格していない'),
     });
     expect(writeStateMock).not.toHaveBeenCalled();
     expect(broadcastProjectCreation).not.toHaveBeenCalled();
   });
 
-  it('category の中の隠しディレクトリ（.snapshots）や .json 以外は承認依頼と数えない', async () => {
-    await placeDir('.spec-workflow', 'approvals', 'steering', '.snapshots');
-    await writeFile(join(share.root, NAME, '.spec-workflow', 'approvals', 'steering', '.snapshots', 'x.json'), '{}');
-    await writeFile(join(share.root, NAME, '.spec-workflow', 'approvals', 'steering', 'notes.md'), '');
-    // approvals 直下のファイルも数えない
-    await writeFile(join(share.root, NAME, '.spec-workflow', 'approvals', 'index.json'), '{}');
+  it('ストローク中（stroking）の対象も 409 phase で断る', async () => {
+    readStateMock.mockResolvedValueOnce({ phase: 'stroking', currentQuestion: null, invocation: 'idle' });
 
-    await expect(activateHandler(fakeEvent(NAME, undefined) as never)).rejects.toMatchObject({ statusCode: 409 });
-  });
-
-  it('.spec-workflow/ が無ければ 409 phase', async () => {
     await expect(activateHandler(fakeEvent(NAME, undefined) as never)).rejects.toMatchObject({
       statusCode: 409,
       data: { reason: 'phase' },
-    });
-    expect(writeStateMock).not.toHaveBeenCalled();
-  });
-
-  it('まだ昇格していない（proposed）対象は 409 で断り、承認依頼の有無を見ない', async () => {
-    readStateMock.mockResolvedValueOnce({ phase: 'proposed', currentQuestion: null, invocation: 'idle' });
-    await placeApproval('steering');
-
-    await expect(activateHandler(fakeEvent(NAME, undefined) as never)).rejects.toMatchObject({
-      statusCode: 409,
-      message: expect.stringContaining('まだ昇格していない'),
     });
     expect(writeStateMock).not.toHaveBeenCalled();
   });
 
   it('既に完成した（activated）対象は 409 で断り、何も変えない', async () => {
     readStateMock.mockResolvedValueOnce({ ...APPROVED, phase: 'activated' });
-    await placeApproval('steering');
 
     await expect(activateHandler(fakeEvent(NAME, undefined) as never)).rejects.toMatchObject({
       statusCode: 409,
@@ -182,7 +178,6 @@ describe('U15 POST /api/sessions/:id/activate', () => {
 
   it('state.json が読めなければ 409 phase で断り、書き換えない', async () => {
     readStateMock.mockRejectedValueOnce(new Error('state.json が壊れている'));
-    await placeApproval('steering');
 
     await expect(activateHandler(fakeEvent(NAME, undefined) as never)).rejects.toMatchObject({
       statusCode: 409,
@@ -192,11 +187,21 @@ describe('U15 POST /api/sessions/:id/activate', () => {
   });
 
   it('invocation は書かない。書くのは phase を変えた state の1回だけ', async () => {
-    await placeApproval('steering');
-
     await activateHandler(fakeEvent(NAME, undefined) as never);
 
     expect(writeStateMock).toHaveBeenCalledTimes(1);
     expect(writeStateMock.mock.calls[0]![1].invocation).toBe(APPROVED.invocation);
+  });
+
+  it('実行中（invocation が running）でも受理し、running のまま残す', async () => {
+    // 叩くのは invokeAi が `idle` に変える前なので、対象の実行はまだ占有中である。
+    // busy を見ると自分の実行に弾かれる。`invocation` は判定にも使わず、書き換えもしない
+    const running = { ...APPROVED, invocation: 'running' } as const;
+    readStateMock.mockResolvedValueOnce(running);
+
+    const response = await activateHandler(fakeEvent(NAME, undefined) as never);
+
+    expect((response as Response).status).toBe(204);
+    expect(writeStateMock).toHaveBeenCalledWith(NAME, { ...running, phase: 'activated' });
   });
 });
