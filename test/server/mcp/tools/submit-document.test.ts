@@ -432,6 +432,48 @@ describe('submit-document', () => {
       removeConnection(token);
     });
 
+    it('振り分け先を決められない type（steering 接続から）は記録しない', async () => {
+      // 手前で弾く 400 のもう1本（tasks 2.3）。`name` 側だけでなく `type` 側も見る
+      const token = issueConnectionToken();
+      registerConnection(token, { projectPath: '/opt/projects/example' });
+
+      const result = await submitDocumentHandler(
+        { type: 'design', document: '# product', name: 'product' },
+        { 'x-stroke-token': token },
+      );
+
+      expect(result.status).toBe(400);
+      expect(upstreamFetchMock).not.toHaveBeenCalled();
+      expect(hasLaunchSubmission(token)).toBe(false);
+      removeConnection(token);
+    });
+
+    it('実行が先に畳まれた後に本家の応答が戻っても記録しない（起動が終わった後まで残さない）', async () => {
+      // 打ち切りで claude を殺しても、飛行中のツールハンドラは中断されない。`kick` の
+      // `.finally`（removeConnection → forgetLaunchSubmission）が済んだ後に記録すると、
+      // 誰も捨てないエントリが残る（specs `mcp/tools/submit` の MUST NOT。
+      // santa-method レビュー指摘 2026-09-04）
+      const token = issueConnectionToken();
+      registerConnection(token, { projectPath: '/opt/projects/example' });
+      resolveProjectIdMock.mockResolvedValue({ ok: true, projectId: 'PID1' });
+      upstreamFetchMock.mockImplementation(async () => {
+        // 提出が飛行中のまま実行が畳まれる（`kick` の `.finally` と同じ2手）
+        removeConnection(token);
+        forgetLaunchSubmission(token);
+        return { status: 200, data: { success: true } };
+      });
+
+      const result = await submitDocumentHandler(
+        { type: 'steering', document: '# product', name: 'product' },
+        { 'x-stroke-token': token },
+      );
+
+      // 代行先の応答はそのまま返す（結果の形は変えない）
+      expect(result).toEqual({ status: 200 });
+      // その起動はもう無いので、記録は作り直されない
+      expect(hasLaunchSubmission(token)).toBe(false);
+    });
+
     it('flontier の提出は受理されても記録しない（受理を数えるのは A7 側。二重に数えない）', async () => {
       const token = issueConnectionToken();
       registerConnection(token, { sessionId: 'session-1' });

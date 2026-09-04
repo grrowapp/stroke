@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { defineStrokeTool } from '../../utils/mcp/define-tool'
 
-import { resolveConnection } from '../../utils/mcp/connection-table'
+import { isConnectionActive, resolveConnection } from '../../utils/mcp/connection-table'
 import { readFetchFailure } from '../../utils/mcp/fetch-failure'
 import { resolveConnectionProjectPath, resolveConnectionSessionId } from '../../utils/mcp/require-connection'
 import { resolveProjectId } from '../../utils/mcp/resolve-project-id'
@@ -199,7 +199,14 @@ export default defineStrokeTool({
       // 提出は stroke-board の endpoint を通らないので、この起動（token）を単位に、ここで
       // しか記録できない（specs `mcp/tools/submit`「受理された steering の提出を、その
       // 起動の作業として記録する」）。結果には項目を足さない（D5）。
-      recordLaunchSubmission(connection.token)
+      //
+      // **記録するのは、その起動がまだ実行中のときだけである。** 打ち切りで実行が先に
+      // 畳まれると、`kick` の `.finally`（`removeConnection` → `forgetLaunchSubmission`）が
+      // 済んだ後に、この飛行中の提出が戻ってくる。無条件に記録すると誰も捨てない記録が
+      // 残り、同 spec の「起動が終わった後まで残してはならない」に反する（santa-method
+      // レビュー指摘 2026-09-04）。判定と記録の間に `await` を置かないこと——理由は
+      // `isConnectionActive` の docblock。
+      if (isConnectionActive(connection.token)) recordLaunchSubmission(connection.token)
       return { status: response.status }
     } catch (error) {
       const failure = classifySteeringFailure(error)

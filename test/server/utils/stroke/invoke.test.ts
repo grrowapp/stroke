@@ -278,6 +278,47 @@ describe('buildRun の didWork', () => {
   afterEach(() => {
     forgetSubmissions('session-1');
     forgetLaunchSubmission('token-1');
+    forgetLaunchSubmission('token-2');
+  });
+
+  it('完成済み（activated）の steering も起動単位の記録を読む', () => {
+    // **この判定が実際に実行の行き先を決めるのはこの局面である。** 生成中（approved）の
+    // steering では完成の記録（U15）の受理が判定に代わる（add-activated-phase design D4・
+    // `ai.ts` の成功経路）ので、`didWork` は評価されない（santa-method レビュー指摘 2026-09-04）
+    const run = buildRun({
+      sessionId: 'project-a',
+      cwd: '/opt/projects/project-a',
+      phase: 'activated',
+      retries: 0,
+      runId: 'run-1',
+      token: 'token-1',
+    });
+
+    expect(run.recordCompletion).toBeUndefined();
+    expect(run.didWork).toBeDefined();
+    expect(run.didWork!()).toBe(false);
+
+    recordLaunchSubmission('token-1');
+    expect(run.didWork!()).toBe(true);
+  });
+
+  it('別の起動（token）の受理は自分の作業にならない', () => {
+    // 起動単位で数える理由そのもの（design.md D1「起動をまたいだ持ち越しが構造的に
+    // 起こらない」）。同じ対象の別の起動が受理していても、この起動は空振りのままである
+    const run = buildRun({
+      sessionId: 'project-a',
+      cwd: '/opt/projects/project-a',
+      phase: 'activated',
+      retries: 0,
+      runId: 'run-1',
+      token: 'token-1',
+    });
+
+    recordLaunchSubmission('token-2');
+    expect(run.didWork!()).toBe(false);
+
+    recordLaunchSubmission('token-1');
+    expect(run.didWork!()).toBe(true);
   });
 
   it('steering の起動は起動単位（token）の提出記録を読む', () => {

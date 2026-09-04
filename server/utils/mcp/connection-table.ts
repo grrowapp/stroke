@@ -44,6 +44,26 @@ export function removeConnection(token: string): void {
 }
 
 /**
+ * その token の起動がまだ実行中か（＝接続表に載ったままか）。
+ *
+ * ツールの中で、**代行先を待っている間に実行が畳まれていないか**を確かめるために要る。
+ * ハンドラの先頭で `resolveConnection` を通っていても、`await` の向こう側では実行が
+ * 終わっていることがある——打ち切り（タイムアウト）で claude を殺しても、サーバー側の
+ * ツールハンドラは中断されないためである。
+ *
+ * これを見ずに起動単位の記録を足すと、`kick` の `.finally`（`removeConnection` →
+ * `forgetLaunchSubmission`）が済んだ後に記録が作り直され、誰も捨てないまま残る
+ * （specs `mcp/tools/submit`「起動が終わった後まで残してはならない」。santa-method
+ * レビュー指摘 2026-09-04）。
+ *
+ * **判定と記録の間に `await` を置かないこと。** 片付けは1つの同期ブロックなので、
+ * 間に `await` が無ければ「片付けの前」か「片付けの後」のどちらかにしかならない。
+ */
+export function isConnectionActive(token: string): boolean {
+  return connections.has(token)
+}
+
+/**
  * `x-stroke-token` ヘッダから接続文脈を解決できなかった。
  *
  * **代行先の応答ではなくここで組み立てた値である。** どの接続の呼び出しかが決まらず、
