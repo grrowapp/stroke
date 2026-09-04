@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  isConnectionActive,
   issueConnectionToken,
   registerConnection,
   removeConnection,
@@ -61,6 +62,19 @@ describe('接続表', () => {
     expect(resolveConnection({ 'x-stroke-token': [token] })).toEqual({ ok: true, context: { sessionId: 'session-array' }, token });
 
     removeConnection(token);
+  });
+
+  it('起動の生存は登録の有無で答える（発行しただけ・削除後は生きていない）', () => {
+    // ツールが `await` の向こう側で「この起動はまだ実行中か」を見るための口
+    // （`submit-document` の起動単位の記録。santa-method レビュー指摘 2026-09-04）
+    const token = issueConnectionToken();
+    expect(isConnectionActive(token)).toBe(false);
+
+    registerConnection(token, { projectPath: '/opt/projects/example' });
+    expect(isConnectionActive(token)).toBe(true);
+
+    removeConnection(token);
+    expect(isConnectionActive(token)).toBe(false);
   });
 
   it('x-stroke-token ヘッダが無い接続は throw せず 401 unauthorized の結果を返す', () => {

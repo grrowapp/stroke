@@ -12,7 +12,8 @@
  * - steering: 受理するのは代行先（本家 spec-workflow）で、stroke-board の endpoint を
  *   1つも通らない。`sessionId` に結びつける経路が無いので、ツール
  *   （`server/mcp/tools/submit-document.ts`）がその場で「どの起動から呼ばれたか」
- *   （接続 token）を単位に数える。以下の `launchCounts` がこちらを持つ
+ *   （接続 token）を単位に、受理された提出の有無で持つ。以下の `launchSubmissions` が
+ *   こちらを持つ
  *
  * 2種類のキーを1つの `Map` に混ぜない——`forgetSubmissions(sessionId)` が何を消して
  * いるのかが読めなくなる（fix-steering-empty-completion design.md D3）。
