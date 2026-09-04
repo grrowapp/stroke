@@ -5,7 +5,7 @@ defineProps<{ message: string }>()
 </script>
 
 <template>
-  <p class="blink text-center text-sm text-muted" role="status" aria-live="polite">
+  <p class="sb-stroke-blink text-center text-sm text-muted" role="status" aria-live="polite">
     {{ message }}
   </p>
 </template>

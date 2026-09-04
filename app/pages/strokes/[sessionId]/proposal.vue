@@ -131,7 +131,7 @@ const annotator = useTemplateRef<{ reveal: (id: string) => boolean }>('annotator
     <button
       v-if="awaitingFollowup"
       type="button"
-      class="blink w-full border-b border-warning bg-warning/10 px-6 py-2 text-left text-sm font-medium text-warning hover:bg-warning/20"
+      class="sb-stroke-blink w-full border-b border-warning bg-warning/10 px-6 py-2 text-left text-sm font-medium text-warning hover:bg-warning/20"
       @click="review.openFollowup"
     >
       AI から質問があります。ここを押して答えてください
