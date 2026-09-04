@@ -47,7 +47,7 @@ openspec/specs/<階層パス>/spec.md          ← 確定した仕様の置き�
 
 ## 入口
 
-stroke が始まる口は複数ある。代表は2つで、網羅と挙動の定義は操作の口を実装する依存 change 側が持つ。
+stroke が始まる操作は複数ある。代表は2つで、網羅と挙動の定義は操作を実装する依存 change 側が持つ。
 
 - change を起票して（ticket + 定義だけの状態から）、change から stroke を開始する
 - feature の画面から stroke を開始する
@@ -196,4 +196,4 @@ openspec では作業は change（`openspec/changes/<change名>/`）として追
 - update change の起票の詳細（命名の確定・自演ガードの実装）
 - 最初の回（確定した仕様がまだ無い作業中の feature）の change ↔ capability の対応の引き方（ticket への後書きは禁止・change ディレクトリの中に作業中の成果物は無い、という制約の下で決める。出自不明の器との区別に要る）
 
-feature への操作（作成・削除等）の挙動は本書では定めない。操作の口を実装する依存 change（`create-feature` ほか）側の仕様が定める。
+feature への操作（作成・削除等）の挙動は本書では定めない。操作を実装する依存 change（`create-feature` ほか）側の仕様が定める。

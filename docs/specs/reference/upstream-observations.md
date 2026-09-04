@@ -127,12 +127,12 @@ allowedOrigins = [http://localhost:{port}, http://127.0.0.1:{port}]   // 既定 
 
 - `/ws` に origin チェックは**無い**
 - `projectId` クエリでプロジェクトスコープを決める
-- `{type:'subscribe', projectId}` を受け付ける口がある（`multi-server.ts:234-264`）が、これは
+- `{type:'subscribe', projectId}` を受け付ける処理がある（`multi-server.ts:234-264`）が、これは
   projectId の切り替えと `initial` の再送のみで、**データ書き込みには使えない**。本家フロントも
   これを使っていない（projectId 変更時は接続を張り直す）
 
 **書き込み操作**（承認・却下、文書保存、タスク状態変更、アーカイブ）は本家では**すべて REST**。
-WS 経由の書き込み口は存在しない。
+WS 経由の書き込み手段は存在しない。
 
 ## 接続管理の実装（`multi-server.ts:176-266, 1365-1418`）
 

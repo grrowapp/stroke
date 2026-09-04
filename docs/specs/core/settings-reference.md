@@ -161,7 +161,7 @@ AI へ渡す定型。**手順の本文をここに書かない。** 手順は MC
 
 **成果物をファイルへ直接書ける道具を許可しない。** 取得・提出の入口は MCP ツールだけである（`docs/specs/mcp/tools.md`「操作の入口はこれだけである」）。`Write` / `Edit` はそれを迂回できるので外した——実測 2026-09-01（`yarn check:stroke --approve` を2周、計4実行）で呼び出しは0回、外した構成でも往復・承認・steering 3本が揃うことを実機で確かめている。
 
-**`Read` は残してある。** steering 工程には文脈を取る MCP ツールが無く（公開は `get-steering-guide` / `get-steering` / `submit-document` の3本）、同じ実測で `Read` は5回使われていた。読み取りの口を MCP へ寄せるのは change `adr0016-sub-add-steering-context-tools` の仕事で、**道具を用意する前に `Read` を外すと steering が成立しない。**
+**`Read` は残してある。** steering 工程には文脈を取る MCP ツールが無く（公開は `get-steering-guide` / `get-steering` / `submit-document` の3本）、同じ実測で `Read` は5回使われていた。読み取りの手段を MCP ツールへ寄せる作業は未着手で、**道具を用意する前に `Read` を外すと steering が成立しない。**
 
 **第三者の MCP のツールを許可に載せない。** steering 工程は本家 spec-workflow の MCP を `--mcp-config` に並べるが、その目的は起動時の登録簿への自己登録だけで、ツール呼び出しは1つも要らない（本家は transport を繋ぐ前に登録する）。`--allowedTools` は可視性を決めないので一覧には残る。呼ばせない責務は案内（`get-steering-guide`）が併せて負う。
 

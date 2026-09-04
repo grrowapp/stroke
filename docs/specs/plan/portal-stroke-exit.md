@@ -89,8 +89,8 @@ flowchart TB
   f -- "上限に達した状態で再キック" --> err["<b>error</b>（終端・ユーザーへ引き渡す）"]
 ```
 
-- **提出告知の口は足さない。** 完了の検知に AI の協力を要らなくしたため（design.md D6）
-- **retry 対象の口も足さない。** 巡回はセッション一覧（U12）の `invocation` を見れば足りる
+- **提出告知のエンドポイントは足さない。** 完了の検知に AI の協力を要らなくしたため
+- **retry 対象一覧のエンドポイントも足さない。** 巡回はセッション一覧（U12）の `invocation` を見れば足りる
 
 ## 設定に足すもの
 
@@ -121,19 +121,19 @@ mcp-config は設定に持たない。**生成先パスから導出**して組�
 | ❶ | 実行管理 | `server/utils/stroke/ai.ts`・`claude.ts` | 起動定義・prompt・cwd を中で固定・導出 | 起動定義・prompt・cwd を呼び出し側から受け取る。**実行の記録を足す**: 起動時に session-id = running をメモリに記録し、timeout したら false に変える |
 | ❷ | ストロークの呼び出し元 | `server/api/strokes/[id]/invoke-agent.get.ts` | `invokeAi(sessionId)` | 直前に設定 JSON を引き、無加工で渡す。cwd はセッションディレクトリ（挙動は不変） |
 | ❸ | 承認の処理 | `server/api/strokes/[id]/approve.post.ts`・`server/utils/stroke/project.ts`・`session-store.ts` | サーバーのコードが proposal.md を書いている（A7 提出でサーバーが保存、`generateProject` が `docs/proposal.md` を新規生成。U10） | **サーバーのコードは proposal.md を作らない**。claude 自身がセッション時点から `docs/` 配下に書く。承認は**セッションディレクトリをプロジェクト名へ rename するだけ**（生成もファイル移動も無し）。その後、設定 JSON を引き、`--mcp-config`（生成先パス入り）と steering 用 prompt に差し替え、cwd に生成先を渡して `invokeAi` を**完了を待たずに呼ぶ** |
-| ❹ | 提出告知の口 | `server/api/strokes/[id]/` に1つ追加 | 無し（既存 A5/A7 は承認済みを拒否） | claude からの提出の告知を受理し、session-id の記録を消す薄い口 |
-| ❺ | retry 対象の口 | `server/api/` に1つ追加 | 無し | retry 対象（false の session-id）一覧を返す |
+| ❹ | 提出告知のエンドポイント | `server/api/strokes/[id]/` に1つ追加 | 無し（既存 A5/A7 は承認済みを拒否） | claude からの提出の告知を受理し、session-id の記録を消す薄いエンドポイント |
+| ❺ | retry 対象一覧のエンドポイント | `server/api/` に1つ追加 | 無し | retry 対象（false の session-id）一覧を返す |
 | ❻ | 巡回 | サーバーの定期処理として登録 | 無し | ❺を拾い、順に起動し直すだけ。条件判定は持たない |
 | ❼ | 設定 | `nuxt.config.ts`・`settings-reference.md` | セッションとプロジェクトの置き場は別（`NUXT_SESSIONS_ROOT` / `NUXT_PROJECTS_ROOT`） | **両者を `SPEC_WORKFLOW_SHARED_ROOT` に統一する**。steering 用 prompt の1項目も追加（いずれも ADR-0004 の手続きで） |
 | ❽ | proposal 確認画面 | `app/pages/strokes/[sessionId]/proposal.vue` | 承認後も同画面に留まり承認済み表示 | 承認成功でモーダルを閉じて `/projects` に戻る |
-| ❾ | テスト | approve・invoke まわりのユニット・E2E | 承認→承認済み表示の期待値 | 承認→一覧に戻る E2E。引数化・提出告知の口・retry 対象の口・巡回のユニット |
+| ❾ | テスト | approve・invoke まわりのユニット・E2E | 承認→承認済み表示の期待値 | 承認→一覧に戻る E2E。引数化・提出告知のエンドポイント・retry 対象一覧のエンドポイント・巡回のユニット |
 
 ## 仕様への影響
 
 - `docs/specs/core/settings-reference.md` — セッションとプロジェクトの置き場を `SPEC_WORKFLOW_SHARED_ROOT` に統一・steering 用 prompt の1項目追加（ADR-0004: change とユーザー承認が要る）
 - `openspec/specs/project-generation` — プロジェクトの作り方が「新規生成」から「セッションディレクトリの rename 昇格」に変わる（proposal.md はセッション時点から docs/ 配下に保存）
 - `openspec/specs/ai-invocation` — 呼び出しの引数化と、承認処理からの呼び出しが増えること
-- `openspec/specs/agent-api` — 提出告知の口・retry 対象一覧の口の追加
+- `openspec/specs/agent-api` — 提出告知・retry 対象一覧のエンドポイントの追加
 - いずれも実装 change `connect-portal-and-strokes` が specs 差分として持つ
 
 ## 対象外

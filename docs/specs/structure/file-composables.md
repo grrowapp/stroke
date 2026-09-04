@@ -1,28 +1,32 @@
 # composable 一覧
 
-`app/composables/` の現状の実態と、規範（`docs/specs/core/system-structure.md` の区切り）への対応。
+`app/composables/` の現状の実態と、規範（`docs/specs/structure/system-structure.md` の区切り）への対応。
 
-## 規範への対応 — 全9本
+**参照元に書いてある `pages/…` は現状の置き場である。** 到達点では `pages/` は Route の対応だけを持ち、ページの実装は `components/page/<PageName>/<PageType>/Container.vue` に集約する（`docs/specs/structure/page-structure.md` / `page-component-structure.md`）。composable を呼ぶのは Container.vue になるので、移行が済んだら参照元を Page Component の名前へ書き換える。
 
-規範は**関心単位の `useXxx` を平置き**（境界のディレクトリ shared / workspace を作らない）。現在の9本:
+## 規範への対応 — 全11本
 
-（`create-module-markdown` で `modules/markdown/` へ移った composable は無い。モジュールの `runtime/position/*.ts` は位置の対応を出す関数で、composable ではなく、この棚卸しの対象外。全数は `docs/specs/core/system-structure.md` §3。）
+規範は**関心単位の `useXxx` を平置き**（境界のディレクトリ shared / workspace を作らない）。現在の11本:
+
+（markdown のモジュール化で `modules/markdown/` へ移った composable は無い。モジュールの `runtime/position/*.ts` は位置の対応を出す関数で、composable ではなく、この棚卸しの対象外。全数は `docs/specs/structure/system-structure.md` §3。）
 
 | 関心 | composable | 整理の方向 |
 | --- | --- | --- |
 | 通知の受信 | `useBoardSocket` | vueuse の `createSharedComposable` で1本に共有。そのまま |
 | 時刻表示 | `useRelativeTime` | vueuse の `formatTimeAgo` の包み。そのまま |
-| プロジェクトの読み書き | `useProjectApi` | プロジェクト単位画面の唯一の口。そのまま |
-| ステアリングの読み書き | `useSteeringDocuments` | `useProjectApi` と同じ関心の口として並べる |
+| プロジェクトの読み書き | `useProjectApi` | プロジェクト単位画面の唯一の経路。そのまま |
+| ステアリングの読み書き | `useSteeringDocuments` | `useProjectApi` と同じ関心の composable として並べる |
 | 問いの往復 | `useAgentQuestion` | 回答送信・AI 起動（契約 U7 / U13）。そのまま |
-| セッションの WS 購読 | `useSessionChannel` | W1 / W2 の唯一の受け口。購読先のパスと届く型を引数で受け、呼び出し側が直接呼ぶ |
+| セッションの WS 購読 | `useSessionChannel` | W1 / W2 の唯一の購読。購読先のパスと届く型を引数で受け、呼び出し側が直接呼ぶ |
 | proposal のレビュー | `useProposalReview` | 39 プロパティに肥大し `Modals.vue` と密結合。うち13はモーダルの状態で、component 側の引き直しと不可分。**分割は未着手**（分割案はここで固定しない） |
-| 注釈 | `useAnnotations` | 色定義5件をコンポーネントが逆向き import している。**色の実値は CSS へ移し、データ（`Annotation.highlightColor`）は色名のみ持つ**（検討） |
+| 注釈 | `useAnnotations` | 色定義5件（`highlightColors`）を `CommentModal.vue` が逆向き import している。塗りの実値は CSS の `::highlight()` へ移った（下の `useAnnotationHighlight`）。`highlightColors` は保存形と色見本が使う |
+| 注釈の塗り | `useAnnotationHighlight` | CSS Custom Highlight API で本文の DOM を書き換えずに範囲を塗る（264行）。色は**名**でだけ引き、実値は `app/assets/css/main.css` の `::highlight()` が持つ。使うのは `review/AnnotateSource.vue`。そのまま |
+| トースト | `useUpstreamToast` | tone → 本家の色クラスの対応と `toast.add()` の組み立て（119行）。`NotificationToaster.vue` から抜き出し、承認への応答の結果も同じ見た目で出す。使うのは `shared/NotificationToaster.vue` / `workspace/ApprovalCard.vue` / `review/ApprovalAnnotator.vue`。そのまま |
 | 待機とリトライ | `useWaitingRetry` | timer は vueuse の `useIntervalFn` に委譲済み。そのまま |
 
 ### 平置き — 実施済み
 
-`shared/` と `workspace/` を畳み、9本すべてが `app/composables/` 直下にある。
+`shared/` と `workspace/` を畳み、11本すべてが `app/composables/` 直下にある。
 
 | 移行前 | 移行後 |
 | --- | --- |
@@ -53,11 +57,11 @@
 
 `app/composables/` にある4つの composable のリファレンス。
 
-- 置き場所の規約は `openspec/changes/restructure-app-directories/specs/app-structure/spec.md`
-- 層の積み方と全体の構造は `docs/specs/core/system-structure.md`
+- 置き場所の判定の物差しは `openspec/specs/app-structure/spec.md`
+- 層の積み方と全体の構造は `docs/specs/structure/system-structure.md`
 - 記述は実装から抽出した事実に限る
 
-**ポータル側は明示 import で参照する**（`~/composables/<階層>/<名前>`）。規約は steering が持つ（Import Patterns）。ストローク側のコードがまだ auto-import に依存しているため `nuxt.config.ts` では当面有効のまま（統一は `align-coding-conventions`）。
+**ポータル側は明示 import で参照する**（`~/composables/<名前>`）。規約は steering が持つ（Import Patterns）。ストローク側のコードがまだ auto-import に依存しているため `nuxt.config.ts` では当面有効のまま（統一は未実施）。
 
 ---
 
@@ -85,7 +89,7 @@ export const useBoardSocket = createSharedComposable((): BoardSocket => { ... })
 
 **`onNotification` に初回スナップショットは流れない。** 画面を開いた瞬間に既存の通知が全部トーストで出てしまうのを避けるため。`snapshot` は `notifications` を差し替えるだけで `notified.trigger` を呼ばない。
 
-中身は vueuse の3つで組んである（`replace-handrolled-with-libraries`）。
+中身は vueuse の3つで組んである（自前の WebSocket・タイマー・ハンドラ管理をライブラリへ置き換えた）。
 
 | 手 | 何に使っているか |
 | --- | --- |
@@ -99,7 +103,7 @@ export const useBoardSocket = createSharedComposable((): BoardSocket => { ... })
 
 **`app.vue` 直下の `NotificationToaster` が常駐して購読を持ち続けること**が、その「全て消える」を起こさない前提。あれを外すとレイアウト切替の瞬間に購読が0になり、接続が切れる。`app.vue` と `NotificationToaster.vue` の両方にその旨のコメントがある。
 
-`createGlobalState` は採っていない。**モジュールスコープに state を置くため、SSR でリクエストを跨いで共有されてしまう**（`openspec/changes/replace-handrolled-with-libraries/design.md` 決定1）。
+`createGlobalState` は採っていない。**モジュールスコープに state を置くため、SSR でリクエストを跨いで共有されてしまう。**
 
 #### SSR では接続しない
 
@@ -109,9 +113,9 @@ URL を `computed` で組み、`typeof window === 'undefined'` なら空文字�
 
 **stroke-board のサーバー（`server/routes/ws.ts`）だけ。本家 WebSocket には繋がない**（`specs/upstream-connection`）。ブラウザから本家へ直接触らせないという境界による。
 
-**参照元**（8）— `components/shared/NotificationToaster.vue`（`onNotification`）、`layouts/portal.vue`、`layouts/workspace.vue`、`pages/index.vue`、`pages/projects/index.vue`、`pages/projects/[projectId]/approvals/[approvalId].vue`、`pages/projects/[projectId]/specs/[specName]/[document].vue`、`pages/projects/[projectId]/steering/[name].vue`
+**参照元**（8）— `components/shared/NotificationToaster.vue`（`onNotification`）、`components/workspace/WorkspaceShell.vue`（`upstreamConnected`。`layouts/workspace.vue` から移った）、`layouts/portal.vue`、`pages/index.vue`、`pages/projects/index.vue`、`pages/projects/[projectId]/approvals/[approvalId].vue`、`pages/projects/[projectId]/specs/[specName]/[document].vue`、`pages/projects/[projectId]/steering/[name].vue`
 
-※ 下層3ページは `upstreamConnected` だけを取る。`app.vue` と `modules/markdown/runtime/edit/MarkdownEditor.vue`（旧 `DocumentEditor.vue`）は呼ばずにコメントで触れているだけ。
+※ 下層3ページは `upstreamConnected` だけを取る。`app.vue` と `components/review/ApprovalAnnotator.vue` は呼ばずにコメントで触れているだけ。
 
 ### useRelativeTime.ts
 
@@ -127,7 +131,7 @@ export function formatRelativeTime(iso: string, now = Date.now()): string
 
 #### 中身は `javascript-time-ago`
 
-刻みの判定・日本語の文言・丸め・7日超の絶対日時への切り替えを自前で持たない（`replace-handrolled-with-libraries`）。**自前で書いてあるのは無効な日付のガード1行だけ。**
+刻みの判定・日本語の文言・丸め・7日超の絶対日時への切り替えを自前で持たない。**自前で書いてあるのは無効な日付のガード1行だけ。**
 
 | 指定 | 既定 | ここでの指定 | 理由 |
 | --- | --- | --- | --- |
@@ -141,7 +145,7 @@ vueuse は採っていない。`formatTimeAgo` は文言8種を手で書く必�
 
 **テスト**（`test/app/composables/useRelativeTime.test.ts`）— 設定を落とすと落ちるケースを明示的に置いてある（46分・23時間59分・`1分59秒`・7日の打ち切り・空白の有無）。
 
-**参照元**（5）— 上層2ページ（`index.vue`、`projects/index.vue`）と下層3ページ（`specs/index.vue`、`steering/index.vue`、`tasks/index.vue`）
+**参照元**（6）— 上層2ページ（`index.vue`、`projects/index.vue`）と下層3ページ（`specs/index.vue`、`steering/index.vue`、`tasks/index.vue`）、使い捨ての `prototype/projects.vue`
 
 ---
 
@@ -149,7 +153,7 @@ vueuse は採っていない。`formatTimeAgo` は文言8種を手で書く必�
 
 ### useProjectApi.ts
 
-**下層の画面が本家の情報を取るための唯一の口。** 192行。11 の関数を export する（※2026-08-24 実測。旧記述は 82行・8関数）。
+**下層の画面が本家の情報を取るための唯一の経路。** 192行。11 の関数を export する（※2026-08-24 実測。旧記述は 82行・8関数）。
 
 ```ts
 export function useProjectId()                                        // route から projectId
@@ -197,7 +201,7 @@ function base(projectId) { return `/api/projects/${toValue(projectId)}`; }
 
 叩く先は `server/api/projects/**` で、その先は `control/upstream-proxy.ts` を経由して本家へ届く。ブラウザから本家へは触らない。
 
-**参照元**（9）— 下層の9ページ
+**参照元**（11）— 下層の9ページ、`pages/projects/index.vue`、`components/review/ApprovalAnnotator.vue`（`respondToApproval` / `pendingApprovalsKey`）
 
 ### useSteeringDocuments.ts
 
@@ -256,13 +260,13 @@ composable は2系統に分かれる。合流しない。
 ────────────                      ──────────────
 本家 WebSocket                     下層ページ
   ▼                                  ▼
-server/utils/upstream/socket        composables/workspace/useProjectApi
+server/utils/upstream/socket        composables/useProjectApi
   ▼                                  ▼
 server/utils/control/**             server/api/projects/**
   ▼                                  ▼
 server/routes/ws.ts                 control/upstream-proxy.ts
   ▼                                  ▼
-composables/shared/useBoardSocket   upstream/rest.ts
+composables/useBoardSocket          upstream/rest.ts
   ▼                                  ▼
 Toaster / 通知一覧                   本家 REST
 ```
@@ -275,7 +279,7 @@ Toaster / 通知一覧                   本家 REST
 
 `app/composables/` 直下に平置き。現状の実態を書き出したもの。
 
-**これは棚卸しであって規則ではない。** 今こうなっている、という記録にすぎない。どう切り直すべきかは決めていない。置き場の規則は `docs/specs/core/system-structure.md`。
+**これは棚卸しであって規則ではない。** 今こうなっている、という記録にすぎない。どう切り直すべきかは決めていない。置き場の規則は `docs/specs/structure/system-structure.md`。
 
 ## 一覧
 
@@ -299,7 +303,7 @@ useSessionChannel<T>(sessionId, channel) → Ref<T | null>
 
 URL は `computed` で組み、`typeof window === 'undefined'` なら空文字を返す（`useWebSocket` は空の URL では繋がない）。
 
-W1 と W2 の**唯一の違いは購読先のパスと届く型**だったので、それを引数に出して1本にした（`replace-handrolled-with-libraries` design 決定2）。
+W1 と W2 の**唯一の違いは購読先のパスと届く型**だったので、それを引数に出して1本にした。
 
 **ラッパは置かない。呼び出し側が直接呼ぶ。**
 
@@ -352,11 +356,11 @@ useAnnotations() → { comments, addSelection, addGeneral, update, remove, clear
 useAgentQuestion(sessionId) → { question, waiting, failed, error, answered, send }
 ```
 
-W1 の購読（`useSessionChannel`）・回答の送信（U7）・AI の起動要求（U13）・待機（`useWaitingRetry`）を1つに束ねる。状態は全て返り値として出し、外から渡す口は持たない。面（`AgentQuestion`）はこれに依存せず props と emit だけで繋がる。使い方は `docs/specs/reference/stroke-modules.md`。
+W1 の購読（`useSessionChannel`）・回答の送信（U7）・AI の起動要求（U13）・待機（`useWaitingRetry`）を1つに束ねる。状態は全て返り値として出し、外から渡す引数は持たない。面（`AgentQuestion`）はこれに依存せず props と emit だけで繋がる。使い方は `docs/specs/reference/stroke-modules.md`。
 
-`replace-handrolled-with-libraries` での変更はコメント1語のみ（面の名前が `AgentQuestionModal` → `AgentQuestion` に変わったことへの追随）。中身は触っていない。
+面の名前が `AgentQuestionModal` → `AgentQuestion` に変わったことへの追随でコメント1語だけ変わった。中身は触っていない。
 
-**送信先の `base` が `/api/${sessionId}` になっている**（`useProposalReview` と画面1は `/api/strokes/${sessionId}`）。これは別 change `fix-agent-question-api-path` の対象で、ここでは現状の記録として残す。
+**送信先の `base` が `/api/${sessionId}` になっている**（`useProposalReview` と画面1は `/api/strokes/${sessionId}`）。契約（`docs/specs/api/contract.md`）の形は `/api/strokes/<id>` なので、これは食い違いである。ここでは現状の記録として残す。
 
 ### `useProposalReview.ts`（412行）
 
@@ -391,8 +395,8 @@ useProposalReview(sessionId, { phase, strokes }) → 39 個のプロパティ
 
 ## 気づいたこと
 
-- ~~**`useQuestionChannel` と `useProposalChannel` が構造的に同じ。** WS の URL 組み立ても重複~~ → **解消済み**（`replace-handrolled-with-libraries`）。2本を消して `useSessionChannel` 1本に畳み、呼び出し側が購読先と型を渡す。URL の組み立ては `useSessionChannel` の1箇所だけ
-- **`useProposalReview` が 412 行で、他の6本の合計（406行）より大きい。** 状態・モーダル・HTTP エラー解体・送信の決着追跡が1箇所に集まっている（※チャンネルの集約で内訳は変わったが、合計 406行 は変わっていない）
-- **色の定義が composable にある。** `useAnnotations.ts` の `highlightColors` を `CommentModal.vue` が直接 import している
-- **画面1側には composable が無い。** `app/pages/strokes/[sessionId]/index.vue` は `useSessionChannel` と `useWaitingRetry` を直接呼び、送信（`answer()` の中の U7 → U13 の2連発）も自前で書いている。画面2だけが `useProposalReview`（と `useAgentQuestion`）にまとまっている。`replace-handrolled-with-libraries` はここを変えていない
-- **`useAgentQuestion` だけ API の base が `/api/<id>` で、他は `/api/strokes/<id>`。** 別 change `fix-agent-question-api-path` の対象
+- ~~**`useQuestionChannel` と `useProposalChannel` が構造的に同じ。** WS の URL 組み立ても重複~~ → **解消済み**。2本を消して `useSessionChannel` 1本に畳み、呼び出し側が購読先と型を渡す。URL の組み立ては `useSessionChannel` の1箇所だけ
+- **`useProposalReview` が 547 行で、ストローク側の他の4本の合計（541行）より大きい**（2026-09-04 実測。「個別」の各節に書いた行数と返り値の内訳は 2026-08-24 時点の記録で、その後の変更を追っていない）。状態・モーダル・HTTP エラー解体・送信の決着追跡が1箇所に集まっている
+- **色の定義が composable にある。** `useAnnotations.ts` の `highlightColors` を `CommentModal.vue` が直接 import している。塗りの実値は CSS へ移ったが、色見本と保存形はまだこの定義を使う
+- **画面1の実装が `pages/` にある。** `app/pages/strokes/[sessionId]/index.vue` は `useSessionChannel` と `useWaitingRetry` を直接呼び、送信（`answer()` の中の U7 → U13 の2連発）も自前で書いている。画面2だけが `useProposalReview`（と `useAgentQuestion`）にまとまっている。到達点では `pages/` にページ固有のロジックを置かない（`page-structure.md`）ので、この実装は Page Component の Container.vue へ移す対象になる。移行課題は `docs/specs/plan/structure-migration.md`
+- **`useAgentQuestion` だけ API の base が `/api/<id>` で、他は `/api/strokes/<id>`。** 契約との食い違い（上の「個別」）

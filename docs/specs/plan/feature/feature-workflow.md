@@ -9,7 +9,7 @@ feature（実装のタスクに繋がる文書の組）の定義。stroke-board 
 ## 全体像
 
 ```
-ポータル（作成の口は create-feature が実装）
+ポータル（作成の操作は create-feature が実装）
   │ 作成。名前は `__` 規約でエンコード
   ▼
 openspec/changes/<change-id>/             ← change。必ず作られる（確定事項）。
@@ -97,7 +97,7 @@ stroke-board は孤児を**検出して表示する**。修復は自動で行わ
 
 **どう見せるか**: Feature 一覧の該当行にバッジを付け、詳細で上の表のどれに当たるかを示す。
 
-**修復**: ユーザーの操作として (a) 本家で再 archive する、(b) openspec 側に change を作り直して作業を再開する。stroke-board 側に archive の口を作る場合は、締めの一連（本家 archive → 戻す接合 → sync → archive）をまとめて実行し、途中で失敗したらそこで止まったことを表示する。unarchive の口は openspec 側の状態を確認してから通す。
+**修復**: ユーザーの操作として (a) 本家で再 archive する、(b) openspec 側に change を作り直して作業を再開する。stroke-board 側に archive の操作を作る場合は、締めの一連（本家 archive → 戻す接合 → sync → archive）をまとめて実行し、途中で失敗したらそこで止まったことを表示する。unarchive の操作は openspec 側の状態を確認してから通す。
 
 ## changes との関係
 
@@ -131,4 +131,4 @@ feature には**必ず対応する change が `openspec/changes/` に存在す�
 - 工程の間の、change の成果物と本家の器の中身の同期のさせ方
 - 締め（戻す接合と openspec 側の sync → archive）の実行の担い手
 
-feature への操作（作成・削除等）の挙動は本書では定めない。操作の口を実装する依存 change（`create-feature` ほか）側の仕様が定める。
+feature への操作（作成・削除等）の挙動は本書では定めない。操作を実装する依存 change（`create-feature` ほか）側の仕様が定める。

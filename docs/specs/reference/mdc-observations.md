@@ -278,4 +278,4 @@ front matter を作る依存も持たないが、文書を書くのは AI か人
 **関連する資料**
 
 - `docs/specs/reference/stroke-modules.md` — モジュールの使い方
-- `docs/specs/core/system-structure.md` — テストをソースの構造の写しに置く規定
+- `docs/specs/structure/system-structure.md` — テストをソースの構造の写しに置く規定

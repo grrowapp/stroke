@@ -61,7 +61,7 @@ payload が指すのは実行主体の**名前**で、それをどう起動す�
 外に出す（`openspec/specs/ai-invocation`・ADR 0001）、ワークフローは定義ファイルで持ち
 コード変更なしで反映する（`openspec/specs/workflow-definition`）。
 
-### 3. 提出と配信の口を run 単位にする
+### 3. 提出と配信のエンドポイントを run 単位にする
 
 今の A5（`POST /api/:id/question`）と W1（`/api/:id/ws/question`）は問い専用。
 これを run 単位に開く。
@@ -99,7 +99,7 @@ const { result, waiting, failed, send } = useAgentRun(sessionId, definition)
 |---|---|
 | JSON Schema による検証の導入（zod からの移行 or 併存） | 中 |
 | 実行主体のレジストリと、起動の組み立ての汎用化 | 中 |
-| 提出・配信の口を run 単位に開く | 大 |
+| 提出・配信のエンドポイントを run 単位に開く | 大 |
 | 画面側の composable の汎用化 | 小 |
 | 既存の問いを1インスタンスへ畳む | 中 |
 

@@ -163,7 +163,7 @@ feature ワークフローの定義は、配置時に `proposal.md` を feature 
 - `documents.get.ts` の返す形を、前提側で決めた形へ変える
 - 画面2枚を新しい形に追従させる
 
-**層の置き場所に制約がある。** 接点層（`server/utils/upstream/`）は本家の形をそのまま扱う場所であり、本家が知らない概念を持ち込めない（`docs/specs/core/system-structure.md` の層の定義）。したがって新しい層は制御層になる。ただし FS 直読みをどちらの層に持たせるかは別途判断が要る。
+**層の置き場所に制約がある。** 接点層（`server/utils/upstream/`）は本家の形をそのまま扱う場所であり、本家が知らない概念を持ち込めない（構造の規範の層の定義）。したがって新しい層は制御層になる。ただし FS 直読みをどちらの層に持たせるかは別途判断が要る。
 
 **書き込み禁止には触れない。** `read-only.test.ts` が禁じているのは `writeFile` / `mkdir` / `rm` などの書き込みと本家の書き込み API であって、読み取りは対象外である。FS 直読みには `server/utils/upstream/scan.ts` と `registry.ts` に前例がある。
 

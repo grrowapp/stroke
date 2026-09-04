@@ -51,7 +51,7 @@ server/mcp/tools/                                      MCP ツール8本（フ�
 | steering の定型 | `runtimeConfig.claude.steeringPrompt` | 承認の直後、cwd＝生成先で起こすときに渡る |
 
 ストローク側の設定を**コードが環境変数から読むことはしない**。値は `nuxt.config.ts` と
-`app/app.config.ts` に書かれたものだけで、読み口は `server/utils/stroke/config.ts` の1本である。
+`app/app.config.ts` に書かれたものだけで、読み出す実装は `server/utils/stroke/config.ts` の1本である。
 一覧は `docs/specs/core/settings-reference.md`。
 
 **「環境変数が効かない」という意味ではない。** 次の3つは事実として押さえておくこと。

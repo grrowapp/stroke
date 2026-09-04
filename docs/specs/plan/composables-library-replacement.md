@@ -4,7 +4,7 @@
 
 軸は **vueuse (@vueuse/core 14.4.0) / @nuxt/ui (4.10.0) / Nuxt 標準機能で代替できるものは置き換える**。あわせて、同型の重複は**1本の composable へ集約する**。
 
-- 棚卸しの本体は `docs/specs/core/file-composables.md`。ここは置換・集約の可否だけを扱う
+- 棚卸しの本体は `docs/specs/structure/file-composables.md`。ここは置換・集約の可否だけを扱う
 - 別軸（責務分離・component との境界の切り直し）はこの評価に持ち込まない
 - 記述は実装と node_modules の実物（型定義・dist ソース）から抽出した事実に限る
 

@@ -7,7 +7,7 @@
 
 ## 振る舞い
 
-- phase を `approved` から `activated` に変える。`stroking → proposed → approved → activated` の一方向で、戻す口は無い
+- phase を `approved` から `activated` に変える。`stroking → proposed → approved → activated` の一方向で、戻す操作は無い
 - **完成の根拠は承認依頼のファイルの存在だけ。** `<project>/.spec-workflow/approvals/<category>/*.json` が1件以上在れば受理する。中身は読まず、状態（保留・承認済み・却下済み）も問わず、category も問わない。本家の REST は呼ばない——本家が動いていなくても判定できる
 - 起動も判断も昇格も受け持たない。`invocation` にも触れない——実行の記録は invokeAi がこの応答を見てから書く
 - **busy を見ない。** 叩くのは invokeAi が `invocation` を `idle` に変える前で、その時点で対象の実行はまだ占有中。busy を見ると自分の実行に弾かれる

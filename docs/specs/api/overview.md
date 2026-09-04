@@ -5,6 +5,7 @@
 | 置き場 | 何が入るか |
 |---|---|
 | [contract.md](./contract.md) | 全ての endpoint に共通する約束 |
+| [server.md](./server.md) | `server/api/` のファイルの置き方（Endpoint はディレクトリ、Method は `index.<method>.ts`） |
 | `sessions/` | `/api/sessions/` の endpoint。1本につき1ファイル |
 | `strokes/` | `/api/strokes/` の endpoint。1本につき1ファイル |
 | `projects/` | `/api/projects/` の endpoint。1本につき1ファイル |

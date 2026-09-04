@@ -46,27 +46,10 @@ worktree = `git worktree` で切った作業ディレクトリ。それぞれが
 - 作ってよいのは3つ — 1. **ユーザーが初期化・新規プロジェクトの立ち上げを指示した**、2. スキル・エージェントのプロンプト定義に指示がある、3. **docs に規定があり、指定されたフォルダがまだ無い**（`docs/` `test/` のような場合）
 - 3 の根拠にできるのは **docs（`docs/adr/` を除く）だけ**。ADR・specs・ticket・change・steering は根拠にしない
 - 3 で作ったときは、**根拠にしたものと作成したフォルダ名を、作成した直後の応答でユーザーへ簡潔に報告する**
-- 直下にフォルダを足したら `docs/specs/core/system-structure.md` のディレクトリ構造へ整合反映する
+- 直下にフォルダを足したら、構造の規範のディレクトリ構造へ整合反映する（規範の所在は issue-tracker）
 - どれにも当たらないなら作らない。置き場が無いと感じたら既存フォルダへ収めるか、ユーザーに確認する
 
 ## Docs
 
-`docs/specs/` は**定義としての specs**。`docs/agents/` は**エージェント向けの運用**。`docs/adr/` は決めの記録。
-
-** `docs/agents/` **
-| ファイル名 | 概要 |
-| --- | --- |
-| `issue-tracker.md` | 「作業の規定」を参照 |
-| `ticket-tracker.md` | ticket の運用と `status` のラベル設定 |
-| `triage-labels.md` | triage の5ラベル |
-| `domain.md` | CONTEXT.md と ADR の運用 |
-
-**`docs/specs/`**
-| 分類 | 分類概要 |
-| --- | --- |
-| `core/` | 構造・入れ物・設定の規範（ディレクトリ構造 / schema / 設定の正 / 部品の棚卸し） |
-| `api/` | 契約（サーバ API・MCP ツール） |
-| `architecture/` | 流れ（セッション・問いの往復・仕様書画面・データ取得と SSR） |
-| `reference/` | 調べた事実（本家 spec-workflow-mcp・`@nuxtjs/mdc`・`claude -p`） |
-| `plan/` | 未確定の検討（feature ワークフロー・接合・置換の可否・移行課題） |
+`docs/specs/` は**定義としての specs**。`docs/agents/` は**エージェント向けの運用**。`docs/adr/` は決めの記録。中身の一覧はこのファイルに持たない。各ディレクトリを直接見る（`docs/adr/0020`）。
 

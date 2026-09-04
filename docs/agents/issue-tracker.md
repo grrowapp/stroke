@@ -40,7 +40,7 @@ openspec/
 
 構造（ファイルの置き場）に触る change は、**規範 → 物差し → 移行課題**の順に読む。構造の正は規範で、食い違ったら規範が勝つ。
 
-1. 規範 — `docs/specs/core/system-structure.md`（到達点）
+1. 規範 — `docs/specs/structure/system-structure.md`（到達点）
 2. 物差し — `openspec/specs/app-structure`（判定を Requirement + Scenario にしたもの。区切りの名前は持たない）
 3. 移行課題 — `docs/specs/plan/structure-migration.md`（規範と現状の差。差があること自体は違反ではない）
 
@@ -165,11 +165,11 @@ repo 直下への新規フォルダ作成は、**エージェントの自己判�
 
 3 の根拠にできるのは **docs（`docs/adr/` を除く）だけ**である。ADR・specs・ticket・change の artifact・steering は根拠にしない（[参照の方向](#参照の方向)の逆流禁止）。
 
-3 で作ったときは、**作成判断の根拠にしたものと、作成したフォルダ名を、作成した直後の応答でユーザーへ簡潔に報告する**（例:「`docs/specs/core/system-structure.md`「ディレクトリ構造」の規定により `test/` を作成」）。
+3 で作ったときは、**作成判断の根拠にしたものと、作成したフォルダ名を、作成した直後の応答でユーザーへ簡潔に報告する**（例:「構造の規範「ディレクトリ構造」の規定により `test/` を作成」）。
 
 どれにも当たらないなら作らない。置き場が無いと感じたら、既存のフォルダへ収めるか、ユーザーに確認する。
 
-repo 直下の構成そのものの規範は [`docs/specs/core/system-structure.md`](../specs/core/system-structure.md) が持つ。**直下にフォルダを足したら、同ファイルのディレクトリ構造へ整合反映する**（[更新対応](#更新対応)
+repo 直下の構成そのものは構造の規範（[artifact を書く前に読むもの](#artifact-を書く前に読むもの)の「規範 → 物差し → 移行課題」の 1）が持つ。**直下にフォルダを足したら、規範のディレクトリ構造へ整合反映する**（[更新対応](#更新対応)
 
 ## 過去の記録
 

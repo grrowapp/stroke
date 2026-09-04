@@ -21,26 +21,11 @@ const SETTING_SOURCES_REQUIRED = 'project';
 export default defineNuxtConfig({
   compatibilityDate: '2026-08-21',
 
-  // Nitro サーバーが本家 spec-workflow-mcp への接続を持つため SSR を有効にする。
-  // ブラウザは stroke-board のサーバーとだけ話す（structure.md の Module Boundaries）。
+  // Nitro サーバーが本家接続を持つため SSR を有効にする。
   ssr: true,
 
-  // ===========================================================================
-  // ビルド時に決まる設定
-  //
-  // ビルドがこれらを消費して出力を作るため、`runtimeConfig` に置けない。環境変数を
-  // 与えても動作は変わらず、変えるにはアプリを作り直す必要がある（specs/configuration）。
-  // 「これも外に出せるのでは」と再検討しないこと。
-  // ===========================================================================
-
-  // ビルド時: モジュールの解決とプラグインの生成がビルドで行われる。
-  // @nuxtjs/mcp-toolkit: stroke-board 自身が MCP サーバーになる（route は既定 `/mcp`、
-  // ツール定義の置き場 `dir` も既定 `server/mcp`）。0.x のため package.json でバージョンを
-  // 固定してある（provide-operations-via-mcp design.md）
-  //
+  // @nuxtjs/mcp-toolkit: MCP サーバーモジュール
   // markdown は `modules/markdown/` が自分で `@nuxtjs/mdc` を入れるのでここに書かない。
-  // parse 設定もそちらに在る（`openspec/specs/markdown/module`）。**戻さないこと。**
-  // `modules/` は Nuxt が自動で読む置き場なので、この配列に列挙する必要もない
   modules: ['@nuxt/ui', '@nuxtjs/mcp-toolkit'],
 
   // ビルド時: アイコンはバンドルに畳み込まれる。
@@ -52,7 +37,6 @@ export default defineNuxtConfig({
   },
 
   // ビルド時: CSS はバンドルに畳み込まれる
-  // main.css はアプリ全体、stroke.css はストローク側の画面だけ（docs/specs/core/system-structure.md）
   css: ['~/assets/css/main.css', '~/assets/css/stroke.css'],
 
   // ビルド時: DevTools はビルドに組み込まれる。画面の上に自前のバーとボタンを重ね、
@@ -189,22 +173,6 @@ export default defineNuxtConfig({
       } as typeof process.emit;
     },
   },
-
-  // ===========================================================================
-  // 実行時に決まる設定
-  //
-  // 設定の正は docs/specs/core/settings-reference.md（ADR 0004）で、そこに無いものは
-  // 設定ではない。ストローク側の値の実体はこのファイルにだけ在り、**環境変数からは
-  // 読まない**。既定値を並べた別モジュールも作らない（出どころが2箇所に割れるため）。
-  //
-  // 読み手は endpoint が `useRuntimeConfig()`、CLI（`yarn session`、Nitro の外）は
-  // このファイルを直接 import する。環境変数を見ないので両者は同じ値になる。
-  // 共有のモジュール（session-core / paths / claude など）は設定を引かず、
-  // 端で解決した値を引数で受け取る。
-  //
-  // ポータル側の4件（upstream〜syncIntervalMs）はこの流儀に未統合で、環境変数で
-  // 差し替えられる（README の「設定（ポータル側）」）。一本化は別 change で行う
-  // ===========================================================================
 
   runtimeConfig: {
     // --- セッションとプロジェクトの共通の親。ポータルとストロークが共有する1つの場所。

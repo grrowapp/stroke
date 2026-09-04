@@ -187,9 +187,9 @@ markdown を扱う実体が `nuxt.config.ts`（parse 設定）・`app/components
 - **状態**: **完了**（2026-09-02 archive。ユーザー承認済み。4.3（写し元の無いテストの置き場）だけ判断待ちで残る）
 - **成果物**: `openspec/changes/archive/2026-09-02-update-docs-structure/`
 - **触るファイル**:
-  - `docs/specs/core/system-structure.md` — ディレクトリ構造に `modules/` を追加。`app/components/` の切り方の規範を `app-structure` と揃える
-  - `docs/specs/core/file-components.md` — `MarkdownPre` / `CodeBlock` / `MermaidDiagram` / `DocumentView` / `DocumentEditor` の行を落とす
-  - `docs/specs/core/file-composables.md` — 移設分を落とす
+  - `docs/specs/structure/system-structure.md` — ディレクトリ構造に `modules/` を追加。`app/components/` の切り方の規範を `app-structure` と揃える
+  - 同ディレクトリの `file-components.md` — `MarkdownPre` / `CodeBlock` / `MermaidDiagram` / `DocumentView` / `DocumentEditor` の行を落とす
+  - 同ディレクトリの `file-composables.md` — 移設分を落とす
   - `docs/specs/plan/structure-migration.md` — `MarkdownPre` の例外の行を解消済みに
 
 **対応内容** — 親 change の実装で生じた、構造の資料と実態の食い違いを直す。
@@ -198,7 +198,7 @@ markdown を扱う実体が `nuxt.config.ts`（parse 設定）・`app/components
 - `file-components.md` / `file-composables.md` の棚卸しから、モジュールへ移した分を落とす
 - `structure-migration.md` の「`global/MarkdownPre.vue` は規範の区切りに従えない唯一の例外」を解消済みとして更新する。Nuxt module の `addComponent({ global: true })` が同じ登録を行うため、置き場の制約は無くなった
 - `test/` の置き場を実態に合わせる件は **`adr0017-sub-create-reference-mdc` が引き取った**。同じ移設が2つの change に載っていたため、資料化の側へ寄せた
-- **構造の規範が2つある状態を解く。** `openspec/specs/app-structure` は「`app/components/` と `app/composables/` の配下は階層ディレクトリ（`workspace/` / `shared/`）で分ける」と定め、`docs/specs/core/system-structure.md` は「`ui/` ＋機能単位で切る」と定める。どちらが正かを決め、もう一方をそれに従わせるか役割を分ける。親 change では前者に delta を当てたが、後者は手つかずである
+- **構造の規範が2つある状態を解く。** `openspec/specs/app-structure` は「`app/components/` と `app/composables/` の配下は階層ディレクトリ（`workspace/` / `shared/`）で分ける」と定め、構造の規範（`system-structure.md`）は「`ui/` ＋機能単位で切る」と定める。どちらが正かを決め、もう一方をそれに従わせるか役割を分ける。親 change では前者に delta を当てたが、後者は手つかずである
 
 **振る舞いは変えない。** `test/` の移設を切り出した結果、この change が触るのは資料だけになった。
 

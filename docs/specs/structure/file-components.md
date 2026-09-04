@@ -1,6 +1,6 @@
 # components の棚卸し
 
-`app/components/` の現状の実態と、規範（`docs/specs/core/system-structure.md` の区切り）への対応を書き出したもの。
+`app/components/` の現状の実態と、規範（`docs/specs/structure/system-structure.md` の区切り）への対応を書き出したもの。参照元の `pages/…` は現状の置き場で、到達点ではページの実装は `components/page/<PageName>/<PageType>/Container.vue` が持つ（`page-structure.md` / `page-component-structure.md`）。
 
 ## 規範への対応 — 全14本
 
@@ -9,13 +9,13 @@
 | 区切り | 部品（現在の置き場 →） | 根拠 |
 | --- | --- | --- |
 | `ui/` | `WaitingIndicator`（直下）、`EmptyState` `RecordList` `WorkspacePanel`（workspace/） | どの機能にも属さない見た目の部品。一覧・外枠・待機表示 |
-| `notification/` | `NotificationToaster`（shared/） | 通知の受け口 |
+| `notification/` | `NotificationToaster`（shared/） | 通知の受け手 |
 | `project/` | `OverviewForm`（stroke/） | 概要入力はプロジェクトを起こす入口 |
 | `question/` | `AgentQuestion` `StrokeBreadcrumb`（直下） | 問いの提示・回答と、ストローク履歴の表示。`Question` / `Answer` / `Stroke` 型を扱う |
 | `proposal/` | `AnnotateSource` `CommentCard` `CommentModal` `Modals`（review/） | proposal の確認・注釈・差し戻し。`Annotation` / `HighlightColor` 型を扱う |
 | `approval/` | `ApprovalCard`（workspace/）、`ApprovalAnnotator`（review/） | 承認1件の表示と、対象文書への指摘・差し戻し |
 
-移動の実施は `docs/specs/plan/structure-migration.md`（change: `reorganize-components`）。**未実施。**
+移動の実施は `docs/specs/plan/structure-migration.md`。**未実施。**
 
 **棚卸しに未追従のものが7本ある**（2026-09-01 時点。`app/components/` の実ファイルは21本）。この資料は markdown のモジュール化で消えた分を落としただけで、これらの区切りへの対応はまだ書いていない。
 
@@ -24,7 +24,7 @@
 
 ### markdown はモジュールへ移った
 
-`create-module-markdown` で、markdown を描く・直す部品5本が `app/components/` から `modules/markdown/runtime/` へ移った。**モジュールは画面の部品ではない**ので、この棚卸しの対象外になる。全数と切り方は `docs/specs/core/system-structure.md` §3。
+markdown を描く・直す部品5本が `app/components/` から `modules/markdown/runtime/` へ移った。**モジュールは画面の部品ではない**ので、この棚卸しの対象外になる。全数と切り方は `docs/specs/structure/system-structure.md` §3。
 
 | 消えたもの | 今どこにあるか |
 | --- | --- |
@@ -40,7 +40,7 @@
 
 ### アイコンは component ではなくなった
 
-`replace-handrolled-with-libraries` で、次の3本が component の一覧から消えた。
+自前の実装をライブラリへ置き換えた際に、次の3本が component の一覧から消えた。
 
 | 消えたもの | 今どこにあるか |
 | --- | --- |
@@ -101,7 +101,7 @@ props と挙動まで書き出してあるのは、ポータル側の5本。残�
 
 通知トースト。128行。props なし。**`<template>` は空で、markup を持たない。**
 
-`app.vue` に常設され、`useBoardSocket().onNotification` を購読して `toast.add()` へ変換する役だけを持つ。描画は `app.vue` の `<UApp :toaster>`。**要素を出さないことがこの component の正しい姿**（`replace-handrolled-with-libraries` の design 決定1）。
+`app.vue` に常設され、`useBoardSocket().onNotification` を購読して `toast.add()` へ変換する役だけを持つ。描画は `app.vue` の `<UApp :toaster>`。**要素を出さないことがこの component の正しい姿。**
 
 `app.vue` 直下から外せない。外すと購読が0になり、`createSharedComposable` が参照カウント式で state ごと接続を捨てる。
 
@@ -248,7 +248,7 @@ const props = defineProps<{ review: ReturnType<typeof useProposalReview> }>()
 
 `Modals.vue` は composable の**戻り値そのもの**を受け取る。39 個のプロパティを持つオブジェクトを丸ごと渡していて、この1本だけ結合の仕方が違う。
 
-`review/` のモーダル一式（本文コメント・全体コメント・削除確認・停止理由・承認確認の5つ）を1箇所にまとめる役をしていて、それぞれへ `review.xxx` を配り直している。切り直しは change `realign-component-composable-boundaries`。**未実施。**
+`review/` のモーダル一式（本文コメント・全体コメント・削除確認・停止理由・承認確認の5つ）を1箇所にまとめる役をしていて、それぞれへ `review.xxx` を配り直している。切り直しは**未実施。**
 
 ## 共有型への依存
 
@@ -271,7 +271,7 @@ import { defaultHighlightColor, highlightColors } from '~/composables/useAnnotat
 
 ## ライブラリに預けたもの
 
-`replace-handrolled-with-libraries` で、自前の markup / 処理をライブラリに置き換えた。
+自前の markup / 処理をライブラリに置き換えた。
 
 | 部品 | 預けた先 |
 |---|---|
@@ -287,5 +287,5 @@ import { defaultHighlightColor, highlightColors } from '~/composables/useAnnotat
 - **置き場の区分の基準が混ざっている。** 直下は「共用」という**使われ方**、`review/` は「レビュー」という**役割**、`stroke/` は「画面1」という**場所**、`shared/` は「共用」、`workspace/` は「下層の作業画面」。「Nuxt が登録する場所」という**仕組みの要求**（`global/`）は、markdown のモジュール化で消えた
 - **`Modals.vue` だけ結合の仕方が違う。** 他は props と emit、これだけ composable の戻り値を丸ごと受ける
 - **`WaitingIndicator.vue` は 11 行。** props 1つで、`.blink` クラスを当てるだけ
-- **画面1の問いと画面2の問い返しの重複は解消済み。** かつては `stroke/QuestionCard.vue`（画面1の問い）と `review/FollowupModal.vue`（画面2の問い返し）が同じ「問いを出して答えを受ける」ことを別々に書いていた。`replace-handrolled-with-libraries` で `AgentQuestion.vue` 1本に統合し、両方がこれを使う。オーバーレイの外殻は持たず、画面1は素置き、画面2は `UModal` の body slot に置く。画面ごとに変わるのは `submitLabel` と `waitingMessage` の2つの文言だけ
+- **画面1の問いと画面2の問い返しの重複は解消済み。** かつては `stroke/QuestionCard.vue`（画面1の問い）と `review/FollowupModal.vue`（画面2の問い返し）が同じ「問いを出して答えを受ける」ことを別々に書いていた。`AgentQuestion.vue` 1本に統合し、両方がこれを使う。オーバーレイの外殻は持たず、画面1は素置き、画面2は `UModal` の body slot に置く。画面ごとに変わるのは `submitLabel` と `waitingMessage` の2つの文言だけ
 - **コンポーネントから composable への import が1件ある**（`CommentModal` → `useAnnotations` の色定義）。依存の向きとしては逆向き

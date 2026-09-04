@@ -1,6 +1,6 @@
 # server/utils の棚卸し
 
-`server/utils/` の現状の実態と、規範（`docs/specs/core/system-structure.md` の区切り）への対応。
+`server/utils/` の現状の実態と、規範（`docs/specs/structure/system-structure.md` の区切り）への対応。
 
 ## 規範への対応 — 全34本
 
