@@ -310,9 +310,9 @@ ticket の tags が bug のもの。あるべき振る舞いに戻す（5件）�
 #### adr0016-sub-fix-project-id-lookup
 
 - **状態**: needs-triage / bug
-- **成果物**: proposal のみ（specs・design・tasks 未作成）
+- **成果物**: proposal・specs（`mcp/server`・`upstream-connection`）・design・tasks
 - **触るファイル**:
-  - `server/utils/mcp/resolve-project-id.ts` — 照合の仕方
+  - `server/utils/mcp/resolve-project-id.ts` — `error` 本文の組み立て（照合は変えない）
   - `docs/specs/reference/upstream-observations.md` — 本家の正規化についての事実を記録
   - `docs/specs/mcp/tools.md` — `errorCode` を足す場合の整合反映（ADR-0004 の手続き）
 
@@ -320,7 +320,9 @@ ticket の tags が bug のもの。あるべき振る舞いに戻す（5件）�
 
 **原因** — `resolve-project-id.ts` は接続表の `projectPath` と本家の一覧の `projectPath` を `resolve()` で突き合わせるが、**本家は渡されたパスを `git rev-parse --show-toplevel` で解決してから登録する**（本家 2.2.5 の `core/git-utils.js`。親 change の santa-method レビュー 8周目にレビュアーB が読んで確認）。いまは `projectShareRoot` が `/opt/projects` で git リポジトリではないため一致している（実測 2026-08-31、`setai-3` が引き当てられた）。登録簿には既に食い違う形の例が在る（`agent-messanger` は `projectPath` と `workflowRootPath` が違う）。
 
-**対処** — `projectPath` の一致だけに頼らず、**一致または祖先（最深優先）**で照合する。引き当てられなかったときに「登録されていない」と「登録はあるが照合が外れた」を区別できるようにする（`errorCode` は増やさず `error` の本文で区別する。表は「これ以外を足してはならない」で閉じている）。
+**対処** — **照合は完全一致のままとし、本家の解決でパスが変わった差を吸収しない。** 引き当てられなかったときに「一覧が空だった」と「一覧にプロジェクトはあるが対応しない」を区別できるようにする（`errorCode` は増やさず `error` の本文で区別する。表は「これ以外を足してはならない」で閉じている）。
+
+**照合を緩める案は採らなかった**（2026-09-04）。`projectId` は解決後のパスから作られ、登録は projectId ごとに1件なので、**解決でパスが変わる場面は本家自身が複数のセッションを1つの `projectId` にまとめている場面**である。そこで差を吸収して引き当てると、どのセッションにも同じ id が返り、別のセッションと共有の id で steering 文書を書く——失敗として現れない。引き当てが外れて `project_not_registered` で止まるほうを採る。緩めると「そのパスがまだ本家に登録されていない」という正しい失敗も隠れる。共有ルートを git 管理下に置かないという運用上の前提は、前提のまま残る。
 
 **起票時に書いた「本家が持つ別の手掛かり（`workflowRootPath` など）も見る」は取り下げた**（2026-09-01）。`GET /api/projects/list` は `workflowRootPath` を返さず、登録簿を直読みしても `SPEC_WORKFLOW_SHARED_ROOT` / `resolveGitRoot` で決まる値なので起動 cwd との一致も祖先関係も保証されない。**`agent-messanger` の食い違いの機序も git ではなかった**——当該ディレクトリに `.git` は無く、同ディレクトリの `.mcp.json` が `SPEC_WORKFLOW_SHARED_ROOT` を渡している（`git-utils.js` が env を最優先で返す）。食い違う登録が在るという事実は正しいが、原因の説明は誤りだった。
 
