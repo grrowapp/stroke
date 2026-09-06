@@ -19,6 +19,70 @@ import { PROJECTS_PARENT } from '../../playwright.config';
 
 const PROPOSAL_BODY = '# 提案\n\nE2E: 受理した proposal が残ることを確かめる本文。';
 
+/**
+ * 後始末の削除が busy で断られる間、出し直しを続ける上限。
+ *
+ * E2E の steering は `/bin/true`（`playwright.config.ts`）で、起動から終了まで 200ms に満たない。
+ * 巡回（60秒ごと）が起こし直した直後に重なっても、この上限の中で終わる。
+ */
+const STEERING_SETTLE_TIMEOUT_MS = 5_000;
+const STEERING_POLL_INTERVAL_MS = 100;
+
+/** 済んだ（消した・もともと無い）か、断られたか。断られた理由は本文ごと持つ */
+type ProjectCleanup = { kind: 'done' } | { kind: 'refused'; detail: string };
+
+/** 削除口が「AI の応答を待っている」で断った応答か（`server/utils/stroke/conflict.ts` の形） */
+function isBusyRefusal(status: number, body: string): boolean {
+  if (status !== 409) return false;
+  try {
+    return (JSON.parse(body) as { data?: { reason?: string } }).data?.reason === 'busy';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 昇格したプロジェクトを消す。busy の間だけ待つ。
+ *
+ * 承認の画面は昇格の直後に steering を起こす（ADR 0011）。その実行中の削除は busy（409）で
+ * 断られる（実測 2026-09-06）。**観測点はサーバ自身の busy 判定にする**——`state.json` の
+ * `invocation` は起動より遅れて書かれ（`running` の集合に入ってから A8 で書くまでの間は昇格時の
+ * `failed` のまま）、しかも afterEach の時点では画面がまだ起動を要求していないこともあるので、
+ * それを見て「終わった」と読むと直後の DELETE が busy で断られる。
+ *
+ * 消す前に名前で在ることを確かめる。無ければ消すものが無い。**在ると確かめた後の 404 は
+ * 失敗である**——名前で在るのに `projectId` で見つからないのは、ここで導出した id とサーバの
+ * 導出がずれたということで、それを緑で隠さない。
+ */
+async function deleteProjectWhenSettled(request: APIRequestContext, name: string): Promise<ProjectCleanup> {
+  const existing = await request.get(`/api/strokes/${encodeURIComponent(name)}`);
+  if (existing.status() === 404) return { kind: 'done' };
+  if (!existing.ok()) {
+    return { kind: 'refused', detail: `状態を読めない: ${existing.status()} ${await existing.text()}` };
+  }
+
+  const projectId = createHash('sha1')
+    .update(join(PROJECTS_PARENT, name))
+    .digest('base64url')
+    .substring(0, 16);
+  const deadline = Date.now() + STEERING_SETTLE_TIMEOUT_MS;
+  for (;;) {
+    const response = await request.delete(`/api/projects/${encodeURIComponent(projectId)}`);
+    if (response.ok()) return { kind: 'done' };
+
+    const body = await response.text();
+    const refusal = `${response.status()} ${body}`;
+    if (!isBusyRefusal(response.status(), body)) return { kind: 'refused', detail: `${projectId}: ${refusal}` };
+    if (Date.now() >= deadline) {
+      return {
+        kind: 'refused',
+        detail: `${projectId}: steering の実行が ${STEERING_SETTLE_TIMEOUT_MS}ms 以内に終わらない。最後の応答: ${refusal}`,
+      };
+    }
+    await new Promise((resolve) => setTimeout(resolve, STEERING_POLL_INTERVAL_MS));
+  }
+}
+
 async function startSession(request: APIRequestContext): Promise<string> {
   const response = await request.post('/api/strokes', {
     data: { overview: 'E2E: 受理した proposal が残ることを確かめる' },
@@ -46,24 +110,46 @@ test.describe('受理した proposal は残る', () => {
    * 昇格したものは名前が変わり、セッションの口では消せない。**プロジェクトの口で消す。**
    *
    * 残すと、承認済み（`phase: 'approved'`）で `.spec-workflow` を持たないディレクトリが
-   * 保存先に居座り、**次の実行から一覧に「生成中」として出る**（specs/project/directory）。
-   * それが他の spec の行数を狂わせる。
+   * 保存先に居座る。かつてはそれが**次の実行から一覧に「生成中」として出て**
+   * （specs/project/directory）他の spec の行数を狂わせた。いまは実行の開始時に保存先を
+   * 丸ごと消す（`playwright.config.ts`）ので次の run には及ばないが、消せなかった事実は
+   * この run の結果にしか現れない。
    */
   let promoted: string[] = [];
 
+  /**
+   * **後始末の失敗は握り潰さない**（openspec/specs/tooling/e2e-harness）。
+   *
+   * かつては応答を見ずに捨てていた（`.catch(() => undefined)` は通信エラーしか拾わず、
+   * 409 や 404 は誰も見ていなかった）。消せなかったものは次の run の無関係なテスト
+   * （`projects.spec.ts` の行数）を落とす形でしか現れず、口が弾いたのか届かなかったのかも
+   * 読めない（fix-e2e-project-residue）。受理されなかったら、何を消そうとしてどう断られたかを
+   * 載せて**このテストを落とす**。昇格したプロジェクトの扱いは `deleteProjectWhenSettled`。
+   */
   test.afterEach(async ({ request }) => {
-    for (const name of created) {
-      await request.delete(`/api/sessions/${name}`).catch(() => undefined);
+    const refused: string[] = [];
+
+    try {
+      for (const name of created) {
+        const response = await request.delete(`/api/sessions/${encodeURIComponent(name)}`);
+        if (!response.ok()) {
+          refused.push(`セッション ${name}: ${response.status()} ${await response.text()}`);
+        }
+      }
+
+      for (const name of promoted) {
+        const outcome = await deleteProjectWhenSettled(request, name);
+        if (outcome.kind === 'refused') refused.push(`プロジェクト ${name}（${outcome.detail}）`);
+      }
+    } finally {
+      // 要求そのものが失敗（通信断など）しても、次のテストへ古い id を持ち越さない
+      created = [];
+      promoted = [];
     }
-    for (const name of promoted) {
-      const projectId = createHash('sha1')
-        .update(join(PROJECTS_PARENT, name))
-        .digest('base64url')
-        .substring(0, 16);
-      await request.delete(`/api/projects/${projectId}`).catch(() => undefined);
+
+    if (refused.length > 0) {
+      throw new Error(`後始末が受理されず、残骸を残した:\n${refused.join('\n')}`);
     }
-    created = [];
-    promoted = [];
   });
 
   test('提出した後に繋いだ画面へ proposal が届く', async ({ page, request }) => {
