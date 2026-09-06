@@ -19,9 +19,7 @@
  * いるのかが読めなくなる（fix-steering-empty-completion design.md D3）。
  *
  * ストロークの1回の実行は、必ず A5 か A7 のどちらかの提出で終わる。steering の1回の
- * 実行は、steering 文書の提出（本家が受理したもの）で終わる——**ただし生成中
- * （phase が `approved`）の steering だけは完成の記録が判定に代わる。下の
- * `launchSubmissions` の説明を見よ。** プロセスが正常終了しても
+ * 実行は、steering 文書の提出（本家が受理したもの）で終わる。プロセスが正常終了しても
  * 提出が1つも無ければ、それは作業をせずに終わったということで、失敗として扱って
  * 起こし直す。これが無いと、`invocation` が `idle` のまま何も進まないセッションが残り、
  * 巡回（`failed` しか拾わない）も回収できない。
@@ -53,10 +51,11 @@ export function forgetSubmissions(sessionId: string): void {
  * 数えるのは代行先（本家 spec-workflow）が受理した経路だけ——拒否・不達・手前で弾いた
  * 400 では記録しない（`submit-document.ts` の責務）。
  *
- * **生成中のプロジェクト（phase が `approved`）の steering はこの記録では決まらない。**
- * その局面では完成の記録（U15）の受理が作業の判定に代わる（add-activated-phase。
- * `openspec/specs/agent/invocation`「完了は output stream で検知して idle に変える」）。
- * ここが効くのは、完成済み（`activated`）の steering の起こし直しである。
+ * **生成中のプロジェクト（phase が `approved`）では、この記録が完成の判定そのものである。**
+ * 完成の記録（U15）は判定を持たない（ADR-0014・add-activated-phase design D3）ので、
+ * 「生成が終わったか」に答えるのはここだけになる。受理された提出が1つも無い起動は
+ * U15 を叩かずに `failed` へ倒れる（`ai.ts` の成功経路・design D4）。完成済み
+ * （`activated`）の steering の起こし直しでも、同じこの記録が `idle` / `failed` を分ける。
  *
  * **数ではなく有無で持つ（`Set`）。** 問いは「その起動で受理された提出が1つ以上あるか」
  * だけで、件数を読む者は居ない（`counts` 側は起動の前後で比べるので数が要る。こちらは

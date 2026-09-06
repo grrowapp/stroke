@@ -109,8 +109,10 @@ function conversationWriter(sessionId: string) {
 }
 
 /**
- * 完成の記録（U15）を叩く。**A8 と同じく endpoint を通す**——判定は U15 の1箇所に閉じ、
- * ここは受理されたかどうかを true / false に写すだけ。
+ * 完成の記録（U15）を叩く。**A8 と同じく endpoint を通す**——ここは受理されたかどうかを
+ * true / false に写すだけで、U15 の側にも判定は無い（ADR-0014）。完成したかを決めたのは
+ * 呼び出し元の invokeAi で、この関数はその判定が済んだ後にだけ呼ばれる（`didWork` が
+ * true のとき。`ai.ts` の `runBuiltInvocation`）。
  *
  * 2xx 以外は「記録できていない」であり、記録できていないものを完成と扱わない。false を
  * 受けた invokeAi は `failed` に倒し、巡回の起こし直しが続きの実行の完了時にもう一度
@@ -120,6 +122,10 @@ function conversationWriter(sessionId: string) {
  * 書き上げ）が `activated` を書いていると、U15 は「既に完成している」で断る。目的
  * （完成の記録）は果たされているので受理と同じに扱う——断られたら phase を読み直して決める。
  * 判定を U15 の応答の文言に頼らない。
+ *
+ * 書き上げが `running` を対象から外した（design D9）ので、この窓は狭い——一覧を取ってから
+ * U15 を POST するまでの間に起動が挟まったときだけである。それでも残すのは、`failed` に
+ * 倒すと完成済みの対象を巡回が起こし直し続けるためで、窓の広さとは別の理由による。
  */
 function completionRecorder(sessionId: string) {
   return async (): Promise<boolean> => {
@@ -216,6 +222,8 @@ export function buildRun(options: {
       // なので起こし直す（fix-steering-empty-completion）。この起動の token で読む——
       // steering の提出は stroke-board の endpoint を通らないため、対象の id ではなく
       // 起動そのものを単位に数える（design.md D1）。
+      // **この判定が完成の判定そのものである。** 記録先の U15 は判定を持たないので、
+      // 生成が終わったかを決めるのはここで渡す `didWork` である（ADR-0014・design D4）。
       didWork: submittedByLaunch(token),
       // 生成中（`approved`）の steering だけが完成を記録する。完成済み（`activated`）の
       // 起こし直しは記録を試みない——完成は一度だけ起こる出来事で、U15 も受理しない

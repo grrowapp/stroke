@@ -102,7 +102,7 @@ stateDiagram-v2
     }
 
     proposed --> approved: U10 判断 → U14 昇格
-    approved --> activated: U15 完成の記録<br/>（steering が承認依頼を出した）
+    approved --> activated: U15 完成の記録<br/>（steering が文書を出し終えた）
     activated --> [*]
 ```
 

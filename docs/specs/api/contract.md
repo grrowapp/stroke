@@ -30,8 +30,10 @@
   流れは U10（判断）→ U14（昇格）→ U13（steering の起こし）→ U15（完成の記録）の4段で、U13 が
   届かなければ巡回が拾う。U15 は画面ではなく invokeAi が叩く（[sessions/activate.md](./sessions/activate.md)）。
 - **phase は `stroking → proposed → approved → activated` の一方向。** 値の集合は `shared/stroke.ts` の
-  `PHASES` が1つ持つ。`approved` は生成中、`activated` は完成（steering が承認依頼を出した）。
+  `PHASES` が1つ持つ。`approved` は生成中、`activated` は完成（steering が文書を出し終えた）。
   生成中か完了かは phase だけで決まり、`.spec-workflow/` の有無も `invocation` も見ない。
+  完成したかを判定するのは U15 ではなく呼び手（invokeAi）である
+  （[sessions/activate.md](./sessions/activate.md)・ADR-0014）。
 
 ## 各 endpoint の入出力
 
@@ -49,7 +51,7 @@
 - 昇格後（`approved` / `activated`）も `invocation` を持つ。昇格したプロジェクトでは steering の
   実行が起こるためで、`idle` に潰さずそのまま返す。`activated` は完成の記録（U15）だけが書く。
 - `failed` のとき、ユーザーの再試行は同じ入力 POST（U7 / U9）の再送と、その成功応答後の U13。
-  巡回（`server/plugins/02.retry-failed.ts`）も `failed` を拾って起こし直す。
+  巡回（`server/plugins/01.retry-failed.ts`）も `failed` を拾って起こし直す。
 - `error` はリトライ上限に達した**終端**。システムは自動では何もしない。画面は再実行
   （`U13?reset=1`。回数のリセットは U13 が行う）か削除（U11）を出す。**画面は A8 を叩かない。**
 - エラー: 404 セッションなし
@@ -87,7 +89,8 @@
   判定する
 - **承認で昇格した対象も載る。** 昇格後は id がプロジェクト名に変わるが、steering の
   巡回・再キックの対象になるため一覧から外さない。完成した対象は `phase: 'activated'` で
-  載る（起動時の書き上げはこの一覧の `approved` を拾って U15 を叩く）。`state.json` を
+  載る（起動時の書き上げはこの一覧の `approved` かつ `invocation: 'idle'` を拾って U15 を
+  叩く）。`state.json` を
   持たないディレクトリは載らない
 - サーバが動いていないときの削除・一覧・作成は `yarn session`（`docs/specs/architecture/session-workflow.md`）
 

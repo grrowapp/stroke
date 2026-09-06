@@ -74,11 +74,11 @@ export interface AiRun {
    * **完成を記録する**。`didWork` と同じ置き方で、渡されているときだけ呼ぶ。
    *
    * 生成中のプロジェクト（phase が `approved`）の steering だけが渡す（`invoke.ts`）。
-   * 完了時に呼び、true なら `idle`、false なら `failed` に倒す——承認依頼が無い、記録先に
-   * 届かない、はどちらも「完成でない」であり、`idle` にすると完成の記録が無いまま完了になる。
-   * **渡されているときは `didWork` に代わる**（完成の記録が受理されたなら作業は済んでいる。
-   * openspec/specs/agent/invocation「完了は output stream で検知して idle に変える」・
-   * add-activated-phase design D4）。
+   * **`didWork` が true のときだけ呼ぶ**——完成したかを決めるのは `didWork`（その起動で
+   * steering 文書の提出が本家に受理されたか）で、記録先の U15 は判定を持たない
+   * （ADR-0014・add-activated-phase design D3・D4）。記録が受理されなければ `failed` に
+   * 倒す——404・409・不達はどれも「記録できていない」であり、`idle` にすると完成の記録が
+   * 無いまま完了になる。
    *
    * invokeAi はいつ叩くかを判定しない。関数が渡されているかどうかが判定の結果である。
    */
@@ -202,7 +202,8 @@ async function writeInvocation(sessionId: string, invocation: Invocation, retrie
 
 /**
  * 組み立てられた材料で実際に起こす。組み立てが成功した後の処理はここに閉じる
- * （かつての `invokeAi` の本体そのもの。成功経路の振る舞いは変えていない）。
+ * （`fix-idle-stuck-on-run-build-failure` で `invokeAi` の本体から切り出した。切り出しの
+ * 時点では振る舞いを変えていない。成功経路はその後 `add-activated-phase` で変えている）。
  */
 async function runBuiltInvocation(sessionId: string, run: AiRun): Promise<void> {
   const {
@@ -259,25 +260,21 @@ async function runBuiltInvocation(sessionId: string, run: AiRun): Promise<void> 
     // output stream の成功エンベロープ = プロセスは完了した。ただし**何もせずに
     // 終わっている**ことがあるので、用途ごとの確認を通す。
     //
-    // 完成の記録を渡された実行（生成中の steering）では、**完成の記録の受理が完了の唯一の
-    // 根拠**で、作業の判定はそれに代わる（openspec/specs/agent/invocation・add-activated-phase
-    // design D4）。ここで先に `didWork` を見ると、起こし直しの実行が文書を出さず承認依頼だけを
-    // 出したとき——前の実行で文書は済んでいる——に `failed` へ倒れ、承認依頼が在るのに誰も
-    // 完成を記録できないまま上限まで落ちる。
-    if (recordCompletion !== undefined) {
-      if (await recordCompletion()) {
-        await setInvocation('idle', 0)
-        return
-      }
-      console.warn(`${LOG_PREFIX} AI 呼び出しが失敗: ${sessionId}`, ['プロセスは成功したが完成を記録できない'])
+    // 作業をしていなければ失敗として起こし直す——ここを素通しにすると、問いも proposal も
+    // 出ないまま `idle` になり、巡回（`failed` しか拾わない）も回収できない詰まりが残る。
+    // **完成の記録より先に見る。** 完成したかを決めるのは `didWork` の方で、記録先の U15 は
+    // 判定を持たない（ADR-0014・add-activated-phase design D4）。作業をしていない実行が
+    // 完成を記録しに行くと、何も出していない対象が完成として畳まれる。
+    if (didWork !== undefined && !didWork()) {
+      console.warn(`${LOG_PREFIX} AI 呼び出しが失敗: ${sessionId}`, ['プロセスは成功したが提出が届かない'])
       await setInvocation('failed')
       return
     }
 
-    // 作業をしていなければ失敗として起こし直す——ここを素通しにすると、問いも proposal も
-    // 出ないまま `idle` になり、巡回（`failed` しか拾わない）も回収できない詰まりが残る。
-    if (didWork !== undefined && !didWork()) {
-      console.warn(`${LOG_PREFIX} AI 呼び出しが失敗: ${sessionId}`, ['プロセスは成功したが提出が届かない'])
+    // 作業があった実行のうち、完成の記録を渡されたもの（生成中の steering）だけが記録する。
+    // 記録できなければ `failed` に倒す——記録できていないものを完成として `idle` にしない。
+    if (recordCompletion !== undefined && !(await recordCompletion())) {
+      console.warn(`${LOG_PREFIX} AI 呼び出しが失敗: ${sessionId}`, ['プロセスは成功したが完成を記録できない'])
       await setInvocation('failed')
       return
     }

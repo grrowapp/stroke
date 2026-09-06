@@ -114,10 +114,16 @@ const settled = computed(() => projects.value.find((p) => p.name === choosing.va
 const canReview = computed(() => settled.value?.projectId != null);
 
 /**
- * 成功で「する」— 今まさに作られた steering への承認依頼を、開いた状態で表示する。
+ * 成功で「する」— steering への承認依頼が在れば、開いた状態で表示する。
  *
  * `approvalId` は本家から引く。通知の行から開くとき（承認画面を開くだけ）とは意図的に違える
- * ——通知は対象が1つとは限らないが、生成の完了は対象が1つに決まっている。
+ * ——通知は対象が1つとは限らないが、生成の完了で開きたい対象は1つだからである。
+ *
+ * **承認依頼が1件も無いことがある。** 完成の記録は steering が文書を出し終えたことを根拠に
+ * しており、承認依頼の有無を見ていない（add-activated-phase・`api/session/activate`）。
+ * steering の工程には承認依頼を出す手段が無いので、これは例外ではなく通常の経路である。
+ * そのときは承認の一覧まで連れて行く——開けないことより行き止まりが悪い
+ * （`project/generation`「決着したら、知らせてから次を選ばせる」）。
  */
 async function review(): Promise<void> {
   const projectId = settled.value?.projectId;

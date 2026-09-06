@@ -282,9 +282,9 @@ describe('buildRun の didWork', () => {
   });
 
   it('完成済み（activated）の steering も起動単位の記録を読む', () => {
-    // **この判定が実際に実行の行き先を決めるのはこの局面である。** 生成中（approved）の
-    // steering では完成の記録（U15）の受理が判定に代わる（add-activated-phase design D4・
-    // `ai.ts` の成功経路）ので、`didWork` は評価されない（santa-method レビュー指摘 2026-09-04）
+    // 生成中（approved）でも完成済みでも、`didWork` は同じ起動単位の記録を読む。
+    // 生成中では**これが完成の判定そのもの**で、false なら U15 を叩かずに `failed` に倒れる
+    // （add-activated-phase design D4・`ai.ts` の成功経路。U15 は判定を持たない = ADR-0014）
     const run = buildRun({
       sessionId: 'project-a',
       cwd: '/opt/projects/project-a',
@@ -433,8 +433,8 @@ describe('buildRun の phase からの導出', () => {
       expect(await run.recordCompletion!()).toBe(true);
       expect($fetch).toHaveBeenCalledWith('/api/sessions/project-a/activate', { method: 'POST' });
 
-      // 409（承認依頼が無い）も不達も「記録できていない」
-      $fetch.mockRejectedValueOnce(Object.assign(new Error('まだ完成していない'), { statusCode: 409 }));
+      // 409（局面が違う）も不達も「記録できていない」
+      $fetch.mockRejectedValueOnce(Object.assign(new Error('まだ昇格していない'), { statusCode: 409 }));
       expect(await run.recordCompletion!()).toBe(false);
       $fetch.mockRejectedValueOnce(new Error('fetch failed'));
       expect(await run.recordCompletion!()).toBe(false);

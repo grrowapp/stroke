@@ -98,8 +98,10 @@ export function buildProjectDirectory(
   });
 
   // 走査に出てこなかった昇格分＝`.spec-workflow/` がまだ無い。承認した直後はここに落ちる。
-  // 完成の記録（`activated`）が在るのに走査に出ないことは起こりえない（承認依頼が在れば
-  // `.spec-workflow/` も在る）。起きたら完了・未接続として出す（design D8）
+  // 完成の記録（`activated`）が在るのに走査に出ないことは、**起動時の書き上げが畳んだ
+  // legacy で起こりうる**（design D9・Risks「成果物ゼロの legacy を畳む」）。書き上げは
+  // 成果物を見ずに `approved` + `idle` を `activated` にするので、`.spec-workflow/` を
+  // 持たないものが完成として現れる。完了・未接続として出す（design D8）
   for (const entry of promotedByName.values()) {
     projects.push(entry.phase === 'approved' ? unfinished(entry.name, entry.path) : completedUnscanned(entry.name, entry.path));
   }
@@ -138,7 +140,8 @@ function unfinished(name: string, workflowRootPath: string): ProjectSummary {
   };
 }
 
-/** 完成の記録は在るが走査に出ない行。起こりえないが、落とさずに完了・未接続として出す */
+/** 完成の記録は在るが走査に出ない行。起動時の書き上げが畳んだ legacy で起こりうる（上）。
+ * 落とさずに完了・未接続として出す */
 function completedUnscanned(name: string, workflowRootPath: string): ProjectSummary {
   return { ...unfinished(name, workflowRootPath), creation: 'done' };
 }

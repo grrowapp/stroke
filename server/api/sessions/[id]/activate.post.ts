@@ -1,10 +1,5 @@
-import { readdir } from 'node:fs/promises'
-import { join } from 'node:path'
-
 import { broadcastProjectCreation } from '../../../utils/control/board'
-import { readStrokeConfig } from '../../../utils/stroke/config'
 import { conflict } from '../../../utils/stroke/conflict'
-import { projectDir } from '../../../utils/stroke/paths'
 import { requireSessionId } from '../../../utils/stroke/session-param'
 import { readState, withStateLock, writeState, type SessionState } from '../../../utils/stroke/session-store'
 
@@ -15,17 +10,22 @@ import { readState, withStateLock, writeState, type SessionState } from '../../.
  * 受け持つ。**起動も判断も昇格も受け持たない。** `invocation` にも触れない——実行の記録は
  * invokeAi がこの応答を見てから書く（openspec/specs/agent/invocation）。
  *
- * ## 完成の根拠は承認依頼のファイルの存在だけ
+ * ## 判定を持たない（ADR-0014）
  *
- * `.spec-workflow/approvals/<category>/*.json` が1件以上在ることをもって完成とする。中身は
- * 読まず、状態（保留・承認済み・却下済み）も問わない。本家の REST は呼ばない——本家が
- * 動いていなくても判定できなければならない（ADR-0005）。
+ * **完成したかを、ここは決めない。** 決めるのは呼び手である——invokeAi はその起動で
+ * steering 文書の提出が本家に受理されたか（`didWork`）を見て、起動時の書き上げは一覧が
+ * 持つ実行の記録（`invocation: 'idle'`）で対象を選ぶ。この endpoint がするのは
+ * `approved` → `activated` の一方向の遷移を記録することだけである。
  *
- * 実物の配置（本家 2.2.7 で確認 2026-09-02）: category ディレクトリの直下に
- * `approval_<ts>_<id>.json` が並び、同じ階層に `.snapshots/` ディレクトリが在る。
- * `approvals/` 直下にファイルは置かれない。**数えるのは category の中の `.json` だけ**とし、
- * 隠しファイル・ディレクトリ・`approvals/` 直下のファイルは数えない
- * （openspec/changes/add-activated-phase design D3・Open Question）。
+ * ファイルシステム（`.spec-workflow/` 配下）も本家の REST も読まない。呼び出し側が渡して
+ * いない内部状態を見て受理の可否を変えないためで、ここに残る判定は「受け取った id に
+ * 対してこの責務が成立するか」——存在しない・読めない・局面が違う——だけである
+ * （ADR-0014「責務の不成立は対象外」・add-activated-phase design D3）。
+ *
+ * かつては `.spec-workflow/approvals/` に承認依頼のファイルが在ることを完成の根拠にして
+ * いたが、2026-09-04 に退けた。API が状態を判定していたこと（ADR-0014）に加え、steering
+ * 工程には承認依頼を出す手段が無く（本家 `request-approval` は allowedTools に無い）、
+ * 文書を出し終えた実行がすべて 409 で断られて `failed` → 巡回 → `error` に倒れていた。
  *
  * ## busy ガードを持たない
  *
@@ -40,12 +40,11 @@ import { readState, withStateLock, writeState, type SessionState } from '../../.
  *
  * ## 409 はすべて `phase` で返す
  *
- * 呼び手は invokeAi と起動時の書き上げだけで、どちらも 409 を「今は完成でない」と読む。
- * 壊れた `state.json` は書き換えない（「分からないものを通さない」）。
+ * 呼び手は invokeAi と起動時の書き上げだけで、どちらも 409 を「この対象は今この責務を
+ * 成立させない」と読む。壊れた `state.json` は書き換えない（「分からないものを通さない」）。
  */
 export default defineEventHandler(async (event): Promise<Response> => {
   const name = await requireSessionId(event)
-  const root = readStrokeConfig().projectShareRoot
 
   await withStateLock(name, async () => {
     let state: SessionState
@@ -62,10 +61,6 @@ export default defineEventHandler(async (event): Promise<Response> => {
       throw conflict('phase', 'まだ昇格していない。完成を記録できるのはプロジェクトだけ。')
     }
 
-    if (!(await hasApprovalRequest(projectDir(root, name)))) {
-      throw conflict('phase', 'まだ完成していない。承認依頼が1件も無い。')
-    }
-
     // 一方向の遷移。phase 以外は触らない（`runId` は完成後の起こし直しの続き先になる）
     await writeState(name, { ...state, phase: 'activated' })
   })
@@ -76,39 +71,3 @@ export default defineEventHandler(async (event): Promise<Response> => {
 
   return new Response(null, { status: 204 })
 })
-
-const APPROVALS_DIR = join('.spec-workflow', 'approvals')
-
-/**
- * 承認依頼のファイルが1件以上在るか。category を問わない——完成の意味は「レビューできる
- * 状態に達した」であって「steering の承認依頼が在る」ではなく、category の名前は本家の
- * 都合で変わりうる（design D3）。
- */
-async function hasApprovalRequest(projectPath: string): Promise<boolean> {
-  const approvals = join(projectPath, APPROVALS_DIR)
-
-  let categories
-  try {
-    categories = await readdir(approvals, { withFileTypes: true })
-  } catch {
-    return false
-  }
-
-  for (const category of categories) {
-    if (!category.isDirectory() || category.name.startsWith('.')) continue
-    if (await hasApprovalFile(join(approvals, category.name))) return true
-  }
-  return false
-}
-
-async function hasApprovalFile(categoryPath: string): Promise<boolean> {
-  let entries
-  try {
-    entries = await readdir(categoryPath, { withFileTypes: true })
-  } catch {
-    return false
-  }
-  return entries.some(
-    entry => entry.isFile() && !entry.name.startsWith('.') && entry.name.endsWith('.json'),
-  )
-}
