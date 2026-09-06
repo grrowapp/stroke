@@ -74,34 +74,13 @@ export default defineNuxtConfig({
 
   hooks: {
     /**
-     * WS を乱暴に切られたときに dev サーバーが止まるのを防ぐ。
-     *
-     * 症状: WebSocket が異常切断（RST）されると dev サーバーが停止し、手で起動し直すまで
-     * 戻らない。全セッション・全画面が同時に使えなくなる。
-     *
-     * 原因は上流（`@nuxt/cli` の dev、dist/dev-*.mjs）にある。2つが重なっている:
-     *
-     *   1. upgrade の受け口が `nuxt.server.upgrade(req, socket, head)` を catch せず、
-     *      socket に `'error'` の受け手も付けていない
-     *   2. dev の子プロセスが `process.once("unhandledRejection", () => { ...; process.exit() })`
-     *      を持ち、**あらゆる** 未処理 rejection でプロセスを落とす
-     *
-     * 相手が RST を送ると `read ECONNRESET` が未処理 rejection になり、2 が発火して落ちる。
-     * ビルド済みサーバーにはどちらの経路も無く、落ちない（実測: 異常切断7通りで無傷）。
-     *
-     * socket に `'error'` の受け手を付けるだけでは足りない（実測: 受け止めても落ちた）。
-     * rejection は socket の emitter ではなく、catch されていない Promise の側から来る。
-     * スタックは TCP 層だけで JS のフレームを持たず、発生点を掴めない。
-     *
-     * そこで、接続リセット系の rejection **だけ** を既存のリスナへ渡さない。それ以外は
-     * 今まで通り上流の扱い（＝落ちる）に渡すので、本物の不具合は今までどおり表に出る。
-     *
-     * 上流側の欠落に対する詰め物である。上流が upgrade の失敗を扱うようになったら
-     * このフックは不要になるので、そのとき外すこと。
-     * 確認したバージョン: nuxt 4.5.2 / @nuxt/cli 3.37.0。
-     *
      * `listen` は dev でしか呼ばれず、ビルド済みの出力はこのファイルを読まない
      * （実測: `.output` を grep して該当なし）。
+     *
+     * かつてここに、WS の異常切断（RST）で dev が止まるのを防ぐ詰め物（`process.emit` の
+     * 差し替え）があった。dev 限定で、実ブラウザの操作では起きず、再現には `terminate()` に
+     * よる強制 RST が要る。対処しないと決めて外した（change fix-ws-disconnect-crash、
+     * 2026-09-06）。起きたら `yarn dev` を起こし直す。
      */
     listen(server) {
       // 実際に bind されたポートを覚える（provide-operations-via-mcp 続き）。claude に
@@ -109,70 +88,6 @@ export default defineNuxtConfig({
       // 届かなくなる（実測 2026-09-01: yarn dev は 3100 で listen するのに設定は 3599
       // を指し ECONNREFUSED）。詳細は `server/utils/stroke/listen-address.ts` の docblock。
       recordDevListenAddress(server);
-
-      // upgrade した socket に `'error'` の受け手を置く。受け手が無いと EventEmitter が
-      // throw するため、まずここで throw の芽を摘む。
-      // 再起動のたびに登録し直されるが、上流が `close` フックで `removeAllListeners('upgrade')`
-      // を呼ぶので多重登録にはならない。
-      server.prependListener('upgrade', (_req, socket) => {
-        socket.on('error', () => {});
-      });
-
-      // ここから下は1プロセスに1回だけ。
-      //
-      // `listen` は dev の再起動（このファイルの編集・`.env` の変更・`restart` フック）の
-      // たびに、同じプロセス・同じ server に対して再び呼ばれる。`process.emit` の差し替えは
-      // 上流が後始末しないので、素直に書くと再起動のたびにラップが1段ずつ積み上がり、
-      // クロージャと呼び出しコストが増え続ける。
-      const applied = Symbol.for('stroke-board:ws-disconnect-guard');
-      const flags = process as unknown as Record<symbol, boolean | undefined>;
-      if (flags[applied]) return;
-      flags[applied] = true;
-
-      /** 相手が消えただけ。サーバーの落ち度ではないので、落とす理由にしない */
-      const disconnected = new Set(['ECONNRESET', 'EPIPE', 'ECONNABORTED']);
-      const isDisconnect = (reason: unknown): boolean => {
-        // 実測した症状はトップレベルの `.code` に載る形だけである。`cause` や
-        // `AggregateError` の中までは見ない。上流や Node がラップの仕方を変えると、
-        // この判定は黙って効かなくなり症状が戻る。`yarn check:ws-disconnect` が
-        // それを捕まえる（design.md - Risks）。
-        const code = (reason as NodeJS.ErrnoException | undefined)?.code;
-        return !!code && disconnected.has(code);
-      };
-
-      // socket の受け手を置いてもなお残る分を、リスナへ配る前に握る。
-      //
-      // リスナを差し替える形では足りない。`@nuxt/cli` は `listen` フックの**後**に
-      // `process.once("unhandledRejection", restart)` を足す（dist/dev-*.mjs）ので、
-      // フック時点のリスナを捕まえて再配布しても、後から付いた分は素通りする（実測）。
-      // 登録順に依存しないよう、配布そのものを止める。
-      //
-      // **`true` を返すこと。** Node は `process.emit('unhandledRejection')` の戻り値で
-      // 「誰かが処理したか」を判定し、偽なら `triggerUncaughtException` へ回す
-      // （node:internal/process/promises）。`false` を返すと、リスナを黙らせた結果として
-      // かえって素の例外で落ちる（実測）。
-      //
-      // 握った分は必ず出す。**この詰め物はプロセス全体の rejection を対象にする**ので、
-      // 黙って捨てると、アプリ自身の catch し忘れが同じコードを持っていたときに気付けない。
-      // 出しておけば、量や出どころから異常に気付ける。
-      //
-      // 型のキャストは Node の型定義の都合である。`process.emit` はイベント名ごとの
-      // オーバーロードの集まりで、汎用のラッパーをそのまま代入できない（`as typeof
-      // process.emit` が無いと TS2322、`as never` が無いと TS2345）。`as never` は引数の
-      // 対応検査を無効にするので、この関数を触るときは実挙動で確かめること。
-      //
-      // `WS_GUARD_OFF=1 yarn dev` で外せる。`yarn check:ws-disconnect` がまだ症状を
-      // 捉えているか（外すと本当に止まるか）を確かめるための口である。外して赤に
-      // ならなくなったら、上流が直ったか、確認の方が症状を捉えなくなっている。
-      const emit = process.emit.bind(process);
-      process.emit = function (event: string | symbol, ...args: unknown[]) {
-        if (!process.env.WS_GUARD_OFF && event === 'unhandledRejection' && isDisconnect(args[0])) {
-          const code = (args[0] as NodeJS.ErrnoException).code;
-          console.warn(`[ws-disconnect-guard] 接続が切れた rejection を握った: ${code}`);
-          return true;
-        }
-        return emit(event as never, ...(args as never[]));
-      } as typeof process.emit;
     },
   },
 

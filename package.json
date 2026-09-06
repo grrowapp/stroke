@@ -17,7 +17,6 @@
     "spec": "openspec validate --all",
     "check": "yarn typecheck && yarn spec",
     "session": "tsx --env-file-if-exists=.env scripts/session.ts",
-    "check:ws-disconnect": "tsx scripts/ws-disconnect-check.ts",
     "check:stroke": "tsx scripts/stroke-check.ts",
     "test": "vitest run",
     "test:e2e": "playwright test"
