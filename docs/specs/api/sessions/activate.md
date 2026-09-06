@@ -7,7 +7,7 @@
 
 ## 振る舞い
 
-- phase を `approved` から `activated` に変える。`stroking → proposed → approved → activated` の一方向で、戻す口は無い
+- phase を `approved` から `activated` に変える。`stroking → proposed → approved → activated` の一方向で、戻す操作は無い
 - **判定を持たない（ADR-0014）。** 完成したかを決めるのは呼び手で、ここは `approved` → `activated` の遷移を記録するだけ。**成果物・ファイルシステム（`.spec-workflow/` 配下）・本家の REST・`invocation` を受理の可否の材料にしない。** 受理を断るのは責務の不成立——対象が無い・`state.json` を読めない・phase が `approved` でない——の3つだけである
 - 起動も判断も昇格も受け持たない。`invocation` にも触れない——実行の記録は invokeAi がこの応答を見てから書く
 - **busy を見ない。** 叩くのは invokeAi が `invocation` を `idle` に変える前で、その時点で対象の実行はまだ占有中。busy を見ると自分の実行に弾かれる

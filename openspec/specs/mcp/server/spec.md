@@ -67,6 +67,10 @@ MCP サーバーは stroke-board の route `/mcp`（Streamable HTTP）で提供�
 
 上の4つは代行先の応答が存在しない。5つ目は応答はあるが**使える結果が無い**場合で、応答の `status`（2xx）を返すと成功と見分けがつかなくなるため例外とする。いずれも `error` は代行先の本文ではなくツールが書いた理由になる。
 
+**`project_not_registered` の `error` は、引き当てに使ったパスと、そのとき本家の一覧が持っていたプロジェクト（名前とパス）を含む SHALL。** 一覧が空だったのか、一覧にプロジェクトはあるが照合が成立しなかったのかを、`error` だけから判別できる形にする SHALL。「登録されていない」としか読めない本文にしてはならない（MUST NOT）——実際には登録されていて照合だけが外れている場合があり、その本文は受け手を、存在しない原因（未登録）の解消へ向かわせる。
+
+**この2つの状況に別々の `errorCode` を割り当ててはならない（MUST NOT）。** `errorCode` は受け手が分岐するための値であり、「一覧に候補が無い」と「一覧に候補はあるが照合が外れた」はどちらも受け手（呼び出した claude）には直せず、次の手が変わらない。分岐の増えない区別は `error` の本文で伝える。
+
 1つ目（`unauthorized`）は、`server/session-management` が要求する **HTTP 401 の代わりではない**。HTTP 401 は route へ届く前の層が返す SHALL で、ツール側のこれは多重防御である。ツールの中で例外を投げると結果の形が崩れるので、到達しない経路でも平坦な形で返す SHALL。
 
 これ以外で代行先が応答を返したなら、その `status` を保持する SHALL——応答があるのにツールが別の値へ組み替えてはならない（MUST NOT）。
@@ -107,6 +111,18 @@ MCP サーバーは stroke-board の route `/mcp`（Streamable HTTP）で提供�
 - **GIVEN** invoke.ts が起動した claude が `/mcp` へ接続している
 - **WHEN** その接続で各ツールの結果スキーマの定義を取る
 - **THEN** すべてのツールで `status` が必須項目にあり、失敗時の `errorCode` / `error` が定義されている
+
+#### Scenario: 照合が外れたことが error から読める
+
+- **GIVEN** 本家の一覧に1件以上のプロジェクトがあり、そのいずれも steering 工程の接続が持つパスに対応しない
+- **WHEN** projectId を要する代行ツールを実行する
+- **THEN** 結果は `status: 404` / `errorCode: project_not_registered` で、`error` には引き当てに使ったパスと、一覧が持っていたプロジェクトの名前とパスが含まれる
+
+#### Scenario: 一覧が空のときも同じ errorCode で、本文が空であることを述べる
+
+- **GIVEN** 本家の一覧が空である
+- **WHEN** projectId を要する代行ツールを実行する
+- **THEN** 結果は `status: 404` / `errorCode: project_not_registered` で、`error` から一覧が空だったことが読み取れ、直前のシナリオの本文とは区別できる
 
 ### Requirement: 代行は確定した方式であり、ツール側に第2の実装を作らない
 
