@@ -1,6 +1,7 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { defineConfig } from '@playwright/test';
 
@@ -98,8 +99,14 @@ async function resolvePort(key: string, from: number): Promise<number> {
 export const STUB_PORT = await resolvePort('E2E_STUB_PORT', PORT_SEARCH_START);
 export const APP_PORT = await resolvePort('E2E_APP_PORT', STUB_PORT + 1);
 
-/** 走査対象と registry をここに作る */
-export const E2E_ROOT = join(process.cwd(), '.e2e-tmp');
+/**
+ * 走査対象と registry をここに作る。
+ *
+ * **この設定ファイルの隣に固定する。** `process.cwd()` から組むと、別の場所から `-c` で
+ * この設定を指して起動したとき、その場所の `.e2e-tmp` を作り——下で丸ごと消すようになった
+ * ので——消す。消す先を作業ツリーの中に固定できるのは、この定義だけである。
+ */
+export const E2E_ROOT = join(dirname(fileURLToPath(import.meta.url)), '.e2e-tmp');
 export const PROJECTS_PARENT = join(E2E_ROOT, 'projects');
 export const SPEC_WORKFLOW_HOME = join(E2E_ROOT, 'home');
 export const REGISTRY_PATH = join(SPEC_WORKFLOW_HOME, 'activeProjects.json');
@@ -185,10 +192,6 @@ export function registryContent(): string {
   );
 }
 
-for (const name of [...ACTIVE.map((project) => project.name), ...DISCONNECTED]) {
-  mkdirSync(join(PROJECTS_PARENT, name, '.spec-workflow'), { recursive: true });
-}
-
 /**
  * 承認まで進んだセッション。
  *
@@ -200,20 +203,62 @@ for (const name of [...ACTIVE.map((project) => project.name), ...DISCONNECTED]) 
 export const SEEDED_SESSION_ID = '11111111-2222-4333-8444-555555555555';
 export const SEEDED_PROJECT_NAME = 'promoted-project';
 
-const seeded = join(PROJECTS_PARENT, SEEDED_SESSION_ID);
-mkdirSync(join(seeded, 'docs'), { recursive: true });
-mkdirSync(join(seeded, 'openspec'), { recursive: true });
-writeFileSync(join(seeded, 'openspec', 'config.yaml'), 'schema: flontier-strokeflow\n');
-writeFileSync(join(seeded, 'docs', 'proposal.md'), '# 承認できる proposal\n\n本文。\n');
-writeFileSync(join(seeded, 'overview.txt'), 'E2E のための概要\n');
-writeFileSync(join(seeded, 'strokes.json'), '[{"proposal":true,"question":null,"answer":null}]\n');
-writeFileSync(
-  join(seeded, 'state.json'),
-  `${JSON.stringify({ phase: 'proposed', currentQuestion: null, invocation: 'idle', retries: 0 }, null, 2)}\n`,
-);
+/**
+ * 保存先に種をまく。走査対象（アクティブ2件 + 未接続1件）・承認まで進んだセッション・registry。
+ *
+ * 作り直しに強い形（`recursive` な mkdir と同じ内容の書き出し）なので、何度呼んでも同じ
+ * 状態になる。この設定は worker プロセスでも評価されるため、実際に何度も呼ばれる。
+ */
+export function seedStore(): void {
+  for (const name of [...ACTIVE.map((project) => project.name), ...DISCONNECTED]) {
+    mkdirSync(join(PROJECTS_PARENT, name, '.spec-workflow'), { recursive: true });
+  }
 
-mkdirSync(SPEC_WORKFLOW_HOME, { recursive: true });
-writeFileSync(REGISTRY_PATH, registryContent());
+  const seeded = join(PROJECTS_PARENT, SEEDED_SESSION_ID);
+  mkdirSync(join(seeded, 'docs'), { recursive: true });
+  mkdirSync(join(seeded, 'openspec'), { recursive: true });
+  writeFileSync(join(seeded, 'openspec', 'config.yaml'), 'schema: flontier-strokeflow\n');
+  writeFileSync(join(seeded, 'docs', 'proposal.md'), '# 承認できる proposal\n\n本文。\n');
+  writeFileSync(join(seeded, 'overview.txt'), 'E2E のための概要\n');
+  writeFileSync(join(seeded, 'strokes.json'), '[{"proposal":true,"question":null,"answer":null}]\n');
+  writeFileSync(
+    join(seeded, 'state.json'),
+    `${JSON.stringify({ phase: 'proposed', currentQuestion: null, invocation: 'idle', retries: 0 }, null, 2)}\n`,
+  );
+
+  mkdirSync(SPEC_WORKFLOW_HOME, { recursive: true });
+  writeFileSync(REGISTRY_PATH, registryContent());
+}
+
+/**
+ * **実行は既知の保存先から始まる**（openspec/specs/tooling/e2e-harness）。
+ *
+ * 前の run が後始末に失敗して残したもの（承認済みのプロジェクト等）は、次の run で一覧の
+ * 行数を狂わせる（fix-e2e-project-residue）。種をまく前に `.e2e-tmp` を**丸ごと**消す。
+ * 名前で選んで消さない——規約から外れた残骸を見逃す。
+ *
+ * **消すのは本体プロセスの評価だけ。** この設定は worker プロセスでも評価される
+ * （Playwright 自身が worker で config を読み直す。`playwright/lib/worker/workerProcessEntry.js`
+ * の `deserializeConfig`。加えて `support.ts` などが定数を import する）。worker でも消すと、
+ * 種をまいた後の保存先を worker の起動のたびに消して作り直す。worker では
+ * `TEST_PARALLEL_INDEX` が config を読むより前に立つ（同ファイル）ので、無いときだけ消す。
+ *
+ * **`globalSetup` には置かない。** Playwright は `webServer` を立ててから `globalSetup` を
+ * 走らせる（`playwright/lib/runner/index.js` の `createGlobalSetupTasks`）。サーバが立った後に
+ * 消すと、まき直すまでの隙間にサーバが空の保存先を読む。ここ（config の評価）は
+ * `yarn test:e2e`（`playwright test`）ではサーバの起動より前である。
+ *
+ * 消す先は `E2E_ROOT` そのもので、この設定ファイルの隣の `.e2e-tmp` に固定されている
+ * （上の定義）。`refuseRealTargets()` が守るのは、サーバと種の書き先が `E2E_ROOT` の下から
+ * 出ていないことと、環境変数での差し替えであって、消す先の所在ではない。
+ *
+ * 落ちた run の残骸は次の run が始まるまで残るので、調べたければその前に見る。
+ * `playwright test --list` も config を評価するので、一覧を出すだけでも消える。
+ */
+if (process.env['TEST_PARALLEL_INDEX'] === undefined) {
+  rmSync(E2E_ROOT, { recursive: true, force: true });
+}
+seedStore();
 
 export default defineConfig({
   testDir: './test/e2e',
