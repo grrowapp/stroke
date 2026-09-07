@@ -259,17 +259,24 @@ body {
    * 生成中を「薄いだけの行」にしないため、薄くするのは中身だけで、地はそのまま残す
    * ——地は下の `td` の重ねが受け持つ。
    *
-   * **弱めるのは文字色であって `opacity` ではない。** 名前セルはローダーと名前を1つの
+   * **名前だけは文字色で弱め、`opacity` を掛けない。** 名前セルはローダーと名前を1つの
    * `span` に収めており、その親へ `opacity` を掛けるとローダーまで沈む。`opacity` は
    * グループを作るので、子を親より濃くして戻すことができない。ローダーは
    * `conic-gradient` の背景なので、文字色で弱めても影響を受けない。
    *
+   * **未処理の通知（3列目）は未接続の行と同じく子要素へ `opacity` を掛ける。** この列の
+   * 「—」はユーティリティで自分の文字色を持つため、`td` の文字色は届かない。ローダーは
+   * 無いので `opacity` で沈めてよい（prototype の `.row-gen td:nth-child(3) > *` と同じ）。
+   *
    * **状態の列（2列目）は弱めない。** 未接続の行と同じ理由である
    * （specs/project/directory）。
    */
-  .sb-row-creating td:nth-child(1),
-  .sb-row-creating td:nth-child(3) {
+  .sb-row-creating td:nth-child(1) {
     color: color-mix(in srgb, var(--text-primary) 45%, var(--surface-panel));
+  }
+
+  .sb-row-creating td:nth-child(3) > * {
+    opacity: 0.45;
   }
 
   .sb-row-creating td:nth-child(4) {
@@ -487,8 +494,9 @@ body {
    * 「まだ何かが続いている」ことは伝わる。
    *
    * **ここで行に `opacity` を掛けない。** 弱め方は動きの設定に関わらず同じで、上の
-   * 文字色による指定が常に効いている。ここで行ごと沈めると、動きを抑えている人にだけ
-   * 状態の列が読めなくなる（specs/project/directory）。
+   * 列ごとの指定（名前は文字色、通知は子要素の `opacity`、最終更新は文字色）が常に
+   * 効いている。ここで行ごと沈めると、動きを抑えている人にだけ状態の列が読めなくなる
+   * （specs/project/directory）。
    */
   @media (prefers-reduced-motion: reduce) {
     .sb-row-creating {
@@ -507,7 +515,8 @@ body {
   }
 
   /*
-   * 状態チップ。prototype の `.chipOff`（無彩色・枠あり）が既定。
+   * 状態チップ。prototype（`update-project-list-view` の `prototype/index.html`）の
+   * `.chip`（無彩色・枠あり）が既定で、`.chip.active` が下の `.sb-chip-on` に当たる。
    *
    * ui.md の Visual Language には「アクティブ / 未接続の区別は色ではなく、チップの文言と
    * 行の非活性で示す」とあるが、同じ ui.md が採用した prototype（案A）はアクティブを
