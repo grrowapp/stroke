@@ -5,6 +5,8 @@ triage:
 tags:
   - proposal
   - specs
+  - design
+  - tasks
 status: Planning
 order: -5.0
 ---
@@ -53,15 +55,26 @@ export function formatRelativeTime(iso: string, now = Date.now()): string {
 
 基準時刻の既定が `Date.now()`。SSR で描いたときとブラウザで描き直したときで実行時刻が違うため、刻みの境界をまたぐと文言が変わる（「19時間前」↔「20時間前」、7日の境界では相対と絶対が入れ替わる）。
 
-呼び出し側5画面はいずれも基準時刻を渡していない。
+呼び出し側はいずれも基準時刻を渡していない。本番ルート5画面と、使い捨ての prototype 1画面（2026-09-07 再確認時点。行番号もこの時点のもの）。
 
 ```
-app/pages/projects/index.vue:190
+app/pages/projects/index.vue:402
 app/pages/index.vue:115
 app/pages/projects/[projectId]/specs/index.vue:35
 app/pages/projects/[projectId]/tasks/index.vue:24
 app/pages/projects/[projectId]/steering/index.vue:40
+app/pages/prototype/projects.vue:293   ← 使い捨て（archive 済み change show-pending-project-in-list の残骸。本 change の対象外）
 ```
+
+## 再確認（2026-09-07）
+
+現在のコード（`pre5` = `491e77e0`）で `yarn dev --port 3155` を起こし、headless Chromium で `/projects` と `/` を開いて console を採った。
+
+- **相対時刻の text mismatch は再現した。** ブラウザの `Date.now()` を +5 日ずらすと `/projects` で `Hydration text content mismatch — rendered on server: 4日前 / expected on client: 9月2日 08:52`（7日の境界を跨いで相対→絶対に入れ替わる）
+- **ダンプの出所も確認した。** この1件が dev ログに **349,030 バイトの1行**（`at <RouteProvider key="/projects" vnode= {...}` の VNode 直列化）を足した。「警告1件あたり数百 KB」は page 内の mismatch について正しい
+- **時計をずらさないと再現しない。** 境界をまたぐのは SSR と描き直しの間（1秒未満）だけで、時計が揃った環境では稀。実測時（2026-08-28）に頻発したのは、`devServer.host: '0.0.0.0'` で**別マシンのブラウザ**から開いており、サーバーとブラウザの時計のずれが境界跨ぎを常態化させていたためと見る（`nuxt.config.ts` の注記「別マシンのブラウザから開くため」）
+- **相対時刻とは別の要因が1つ混ざっている。** ticket 冒頭の `Hydration style mismatch` / `Hydration attribute mismatch` は相対時刻では起きない。出所は `app/layouts/portal.vue` の接続ドット——SSR は `upstreamConnected = false` で描くが、本家に繋がっていると WS のスナップショットが hydration より先に届き、client は `background: var(--status-success)` / `title="本家に接続済み"` を期待する。本家が繋がっている限り毎回出る（実測: `/`・`/projects` とも、本家接続中は 100% 再現）。**ダンプは伴わない**（ERROR 1行 + WARN 2行、数百バイト）が、`Hydration completed but contains mismatches.` の ERROR はこちらでも出る。相対時刻を直しても、この ERROR は本家接続中は残る
+- 本家が繋がっていない時間帯は、時計を揃えたブラウザで警告 0 件だった
 
 ## 害
 
@@ -74,3 +87,5 @@ app/pages/projects/[projectId]/steering/index.vue:40
 `provide-operations-via-mcp` の検証中に見つけた。ストロークの往復とは無関係の既存の不具合。
 
 change: `fix-relative-time-hydration`（proposal / specs 作成済み、実装は未着手）
+
+2026-09-07 に現在のコードとの整合と主張の妥当性を再確認し、上の「再確認」を足した。接続ドットの mismatch は本 change に含めず別 change に切る（proposal「対象の線引き」。起票は未着手）。同日 design / tasks を作成。

@@ -13,7 +13,7 @@
 - **状態チップにガラスの質感を戻す。** 面の3段グラデーション・上辺の照り返し・下辺の落ち込み・文字を `#fff` と混ぜる処理を `.sb-chip` に入れる
 - **アクティブのチップに発光を戻す。** 文字のにじみ（`text-shadow`）と外へのにじみ2枚を `.sb-chip-on` に入れる
 - **未接続の行の薄め方を変える。** 行ごと `opacity` を掛けるのをやめ、**状態列以外**を薄める形にする。チップは沈ませない
-- **生成中の行の薄め方も同じ形にする**（実装中に加えた。tasks 2.6）。`td > *` への `opacity` をやめ、文字色で弱める。ローダーとチップは沈ませない
+- **生成中の行の薄め方も同じ形にする**（実装中に加えた。tasks 2.6）。`td > *` への一律の `opacity` をやめ、名前は文字色で、未処理の通知は子要素の `opacity` で、最終更新は文字色で弱める。ローダーとチップは沈ませない（通知の列の形は 2026-09-07 のレビューで直した。「決定の記録」）
 - **動きを抑える設定でも状態の列が読めるようにする**（実装中に加えた。tasks 5.3）。`@media (prefers-reduced-motion: reduce)` の中にあった行ごとの `opacity` を落とす
 - 当時の prototype を `prototype/index.html` として本 change に持ち込む（ペラ1・依存なし）
 
@@ -40,9 +40,9 @@
 
 | ファイル | 内容 |
 | --- | --- |
-| `app/assets/css/main.css` | `.sb-chip` / `.sb-chip-on` / `.sb-row-off` / `.sb-row-creating` の4つと、`@media (prefers-reduced-motion: reduce)` の行ごと `opacity` の除去 |
+| `app/assets/css/main.css` | `.sb-chip` / `.sb-chip-on` / `.sb-row-off` / `.sb-row-creating` の4つと、`@media (prefers-reduced-motion: reduce)` の行ごと `opacity` の除去。最終更新の色の持ち主として `.sb-table td:nth-child(4)` を新設 |
 | `app/pages/projects/index.vue` | 最終更新の `td` から文字色のユーティリティ1つを外す。持ち主を `main.css` へ一本化するため |
-| `test/e2e/design-token.spec.ts` | チップの断言を、実値の固定から要件の確認へ書き換える（書き換え時は `e2e/`。マージ後の `79afcbb9` で `test/e2e/` へ移った） |
+| `test/e2e/design-token.spec.ts` | チップの断言を、実値の固定から要件の確認へ書き換える（書き換え時は `e2e/`。develop 側で `test/e2e/` へ移っていたものをマージ `36470429` で取り込み、同日の `79afcbb9` は `playwright.config.ts` の中のパス3箇所を `test/e2e` へ戻しただけ） |
 
 コードの構造・DOM は変えない。**CSS の宣言を直し、色の持ち主を CSS に寄せるためのユーティリティ1つを外す。**
 
@@ -77,9 +77,9 @@ prototype の実物は `.chip { border: 1px solid }` ＋ `.chip.active { border-
 
 `openspec/specs/project/directory/spec.md` の要件文は「押せないことが見て分かる」までしか規定しておらず、行ごと `opacity` を掛ける実装もこの文言は満たしてしまう。旧テストが実値を固定していたのは、関係を規定する文言が spec に無かったためでもある。そこで delta spec は、テストが見るべき**関係**を要件へ引き上げる——3状態は同じ形・同じ幅、際立つのはアクティブだけ、行を弱めるとき状態の列は弱めない。実現手段（`opacity` か文字色か）には踏み込まない。
 
-## 突き合わせの結果
+## 突き合わせの結果（2026-08-30・修正前）
 
-`ui.md` の記録と `main.css` の実装を1項目ずつ照合した。
+`ui.md` の記録と、**修正前**（`64a2b8d1` 以前）の `main.css` を1項目ずつ照合した。以下の「実装」列は当時の値で、現在の `main.css` は `ui.md` 側に揃っている。
 
 ### チップ（既定）
 
@@ -133,3 +133,5 @@ prototype の実物は `.chip { border: 1px solid }` ＋ `.chip.active { border-
 | 2026-09-02 | **6.3（E2E）・8.1（レビュー）・8.2（完了承認）を未実施のままマージした事実を tasks に残す。** チェックを付けて埋めない。archive の前に 6.3 を通す |
 | 2026-09-06 | **delta spec を、`add-activated-phase`（2026-09-06 archive）が進めた本体 spec の上へ乗せ直す。** 同 change は本 change と同じ2つの要件（「一覧は4つの列を持つ」「未接続のプロジェクトは選択できない」）を MODIFIED し、phase を根拠にする文言と scenario 2本（「生成中のプロジェクトが .spec-workflow を持つ」「中身を持つ生成中の行を押す」）を足していた。本 change の delta は 2026-08-30 時点の本体を写していたため、`openspec validate` が「本体にある scenario を落としている」で失敗し、そのまま archive すると同 change の成果を消すところだった。本体の現行文へ、本 change の要件文（同じ形・同じ幅／アクティブだけ際立つ／状態の列を弱めない）と scenario 6本を足し直した。**見た目の要件そのものは変えていない** |
 | 2026-09-06 | **`.sb-chip` を使う画面の所在を現在のファイルへ更新する。** ヘッダは `WorkspaceShell.vue`、保存の状態は `modules/markdown/.../MarkdownEditor.vue` へ移っていた。使い方と意味は変わっておらず、揃えるという判断はそのまま |
+| 2026-09-07 | **生成中の行の未処理の通知（3列目）を、未接続と同じ子要素の `opacity` で沈める。** 8.1 のレビューで、`.sb-row-creating td:nth-child(3)` の文字色指定が効いていないと分かった。この列の「—」はユーティリティで自分の文字色を持つため、`td` の色は届かない。この列にローダーは無いので `opacity` で沈めてよく、prototype の `.row-gen td:nth-child(3) > *` とも一致する。文字色で弱めるのは名前セルだけに絞った |
+| 2026-09-07 | **`design-token.spec.ts` の移動を `79afcbb9` に帰していた記述を正す。** ファイルはマージ `36470429` の時点で既に `test/e2e/` にあり（develop 側の移動を merge で取り込んだ）、`79afcbb9` は `playwright.config.ts` の中のパス3箇所（testDir・スタブの起動コマンド・コメント）を `test/e2e` へ戻しただけである |

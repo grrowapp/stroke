@@ -1,13 +1,13 @@
 # update-project-list-view — tasks
 
-入れる値の正は `prototype/index.html`。写しは `ui.md` にある。触るのは `app/assets/css/main.css` の宣言——当初は3つ、2.6 と 5.3 で `.sb-row-creating` と `@media (prefers-reduced-motion: reduce)` を加えて4つになった。DOM は変えない。クラス名は、最終更新の `td` から文字色のユーティリティ1つを外した（持ち主を `main.css` へ移すため。7.1）。
+入れる値の正は `prototype/index.html`。写しは `ui.md` にある。触るのは `app/assets/css/main.css` の宣言——当初は `.sb-row-off` / `.sb-chip` / `.sb-chip-on` の3つ、2.6 で `.sb-row-creating` を加えて4つ。これに加えて 5.3 で `@media (prefers-reduced-motion: reduce)` の中の `opacity` を落とし、7.1 で最終更新の色の持ち主 `.sb-table td:nth-child(4)` を新設した。DOM は変えない。クラス名は、最終更新の `td` から文字色のユーティリティ1つを外した（持ち主を `main.css` へ移すため。7.1）。
 
-**実装は pre6（`/home/vagrant/work/stroke-board/pre6`、当時のブランチ `move-conventions-to-steering`。2026-09-06 現在は `pre6` ブランチで develop と同じ `491e77e0`）で行った。** 2026-08-31 に `64a2b8d1` でコミットし、`36470429` で develop へマージ済み。**6.3・8.1・8.2 は未実施のままマージされている**（本書のチェックがその記録）。
+**実装は pre6（`/home/vagrant/work/stroke-board/pre6`、当時のブランチ `move-conventions-to-steering`。その後 `pre6` ブランチになり、2026-09-07 に develop `bd82a563` へ追随した）で行った。** 2026-08-31 に `64a2b8d1` でコミットし、`36470429` で develop へマージ済み。**6.3・8.1・8.2 は未実施のままマージされている**（本書のチェックがその記録）。
 
 ## 1. 実物と prototype を並べる
 
 - [x] 1.1 `prototype/index.html` を静的サーバで開く。ペラ1・依存なしなので、node の素の `http` で配れば足りる（`nuxt dev` は要らない）— node の素の `http` 40行で 3698 に配った
-- [x] 1.2 実物（`yarn dev` → `/projects`）を開き、同じ画面幅で並べる。ポートは 3399 固定（`CLAUDE.md`）— 幅 1300px で両方を撮って突き合わせた
+- [x] 1.2 実物（`yarn dev` → `/projects`）を開き、同じ画面幅で並べる。ポートは当時の `CLAUDE.md` で 3399 固定だった（現在は worktree ごとにずらす方式で、pre6 の `dev` は 3100）— 幅 1300px で両方を撮って突き合わせた
 - [x] 1.3 **生成中の行が実データで出ない場合の確認手段を決める。** 承認を通すか、prototype 側だけで見るか。生成中の地とローダーはこの change の対象外なので、出せなければ prototype の確認だけで進めてよい
 
 ## 2. 未接続の行の薄め方を直す（先にこれ）
@@ -24,6 +24,8 @@
       **`opacity` では直せない。** 親に `opacity` を掛けると子はそれより濃くできないため、ローダーだけを戻すことができない。名前は**文字色**で弱め、ローダーとチップには何も掛けない形にする。ローダーは `conic-gradient` の背景なので文字色の影響を受けない
 
       2.6 は tasks を書いた時点で見落としていたもので、範囲を広げる判断である。delta spec の「行を弱めるとき状態の列を弱めてはならない」は同じ要件の中で生成中の行にも掛かっており、目的に沿う
+
+      **2026-09-07 追記（8.1 の指摘）:** 文字色で弱める形にしていた3列目（未処理の通知）は効いていなかった。「—」の `span` がユーティリティで自分の文字色を持ち、`td` の色が届かない。この列にローダーは無いので、未接続と同じ `td:nth-child(3) > * { opacity: 0.45 }` に改め、文字色で弱めるのは名前セルだけにした（prototype の `.row-gen td:nth-child(3) > *` と一致）
 
 ## 3. チップにガラスの質感を入れる
 
@@ -58,15 +60,16 @@
 ## 6. 門番
 
 - [x] 6.1 `yarn typecheck` を通す — 通過
-- [x] 6.2 `yarn test` を通す — 21ファイル / 211件 通過
-- [ ] 6.3 `yarn test:e2e` を通す。E2E は並列時に本家スタブの競合で落ちることがある（実測 2026-08-30）。落ちたら `--workers=1` で単独確認する — **未実施のままマージされた。** 実施の記録が無い。archive の前に通す。`playwright.config.ts` の webServer は `.output/server/index.mjs` を起動するので、先に `yarn build` が要る（2026-09-06 時点で pre6 に `.output` は無い）
-- [x] 6.4 CSS だけの変更なので、既存のテストが状態の表示を文言で見ていることを確かめる。見た目の値をテストに固定しない — `.sb-chip` の実値を固定していたのは `design-token.spec.ts` の1件だけで、要件を見る形へ書き換えた（書き換え時は `e2e/`、マージ後の `79afcbb9` で `test/e2e/` へ移った）。`notifications.spec.ts` の実値固定は通知画面の別テーブル（`sb-datarow-*`）が対象で `.sb-chip` は「存在しないこと」しか見ていない。`upstream-style.spec.ts` は本家との比較で無関係
+- [x] 6.2 `yarn test` を通す — 2026-08-31 時点で 21ファイル / 211件 通過（2026-09-07 のレビュー時点では 77ファイル / 976件。他 change の分が増えている）
+- [x] 6.3 `yarn test:e2e` を通す。E2E は並列時に本家スタブの競合で落ちることがある（実測 2026-08-30）。落ちたら `--workers=1` で単独確認する — 2026-08-31 のマージ時は未実施だった（実施の記録が無い）。**2026-09-07 に pre6（`491e77e0`＝当時の develop）で通した: 243 件通過、19.7 分。** 8.1 で入れた CSS 修正（`6995567a`）の後は、build し直して `design-token.spec.ts` だけ再実行し 21 件通過（一覧の行の弱め方とチップの断言はここにある）。 `playwright.config.ts` の webServer は `.output/server/index.mjs` を起動するので、先に `yarn install` と `yarn build` が要った
+- [x] 6.4 CSS だけの変更なので、既存のテストが状態の表示を文言で見ていることを確かめる。見た目の値をテストに固定しない — `.sb-chip` の実値を固定していたのは `design-token.spec.ts` の1件だけで、要件を見る形へ書き換えた（書き換え時は `e2e/`。develop 側で `test/e2e/` へ移っていたものをマージ `36470429` で取り込み、同日の `79afcbb9` は `playwright.config.ts` の中のパス3箇所を `test/e2e` へ戻しただけ）。`notifications.spec.ts` の実値固定は通知画面の別テーブル（`sb-datarow-*`）が対象で `.sb-chip` は「存在しないこと」しか見ていない。`upstream-style.spec.ts` は本家との比較で無関係
 
 ## 7. コミット
 
 - [x] 7.1 pre6 のブランチへ直接コミットする（`CLAUDE.md`「change の実装（apply）は、この worktree のブランチへ直接コミットする」）。コミットメッセージに、直した3宣言を1行で残す — `64a2b8d1`「fix: 一覧の状態を ui.md の確定値どおりに出す」（2026-08-31）。`36470429` で develop へマージ。触ったのは `main.css`・`app/pages/projects/index.vue`（最終更新の `td` から文字色ユーティリティを外し、持ち主を `main.css` の `.sb-table td:nth-child(4)` へ一本化）・`design-token.spec.ts`。**同じコミットに `playwright.config.ts` と `CLAUDE.md`（E2E ポートを 50000 から上へ空きを探す方式へ）が同乗している。** この change の対象外で、proposal の決定の記録に残した
+- [x] 7.2 8.1 で見つけた3列目の修正（`main.css`）と、陳腐化したコメント（`main.css`・`index.vue`）を pre6 の `pre6` ブランチへ直接コミットする（2026-09-07、`6995567a`）。develop への合流はユーザー指示を待つ
 
 ## 8. レビューと完了承認
 
-- [ ] 8.1 `typescript-reviewer` エージェントに `/santa-method` でレビューを実行する。対象はこの change の成果物（`main.css` の4宣言・delta spec・`ui.md`・`prototype/index.html`）と、`prototype` / `ui.md` / 実装の3者で値が一致しているかの整合。レビューが完全にパスするまで続ける
-- [ ] 8.2 ユーザーから完了承認を得る
+- [x] 8.1 `typescript-reviewer` エージェントに `/santa-method` でレビューを実行する。対象はこの change の成果物（`main.css` の4宣言・delta spec・`ui.md`・`prototype/index.html`）と、`prototype` / `ui.md` / 実装の3者で値が一致しているかの整合。レビューが完全にパスするまで続ける — **2026-09-07 1周目:** 独立レビュアー2名のうち1名が FAIL。critical 2件（生成中の行の3列目が沈んでいない／`79afcbb9` の帰属違い）を直した（2.6 の追記、proposal「決定の記録」2026-09-07）。**2周目:** 2名とも FAIL。proposal「What Changes」の生成中の行の記述が3列目の修正と矛盾していた点と、CSS の修正が未コミットだった点を直し、コメントの陳腐化（`main.css` の `.chipOff`／reduced-motion の説明、`index.vue` 冒頭の「行の不透明度」）も合わせて直した。3列目の修正は pre6 へコミット済み（7.2）。**3周目:** 2名とも PASS、critical なし。残った提案（ui.md のコード例のクラス名・`gap` の不採用の明記・`79afcbb9` の表現の統一・7章の並び）は資料側で取り込んだ。**レビュー完了**
+- [x] 8.2 ユーザーから完了承認を得る — 2026-09-07 承認。合流は PR で行う（ユーザー指示）

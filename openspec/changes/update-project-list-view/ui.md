@@ -10,7 +10,7 @@ CSS の宣言を直す。当初は3つの予定だったが、実装中に同じ
 
 ```
 .sb-row-off       行ごとの opacity をやめ、状態列以外を薄める形にする
-.sb-row-creating  同上。ただし名前セルはローダーを内包するため opacity では戻せず、文字色で弱める
+.sb-row-creating  同上。ただし名前セルはローダーを内包するため opacity では戻せず、文字色で弱める（通知の列は未接続と同じ opacity）
 .sb-chip          ガラスの質感（面の3段・上辺の照り・下辺の落ち込み・文字の混色）を入れる
 .sb-chip-on       アクティブの発光（文字のにじみ・外へのにじみ2枚）を入れる
 ```
@@ -41,20 +41,24 @@ DOM は変えない。クラス名は1つだけ外した——最終更新の `t
 
 ## 生成中の行
 
-未接続の行と**同じ薄さ**にする。ただし薄め方が違う。名前セルはローダーと名前を1つの `span` に収めており、その親へ `opacity` を掛けるとローダーまで沈む。`opacity` はグループを作るので、子を親より濃くして戻すことができない。そのため**文字色で弱める**。ローダーは `conic-gradient` の背景なので文字色の影響を受けず、チップは自分の文字色を持つので影響を受けない。
+未接続の行と**同じ薄さ**にする。ただし名前セルだけ薄め方が違う。名前セルはローダーと名前を1つの `span` に収めており、その親へ `opacity` を掛けるとローダーまで沈む。`opacity` はグループを作るので、子を親より濃くして戻すことができない。そのため名前セルは**文字色で弱める**。ローダーは `conic-gradient` の背景なので文字色の影響を受けず、チップは自分の文字色を持つので影響を受けない。
+
+**ここは prototype（`.row-gen .name { opacity }`）から意図して離れている。** prototype はローダーと名前が別の要素だが、実物は1つの `span` に収めているためである。「食い違ったら prototype が勝つ」の例外はこの1点だけ。
+
+未処理の通知（3列目）は未接続の行と同じく**子要素に `opacity`** を掛ける。この列の「—」はユーティリティで自分の文字色を持つため、`td` の文字色を変えても届かない。ローダーは無いので `opacity` で沈めてよい（prototype の `.row-gen td:nth-child(3) > *` と同じ）。当初は名前と同じ文字色の指定にしていたが効いておらず、2026-09-07 のレビュー（tasks 8.1）で見つけて直した。
 
 ```css
-/* 弱めるのは文字色。opacity は掛けない。状態列（2列目）は触らない */
-.row-creating td:nth-child(1),
-.row-creating td:nth-child(3) { color: color-mix(in srgb, var(--text-primary) 45%, var(--surface-panel)); }
-.row-creating td:nth-child(4) { color: color-mix(in srgb, var(--text-secondary) 45%, var(--surface-panel)); }
+/* 実装の形（main.css）。名前は文字色、通知は子要素の opacity。状態列（2列目）は触らない */
+.sb-row-creating td:nth-child(1) { color: color-mix(in srgb, var(--text-primary) 45%, var(--surface-panel)); }
+.sb-row-creating td:nth-child(3) > * { opacity: 0.45; }
+.sb-row-creating td:nth-child(4) { color: color-mix(in srgb, var(--text-secondary) 45%, var(--surface-panel)); }
 ```
 
 | 列 | 薄め方 |
 | --- | --- |
 | 1 プロジェクト | 文字色を `--text-primary` 45% で `--surface-panel` と混ぜる。ローダーは沈まない |
 | 2 状態 | **薄めない** |
-| 3 未処理の通知 | 文字色を `--text-primary` 45% で `--surface-panel` と混ぜる |
+| 3 未処理の通知 | 未接続と同じ。子要素に `opacity: 0.45` |
 | 4 最終更新 | 未接続と同じ。`--text-secondary` 45% で `--surface-panel` と混ぜる |
 
 行の地（`#161f32` の重ね）はそのまま残す。薄くするのは中身だけで、生成中を「薄いだけの行」にしない。
@@ -73,6 +77,8 @@ DOM は変えない。クラス名は1つだけ外した——最終更新の `t
 | 下辺の落ち込み | `inset 0 -1px 0` `#000` **20%** |
 
 面の3段は、中央（55%）をいちばん薄くし、下端（100%）で少し戻す。平坦なグラデーションではなく、下辺で受けた光が戻る形にしている。
+
+prototype の `.chip` にある `gap: 6px` は写していない。チップの中身は文字1つで、`gap` が効く相手が無い。
 
 ## チップ（アクティブ）
 
@@ -113,4 +119,4 @@ DOM は変えない。クラス名は1つだけ外した——最終更新の `t
 
 この change は動きを足さない。`animation: none` の指定は既存のまま残す。
 
-ただし `@media (prefers-reduced-motion: reduce)` の中に `.sb-row-creating { opacity: 0.45 }` があり、動きを抑える設定のときだけ行ごと沈んで状態の列が読めなくなっていた（tasks 5.3）。**弱め方は動きの設定に関わらず同じ**であるべきで、上の「生成中の行」の文字色の指定が常に効いていればよい。この `opacity` を落とした。
+ただし `@media (prefers-reduced-motion: reduce)` の中に `.sb-row-creating { opacity: 0.45 }` があり、動きを抑える設定のときだけ行ごと沈んで状態の列が読めなくなっていた（tasks 5.3）。**弱め方は動きの設定に関わらず同じ**であるべきで、上の「生成中の行」の列ごとの指定（名前は文字色、通知は子要素の `opacity`、最終更新は文字色）が常に効いていればよい。この `opacity` を落とした。
