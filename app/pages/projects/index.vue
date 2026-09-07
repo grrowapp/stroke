@@ -9,8 +9,10 @@
  * 可否をサーバーに問わない。前提の欠けは概要投稿時の 503 として現れる（既存経路）。
  * 登録は中身が未決のため非活性固定にする。
  *
- * アクティブ / 未接続の区別は色ではなく、チップの文言と行の不透明度で示す
- * （ui.md の Visual Language）。アイコンと寸法は prototype に合わせる。
+ * アクティブ / 未接続 / 生成中の区別は、チップの文言と、際立つかどうか（アクティブだけ
+ * 灯る）で示す。押せない行は状態の列を残して他の列だけ弱める。いずれも `main.css` が
+ * 持ち、ここでは行にクラスを付けるだけ（specs/project/directory）。アイコンと寸法は
+ * prototype に合わせる。
  */
 import { computed, definePageMeta, navigateTo, ref, refreshNuxtData, useFetch, useHead } from '#imports';
 
