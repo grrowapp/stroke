@@ -1,6 +1,6 @@
 ## Why
 
-E2E の `proposal-persistence.spec.ts` が承認で作ったプロジェクトが `.e2e-tmp/projects/` に残り、次の run から一覧に「生成中」として並んで `projects.spec.ts` の3件を落とす。後始末（`afterEach` の `DELETE /api/projects/:projectId`）は在るのに効いておらず、その失敗を `.catch(() => undefined)` が握り潰しているため、発覚が次の run まで遅れる。full run のたびに1件ずつ増え、手で消すまで2回目以降の full run は落ち続ける（ticket `fix-e2e-project-residue`）。
+E2E の `proposal-persistence.spec.ts` が承認で作ったプロジェクトが `.e2e-tmp/projects/` に残り、次の run から一覧に「生成中」として並んで `projects.spec.ts` の3件を落とす。後始末（`afterEach` の `DELETE /api/projects/:projectId`）は在るのに効いておらず、その応答を誰も見ていない（`.catch(() => undefined)` は通信エラーしか拾わず、409 も 404 も捨てられる）ため、発覚が次の run まで遅れる。full run のたびに1件ずつ増え、手で消すまで2回目以降の full run は落ち続ける（ticket `fix-e2e-project-residue`）。
 
 プロダクトの不具合ではない。削除口は仕様どおりに動いている。壊れているのはテストの土台の後始末だけで、直すのも `test/e2e/` と `playwright.config.ts` に閉じる。
 
@@ -8,7 +8,7 @@ E2E の `proposal-persistence.spec.ts` が承認で作ったプロジェクト�
 
 - **後始末の失敗を握り潰さない。** `proposal-persistence.spec.ts` の `afterEach` で、セッションの削除・プロジェクトの削除が受理されなかったとき、その status と本文をメッセージに載せて**そのテストを落とす**。残骸を作った run の中で分かるようにする
 - **実行は既知の保存先から始まる。** `playwright.config.ts` の種まきの直前に `.e2e-tmp` を丸ごと消す。消すのは本体プロセスの評価だけ（worker プロセスでも評価されるため、worker では消さない）。前回の残骸は次の run に影響せず、落ちた run の残骸は次の run まで残るので調べられる
-- **原因の確定は full run で取る。** 単発の再現では DELETE が 204 で通り残骸は出なかった（ticket 追記 2026-09-06）。握り潰しを外した状態で full run を回し、DELETE の応答をそのまま記録にする。断られる理由が出たら、その対処（実行終了を待つ等）は事実を見てから別途決める
+- **後始末は steering の実行が終わってから行う。** 握り潰しを外した再実行で、断られる理由が **409 busy** と確定した（ticket 追記 2026-09-06）。承認の画面は昇格の直後に steering を起こし（ADR 0011）、E2E では `/bin/true` の短い実行が走る。`afterEach` は削除が busy で断られる間だけ上限付きで出し直し、待ちきれなければそれも失敗として出す
 
 変えないもの: `DELETE /api/projects/:projectId` の仕様（busy・phase で断る）。テストの都合で口を緩めない。テストのアサーション。スタブの payload。
 

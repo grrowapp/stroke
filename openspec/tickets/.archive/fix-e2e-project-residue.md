@@ -1,5 +1,5 @@
 ---
-status: Doing
+status: Wait-for-archive
 change: fix-e2e-project-residue
 origin: agent
 tags:
@@ -124,7 +124,7 @@ steering の起動と同じ時刻に届く**。重なれば 409 busy で弾か�
 巡回（`server/plugins/01.retry-failed.ts`）、負荷による steering の伸び。**full run での再現は
 未実施。** 単発の probe は busy の筋を否定しておらず、確定もしていない。
 
-### 事実: 保存先を既知の状態へ戻す仕組みは無い
+### 事実: 保存先を既知の状態へ戻す仕組みは無い（置き場は下の訂正2 で改めた）
 
 `playwright.config.ts` の種まき（`:188-216`）は mkdir と writeFile だけで、消す処理を持たない。
 `.e2e-tmp` を消すのは `package.json` の `clean` だけである。config のトップレベルは worker
@@ -137,12 +137,59 @@ steering の起動と同じ時刻に届く**。重なれば 409 busy で弾か�
    full run を回し、DELETE の応答をそのまま記録にする
 2. 変わらず。消せなかったテストは、DELETE の status と本文をメッセージに載せて**赤にする**。
    セッションの削除（`created` の loop）の `.catch(() => undefined)` も同じ扱いにする
-3. **実行の最初に `.e2e-tmp` を丸ごと消してから種をまく**（`globalSetup`）。前回の残骸は次の
-   run に影響せず、落ちた run の残骸は次の run まで残るので調べられる
+3. **実行の最初に `.e2e-tmp` を丸ごと消してから種をまく**（当初は `globalSetup`。置き場は下の訂正2 で
+   config の本体プロセス評価に改めた）。前回の残骸は次の run に影響せず、落ちた run の残骸は次の run まで
+   残るので調べられる
 
 決め（エージェント判断、2026-09-06）: [[update-e2e-harness]] とは独立に小さく進め、先に develop へ
 入れる。spec は同 change が新設する `tooling/e2e-harness` と同じ path に requirement を足す。
 
-決め（ユーザー、2026-09-06）: **最小構成で進める。** 上の 2（握り潰しを外す）と 3（既知の保存先から
+決め（ユーザー、2026-09-06、着手前）: **最小構成で進める。** 上の 2（握り潰しを外す）と 3（既知の保存先から
 始める）だけを入れる。削除が断られる原因への対処（実行終了を待つ等）は、握り潰しを外した full run で
 応答を見てから別途決める。これはプロダクトの不具合ではなくテスト土台の保守であり、優先度は高くない。
+（**同日、原因の確定後に覆した。** 下の「事実: 原因は 409 busy と確定」に続く決めが正）
+
+### 訂正2: 消す処理の置き場は `globalSetup` ではなく config の本体プロセス評価（2026-09-06、実装時）
+
+上の「事実: 保存先を既知の状態へ戻す仕組みは無い」と「畳む方向（更新）3」は置き場を `globalSetup` と
+していたが、実装時に改めた。Playwright は `webServer` を立ててから `globalSetup` を走らせる
+（`playwright/lib/runner/index.js` `createGlobalSetupTasks`）。サーバ稼働中に消すと、まき直すまでの隙間を
+サーバが読む。config の評価はサーバの起動より前なので、そこで消す。worker でも評価される問題は
+`TEST_PARALLEL_INDEX`（worker の入口でだけ立つ）で本体プロセスに限定した（design D2）。
+
+### 事実: 握り潰しを外した full run で、削除は受理された（2026-09-06、pre3、tasks 4.1）
+
+`afterEach` の `.catch` を外し、実行開始時に `.e2e-tmp` を消す形にした上で `yarn test:e2e` を full で回した。
+**243件中 242 passed / 1 failed（22.9分）。** `proposal-persistence.spec.ts` は4件とも緑で、afterEach の
+DELETE は断られていない。run の後の `.e2e-tmp/projects/` に `e2e-proposal-approved-*` は無い。
+落ちた1件は `approval-annotation.spec.ts:768`（注釈の spec、30秒の timeout）で、本 change の範囲外。
+単独で再実行しても同じ箇所（`support.ts:243`、コメント用モーダルが閉じない）で落ちるので flake ではなく、
+pre3（`9cf92ed9`）に元からある失敗である。本 change はアプリ側を変えておらず、この spec は `.e2e-tmp` にも
+触れない。別 ticket の対象。
+
+したがって「DELETE が効かない」は**この run では観測されなかった**。09-02・09-04 の残骸は、
+run の中断（afterEach を通らない）か、再現できていない条件によるものである。どちらであっても、
+実行開始時に保存先を消す形で次の run は影響を受けない。断られる事象が今後出れば、afterEach の
+失敗として status と本文がそのまま結果に出る。
+
+### 事実: 原因は 409 busy と確定（2026-09-06、pre3、レビュー後の再実行）
+
+握り潰しを外した `afterEach` で、`proposal-persistence.spec.ts` と `projects.spec.ts` の2本だけを回したところ、
+承認テストの後始末が断られた。**応答は 409、本文は「このプロジェクトは AI の応答を待っている。完了するまで
+削除は受け付けない」（`reason: busy`）。** 保存先には `e2e-proposal-approved-1788688907172` が残った。
+
+承認の画面が昇格直後に起こす steering（E2E では `/bin/true`）の実行中に、afterEach の DELETE が届いている。
+見当の「busy で弾かれる筋」が正しかった。同じ手順でも full run（tasks 4.1）と単発 probe では重ならず 204 だったので、
+**重なるかどうかは timing 次第**である。握り潰しを外した今、承認テストは重なった run で赤になり、本文に busy が出る。
+
+決め（ユーザー、2026-09-06）: **待ちをこの change に入れる。** afterEach は steering の実行が終わるのを
+上限付き（5秒）で待ってから消す。待ちきれなければ失敗として出す（design D4）。
+
+### 訂正3: 待ちの観測点は `invocation` ではなく、削除口の busy 応答（2026-09-06、レビュー2周目）
+
+最初の実装は `GET /api/strokes/:name` の `invocation` が `running` でなくなるのを待った。しかしこの値は
+削除口が見る busy の事実（メモリ上の `running` 集合）より遅れて書かれる——`beginRun` で集合に入ってから
+A8 で `running` が書かれるまでの間は、昇格時の `failed` のままである。afterEach の時点では画面がまだ起動を
+要求していないこともあり、その場合も `failed` を見て「終わった」と読む。どちらも直後の DELETE が busy で
+断られる。**観測点をサーバ自身の busy 判定に改め、DELETE が `reason: busy` の 409 を返す間だけ上限付きで
+出し直す形にした**（design D4）。

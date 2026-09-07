@@ -55,8 +55,10 @@
 | 画面 | 使い方 |
 | --- | --- |
 | `app/pages/projects/index.vue` | 一覧の状態（アクティブ / 未接続 / 生成中）。この change の主対象 |
-| `app/layouts/workspace.vue` | 下層ヘッダの接続状態（アクティブ / 未接続）。一覧と同じ状態を同じ言葉で出している |
-| `app/components/workspace/DocumentEditor.vue` | 保存の状態（保存しました / 未保存 / 保存できません） |
+| `app/components/workspace/WorkspaceShell.vue` | 下層ヘッダの接続状態（アクティブ / 未接続）。一覧と同じ状態を同じ言葉で出している。実装時（`64a2b8d1`）は `app/layouts/workspace.vue` にあり、`025c4118`（2026-09-02）でヘッダごとここへ移った |
+| `modules/markdown/runtime/edit/MarkdownEditor.vue` | 保存の状態（保存しました / 未保存 / 保存できません）。実装時は `app/components/workspace/DocumentEditor.vue` にあり、markdown の module 化（`cbd61699`）でここへ移った |
+
+`app/pages/prototype/projects.vue`（`ce23e6f5` で回収した試作ページ）も `.sb-chip` を使うが、試作なので確認の対象にしない。
 
 **揃うのが正しい。** どれも「いまどうなっているか」を同じ形で出すものなので、一覧だけガラスにして他を平板に残す理由が無い。実機で3箇所とも崩れないことを確かめる（tasks 5.5）。
 
@@ -129,3 +131,5 @@ prototype の実物は `.chip { border: 1px solid }` ＋ `.chip.active { border-
 | 2026-08-31 | **最終更新の文字色の持ち主を `main.css` に一本化する。** `td` の Tailwind ユーティリティが後のレイヤーに載るため、行の状態で沈める指定が必ず負けていた。DOM は変えず、ユーティリティ1つを外して `.sb-table td:nth-child(4)` を持ち主にする |
 | 2026-08-31 | **E2E のポート割り当ての直し（`playwright.config.ts`・`CLAUDE.md`）を同じコミットに同乗させる。** worktree 名の固定表で pre1〜pre7 が同じスロットへ落ちて衝突し、6.3 が回せなかった。この change の対象外だが、切り離すと E2E を通す手段が無いため同乗を許した。規定は `CLAUDE.md`「Dev サーバー」へ入れた |
 | 2026-09-02 | **6.3（E2E）・8.1（レビュー）・8.2（完了承認）を未実施のままマージした事実を tasks に残す。** チェックを付けて埋めない。archive の前に 6.3 を通す |
+| 2026-09-06 | **delta spec を、`add-activated-phase`（2026-09-06 archive）が進めた本体 spec の上へ乗せ直す。** 同 change は本 change と同じ2つの要件（「一覧は4つの列を持つ」「未接続のプロジェクトは選択できない」）を MODIFIED し、phase を根拠にする文言と scenario 2本（「生成中のプロジェクトが .spec-workflow を持つ」「中身を持つ生成中の行を押す」）を足していた。本 change の delta は 2026-08-30 時点の本体を写していたため、`openspec validate` が「本体にある scenario を落としている」で失敗し、そのまま archive すると同 change の成果を消すところだった。本体の現行文へ、本 change の要件文（同じ形・同じ幅／アクティブだけ際立つ／状態の列を弱めない）と scenario 6本を足し直した。**見た目の要件そのものは変えていない** |
+| 2026-09-06 | **`.sb-chip` を使う画面の所在を現在のファイルへ更新する。** ヘッダは `WorkspaceShell.vue`、保存の状態は `modules/markdown/.../MarkdownEditor.vue` へ移っていた。使い方と意味は変わっておらず、揃えるという判断はそのまま |

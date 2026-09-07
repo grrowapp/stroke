@@ -2,7 +2,7 @@
 
 入れる値の正は `prototype/index.html`。写しは `ui.md` にある。触るのは `app/assets/css/main.css` の宣言——当初は3つ、2.6 と 5.3 で `.sb-row-creating` と `@media (prefers-reduced-motion: reduce)` を加えて4つになった。DOM は変えない。クラス名は、最終更新の `td` から文字色のユーティリティ1つを外した（持ち主を `main.css` へ移すため。7.1）。
 
-**実装は pre6（`/home/vagrant/work/stroke-board/pre6`、ブランチ `move-conventions-to-steering`）で行った。** 2026-08-31 に `64a2b8d1` でコミットし、`36470429` で develop へマージ済み。**6.3・8.1・8.2 は未実施のままマージされている**（本書のチェックがその記録）。
+**実装は pre6（`/home/vagrant/work/stroke-board/pre6`、当時のブランチ `move-conventions-to-steering`。2026-09-06 現在は `pre6` ブランチで develop と同じ `491e77e0`）で行った。** 2026-08-31 に `64a2b8d1` でコミットし、`36470429` で develop へマージ済み。**6.3・8.1・8.2 は未実施のままマージされている**（本書のチェックがその記録）。
 
 ## 1. 実物と prototype を並べる
 
@@ -52,14 +52,14 @@
 - [x] 5.2 **失敗の行と PID が実装に紛れ込んでいない**ことを確かめる。どちらも spec が MUST NOT で禁じている
 - [x] 5.3 `@media (prefers-reduced-motion: reduce)` の既存の記述が壊れていないことを確かめる。この change は動きを足さない — **穴が見つかったので塞いだ。** 同ブロックが `.sb-row-creating { opacity: 0.45 }` を持っており、動きを抑える設定のときだけ行ごと沈んで状態の列が読めなくなっていた。弱め方は動きの設定に関わらず同じであるべきなので、この `opacity` を落とした（`animation: none` は残す）
 - [x] 5.4 生成中の行の地・ローダー・回転・明滅・チップ幅に差分が入っていないことを確かめる（対象外）
-- [x] 5.5 `.sb-chip` を使っている他の画面を洗い出し、意図しない見た目の変化が起きていないことを確かめる。**一覧だけが使っているとは限らない** — 他に2箇所（`layouts/workspace.vue` のヘッダ、`workspace/DocumentEditor.vue` の保存状態）。どちらも同じ意味のチップで、揃うのが正しい。workspace ヘッダを実機で見て崩れないことを確認済み。proposal の Impact に記録した
-- [x] 5.6 `openspec validate update-project-list-view --store stroke` が通ることを確かめる
+- [x] 5.5 `.sb-chip` を使っている他の画面を洗い出し、意図しない見た目の変化が起きていないことを確かめる。**一覧だけが使っているとは限らない** — 他に2箇所（`layouts/workspace.vue` のヘッダ、`workspace/DocumentEditor.vue` の保存状態）。どちらも同じ意味のチップで、揃うのが正しい。workspace ヘッダを実機で見て崩れないことを確認済み。proposal の Impact に記録した。**2026-09-06 追記:** その後ヘッダは `components/workspace/WorkspaceShell.vue`（`025c4118`）、保存状態は `modules/markdown/runtime/edit/MarkdownEditor.vue`（`cbd61699`）へ移った。使い方は同じ。proposal の表を更新した
+- [x] 5.6 `openspec validate update-project-list-view --store stroke` が通ることを確かめる — 実装時は通過。**2026-09-06 に再確認したところ失敗していた。** `add-activated-phase` の archive（同日）で本体 spec が進み、この delta が本体の scenario 2本を落とす形になっていた。delta を本体の現行文へ乗せ直して再び通した（proposal「決定の記録」2026-09-06）
 
 ## 6. 門番
 
 - [x] 6.1 `yarn typecheck` を通す — 通過
 - [x] 6.2 `yarn test` を通す — 21ファイル / 211件 通過
-- [ ] 6.3 `yarn test:e2e` を通す。E2E は並列時に本家スタブの競合で落ちることがある（実測 2026-08-30）。落ちたら `--workers=1` で単独確認する — **未実施のままマージされた。** 実施の記録が無い。archive の前に通す
+- [ ] 6.3 `yarn test:e2e` を通す。E2E は並列時に本家スタブの競合で落ちることがある（実測 2026-08-30）。落ちたら `--workers=1` で単独確認する — **未実施のままマージされた。** 実施の記録が無い。archive の前に通す。`playwright.config.ts` の webServer は `.output/server/index.mjs` を起動するので、先に `yarn build` が要る（2026-09-06 時点で pre6 に `.output` は無い）
 - [x] 6.4 CSS だけの変更なので、既存のテストが状態の表示を文言で見ていることを確かめる。見た目の値をテストに固定しない — `.sb-chip` の実値を固定していたのは `design-token.spec.ts` の1件だけで、要件を見る形へ書き換えた（書き換え時は `e2e/`、マージ後の `79afcbb9` で `test/e2e/` へ移った）。`notifications.spec.ts` の実値固定は通知画面の別テーブル（`sb-datarow-*`）が対象で `.sb-chip` は「存在しないこと」しか見ていない。`upstream-style.spec.ts` は本家との比較で無関係
 
 ## 7. コミット
