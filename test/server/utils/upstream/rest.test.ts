@@ -144,3 +144,73 @@ describe('UpstreamRestClient の失敗の分け方', () => {
     });
   });
 });
+
+/**
+ * プロジェクトの登録（`POST /api/projects/add`。update-project-generation-via-upstream-rest
+ * design D5）。本家は `{ projectId, success: true }` を返す。登録済みのパスには同じ
+ * `projectId` を返すので、呼び出し側は重ねて依頼してよい。
+ */
+describe('UpstreamRestClient.registerProject', () => {
+  beforeEach(() => {
+    ofetchMock.mockReset();
+  });
+
+  it('projectPath をそのまま本文に載せて POST し、projectId を返す', async () => {
+    ofetchMock.mockResolvedValue({ projectId: 'PID9', success: true });
+
+    const result = await client.registerProject('/opt/projects/made-app');
+
+    expect(result).toEqual({ ok: true, value: { projectId: 'PID9', success: true } });
+    expect(ofetchMock).toHaveBeenCalledWith('/api/projects/add', expect.objectContaining({
+      baseURL: 'http://localhost:1234',
+      method: 'POST',
+      body: { projectPath: '/opt/projects/made-app' },
+      retry: 0,
+    }));
+  });
+
+  it('本家が 500 を返したら error-response（状態コードと本文を保つ）', async () => {
+    ofetchMock.mockRejectedValue(fetchErrorWith(500, { error: 'Failed to register' }));
+
+    const result = await client.registerProject('/opt/projects/made-app');
+
+    expect(result).toEqual({
+      ok: false,
+      failure: {
+        kind: 'error-response',
+        path: '/api/projects/add',
+        status: 500,
+        reason: expect.any(String),
+        detail: 'Failed to register',
+      },
+    });
+  });
+
+  it('接続拒否は unreachable', async () => {
+    ofetchMock.mockRejectedValue(new Error('connect ECONNREFUSED 127.0.0.1:1234'));
+
+    const result = await client.registerProject('/opt/projects/made-app');
+
+    expect(result).toEqual({
+      ok: false,
+      failure: { kind: 'unreachable', path: '/api/projects/add', reason: 'connect ECONNREFUSED 127.0.0.1:1234' },
+    });
+  });
+
+  it('URL が未設定なら発行せず not-configured', async () => {
+    const result = await new UpstreamRestClient(null).registerProject('/opt/projects/made-app');
+
+    expect(result).toEqual({ ok: false, failure: { kind: 'not-configured' } });
+    expect(ofetchMock).not.toHaveBeenCalled();
+  });
+
+  it('200 でも projectId を持たなければ malformed', async () => {
+    ofetchMock.mockResolvedValue({ success: true });
+
+    const result = await client.registerProject('/opt/projects/made-app');
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('失敗するはずの呼び出しが成功した');
+    expect(result.failure.kind).toBe('malformed');
+  });
+});

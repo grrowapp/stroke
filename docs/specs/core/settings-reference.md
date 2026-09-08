@@ -62,7 +62,7 @@ const { projectShareRoot, claude } = config.runtimeConfig
 │   └── docs/proposal.md          AI が書く
 ├── my-new-project/               昇格後（改名しただけで中身は同一）
 │   ├── docs/proposal.md
-│   └── .spec-workflow/           本家 MCP が作る。ここで一覧に現れる
+│   └── .spec-workflow/           本家が作る。ここで一覧に現れる
 └── .spec-workflow-mcp/           本家のグローバル状態
 ```
 
@@ -163,13 +163,13 @@ AI へ渡す定型。**手順の本文をここに書かない。** 手順は MC
 
 **`Read` は残してある。** steering 工程には文脈を取る MCP ツールが無く（公開は `get-steering-guide` / `get-steering` / `submit-document` の3本）、同じ実測で `Read` は5回使われていた。読み取りの手段を MCP ツールへ寄せる作業は未着手で、**道具を用意する前に `Read` を外すと steering が成立しない。**
 
-**第三者の MCP のツールを許可に載せない。** steering 工程は本家 spec-workflow の MCP を `--mcp-config` に並べるが、その目的は起動時の登録簿への自己登録だけで、ツール呼び出しは1つも要らない（本家は transport を繋ぐ前に登録する）。`--allowedTools` は可視性を決めないので一覧には残る。呼ばせない責務は案内（`get-steering-guide`）が併せて負う。
+**第三者の MCP を配線しない。** 両工程とも `--mcp-config` に並ぶのは自前 MCP（`stroke-board`）だけである。プロジェクトの生成は `POST /api/projects`（`docs/specs/api/projects/generate.md`）が本家 REST へ依頼する。
 
 **`--strict-mcp-config` を外してはならない。** `--mcp-config` は「追加」であって「限定」ではないので、これが無いと開発者個人の MCP 設定が全部読み込まれる（実測 2026-08-30: 8サーバー・約80ツールが、許可されていないので呼べないまま実行に並んでいた）。
 
 `--setting-sources` から `project` を外してはならない（ADR 0001）。**ただし `--add-dir` を外した今、この指定は実効を持たない**——探索先は cwd だけで、そこに `.claude/` は無いのでロードされるスキルは0本である。案内を Skill として配り直したときに要る守りとして残してある。
 
-`-p` / `--output-format json` と、`--session-id` / `--resume` と会話 id、`--mcp-config`、**MCP ツール分の `--allowedTools`**（両工程とも `mcp__stroke-board` だけ。steering 工程の `--mcp-config` には本家 MCP も並ぶが、そのツールは許可に載せない——下の「`--allowedTools`」）、`--` 以降の prompt は**呼び出しごとに決まる**ため、この定義には含まれない。呼び出し側が `args` の後ろに足す。
+`-p` / `--output-format json` と、`--session-id` / `--resume` と会話 id、`--mcp-config`、**MCP ツール分の `--allowedTools`**（両工程とも `mcp__stroke-board` だけ）、`--` 以降の prompt は**呼び出しごとに決まる**ため、この定義には含まれない。呼び出し側が `args` の後ろに足す。
 
 会話 id の与え方は用途で違う。
 
@@ -213,8 +213,8 @@ AI へ渡す定型。**手順の本文をここに書かない。** 手順は MC
 
 **ここに無い値でも、環境変数が効かないわけではない。** `runtimeConfig` は Nitro が `useRuntimeConfig()` のたびに `applyEnv` を掛けるので、**全キーが `NUXT_*` で上書きされうる**（`NUXT_CLAUDE_COMMAND` など）。この資料が定めているのは「**コードが環境変数を読みに行かない**」ことと「値の実体を `nuxt.config.ts` に置く」ことであって、外から差し替えられないことではない。差し替えられたときに何が起きるかは、各項目の説明が持つ。
 
-**ただし `specWorkflowHome` はポータル専用ではない。** steering 工程の起動が組み立てる `--mcp-config` に、本家 MCP 向けの環境変数 `SPEC_WORKFLOW_HOME` としてこの値が載る（`server/utils/stroke/invoke.ts` の `mcpConfigFor`）。本家 MCP はここで指した場所の登録簿へ「動いているプロジェクト」として自分を書き、ポータルは同じ場所を読む。**ずらすと書き手と読み手が割れ、昇格したプロジェクトが本家の一覧に現れず、steering 工程の取得・提出が `project_not_registered` で全滅する**（実測 2026-08-31）。`NUXT_SPEC_WORKFLOW_HOME` を変えるときは、本家 dashboard の `SPEC_WORKFLOW_HOME` と揃っていることを確かめること。
+`specWorkflowHome` はポータルの登録簿の読み（アクティブ判定）にだけ使う。steering 工程の起動には載らない（本家 MCP を配線しないため）。
 
-`upstreamBaseUrl` も同じく steering 工程に効く。`get-steering` と `submit-document`（steering 種別）の代行先そのものなので、ずらせば工程は成立しない（`server/utils/mcp/upstream-fetch.ts`）。
+`upstreamBaseUrl` は steering 工程に効く。生成（`POST /api/projects`）の依頼先であり、`get-steering` と `submit-document`（steering 種別）の代行先そのものなので、ずらせば工程は成立しない（`server/utils/mcp/upstream-fetch.ts`）。
 
 `projectsParentPath` は廃止した。ストローク側の保存先と同じ場所を指す必要があるため、上の `projectShareRoot` に畳んである。

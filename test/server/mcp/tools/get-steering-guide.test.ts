@@ -22,7 +22,8 @@ const REQUIRED: Array<[string, RegExp[], number]> = [
     /直接書いて/,
   ], 510],
   ['どこで工程が終わるか', [/3本/], 35],
-  ['本家 MCP は使わない', [/approvals/, /呼ばない/, /許可/, /通らない/], 230],
+  // 本家 MCP はこの工程に配線されていない（update-project-generation-via-upstream-rest design D3）
+  ['本家 MCP は配線されていない', [/配線されていない/, /stroke-board/, /並ばない/], 120],
   ['やらないこと', [/直接読み書き/], 30],
 ];
 /**

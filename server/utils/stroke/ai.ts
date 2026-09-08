@@ -126,7 +126,14 @@ export interface InvokeAiOutcome {
  * （busy ガードの対称性）。`built` は応答の可否だけを見るためのもので、busy ガードには
  * 使わない。
  */
-export function invokeAi(sessionId: string, retries: number, build: () => AiRun): InvokeAiOutcome {
+export function invokeAi(
+  sessionId: string,
+  retries: number,
+  // 組み立ては非同期になりうる（steering は材料を返す前に生成（P2）を依頼する。
+  // `invoke.ts` の `kick`）。同期の throw も reject も同じ「組み立ての失敗」として扱い、
+  // ここでは判定を足さない（update-project-generation-via-upstream-rest design D2）
+  build: () => AiRun | Promise<AiRun>,
+): InvokeAiOutcome {
   let resolveBuilt!: () => void
   let rejectBuilt!: (error: unknown) => void
   const built = new Promise<void>((resolve, reject) => {
@@ -141,7 +148,7 @@ export function invokeAi(sessionId: string, retries: number, build: () => AiRun)
   const settled = (async () => {
     let run: AiRun
     try {
-      run = build()
+      run = await build()
     } catch (error) {
       rejectBuilt(error)
       await recordBuildFailure(sessionId, retries, error)

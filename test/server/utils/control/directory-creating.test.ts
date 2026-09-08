@@ -13,7 +13,7 @@ import type { ProjectSummary } from '../../../../shared/types';
  * 行が生成中か完了かは **`state.json` の phase だけ**で決まる（specs/project/generation・
  * add-activated-phase design D8）。`approved` は生成中、`activated` は完了。走査に出るか
  * どうか（`.spec-workflow/` の有無）は母集合を作るためにだけ使い、判定には使わない——
- * そのディレクトリは本家 MCP が接続した瞬間にできる。`invocation` も見ない。
+ * そのディレクトリは生成（P2）の依頼を本家が受理したときにできる。`invocation` も見ない。
  */
 
 const SCANNED_AT = '2026-08-21T09:00:00.000Z';

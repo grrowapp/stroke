@@ -20,7 +20,7 @@ flowchart TB
   record --> done["U15 が <b>done</b> を配信<br>生成中の表現が外れ、一度だけ祝う"]
 ```
 
-`.spec-workflow/` は本家 MCP が接続した瞬間にできるので、その有無は完了の根拠にならない（change `add-activated-phase`・2026-09-02）。生成中か完了かは `state.json` の phase（`approved` / `activated`）だけで決まり、行も配信も同じ根拠を見る。
+`.spec-workflow/` は生成（`POST /api/projects`）の依頼を本家が受理したときにできるので、その有無は完了の根拠にならない（change `add-activated-phase`・2026-09-02）。生成中か完了かは `state.json` の phase（`approved` / `activated`）だけで決まり、行も配信も同じ根拠を見る。
 
 ※ `proposal.md` は最初から `docs/proposal.md`（セッション中も同じ場所）に、**claude 自身が書く**。サーバーのコードは作らない。
 

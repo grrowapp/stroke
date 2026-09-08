@@ -348,8 +348,10 @@ describe('invokeAi', () => {
 
     let settledResolved = false
     void settled.then(() => { settledResolved = true })
-    // 1 マイクロタスクだけ回す。built が resolve しても settled はまだ先である
-    await Promise.resolve()
+    // built が resolve しても settled はまだ先である。プロセス（runClaude）が始まるまで
+    // 待ってから見る——組み立てが非同期になり、built の後にプロセスが始まるまでの
+    // マイクロタスクの数は固定されない
+    await vi.waitFor(() => expect(runClaude).toHaveBeenCalledTimes(1))
     expect(settledResolved).toBe(false)
 
     finishClaude()
@@ -420,5 +422,50 @@ describe('invokeAi の組み立て失敗', () => {
       `/api/strokes/${SESSION_ID}/submission`,
       { method: 'POST', body: { invocation: 'error' } },
     )
+  })
+
+  /**
+   * 組み立ては非同期になりうる（update-project-generation-via-upstream-rest design D2。
+   * steering は材料を返す前に生成を依頼する）。同期の throw と同じに扱う——`invokeAi` は
+   * 組み立ての中身を知らず、判定も足さない。
+   */
+  it('非同期の組み立てが reject しても、同じく failed を書いて built が reject する', async () => {
+    runClaude.mockReset()
+    const asyncBuild = async (): Promise<AiRun> => { throw BUILD_ERROR }
+    const { built, settled } = invokeAi(SESSION_ID, 1, asyncBuild)
+
+    await expect(built).rejects.toBe(BUILD_ERROR)
+    await settled
+
+    expect($fetch).toHaveBeenCalledWith(
+      `/api/strokes/${SESSION_ID}/submission`,
+      { method: 'POST', body: { invocation: 'failed', retries: 2 } },
+    )
+    expect(runClaude).not.toHaveBeenCalled()
+  })
+
+  it('非同期の組み立てが resolve すれば、その材料で起こす', async () => {
+    runClaude.mockReset()
+    runClaude.mockResolvedValue({ ok: true, sessionId: 'x' })
+    const calls: Array<{ invocation: Invocation, retries?: number }> = []
+    const run: AiRun = {
+      launch: LAUNCH,
+      cwd: '/opt/projects/my-project',
+      prompts: { first: 'FIRST', continue: 'CONTINUE' },
+      maxRetries: 2,
+      retries: 0,
+      timeoutMs: 60000,
+      timeoutStepMs: 0,
+      hasConversation: async () => false,
+      setInvocation: async (invocation, retries) => { calls.push({ invocation, retries }) },
+      didWork: () => true,
+    }
+    const { built, settled } = invokeAi(SESSION_ID, 0, async () => run)
+
+    await built
+    await settled
+
+    expect(runClaude).toHaveBeenCalledTimes(1)
+    expect(calls.at(-1)).toEqual({ invocation: 'idle', retries: 0 })
   })
 })

@@ -107,7 +107,7 @@ describe('P1 DELETE /api/projects/:projectId — busy', () => {
 
 describe('P1 DELETE /api/projects/:projectId — 受理範囲', () => {
   it('作りきれなかった（approved）ものは .spec-workflow/ を持っていても消える', async () => {
-    // 本家 MCP が接続した瞬間に `.spec-workflow/` はできる。steering が終わらないまま
+    // 生成（P2）の依頼を本家が受理したときに `.spec-workflow/` はできる。steering が終わらないまま
     // 失敗したプロジェクトは、それを持ったまま「破棄する」を選ばれる
     const id = await place('half-made', { phase: 'approved', projectName: 'half-made', invocation: 'error' }, true);
 

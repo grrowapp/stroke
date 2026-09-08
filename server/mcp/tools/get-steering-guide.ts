@@ -79,26 +79,16 @@ tech が決めた道具に従うので、後ろの2本は前を読まないと�
 3本すべてが受理された時点で、この工程は終わりである。完了を自分で宣言しない
 ——実行の終わりはサーバーが検知する。
 
-## 本家 MCP は使わない
+## 本家 MCP は配線されていない
 
-この工程には本家 spec-workflow の MCP（\`mcp__specworkflow\`）も配線されているが、
-**許可（\`--allowedTools\`）には載っていないので、呼んでも通らない。この工程では1つも
-呼ばない。** 配線の目的は起動時の登録簿への自己登録だけで、ツール呼び出しは1つも要らない。
-一覧には5本（\`approvals\` / \`steering-guide\` / \`spec-workflow-guide\` / \`spec-status\` /
-\`log-implementation\`）が並んで見えるが、どれも許可されていないので呼んでも実行されない。
+本家 spec-workflow の MCP はこの工程に配線されていない。ツールの一覧に本家のツール
+（\`approvals\` / \`steering-guide\` / \`spec-workflow-guide\` / \`spec-status\` /
+\`log-implementation\`）は並ばない。プロジェクトは起動の前にサーバーが本家へ登録済みで、
+この工程で本家に何かを登録する必要は無い。
 
 steering 文書の取得と提出は、上に挙げた stroke-board のツールだけを使う。本家の
-\`steering-guide\` / \`spec-workflow-guide\` が返す手順は本家のワークフロー
-（\`.spec-workflow/\` の構造・dashboard での承認）向けで、提出の入口が違う。従うと
-\`submit-document\` を通らない道へ行く。\`spec-status\` / \`log-implementation\` は
-\`.spec-workflow/\` を直接読み書きする経路で、この工程の入口ではない。食い違ったら
-この手順が正しい。
-
-**\`approvals\` も呼ばない。** 許可されていないため呼んでも通らないことに加え、
-呼ぶと本家は「口頭の承認は受け付けない。\`status\` で問い合わせ続けろ」と返す
-（本家 2.2.5 の \`dist/tools/approvals.js\`。santa-method レビュー 8周目 2026-08-30 に
-読んで確認）。無人の実行はそのまま待ち続けて打ち切られる。この工程の終わりは3文書が
-受理されたときで、承認は終わりの条件ではない。
+ワークフロー（\`.spec-workflow/\` の構造・dashboard での承認）の手順とは提出の入口が
+違う。この工程の終わりは3文書が受理されたときで、承認は終わりの条件ではない。
 
 ## やらないこと
 
