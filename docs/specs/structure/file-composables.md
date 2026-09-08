@@ -13,7 +13,7 @@
 | 関心 | composable | 整理の方向 |
 | --- | --- | --- |
 | 通知の受信 | `useBoardSocket` | vueuse の `createSharedComposable` で1本に共有。そのまま |
-| 時刻表示 | `useRelativeTime` | vueuse の `formatTimeAgo` の包み。そのまま |
+| 時刻表示 | `useRelativeTime` | `javascript-time-ago` の包み。画面が使う `useRelativeTime()` は mount の後にだけ描く（`docs/specs/architecture/data-fetching.md`「最初のレンダリングを決定論的に保つ」）。そのまま |
 | プロジェクトの読み書き | `useProjectApi` | プロジェクト単位画面の唯一の経路。そのまま |
 | ステアリングの読み書き | `useSteeringDocuments` | `useProjectApi` と同じ関心の composable として並べる |
 | 問いの往復 | `useAgentQuestion` | 回答送信・AI 起動（契約 U7 / U13）。そのまま |
@@ -41,7 +41,7 @@
 
 単体テストは `test/app/composables/useRelativeTime.test.ts` にある。
 
-`shared/useRelativeTime.ts` は `useXxx` を1つも export していない（中身は純関数 `formatRelativeTime` のみ）。規範の「関心単位の `useXxx` を平置き」に当てはまらないが、**規範のツリーに純関数の置き場が無い**ため、置き場の新設を含めて平置きと同じ change で決める。
+`useRelativeTime.ts` は、平置きの時点では `useXxx` を1つも export していなかった（中身は純関数 `formatRelativeTime` のみ）。`fix-relative-time-hydration` で画面が呼ぶ `useRelativeTime()` が加わり、規範の「関心単位の `useXxx` を平置き」に当てはまる。純関数 `formatRelativeTime` は同じファイルに同居させ、純関数の置き場を新設しない。
 
 ---
 
@@ -119,15 +119,16 @@ URL を `computed` で組み、`typeof window === 'undefined'` なら空文字�
 
 ### useRelativeTime.ts
 
-一覧の「最終更新」列に出す相対時刻。47行。**4つの中で最小。**
+一覧の「最終更新」列に出す相対時刻。
 
 ```ts
 export function formatRelativeTime(iso: string, now = Date.now()): string
+export function useRelativeTime(): (iso: string) => string
 ```
 
-`now` を引数で受けるためテストで時刻を固定できる。
+`formatRelativeTime` は純関数。`now` を引数で受けるためテストで時刻を固定できる。
 
-`use` で始まるが Vue のリアクティブな状態を持たない純関数。ファイル名の慣習に合わせてある。
+`useRelativeTime()` は画面が使う側で、setup で呼ぶ。相対時刻は「現在時刻」に依存する文言なので SSR では描かず（サーバーと hydration は空文字）、`onMounted` の後にブラウザの時計で描く（`docs/specs/architecture/data-fetching.md`「最初のレンダリングを決定論的に保つ」）。mount 前を `undefined` にすると `RecordList` が列ごと畳み、「—」は「取れない」の印（specs `project/directory`）なので、空文字にしてある。
 
 #### 中身は `javascript-time-ago`
 
@@ -143,9 +144,9 @@ export function formatRelativeTime(iso: string, now = Date.now()): string
 
 vueuse は採っていない。`formatTimeAgo` は文言8種を手で書く必要があり、`formatTimeAgoIntl` は「昨日」「先週」「先月」「昨年」という本家に無い表現を出す（`docs/specs/plan/composables-library-replacement.md` に実測の比較表がある）。
 
-**テスト**（`test/app/composables/useRelativeTime.test.ts`）— 設定を落とすと落ちるケースを明示的に置いてある（46分・23時間59分・`1分59秒`・7日の打ち切り・空白の有無）。
+**テスト**（`test/app/composables/useRelativeTime.test.ts`）— 設定を落とすと落ちるケースを明示的に置いてある（46分・23時間59分・`1分59秒`・7日の打ち切り・空白の有無）。`useRelativeTime()` は SSR の出力が空・mount 前が空・mount 後に相対時刻、の3点。E2E は `test/e2e/relative-time-hydration.spec.ts`（サーバーの HTML の列が空で、mount 後の DOM に文言が入る）。
 
-**参照元**（6）— 上層2ページ（`index.vue`、`projects/index.vue`）と下層3ページ（`specs/index.vue`、`steering/index.vue`、`tasks/index.vue`）、使い捨ての `prototype/projects.vue`
+**参照元**（6）— 上層2ページ（`index.vue`、`projects/index.vue`）と下層3ページ（`specs/index.vue`、`steering/index.vue`、`tasks/index.vue`）は `useRelativeTime()` を呼ぶ。使い捨ての `prototype/projects.vue` だけが `formatRelativeTime` を直接呼ぶ
 
 ---
 
