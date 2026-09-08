@@ -20,22 +20,27 @@
 
 ## What Changes
 
-- **変更**: 相対時刻の基準時刻を、SSR とクライアントで同じ値にする。`formatRelativeTime` の既定を `Date.now()` にしたままにせず、描画の基準として1つ決めた値を使う
+- **変更**: 相対時刻を SSR で描かない。サーバーと hydration は空の文言を描き、mount の後にブラウザの時計で描く（規範 `data-fetching.md` の `onMounted` の後ろに置く形）。`formatRelativeTime` の純関数は変えない
 - **変更**: 呼び出し側5画面（`pages/projects/index.vue` / `pages/index.vue` / `pages/projects/[projectId]/specs/index.vue` / 同 `tasks/index.vue` / 同 `steering/index.vue`）を、その形に合わせる
 
 方式は design で決める。2026-09-07 の再確認で候補を洗った結果は次のとおり（design はここから選ぶか、覆すなら理由を書く）。
 
+**2026-09-08 訂正。** 下表の当初の「推奨」（基準時刻を `useState` で配る）は規範 `docs/specs/architecture/data-fetching.md`「規定」（時刻は SSR マークアップに直接入れず、`onMounted` / `import.meta.client` / `ClientOnly` の後ろに置く）の外にある方式で、それを実装してから規範を直す提案をしたのは違反だった（ユーザー指摘。design 冒頭）。規範の内側の手段（`onMounted` の後ろに置く）を「列が欠ける」という規範より弱い理由で退けていたのも誤り。訂正後の判定が下表。
+
 | 候補 | 判定 | 理由 |
 | --- | --- | --- |
-| **描画の基準時刻を1つ決めて配る** — サーバーが描いた時点の `now` を Nuxt の payload に載せ（`useState`）、hydration はその値で描く。描き終えたら client の時刻に更新してよい（描き直し後の更新は mismatch にならない） | **推奨** | `formatRelativeTime(iso, now)` の第2引数がそのまま受け口になる。時計のずれにも効く（基準がサーバー1つになる）。specs の2要件を両方満たす |
+| **mount の後にだけ描く**（規範の `onMounted`）— サーバーと hydration は空文字を描き、mount 後に相対時刻を入れる | **採用** | 規範の内側。サーバーが現在時刻に依存する文言を描かないので、描き直しで入れ替わる元が無く、基準を別々に決めることも無い。specs の2要件を満たす |
+| 描画の基準時刻を1つ決めて配る（`useState` でペイロードに載せる） | 採らない（撤回） | 規範の外。時刻を SSR マークアップに入れている |
+| SSR は絶対日時を描き、mount の後に相対時刻へ切り替える | 採らない | 規範の内側だが、mount で「8月30日 16:26」が「5日前」へ動く。specs の「同じ形式になる」を mount 後まで含めて読むと破る |
 | Nuxt 組み込みの `<NuxtTime relative>` | 採らない | 刻みが 60秒/60分/24時間/**30日**/12か月で、7日で絶対日時へ切り替える本家の規定（`useRelativeTime.ts` の `STYLE`、単体テストで固定）と合わない。丸めも `round` で本家の `floor` と違う |
-| 一定の粒度に丸める | 採らない | 丸めても境界は残る。時計のずれがあれば同じ確率で跨ぐ |
-| 相対時刻の要素に `data-allow-mismatch="text"` を付ける | 採らない | 警告は消えるが表示は一致しない（Requirement「サーバーで描いた結果とブラウザで描き直した結果が一致する」を満たさない）。逃げ道であって解決ではない |
-| `<ClientOnly>` / `onMounted` 後に描く | 採らない | サーバーが描かない列ができ、初期表示が欠ける。「最終更新」は未接続プロジェクトの唯一の手がかり（specs `project/directory`）で、欠けてよい列ではない |
+| 一定の粒度に丸める | 採らない | 丸めても境界は残る。時計のずれがあれば同じ確率で跨ぐ。時刻を SSR に入れる点も規範の外 |
+| 相対時刻の要素に `data-allow-mismatch="text"` を付ける | 採らない | 警告は消えるが表示は一致しない。規範の外でもある |
 
 ### 対象の線引き
 
 再確認で、**相対時刻とは別の hydration mismatch が1つ**見つかった。`app/layouts/portal.vue` の接続ドットで、SSR は `upstreamConnected = false` で描くが、本家に繋がっていると WS のスナップショットが hydration より先に届き、client は `background: var(--status-success)` と `title="本家に接続済み"` を期待する（`Hydration style mismatch` / `Hydration attribute mismatch`。ticket 冒頭に記録された2種の警告がこれ）。本家接続中は毎回出る。ダンプは伴わないが、`Hydration completed but contains mismatches.` の ERROR はこちらでも出るため、**相対時刻だけ直しても本家接続中はその ERROR が残る。**
+
+同じ原因の mismatch が下層のシェルにもある（santa-method レビュー 2026-09-08 の実測）。本家接続中はチップの文言 `未接続`→`アクティブ` の text mismatch と class `sb-chip`→`sb-chip sb-chip-on` の mismatch が出る。text の不一致なので本番ビルドでも `Hydration completed but contains mismatches.` になる。別 change の対象に含める。
 
 原因は「client 専用の状態（WS）を SSR の markup に載せている」ことで、相対時刻の「基準時刻が2つある」とは別の不具合である。**本 change には含めず、別 change（`fix-*`）に切る**（2026-09-07、design 着手時のエージェント判断。capability `portal/relative-time` の範囲外で、直す場所も `portal.vue` と分かれるため。ユーザーが含める判断をしたら proposal・specs・design を書き直す）。specs の「不一致の警告を出さない」は相対時刻を理由とするものに限る（delta はその形になっている）。
 
