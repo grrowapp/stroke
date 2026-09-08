@@ -5,7 +5,7 @@ import { computed, definePageMeta } from '#imports';
 import RecordList from '~/components/workspace/RecordList.vue';
 import WorkspacePanel from '~/components/workspace/WorkspacePanel.vue';
 import { useProjectId, useProjectInfo } from '~/composables/useProjectApi';
-import { formatRelativeTime } from '~/composables/useRelativeTime';
+import { useRelativeTime } from '~/composables/useRelativeTime';
 import { useSteeringEntries } from '~/composables/useSteeringDocuments';
 
 definePageMeta({ layout: 'workspace' });
@@ -13,6 +13,8 @@ definePageMeta({ layout: 'workspace' });
 const projectId = useProjectId();
 const { data: info } = await useProjectInfo(projectId);
 const entries = useSteeringEntries(info);
+// 最終更新の相対時刻。mount の後にだけ描く（specs/portal/relative-time）
+const relativeTime = useRelativeTime();
 
 /**
  * 本家は有無を緑（Available）と無彩色（Not Created）のバッジで出す
@@ -37,7 +39,7 @@ const items = computed(() =>
      */
     meta:
       entry.exists && info.value?.steering.lastModified
-        ? formatRelativeTime(info.value.steering.lastModified)
+        ? relativeTime(info.value.steering.lastModified)
         : undefined,
     // 未作成の文書へはリンクを張らない
     to: entry.exists ? `/projects/${projectId.value}/steering/${entry.name}` : undefined,

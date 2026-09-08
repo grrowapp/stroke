@@ -95,6 +95,9 @@ test.describe('一覧の列は prototype と同じ', () => {
 
   test('最終更新は未接続でも出る。本家 API から取れない情報なので走査で拾う', async ({ page }) => {
     const row = page.getByTestId('project-row').filter({ hasText: 'idle-project' });
+    // 相対時刻は mount の後にだけ入る（specs/portal/relative-time）。mount 前は空文字なので、
+    // 「—」でないことだけでは走査した値が出たことにならない。空でないことも見る
+    await expect(row.getByTestId('project-last-modified')).not.toHaveText('');
     await expect(row.getByTestId('project-last-modified')).not.toHaveText('—');
   });
 });

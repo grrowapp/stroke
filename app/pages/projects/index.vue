@@ -22,7 +22,7 @@ import {
   fetchPendingApprovals,
   restartSteering,
 } from '~/composables/useProjectApi';
-import { formatRelativeTime } from '~/composables/useRelativeTime';
+import { useRelativeTime } from '~/composables/useRelativeTime';
 import type { ProjectDirectoryResponse, ProjectSummary } from '#shared/types';
 
 /** 決着の中身。`in-progress` は行が出るだけで決着ではないので、ここには来ない */
@@ -45,6 +45,9 @@ const directory = computed(() => data.value?.directory);
 const projects = computed<ProjectSummary[]>(() =>
   directory.value?.status === 'ok' ? directory.value.projects : [],
 );
+
+// 最終更新の相対時刻。mount の後にだけ描く（specs/portal/relative-time）
+const relativeTime = useRelativeTime();
 
 /** 作成の入口。ストロークの概要入力へ入る（ADR 0009） */
 function startStroke(): void {
@@ -401,7 +404,7 @@ function unread(project: ProjectSummary): number | null {
               ユーティリティで色を当てると持ち主が2人になり、後勝ちで沈まなくなる。
             -->
             <td class="text-[12px]" data-testid="project-last-modified">
-              {{ project.lastModified === null ? '—' : formatRelativeTime(project.lastModified) }}
+              {{ project.lastModified === null ? '—' : relativeTime(project.lastModified) }}
             </td>
           </tr>
         </tbody>
