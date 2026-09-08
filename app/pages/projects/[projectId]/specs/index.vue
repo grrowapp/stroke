@@ -6,12 +6,14 @@ import EmptyState from '~/components/workspace/EmptyState.vue';
 import RecordList from '~/components/workspace/RecordList.vue';
 import WorkspacePanel from '~/components/workspace/WorkspacePanel.vue';
 import { useProjectId, useSpecs } from '~/composables/useProjectApi';
-import { formatRelativeTime } from '~/composables/useRelativeTime';
+import { useRelativeTime } from '~/composables/useRelativeTime';
 
 definePageMeta({ layout: 'workspace' });
 
 const projectId = useProjectId();
 const { data, error } = await useSpecs(projectId);
+// 最終更新の相対時刻。mount の後にだけ描く（specs/portal/relative-time）
+const relativeTime = useRelativeTime();
 
 /**
  * 本家の仕様書一覧は 名前 / 進捗 / 最終更新 の3列で、進捗はバーと `完了/全体` を並べる
@@ -32,7 +34,7 @@ const items = computed(() =>
     detail: spec.name,
     icon: 'document' as const,
     progress: spec.taskProgress ?? { completed: 0, total: 0 },
-    meta: formatRelativeTime(spec.lastModified),
+    meta: relativeTime(spec.lastModified),
     to: `/projects/${projectId.value}/specs/${spec.name}`,
   })),
 );

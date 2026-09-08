@@ -18,6 +18,7 @@
  */
 import TimeAgo from 'javascript-time-ago';
 import ja from 'javascript-time-ago/locale/ja';
+import { onMounted, ref } from 'vue';
 
 import type { Style } from 'javascript-time-ago';
 
@@ -60,4 +61,27 @@ export function formatRelativeTime(iso: string, now = Date.now()): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '—';
   return timeAgo.format(date, STYLE, { now });
+}
+
+/**
+ * 画面が使う相対時刻。**mount の後にだけ描く。**
+ *
+ * 相対時刻は「現在時刻」に依存する文言で、SSR がサーバーの時計で描き、ブラウザが自分の
+ * 時計で描き直すと、刻みの境界をまたいだ行の文言が入れ替わる（hydration mismatch。
+ * specs/portal/relative-time）。規範（`docs/specs/architecture/data-fetching.md`「最初の
+ * レンダリングを決定論的に保つ」）に従い、時刻を SSR マークアップに入れず `onMounted` の
+ * 後ろに置く。サーバーと hydration は空文字を描き、mount の後に相対時刻が入る。
+ *
+ * mount 前は**空文字**にする。`undefined` だと（全件がそうなる mount 前は）`RecordList` が
+ * 列ごと畳み、mount で列が生えて構造の不一致になる。「—」は「取れない」の印（specs/project/directory）で、意味が違う。
+ *
+ * setup で呼ぶこと（`onMounted` の制約）。返る関数はテンプレートや `computed` から
+ * 何度呼んでもよく、mount で描き直される。
+ */
+export function useRelativeTime(): (iso: string) => string {
+  const mounted = ref(false);
+  onMounted(() => {
+    mounted.value = true;
+  });
+  return (iso) => (mounted.value ? formatRelativeTime(iso) : '');
 }

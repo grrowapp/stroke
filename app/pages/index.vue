@@ -10,13 +10,15 @@
 import { computed, definePageMeta, navigateTo, useFetch, useHead, watch } from '#imports';
 
 import { useBoardSocket } from '~/composables/useBoardSocket';
-import { formatRelativeTime } from '~/composables/useRelativeTime';
+import { useRelativeTime } from '~/composables/useRelativeTime';
 import type { Notification, ProjectDirectoryResponse } from '#shared/types';
 
 definePageMeta({ layout: 'portal' });
 useHead({ title: '通知 — stroke-board' });
 
 const { notifications, upstreamConnected } = useBoardSocket();
+// 最終更新の相対時刻。mount の後にだけ描く（specs/portal/relative-time）
+const relativeTime = useRelativeTime();
 
 const rows = computed(() => notifications.value);
 
@@ -112,7 +114,7 @@ function open(notification: Notification): void {
             <div class="text-[12px] text-[var(--text-secondary)]">{{ row.subject }}</div>
           </td>
           <td class="text-[12px] text-[var(--text-secondary)]">
-            {{ formatRelativeTime(row.occurredAt) }}
+            {{ relativeTime(row.occurredAt) }}
           </td>
         </tr>
       </tbody>

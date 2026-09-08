@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * `javascript-time-ago` の設定が本家の刻みと一致することを固定する。
  *
@@ -6,9 +7,12 @@
  *
  * 落ちたときに疑う設定を各ケースに書いてある。
  */
-import { describe, expect, it } from 'vitest';
+import { mount } from '@vue/test-utils';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createSSRApp, defineComponent, h } from 'vue';
+import { renderToString } from 'vue/server-renderer';
 
-import { formatRelativeTime } from '../../../app/composables/useRelativeTime';
+import { formatRelativeTime, useRelativeTime } from '../../../app/composables/useRelativeTime';
 
 const NOW = Date.parse('2026-08-25T12:00:00.000Z');
 
@@ -73,5 +77,56 @@ describe('formatRelativeTime', () => {
   it('無効な日付は「—」', () => {
     expect(formatRelativeTime('', NOW)).toBe('—');
     expect(formatRelativeTime('not a date', NOW)).toBe('—');
+  });
+});
+
+/**
+ * 画面が使う側は **mount の後にだけ描く**（specs/portal/relative-time、design D1）。
+ * SSR とブラウザの hydration は空文字で一致し、mount の後に相対時刻が入る。
+ *
+ * `useRelativeTime()` を setup で呼ぶ小さな部品を作り、SSR の出力・setup の時点・mount 後の
+ * 3 つを見る。
+ */
+describe('useRelativeTime', () => {
+  /** 描画の基準。`formatRelativeTime` の既定の `Date.now()` がこれになる */
+  beforeEach(() => {
+    vi.useFakeTimers({ now: NOW });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** setup の時点（mount 前）に返った文言を `seen` へ控える部品 */
+  function subject(iso: string, seen: string[] = []) {
+    return defineComponent({
+      setup() {
+        const relativeTime = useRelativeTime();
+        seen.push(relativeTime(iso));
+        return () => h('span', relativeTime(iso));
+      },
+    });
+  }
+
+  it('SSR では空文字を描く（現在時刻に依存する文言をサーバーが出さない）', async () => {
+    const html = await renderToString(createSSRApp(subject(ago(46 * MINUTE))));
+
+    expect(html).toBe('<span></span>');
+  });
+
+  it('mount 前は空文字、mount 後に相対時刻になる', async () => {
+    const seen: string[] = [];
+    const wrapper = mount(subject(ago(46 * MINUTE), seen));
+    await wrapper.vm.$nextTick();
+
+    expect(seen).toEqual(['']);
+    expect(wrapper.text()).toBe('46分前');
+  });
+
+  it('7日超は mount 後に絶対日時になる（形の切り替えも mount 後だけ）', async () => {
+    const wrapper = mount(subject(ago(8 * DAY)));
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.text()).toBe('8月17日 12:00');
   });
 });
