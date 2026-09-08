@@ -7,7 +7,8 @@ tags:
   - specs
   - design
   - tasks
-status: Planning
+  - pre5/a61a047e-d93e-4e05-ae6d-23b8a4242ee9
+status: Wait-for-archive
 order: -5.0
 ---
 
@@ -76,6 +77,12 @@ app/pages/prototype/projects.vue:293   ← 使い捨て（archive 済み change 
 - **相対時刻とは別の要因が1つ混ざっている。** ticket 冒頭の `Hydration style mismatch` / `Hydration attribute mismatch` は相対時刻では起きない。出所は `app/layouts/portal.vue` の接続ドット——SSR は `upstreamConnected = false` で描くが、本家に繋がっていると WS のスナップショットが hydration より先に届き、client は `background: var(--status-success)` / `title="本家に接続済み"` を期待する。本家が繋がっている限り毎回出る（実測: `/`・`/projects` とも、本家接続中は 100% 再現）。**ダンプは伴わない**（ERROR 1行 + WARN 2行、数百バイト）が、`Hydration completed but contains mismatches.` の ERROR はこちらでも出る。相対時刻を直しても、この ERROR は本家接続中は残る
 - 本家が繋がっていない時間帯は、時計を揃えたブラウザで警告 0 件だった
 
+**撤回（2026-09-08）。** 下の「直した後」の実装（`useState` で基準時刻を配る方式）は規範 `docs/specs/architecture/data-fetching.md` の外にある方式で、規範を後から書き換える提案を添えて実装したのは違反（ユーザー指摘）。作業ツリーを着手前へ戻し、規範の 3 手段（`ClientOnly` / `onMounted` / `import.meta.client`）の内側で設計をやり直す。
+
+**やり直し後（2026-09-08、tasks 4.4。規範の `onMounted` の後ろに置く形）。** 同じ手順（`yarn dev --port 3155`、headless Chromium、`Date.now()` を +5 日ずらして `/projects` と `/` を各2回）で、`Hydration text content mismatch` は 0 件、`children mismatch` も 0 件。最終更新の列は mount 後に入り、ずらしたブラウザでは「9月2日 08:52」（そのブラウザの時計を基準にした一度きりの描画）。dev ログは4回のロードで 8.7KB 増え、`<RouteProvider ... vnode=` のダンプ行は 0。残ったのは本家接続中の接続ドットの style/attribute mismatch（各ロード WARN 2行 + ERROR 1行）だけで、別 change の対象。
+
+**直した後（2026-09-08、tasks 4.4。撤回済み）。** 同じ手順（`yarn dev --port 3155`、headless Chromium、`Date.now()` を +5 日ずらして `/projects` と `/` を各2回）で、`Hydration text content mismatch` は 0 件、最終更新の列は SSR の「5日前」のまま（直す前は絶対日時へ入れ替わった）。dev ログは4回のロードで 8.7KB 増え、`<RouteProvider ... vnode=` のダンプ行は 0。残ったのは本家接続中の接続ドットの style/attribute mismatch（各ロード WARN 2行 + ERROR 1行、数百バイト）だけで、これは別 change の対象。
+
 ## 害
 
 - 調べたい `[stroke-board]` のログが VNode の海に埋もれる
@@ -88,4 +95,4 @@ app/pages/prototype/projects.vue:293   ← 使い捨て（archive 済み change 
 
 change: `fix-relative-time-hydration`（proposal / specs 作成済み、実装は未着手）
 
-2026-09-07 に現在のコードとの整合と主張の妥当性を再確認し、上の「再確認」を足した。接続ドットの mismatch は本 change に含めず別 change に切る（proposal「対象の線引き」。起票は未着手）。同日 design / tasks を作成。
+2026-09-07 に現在のコードとの整合と主張の妥当性を再確認し、上の「再確認」を足した。接続ドットの mismatch は本 change に含めず別 change に切る（proposal「対象の線引き」。起票は未着手）。同日 design / tasks を作成。同日、規範の内側でやり直した実装を `1bb09ac0`（pre5）に commit。santa-method レビュー 2 本 PASS。残りは docs（`file-composables.md` の事実の修正）の承認と完了承認。
