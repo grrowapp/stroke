@@ -162,7 +162,7 @@ sequenceDiagram
 | --- | --- |
 | `useSpecs` / `useSpecDocuments` | `app/composables/useProjectApi.ts:43, 48` |
 | 一覧 API | `server/api/projects/[projectId]/specs/index.get.ts` |
-| 本文 API | `server/api/projects/[projectId]/specs/[specName]/documents.get.ts` |
+| 本文 API | `server/api/projects/[projectId]/specs/[specName]/documents/index.get.ts` |
 | `upstreamClient()` / `toHttpError()` | `server/utils/control/upstream-proxy.ts:13, 24` |
 | `listSpecs()` / `getSpecDocuments()` | `server/utils/upstream/rest.ts:61, 66` |
 | 検証と失敗の区別 | `server/utils/upstream/rest.ts:149-174` |

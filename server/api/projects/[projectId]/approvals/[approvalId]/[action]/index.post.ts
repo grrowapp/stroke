@@ -12,8 +12,8 @@
 import { createError, defineEventHandler, getRouterParam, readBody } from 'h3';
 import { z } from 'zod';
 
-import { APPROVAL_ACTIONS, type ApprovalAction } from '../../../../../utils/upstream/rest';
-import { toHttpError, upstreamClient } from '../../../../../utils/control/upstream-proxy';
+import { APPROVAL_ACTIONS, type ApprovalAction } from '../../../../../../utils/upstream/rest';
+import { toHttpError, upstreamClient } from '../../../../../../utils/control/upstream-proxy';
 
 /**
  * 注釈1件。`#shared/stroke` の `Annotation` と同じ形を、境界で検証できるように zod で持つ。

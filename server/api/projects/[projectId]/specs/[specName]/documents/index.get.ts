@@ -4,7 +4,7 @@
 
 import { defineEventHandler, getRouterParam } from 'h3';
 
-import { toHttpError, upstreamClient } from '../../../../../utils/control/upstream-proxy';
+import { toHttpError, upstreamClient } from '../../../../../../utils/control/upstream-proxy';
 
 export default defineEventHandler(async (event) => {
   const projectId = getRouterParam(event, 'projectId') ?? '';
