@@ -8,7 +8,10 @@ import { fakeEvent, stubNitroGlobals, type FakeEvent } from '../support';
  * `question.post.test.ts` と同じ。
  *
  * 昇格の段（openspec/specs/api/session/promote）。判断が無ければ受理せず、順序は
- * 「衝突確認 → 改名 → `phase` を書く」のまま、失敗したら改名を戻して**判断は残す**。
+ * 「衝突確認 → 改名 → `phase` を書く」のまま。**失敗の種類で判断の扱いが分かれる**——
+ * 改名・`phase` の書き込みが失敗したら改名を戻して**判断は残し**（同じ判断のままやり直せる）、
+ * 名前が衝突したときは**判断を取り下げてから** 409 name-conflict を返す（その判断のままでは
+ * 何度やり直しても昇格できないため。openspec/specs/project/generation）。
  * 起動は要求せず、`invocation` を A8 経由で `failed` にして巡回へ引き渡す。
  *
  * **busy ガードは U10 からここへ移した**（fix-rename-during-running-session）。改名する
@@ -84,6 +87,7 @@ const { default: promoteHandler } = await import('../../../../server/api/strokes
 const { readState, sessionExists, writeState } = await import(
   '../../../../server/utils/stroke/session-store'
 );
+const { conflict } = await import('../../../../server/utils/stroke/conflict');
 const { invokePath } = await import('../../../../server/utils/stroke/invoke');
 const { submissionPath } = await import('../../../../server/utils/stroke/submission-path');
 const { sessionRunPath } = await import('../../../../server/utils/stroke/running');
@@ -105,6 +109,15 @@ const DECIDED = {
 /** $fetch に渡された path の一覧 */
 function fetchedPaths(): string[] {
   return fetchMock.mock.calls.map((call) => String(call[0]));
+}
+
+/**
+ * `assertNameAvailable` が保存先に同名を見つけたときに投げるもの。
+ * 理由の印（`data.reason`）まで含めて実物と同じ口（`conflict()`）で作る——受け口はこの印で
+ * 「取り下げる失敗」と「判断を残す失敗」を分けるので、印の無い 409 で代用すると空振りする。
+ */
+function nameConflict(): unknown {
+  return conflict('name-conflict', `/share/${NAME} は既に存在する。別の名前を確定すること。`);
 }
 
 describe('U14 POST /api/strokes/:id/promote', () => {
@@ -295,12 +308,166 @@ describe('U14 POST /api/strokes/:id/promote', () => {
     expect(promoteSessionToProject).not.toHaveBeenCalled();
   });
 
-  it('衝突は改名の前に弾く。判断はそのまま残る', async () => {
-    assertNameAvailable.mockRejectedValueOnce(Object.assign(new Error('既に存在する'), { statusCode: 409 }));
+  it('衝突は改名の前に弾き、判断を取り下げてから 409 name-conflict を返す', async () => {
+    assertNameAvailable.mockRejectedValueOnce(nameConflict());
 
-    await expect(promoteHandler(fakeEvent(SESSION, undefined) as never)).rejects.toThrow('既に存在する');
+    await expect(promoteHandler(fakeEvent(SESSION, undefined) as never)).rejects.toMatchObject({
+      statusCode: 409,
+      data: { reason: 'name-conflict' },
+    });
+
+    // 判断を取り下げた = セッションの state から `decision` が消えている。`phase` は動かない
+    expect(writeStateMock).toHaveBeenCalledTimes(1);
+    expect(writeStateMock).toHaveBeenCalledWith(SESSION, {
+      phase: 'proposed',
+      currentQuestion: null,
+      invocation: 'idle',
+      retries: 0,
+    });
+    for (const [, written] of writeStateMock.mock.calls) {
+      expect(written).not.toHaveProperty('decision');
+    }
+
+    // 改名も、配信も、A8 への引き渡しも起きない
     expect(promoteSessionToProject).not.toHaveBeenCalled();
+    expect(revertPromotion).not.toHaveBeenCalled();
+    expect(broadcastProjectCreation).not.toHaveBeenCalled();
+    expect(forgetSubmissions).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('改名の直前の二度目の衝突確認で弾かれても、同じように取り下げてから 409 を返す', async () => {
+    // `promoteSessionToProject` は改名の直前にもう一度 `assertNameAvailable` を通す
+    // （`utils/stroke/project.ts`）。1回目の確認と改名の間に同じ名前が現れる並びがあるので、
+    // そこから出た衝突も同じ扱いにする
+    promoteSessionToProject.mockRejectedValueOnce(nameConflict());
+
+    await expect(promoteHandler(fakeEvent(SESSION, undefined) as never)).rejects.toMatchObject({
+      statusCode: 409,
+      data: { reason: 'name-conflict' },
+    });
+
+    expect(writeStateMock).toHaveBeenCalledTimes(1);
+    expect(writeStateMock).toHaveBeenCalledWith(SESSION, {
+      phase: 'proposed',
+      currentQuestion: null,
+      invocation: 'idle',
+      retries: 0,
+    });
+    // 改名は成立していないので巻き戻しは要らない。配信も引き渡しも起きない
+    expect(revertPromotion).not.toHaveBeenCalled();
+    expect(broadcastProjectCreation).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+    // 占有の解放はこちらの経路でも起きる
+    expect(endRun).toHaveBeenCalledWith(`key:${sessionRunPath('/share', SESSION)}`);
+  });
+
+  it('衝突で取り下げたときも占有は解放する。取り下げは解放より前（占有の中）で起きる', async () => {
+    const order: string[] = [];
+    assertNameAvailable.mockImplementationOnce(async () => {
+      order.push('assert');
+      throw nameConflict();
+    });
+    writeStateMock.mockImplementationOnce(async () => {
+      order.push('withdraw');
+    });
+    endRun.mockImplementation(() => {
+      order.push('end');
+    });
+
+    await expect(promoteHandler(fakeEvent(SESSION, undefined) as never)).rejects.toMatchObject({ statusCode: 409 });
+
+    expect(order).toEqual(['assert', 'withdraw', 'end']);
+    expect(endRun).toHaveBeenCalledWith(`key:${sessionRunPath('/share', SESSION)}`);
+  });
+
+  it('取り下げた後に別の名前で承認し直せば、その名前で昇格する', async () => {
+    assertNameAvailable.mockRejectedValueOnce(nameConflict());
+    await expect(promoteHandler(fakeEvent(SESSION, undefined) as never)).rejects.toMatchObject({ statusCode: 409 });
+
+    // サーバが書いた「判断なし」の state（上のケースで検証済み）へ、画面が別の名前で
+    // 下し直した判断（U10）が載った状態。取り下げ済みなので U10 は重ねての判断にならない
+    expect(writeStateMock).toHaveBeenCalledWith(SESSION, {
+      phase: 'proposed',
+      currentQuestion: null,
+      invocation: 'idle',
+      retries: 0,
+    });
+    const RENAMED = { ...DECIDED, decision: { projectName: 'decided-app-2' } };
+    readStateMock.mockResolvedValueOnce(RENAMED);
+
+    const response = await promoteHandler(fakeEvent(SESSION, undefined) as never);
+
+    expect((response as Response).status).toBe(204);
+    expect(promoteSessionToProject).toHaveBeenCalledWith('/share', SESSION, 'decided-app-2');
+  });
+
+  it('理由の印が name-conflict でない 409 では取り下げない。status だけで判定していない', async () => {
+    assertNameAvailable.mockRejectedValueOnce(conflict('busy', 'この作業場所は AI の応答を待っている。'));
+
+    await expect(promoteHandler(fakeEvent(SESSION, undefined) as never)).rejects.toMatchObject({
+      statusCode: 409,
+      data: { reason: 'busy' },
+    });
+
     expect(writeStateMock).not.toHaveBeenCalled();
+    expect(promoteSessionToProject).not.toHaveBeenCalled();
+  });
+
+  it('名前の形が不正（400）なら判断は取り下げない。衝突ではないので、やり直す対象は判断ではない', async () => {
+    assertNameAvailable.mockRejectedValueOnce(
+      Object.assign(new Error('プロジェクト名に使えない文字が含まれている。'), { statusCode: 400 }),
+    );
+
+    await expect(promoteHandler(fakeEvent(SESSION, undefined) as never)).rejects.toMatchObject({ statusCode: 400 });
+
+    // セッション側の state.json は書き換えない = 判断はそのまま残る
+    expect(writeStateMock).not.toHaveBeenCalled();
+    expect(promoteSessionToProject).not.toHaveBeenCalled();
+  });
+
+  it('取り下げは読み直してから書く。読み直した時点で判断が無ければ何も書かない', async () => {
+    // 冒頭の読みと、取り下げの直前の読み直し。間に承認（U10）の取り下げが入った並び
+    // ——U10 は busy ガードの対象外なので、占有の中でも判断は入れ替わりうる
+    readStateMock
+      .mockResolvedValueOnce(DECIDED)
+      .mockResolvedValueOnce({ phase: 'proposed', currentQuestion: null, invocation: 'idle' });
+    assertNameAvailable.mockRejectedValueOnce(nameConflict());
+
+    await expect(promoteHandler(fakeEvent(SESSION, undefined) as never)).rejects.toMatchObject({
+      statusCode: 409,
+      data: { reason: 'name-conflict' },
+    });
+
+    expect(readStateMock).toHaveBeenCalledTimes(2);
+    // 取り下げの目的は既に達しているので、スナップショットを書き戻さない
+    expect(writeStateMock).not.toHaveBeenCalled();
+  });
+
+  it('読み直した判断が別の名前なら取り下げない。衝突していない判断を消さない', async () => {
+    // 冒頭の読みと、取り下げの直前の読み直し。間に承認（U10）が別の名前で判断を下し直した
+    // 並び——U10 は busy ガードの対象外で `withStateLock` も取らないので、この占有では
+    // 止まらない。新しい判断の名前は衝突していないので、消す根拠が無い
+    readStateMock
+      .mockResolvedValueOnce(DECIDED)
+      .mockResolvedValueOnce({ ...DECIDED, decision: { projectName: 'decided-app-2' } });
+    assertNameAvailable.mockRejectedValueOnce(nameConflict());
+
+    await expect(promoteHandler(fakeEvent(SESSION, undefined) as never)).rejects.toMatchObject({
+      statusCode: 409,
+      data: { reason: 'name-conflict' },
+    });
+
+    expect(readStateMock).toHaveBeenCalledTimes(2);
+    expect(writeStateMock).not.toHaveBeenCalled();
+  });
+
+  it('取り下げの書き込みが失敗したら、その失敗を返す。409 で上書きしない', async () => {
+    assertNameAvailable.mockRejectedValueOnce(nameConflict());
+    writeStateMock.mockRejectedValueOnce(new Error('disk full'));
+
+    await expect(promoteHandler(fakeEvent(SESSION, undefined) as never)).rejects.toThrow('disk full');
+    expect(promoteSessionToProject).not.toHaveBeenCalled();
   });
 });
 

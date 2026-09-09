@@ -447,14 +447,18 @@ export function useProposalReview(
       const status = statusOf(error)
 
       if (status === 409 && reasonOf(error) === 'name-conflict') {
-        // 判断の後に同じ名前が保存先に現れた。同じ判断のままでは昇格できないので、判断を
-        // 取り下げて別の名前を確定させる（specs/project/generation「判断を取り下げて別の
-        // 名前で改めて承認できる」）
-        await $fetch(`${base.value}/approve`, { method: 'DELETE' }).catch(() => undefined)
+        // 判断の後に同じ名前が保存先に現れた。同じ判断のままでは昇格できない。**衝突した
+        // 名前の判断はサーバが取り下げている**ので（specs/api/session/promote「判断の名前が
+        // 昇格の直前に衝突している」・specs/project/generation「昇格の直前に既存名との衝突を
+        // 確認する」）、ここは衝突した名前を出して、別の名前を確定させる面へ戻すだけでよい。
+        // 次の承認は今までどおり `DELETE` → `POST` で下す——取り下げ済みなら `DELETE` は
+        // 何も変えず、取り下げの対象外だった判断（間に別の名前で下し直していた場合。同 spec）
+        // はその `DELETE` が拾う
         conflictName.value = name
       } else if (status === 500) {
-        // **昇格の実行が失敗した**（改名の I/O・`phase` の書き込み）。判断は記録されたまま
-        // 残っているので、決着と同じ器で次を選ばせる（specs/project/generation）。この時点では
+        // **昇格の実行が失敗した**（改名の I/O・`phase` の書き込み・衝突時の取り下げの
+        // 書き込み）。判断は記録されたまま残っているので、決着と同じ器で次を選ばせる
+        // （specs/project/generation）。この時点では
         // プロジェクトが無く phase は `proposed` なので、破棄はセッション側、やり直すは昇格だけの
         // 再要求になる
         promotionNotice.value = name
