@@ -133,8 +133,8 @@ function describeFailureForLog(failure: UpstreamFailure): string {
  * している」と断る（`completionRecorder`）。
  *
  * 本家の承認依頼の一覧は **pending だけ**を返す。プロセス終了より前にユーザーが承認を
- * 済ませていると生成中の判定は false になるが、確認は終了直後の1回なので窓は狭く、
- * 起動し直された実行が承認依頼を出し直せば次で true になる。
+ * 済ませていると生成中の判定は false になる。確認は終了直後の1回なので、承認がその前に
+ * 済んでいることは稀で、起動し直された実行が承認依頼を出し直せば次で true になる。
  *
  * 到達済みの状態で何もしなかった実行も true になる。これは意図した変化で、起動し直しが
  * 空振りして `failed` に倒れ続ける経路が無くなる。
@@ -212,9 +212,9 @@ function conversationWriter(sessionId: string) {
  * （完成の記録）は果たされているので受理と同じに扱う——断られたら phase を読み直して決める。
  * 判定を U15 の応答の文言に頼らない。
  *
- * 書き上げが `running` を対象から外した（design D9）ので、この窓は狭い——一覧を取ってから
+ * 書き上げが `running` を対象から外した（design D9）ので、これが起こるのは一覧を取ってから
  * U15 を POST するまでの間に起動が挟まったときだけである。それでも残すのは、`failed` に
- * 倒すと完成済みの対象を巡回が起こし直し続けるためで、窓の広さとは別の理由による。
+ * 倒すと完成済みの対象を巡回が起動し直し続けるためで、起こりやすさとは別の理由による。
  */
 function completionRecorder(sessionId: string) {
   return async (): Promise<boolean> => {

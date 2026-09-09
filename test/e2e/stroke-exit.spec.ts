@@ -186,7 +186,7 @@ test.describe('承認して一覧へ戻る', () => {
 
       // 「起動の材料を組み立てられない」は起こし直しの回数を進めて `failed`（上限に達していれば
       // `error`）を書く（`ai.ts` の `recordBuildFailure`）。U13 の 503 は記録の書き込みより先に返るので、
-      // 待って見る。巡回が同じ窓で起こし直すこともあるので、回数は「増えた」ことだけを見る
+      // 待って見る。巡回が同じ間に起動し直すこともあるので、回数は「増えた」ことだけを見る
       // 上限に達した記録（`error`）は回数を進めないので、回数の増加か `error` への到達のどちらかを待つ
       await expect
         .poll(async () => readRetries() > retriesBefore || (await readStatus()).invocation === 'error', { timeout: 10_000 })
