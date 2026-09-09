@@ -60,7 +60,7 @@ export function useAgentQuestion(sessionId: MaybeRefOrGetter<string>): AgentQues
   const answered = ref(0)
   const error = ref<AgentQuestionError | null>(null)
 
-  const base = computed(() => `/api/${toValue(sessionId)}`)
+  const base = computed(() => `/api/sessions/${toValue(sessionId)}`)
 
   /** 今その回答を送った問い。決着したときに、まだ同じ問いを握っていないかを見るため。 */
   let asked: Question | null = null

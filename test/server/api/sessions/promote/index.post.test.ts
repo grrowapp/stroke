@@ -4,8 +4,8 @@ import { shouldRetry } from '../../../../../server/utils/stroke/sweep';
 import { fakeEvent, stubNitroGlobals, type FakeEvent } from '../../support';
 
 /**
- * 対象は `server/api/strokes/[id]/promote/index.post.ts`（U14）。位置の付け方は
- * `question/index.post.test.ts` と同じ。
+ * 対象は `server/api/sessions/[id]/promote/index.post.ts`（U14）。位置の付け方は
+ * `test/server/api/strokes/question/index.post.test.ts` と同じ。
  *
  * 昇格の段（openspec/specs/api/session/promote）。判断が無ければ受理せず、順序は
  * 「衝突確認 → 改名 → `phase` を書く」のまま。**失敗の種類で判断の扱いが分かれる**——
@@ -83,7 +83,7 @@ stubNitroGlobals();
 // A8 への内部 $fetch の観測点。U13（invoke-agent）が呼ばれないことも同じ口で見る
 vi.stubGlobal('$fetch', fetchMock);
 
-const { default: promoteHandler } = await import('../../../../../server/api/strokes/[id]/promote/index.post');
+const { default: promoteHandler } = await import('../../../../../server/api/sessions/[id]/promote/index.post');
 const { readState, sessionExists, writeState } = await import(
   '../../../../../server/utils/stroke/session-store'
 );
@@ -120,7 +120,7 @@ function nameConflict(): unknown {
   return conflict('name-conflict', `/share/${NAME} は既に存在する。別の名前を確定すること。`);
 }
 
-describe('U14 POST /api/strokes/:id/promote', () => {
+describe('U14 POST /api/sessions/:id/promote', () => {
   beforeEach(() => {
     assertNameAvailable.mockReset().mockImplementation(async (_root, name) => `/share/${name}`);
     promoteSessionToProject.mockReset().mockImplementation(async (_root, _id, name) => `/share/${name}`);
@@ -471,7 +471,7 @@ describe('U14 POST /api/strokes/:id/promote', () => {
   });
 });
 
-describe('U14 POST /api/strokes/:id/promote — busy ガード（U10 から移した。fix-rename-during-running-session）', () => {
+describe('U14 POST /api/sessions/:id/promote — busy ガード（U10 から移した。fix-rename-during-running-session）', () => {
   beforeEach(() => {
     assertNameAvailable.mockReset().mockImplementation(async (_root, name) => `/share/${name}`);
     promoteSessionToProject.mockReset().mockImplementation(async (_root, _id, name) => `/share/${name}`);

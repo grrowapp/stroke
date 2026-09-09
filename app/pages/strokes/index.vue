@@ -16,7 +16,7 @@ async function start(overview: string) {
 
   let sessionId: string
   try {
-    const created = await $fetch<{ sessionId: string }>('/api/strokes', {
+    const created = await $fetch<{ sessionId: string }>('/api/sessions', {
       method: 'POST',
       body: { overview },
     })
@@ -30,7 +30,7 @@ async function start(overview: string) {
   // 受理と起動は分かれている(specs/api/overview)。成功応答の直後に起動を要求する
   // (design.md 決定6)。起動に失敗しても、セッション自体は作られている。
   try {
-    await $fetch(`/api/strokes/${sessionId}/invoke-agent`)
+    await $fetch(`/api/sessions/${sessionId}/invoke-agent`)
   } catch {
     errorMessage.value = 'AI を起動できませんでした。もう一度投稿してください。'
     waiting.value = false

@@ -384,12 +384,12 @@ async function run(browser: Browser, policy: Policy): Promise<{
 
   // 概要の投稿もセッションの作成と起動要求の2本立て（`app/pages/strokes/index.vue`）
   //
-  // **セッションは受理（`POST /api/strokes`）の時点で出来ている。** 起動要求より早いので、
+  // **セッションは受理（`POST /api/sessions`）の時点で出来ている。** 起動要求より早いので、
   // 片付けの対象はこちらで拾うのが最短である。ここを待たずにいると、投稿の直後に画面が
   // 死んだとき（実測 2026-08-30: chromium が外から SIGTERM される）、サーバー側に出来た
   // セッションが対象から外れ、`stroking` のまま巡回に拾われて再キックされ続ける
   const created = page.waitForResponse(
-    response => response.request().method() === 'POST' && /\/api\/strokes\/?($|\?)/.test(response.url()),
+    response => response.request().method() === 'POST' && /\/api\/sessions\/?($|\?)/.test(response.url()),
     { timeout: 60_000 },
   ).catch(() => null)
 
@@ -409,12 +409,12 @@ async function run(browser: Browser, policy: Policy): Promise<{
   const launchResponse = await launched
 
   // **id が分かった時点で覚える。** 起動要求の URL には既にセッション id が入っている
-  // （`/api/strokes/<uuid>/invoke-agent`）ので、下の `waitForURL` を待たずにここで拾う。
+  // （`/api/sessions/<uuid>/invoke-agent`）ので、下の `waitForURL` を待たずにここで拾う。
   // 待ってから覚えると、その手前の分岐——409 の起こし直し・非 ok の throw・URL 待ちの
   // 時間切れ——で落ちたときに、**サーバー側に出来ているセッションが片付けの対象から
   // 外れる**。残れば `stroking` のまま巡回に拾われて再キックされ続ける
   if (launchResponse !== null) {
-    const fromLaunch = /\/strokes\/([0-9a-f-]{36})\//.exec(launchResponse.url())?.[1]
+    const fromLaunch = /\/sessions\/([0-9a-f-]{36})\//.exec(launchResponse.url())?.[1]
     if (fromLaunch !== undefined) cleanupTargets.add(fromLaunch)
   }
 

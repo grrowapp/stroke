@@ -2,11 +2,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, nextTick, ref, toValue, watch } from 'vue'
 
 /**
- * 呼び出し側が 409 をどう扱うか。
+ * 呼び出し側が 409 をどう扱うか、そして**どの path へ送っているか**。
  *
- * **helper の戻り値だけを見ても足りない。** この不具合の発生源は「同じ扱いが3箇所に散り、
- * 1箇所だけ直されて残りが取り残された」ことである。器（`error`）に文言を入れないことは
+ * **helper の戻り値だけを見ても足りない。** 409 の扱いの不具合の発生源は「同じ扱いが3箇所に
+ * 散り、1箇所だけ直されて残りが取り残された」ことである。`error` に文言を入れないことは
  * 呼び出し側の責任なので、そこを見ないと同型の再発を検出できない。
+ *
+ * **path も見る。** この composable は `base` を `/api/${sessionId}` と組み立てており、
+ * セッションの名前空間そのものを落として回答の送信も起動要求も 404 にしていた
+ * （change `fix-session-api-namespace`。旧 ticket `fix-agent-question-api-path`）。
+ * `url.includes('/invoke-agent')` のような部分一致では、基底が誤っていても通ってしまう。
+ * 実際に渡された URL を全文で突き合わせる。
  */
 
 const { fetchMock } = vi.hoisted(() => {
@@ -67,7 +73,7 @@ describe('useAgentQuestion.send', () => {
     await q.send({ kind: 'option', value: '同期で書く' })
     await nextTick()
 
-    // 器は空のまま（`specs/agent-question`「失敗を示してはならない」）
+    // `error` は空のまま（`specs/agent-question`「失敗を示してはならない」）
     expect(q.error.value).toBeNull()
     expect(q.waiting.value).toBe(true)
     // 受理は通っているので数えは進む
@@ -117,5 +123,61 @@ describe('useAgentQuestion.send', () => {
 
     expect(q.error.value?.title).toBe('AI を起動できませんでした')
     expect(q.waiting.value).toBe(false)
+  })
+})
+
+describe('useAgentQuestion.send の送り先', () => {
+  /**
+   * `send` が成功すると `useWaitingRetry` が3秒間隔のポーリングを張る。張ったまま抜けると、
+   * この後のテストの最中に U2 を読みに行き、`$fetch` のモックが返す `null` から
+   * `invocation` を取ろうとして落ちる（`useWaitingRetry.ts` の poll）。
+   * `useAgentQuestion` は `stopWaiting` を返さないので、`useWaitingRetry` を包んで
+   * 中の1つを捕まえておき、テストごとに止める（`useWaitingRetry.test.ts` が
+   * `stopWaiting()` を呼んでいるのと同じ理由）。
+   */
+  let stopWaiting: (() => void) | undefined
+
+  async function stubWaitingRetry(): Promise<void> {
+    const { useWaitingRetry } = await import('../../../app/composables/useWaitingRetry')
+    vi.stubGlobal('useWaitingRetry', (sessionId: string) => {
+      const w = useWaitingRetry(sessionId)
+      stopWaiting = w.stopWaiting
+      return w
+    })
+  }
+
+  afterEach(() => {
+    stopWaiting?.()
+    stopWaiting = undefined
+  })
+
+  it('回答は U7 `/api/sessions/<id>/answer` へ送る', async () => {
+    await stubWaitingRetry()
+    const { useAgentQuestion } = await import('../../../app/composables/useAgentQuestion')
+
+    fetchMock.mockResolvedValue(null)
+
+    const q = useAgentQuestion('session-1')
+    await q.send({ kind: 'option', value: '同期で書く' })
+
+    // 1回目の呼び出しが受理（U7）。基底が `/api/<id>` に戻れば 404 になる path なので、
+    // 全文で突き合わせる
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/sessions/session-1/answer')
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ method: 'POST' })
+  })
+
+  it('受理の直後の起動要求は U13 `/api/sessions/<id>/invoke-agent` へ出す', async () => {
+    await stubWaitingRetry()
+    const { useAgentQuestion } = await import('../../../app/composables/useAgentQuestion')
+
+    fetchMock.mockResolvedValue(null)
+
+    const q = useAgentQuestion('session-1')
+    await q.send({ kind: 'option', value: '同期で書く' })
+
+    // 受理（U7）と起動（U13）は分かれている（`specs/api/answer`）ので、この順で2回叩く。
+    // **件数を固定しない。** 待機に入ると `useWaitingRetry` の3秒ポーリングが動きだすので、
+    // 実時間に依存した件数を期待すると将来間隔が縮んだときに落ちる
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('/api/sessions/session-1/invoke-agent')
   })
 })

@@ -42,7 +42,7 @@ const { projectShareRoot, claude } = config.runtimeConfig
 | `claude.debugLogDir` | （空 = 無効） |
 | `openspec.bin` | `openspec` |
 | `openspec.initArgs` | `init --tools none` |
-| `wsPathPattern` | `/api/strokes/([^/]+)/ws/{channel}(?:$\|[/?#])` |
+| `wsPathPattern` | `/api/sessions/([^/]+)/ws/{channel}(?:$\|[/?#])` |
 
 ### `projectShareRoot`
 

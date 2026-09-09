@@ -3,7 +3,7 @@ import { readState, sessionExists, sessionProposal } from '../../../../../utils/
 import { proposalChannel, sessionIdFromUrl } from '../../../../../utils/stroke/ws-channels'
 
 /**
- * W2 `/api/:id/ws/proposal`。proposal と名前候補を配信する。セッション id は URL から読む。
+ * W2 `/api/sessions/:id/ws/proposal`。proposal と名前候補を配信する。セッション id は URL から読む。
  * パスのパターンは `runtimeConfig.wsPathPattern`。読むのは `ws-channels.ts` の1本。
  */
 

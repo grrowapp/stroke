@@ -24,7 +24,7 @@ describe('shouldRetry', () => {
 describe('invokePath', () => {
   it('path を cwd として添える', () => {
     expect(invokePath('abc', '/opt/projects/abc')).toBe(
-      '/api/strokes/abc/invoke-agent?cwd=%2Fopt%2Fprojects%2Fabc',
+      '/api/sessions/abc/invoke-agent?cwd=%2Fopt%2Fprojects%2Fabc',
     )
   })
 
@@ -37,6 +37,6 @@ describe('invokePath', () => {
   })
 
   it('プロジェクト名に含まれる記号も素通しにしない', () => {
-    expect(invokePath('a b', '/x')).toContain('/api/strokes/a%20b/invoke-agent')
+    expect(invokePath('a b', '/x')).toContain('/api/sessions/a%20b/invoke-agent')
   })
 })

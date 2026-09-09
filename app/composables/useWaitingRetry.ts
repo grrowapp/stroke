@@ -57,7 +57,7 @@ export function useWaitingRetry(sessionId: MaybeRefOrGetter<string>) {
   // scope が壊れたときの停止も内蔵している
   const poll = useIntervalFn(
     async () => {
-      const status = await $fetch<{ invocation: Invocation }>(`/api/strokes/${toValue(sessionId)}`)
+      const status = await $fetch<{ invocation: Invocation }>(`/api/sessions/${toValue(sessionId)}`)
       if (status.invocation === 'error') {
         // 終端。巡回は拾わないので、ユーザーが再実行か削除を選ぶまで動かない。
         errored.value = true
@@ -125,7 +125,7 @@ export function useWaitingRetry(sessionId: MaybeRefOrGetter<string>) {
    */
   async function run(query: RunQuery, retriesLeft: number): Promise<RunResult> {
     try {
-      await $fetch(`/api/strokes/${toValue(sessionId)}/invoke-agent`, {
+      await $fetch(`/api/sessions/${toValue(sessionId)}/invoke-agent`, {
         ...(Object.keys(query).length === 0 ? {} : { query }),
       })
       pendingRun = null
