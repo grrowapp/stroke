@@ -1,20 +1,16 @@
 # サーバ API の契約
 
 画面（`app/`）・エージェント（`claude -p`）とサーバ（`server/`）の境界。型は `shared/stroke.ts`。
-ここに並ぶ番号が実際にどう繋がるかは `docs/specs/architecture/question-flow.md`、入れ物の形と検証の規定は
-`docs/specs/core/schema.md`。
+**この資料は全ての endpoint に共通する約束だけを持つ。** 各 endpoint の入出力は1本につき1ファイルで
+`docs/specs/api/sessions/` と `docs/specs/api/strokes/`、WS 配信は `docs/specs/api/ws/delivery.md`、
+endpoint の一覧は `docs/specs/api/overview.md` にある。番号が実際にどう繋がるかは
+`docs/specs/architecture/question-flow.md`、入れ物の形と検証の規定は `docs/specs/core/schema.md`。
 
 ## セッションの参照方法
 
-**セッション uuid は URL に載せる。** cookie では持たない。
+**セッション uuid は URL に載せる。** cookie では持たない。どの endpoint も対象の id を URL で受け取る。
 
-| 画面 | ルート |
-|---|---|
-| 概要入力（セッション開始前） | `/` |
-| 画面1（ストローク） | `/strokes/<uuid>` |
-| 画面2（proposal 確認） | `/strokes/<uuid>/proposal` |
-
-概要を投稿するとセッションが作られ、`/strokes/<uuid>` へ移る。
+画面とルートの対応は `docs/specs/architecture/question-flow.md`「画面とルート」。
 
 ## 全体設計
 
@@ -37,134 +33,28 @@
   完成したかを判定するのは U15 ではなく invoke-agent である
   （[architecture/invoke-agent.md](../architecture/invoke-agent.md)「作業が行われたかの判定」）。
 
-## 各 endpoint の入出力
+## 責務範囲
 
-### U1 `POST /api/sessions`
+**endpoint の責務は原則1つ。** 1つの endpoint は軸を1つだけ持ち、2つ目の軸を持たない。軸とは、
+その endpoint が受け持つ1つの事である——「完成を記録する」「実行の記録を書く」「要求を受けて
+AI を起動する」。
 
-- input: `{ overview: string }`（空・空白のみは 400）
-- output: `{ sessionId: string }`
+**責務範囲は軸を起点に前後の幅を持つ。** 軸の成立に不可分な前と後——受理してよいかの検証、受理した
+ことの記録、受理に続く配信——は責務範囲の**内**である。
 
-### U2 `GET /api/sessions/:id`
+**責務範囲を点で捉えた責務外判定は、責務判定の誤用である。** 「軸そのもの以外は責務外」と読むと、
+検証も記録も配信も責務外になり、endpoint はその軸を成立させられなくなる。
 
-- output: `{ phase: 'stroking' | 'proposed' | 'approved' | 'activated', invocation: 'running' | 'idle' | 'failed' | 'error', path: string }`
-- `path` は対象のディレクトリ。画面はこれを cwd として U13 に渡す（endpoint に導出させない）
-- リロード時に1回読み、画面の行き先（`stroking`=画面1 / `proposed` 以降=画面2）と
-  待機・失敗表示を決める。**回答や差し戻しを送って待っている間だけ**、数秒おきに読み直す。
-- 昇格後（`approved` / `activated`）も `invocation` を持つ。昇格したプロジェクトでは steering の
-  実行が起こるためで、`idle` に潰さずそのまま返す。`activated` は完成の記録（U15）だけが書く。
-- `failed` のとき、ユーザーの再試行は同じ入力 POST（U7 / U9）の再送と、その成功応答後の U13。
-  巡回（`server/plugins/01.retry-failed.ts`）も `failed` を拾って起こし直す。
-- `error` はリトライ上限に達した**終端**。システムは自動では何もしない。画面は再実行
-  （`U13?reset=1`。回数のリセットは U13 が行う）か削除（U11）を出す。**画面は A8 を叩かない。**
-- エラー: 404 セッションなし
+**責務外の判定は軸の数で行う。** ある処理が責務外かどうかは、それが2つ目の軸に属するかどうかで
+決める。軸が1つのまま前後へ広がっているものを責務外と判定しない。
 
-### U3 `GET /api/sessions/:id/strokes`
+既存の判断はこの形で説明が付く。
 
-- output: `{ strokes: Stroke[] }`
-- `Stroke` は `proposal: false`（問いと回答のペア。問い返しも同じ形）か
-  `proposal: true`（proposal 初提出のマーカー。`question` / `answer` は null）のどちらか。
-- エラー: 404 セッションなし
-
-### U7 `POST /api/sessions/:id/answer`
-
-- input: `Answer`（`{ kind: 'option' | 'free', value: string }`）
-- output: 本文なし（204）
-- 実行中かどうかを見ないで受理する（多重起動は U13 が止める）
-- エラー: 400 形式不正 / 404 / 409 phase（承認以降＝`approved` / `activated`・答えるべき問いが無い）
-
-### U9 `POST /api/sessions/:id/send-back`
-
-- input: `SendBackPayload`（`response` / `comments[]` / `annotations` / `nextSteps`）
-- output: 本文なし（204）
-- 実行中かどうかを見ないで受理する（多重起動は U13 が止める）
-- エラー: 400 指摘0件・形式不正 / 404 / 409 phase（`proposed` のみ受理）
-
-### U12 `GET /api/sessions`
-
-- output: `SessionSummary[]`（`{ id, phase, updatedAt, path, invocation }`。`updatedAt` は
-  `state.json` の mtime。読めない `state.json` は `phase: 'unknown'`）。新しいものから並ぶ。
-  1件も無ければ `[]`
-- `path` は対象のディレクトリ。**キックする側はこれを cwd として U13 に渡す**（endpoint に
-  導出させない）。`invocation` は実行の記録で、巡回はこれが `failed` の件だけを拾う
-- 一覧には実体の揃ったセッション（ディレクトリ・openspec ルート・スキーマ設定済み）だけが
-  載る。**作成直後（初回起動前）のセッションはまだ載らない**。U13 はこの符合で初回か継続かを
-  判定する
-- **承認で昇格した対象も載る。** 昇格後は id がプロジェクト名に変わるが、steering の
-  巡回・再キックの対象になるため一覧から外さない。完成した対象は `phase: 'activated'` で
-  載る（起動時の書き上げはこの一覧の `approved` かつ `invocation: 'idle'` を拾って U15 を
-  叩く）。`state.json` を
-  持たないディレクトリは載らない
-- サーバが動いていないときの削除・一覧・作成は `yarn session`（`docs/specs/architecture/session-workflow.md`）
-
-### A1 `GET /api/strokes/:id/overview`
-
-- output: `{ overview: string }`
-- エラー: 404 セッションなし・概要なし
-
-### A4 `GET /api/strokes/:id/send-back`
-
-- output: `SendBackPayload`
-- エラー: 404 セッションなし・差し戻しがまだ無い
-
-### A5 `POST /api/strokes/:id/question`
-
-- input: `Question`（`header` / `detail` / `question` / `options[]`）
-- output: 本文なし（204）
-- **記録だけを行う。** 今の1問として残すところまでで、画面へは配信しない。配信は、この提出を
-  行った実行の決着（A9）で行われる。
-- エラー: 400 スキーマ不適合 / 404 / 409 phase（承認以降＝`approved` / `activated` は拒否）
-
-### A7 `POST /api/strokes/:id/proposal`
-
-- input: `{ proposal: string, projectName?: string }`（`projectName` は kebab-case のときだけ候補採用）
-- output: 本文なし（204）
-- **記録だけを行う。** phase を進めず、画面へも配信しない。局面の切り替えと配信は、この提出を
-  行った実行の決着（A9）で行われる。
-- **受理した本文を残す。** セッションの `docs/proposal.md` へ書き、以後に繋ぎ直した画面
-  （W2 の接続時配信）でも承認（U10）でも同じ proposal が得られる。出し直しは上書きで、
-  残るのは最後に受理した1件だけ。
-- **残せなければ受理しない。** 書けなかったときは失敗を返す。受理したのに残っていない状態を
-  作らない。
-- エラー: 400 本文が空 / 404 / 409 phase（承認以降＝`approved` / `activated` は拒否）/ 500 残せなかった
-
-### A8 `POST /api/strokes/:id/submission`
-
-- input: `{ invocation: 'running' | 'idle' | 'failed' | 'error', retries?: number }`
-- output: 本文なし（204）
-- 実行の記録を指定の値に変えるだけの endpoint。**`invocation` を書き込めるのはここだけ**であり、
-  叩くのは invoke-agent だけとする。claude（エージェント）と画面は叩かない
-  A5・A7 も `invocation` に触れない。
-- 値の意味づけも遷移の判定もここでは持たない。`retries` は渡されたときだけ上書きする
-  （`error` からの再実行で 0 に戻すのに使う）。
-- **成功の決着は流さない。** `idle` は「終わった」であって「できた」ではなく、`done` を配信するのは
-  完成の記録（U15）だけ。生成中（`approved`）の対象が `error` に達したときの `failed` だけをここから流す。
-- エラー: 400 形式不正 / 404 セッションなし
-
-### A9 `POST /api/strokes/:id/settlement`
-
-- input: `{ submitted: 'question' | 'proposal' }`
-- output: 本文なし（204）
-- 実行の決着。その実行で提出されたものに応じて局面を切り替え、画面へ届ける endpoint。
-  **叩くのは invoke-agent だけ**とする（A8・U15 と同じ規律）。claude（エージェント）と画面は叩かない。
-- `question` — 記録された今の1問を W1 へ配信する。phase は動かさない。
-- `proposal` — phase を `proposed` にし、今の1問を消してから、残っている proposal を W2 へ配信する。
-- **何をするかは `submitted` が決める。** endpoint が状態を見て選ばない。書き込みを済ませてから
-  配信する（逆にすると、配信だけ届いて局面が動いていない状態が作れる）。
-- エラー: 400 形式不正 / 404 セッションなし / 409 phase（昇格した対象＝`approved` / `activated`・
-  残っている proposal が無い）
-
-### W1 `/api/sessions/:id/ws/question`
-
-- メッセージ: `Question`
-- 配信タイミング: その問いを提出した実行の決着（A9）・接続の瞬間（現在の1問があれば1件）
-- 画面は最後に届いた1件で表示を上書きする
-
-### W2 `/api/sessions/:id/ws/proposal`
-
-- メッセージ: `ProposalMessage`（`{ proposal: string, projectName: string | null }`）
-- 配信タイミング: その proposal を提出した実行の決着（A9。phase が `proposed` になるのと同時）・
-  接続の瞬間（現在の proposal があれば1件）
-- 画面は最後に届いた1件で表示を上書きする
+| endpoint | 軸 | 幅の内 | 責務外（別の軸） |
+|---|---|---|---|
+| U15（完成の記録） | phase を `approved` から `activated` へ変えたことを記録する | 記録に続く WS 配信 | 完成したかの判定（ADR-0014） |
+| A8（実行の記録） | 渡された値を `invocation` へ書く | 形式の検証 | 値の意味づけと遷移の判定 |
+| U13（AI の起動） | 要求を受けて AI を起動する | 起動の材料の組み立て | 起動したプロセスの終了を待って結果を返すこと |
 
 ## 約束
 
@@ -182,7 +72,8 @@
 
 **「実行中だから受理しない」という応答は無い。** 受理系は AI が走っていても受理する。起動（U13）は冪等で、対象が既に走っていればその要求は満たされているものとして受理し、新しい呼び出しを開始しない。同じ対象で2つの呼び出しを走らせないのは変わらないが、それを断る理由として呼び手へ返すものは持たない。
 
-**502 は無い。** リトライを尽くした失敗は実行の記録（`invocation: failed`）で伝わる。ユーザーの再試行は、同じ入力の再送と、その成功応答に続く起動である。
+**502 は無い。** リトライを尽くした失敗は実行の記録（`invocation: failed`）で伝わる。ユーザーの再試行は、同じ入力の再送と、その成功応答に続く起動である。リトライが上限に達した後の扱いは
+`docs/specs/architecture/failure.md`。
 
 ## 対称性
 
