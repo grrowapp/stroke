@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto'
 /**
  * 接続表。
  *
- * MCP ツール呼び出しを、それを起こした claude の接続文脈に結びつける層
+ * MCP ツール呼び出しを、それを起動した claude の接続文脈に結びつける層
  * （specs `server/session-management`、design.md「接続の担保」）。
  *
  * flontier 工程の呼び出しは `sessionId`、steering 工程の呼び出しは `projectPath` を持つ。
