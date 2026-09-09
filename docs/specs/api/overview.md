@@ -27,11 +27,12 @@
 | U14 | `POST /api/sessions/:id/promote` | セッションをプロジェクトへ昇格させる |
 | U15 | `POST /api/sessions/:id/activate` | プロジェクトの完成を記録する |
 
-## `projects/` — 1本
+## `projects/` — 2本
 
 | # | メソッド / パス | 内容 |
 |---|---|---|
 | P1 | `DELETE /api/projects/:projectId` | 作りきれなかったプロジェクトを消す |
+| P2 | `POST /api/projects` | 昇格したプロジェクトの生成を本家へ依頼する |
 
 ## `strokes/` — 5本
 

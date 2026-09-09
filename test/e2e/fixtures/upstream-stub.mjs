@@ -11,6 +11,7 @@
  * `/__control/*` はテストから状態を動かすための口で、本家には存在しない。
  */
 
+import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
 import { WebSocketServer } from 'ws';
 
@@ -24,7 +25,17 @@ const sockets = new Set();
  * `GET .../tasks/progress` を1回ずつ呼ぶ（design.md 決定4）。その回数が揃えば基準が
  * 揃ったことになる。時間で待つと環境によってぶれる。
  */
-const stats = { progressRequests: 0, lastApprovalAction: null };
+const stats = {
+  progressRequests: 0,
+  lastApprovalAction: null,
+  /**
+   * `POST /api/projects/add` で受けた登録の依頼（届いた順）。生成（P2）が本家へ何を
+   * 依頼したかを、テストから確かめるための計数。
+   */
+  registrations: [],
+  /** 登録の依頼を 500 で断る細工。本家が登録を受け付けない状況を作る */
+  refuseRegistration: false,
+};
 
 function task(id, description, status) {
   return {
@@ -148,6 +159,8 @@ function handleControl(rest, body) {
       stats.progressRequests = 0;
       // 前のテストが送った応答を残さない。「何も届いていない」を確かめられなくなる
       stats.lastApprovalAction = null;
+      stats.registrations = [];
+      stats.refuseRegistration = false;
       return { ok: true };
 
     case 'stats':
@@ -155,7 +168,14 @@ function handleControl(rest, body) {
         sockets: sockets.size,
         progressRequests: stats.progressRequests,
         lastApprovalAction: stats.lastApprovalAction,
+        registrations: stats.registrations,
       };
+
+    case 'refuse-registration':
+      // 本家が登録の依頼を受け付けない状況（停止・エラー応答）を作る。
+      // 生成（P2）は本家が受理して初めて受理を返すので、これで「生成が通らない」を再現できる
+      stats.refuseRegistration = body.refuse === true;
+      return { ok: true };
 
     case 'complete-task': {
       // 完了数を1つ増やす。`task-completed` と、全件なら `all-tasks-completed` が出るはず
@@ -235,8 +255,50 @@ function handleControl(rest, body) {
   }
 }
 
+/**
+ * 本家は登録の前にパスを自分の規則で解決するが、スタブは渡された値をそのまま使う。
+ * `projectId` は本家と同じ式（`server/utils/upstream/project-id.ts`）で作る。
+ */
+function projectIdOf(projectPath) {
+  return createHash('sha1').update(projectPath).digest('base64url').substring(0, 16);
+}
+
 function handleApi(segments, respond, method = 'GET', body = null) {
   if (segments.join('/') === 'api/projects/list') return respond(200, projectList());
+
+  /*
+   * プロジェクトの登録（本家 2.2.5 `addProjectByPath`）。登録済みのパスには同じ `projectId` を
+   * 返し、未登録なら登録して watcher を起こす（スタブでは specs も approvals も空で登録する）。
+   * 登録の依頼はすべて `stats.registrations` に残す——生成（P2）が本家へ依頼したことを
+   * テストから確かめるため（update-project-generation-via-upstream-rest design D4）。
+   */
+  if (method === 'POST' && segments.join('/') === 'api/projects/add') {
+    if (stats.refuseRegistration) return respond(500, { error: 'Registration refused by stub' });
+    if (typeof body?.projectPath !== 'string' || body.projectPath === '') {
+      return respond(400, { error: 'projectPath is required' });
+    }
+
+    // 登録済みのパスへの依頼も数える。テストが見たいのは「依頼が届いたか」であって
+    // 「新しく登録されたか」ではない（本家も登録済みのパスに同じ id を返して受理する）
+    stats.registrations.push({ projectPath: body.projectPath });
+
+    const existing = [...projects.values()].find((project) => project.projectPath === body.projectPath);
+    if (existing !== undefined) return respond(200, { projectId: existing.projectId, success: true });
+
+    const projectId = projectIdOf(body.projectPath);
+    projects.set(projectId, {
+      projectId,
+      projectName: body.projectPath.split('/').filter(Boolean).at(-1) ?? body.projectPath,
+      projectPath: body.projectPath,
+      specs: [],
+      approvals: [],
+      savedSpecDocuments: new Map(),
+      savedSteeringDocuments: new Map(),
+      approvalContents: new Map(),
+      tasksBySpec: new Map(),
+    });
+    return respond(200, { projectId, success: true });
+  }
 
   if (segments[0] !== 'api' || segments[1] !== 'projects' || segments.length < 3) return false;
 

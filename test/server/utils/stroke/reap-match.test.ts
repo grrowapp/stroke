@@ -31,13 +31,15 @@ describe('matchesTarget（単体）', () => {
     expect(matchesTarget('claude -p --session-id abc-123 --', { kind: 'stroke', sessionId: 'xyz-999' })).toBe(false)
   })
 
-  it('steering: cwd が --mcp-config の npx args に載っていれば true（初回・runId 無し）', () => {
-    const argv = 'claude -p --mcp-config {"mcpServers":{"specworkflow":{"command":"npx","args":["-y","@pimzino/spec-workflow-mcp@latest","/opt/projects/my-project"]}}}'
+  it('steering: cwd が --mcp-config の自前 MCP エントリのヘッダに載っていれば true（初回・runId 無し）', () => {
+    // 本家 MCP の配線は外した（update-project-generation-via-upstream-rest design D3・D4）。
+    // cwd は自前 MCP エントリの `x-stroke-cwd` ヘッダで argv に載る
+    const argv = 'claude -p --mcp-config {"mcpServers":{"stroke-board":{"type":"http","url":"http://127.0.0.1:3100/mcp","headers":{"x-stroke-token":"t","x-mcp-tools":"get-steering-guide","x-stroke-cwd":"/opt/projects/my-project"}}}}'
     expect(matchesTarget(argv, { kind: 'steering', cwd: '/opt/projects/my-project' })).toBe(true)
   })
 
   it('steering: 別の cwd では false', () => {
-    const argv = 'claude -p --mcp-config {"mcpServers":{"specworkflow":{"args":["-y","x","/opt/projects/my-project"]}}}'
+    const argv = 'claude -p --mcp-config {"mcpServers":{"stroke-board":{"headers":{"x-stroke-cwd":"/opt/projects/my-project"}}}}'
     expect(matchesTarget(argv, { kind: 'steering', cwd: '/opt/projects/other-project' })).toBe(false)
   })
 
@@ -75,15 +77,6 @@ vi.mock('../../../../server/utils/stroke/config', () => ({
 /** MCP の url に使う base URL は実際の待ち受けから組み立てる（`listen-address.ts`）。ここは固定値で足りる。 */
 vi.mock('../../../../server/utils/stroke/listen-address', () => ({
   currentApiBaseUrl: () => 'http://example.test:3599',
-}))
-
-vi.mock('../../../../server/utils/config', () => ({
-  readServerConfig: () => ({
-    upstreamBaseUrl: 'http://example.test:5000',
-    projectsParentPath: '/tmp/share',
-    specWorkflowHome: '/tmp/share/.spec-workflow-mcp',
-    syncIntervalMs: 30000,
-  }),
 }))
 
 const { buildRun } = await import('../../../../server/utils/stroke/invoke')

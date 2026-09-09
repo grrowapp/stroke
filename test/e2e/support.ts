@@ -53,7 +53,12 @@ export const stub = {
         annotations: string | null;
         comments: unknown[] | null;
       } | null;
+      /** `POST /api/projects/add` で受けた登録の依頼（届いた順）。生成（P2）が出したもの */
+      registrations: Array<{ projectPath: string }>;
     }>('stats'),
+
+  /** 本家が登録の依頼を受け付けない状況を作る（500 で断る）。`false` で戻す */
+  refuseRegistration: (refuse: boolean) => control('refuse-registration', { refuse }),
 
   /** 完了数を1つ増やす */
   completeTask: (projectId: string, specName = 'auth-spec') =>

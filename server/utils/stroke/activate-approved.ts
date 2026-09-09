@@ -11,8 +11,8 @@ import type { SessionSummary } from '#shared/stroke'
  * **対象は一覧が持つ state から選ぶ。** `approved` かつ実行の記録が `idle` のもの——
  * 導入前に生成を終えていたもの——だけを通す。`failed` / `error` / `running` は生成中の
  * まま残す（`running` は `01.reap-running.ts` が `failed` に倒し、巡回が拾う）。
- * **ファイルシステムを見て成果物を数えない**（`.spec-workflow/` は本家 MCP が接続した
- * 瞬間にでき、成果物が無いうちから在る）。U15 も判定を持たないので、完成したかを決めるのは
+ * **ファイルシステムを見て成果物を数えない**（`.spec-workflow/` は生成（P2）の依頼を本家が
+ * 受理したときにでき、AI が起動する前、成果物が無いうちから在る）。U15 も判定を持たないので、完成したかを決めるのは
  * この選び方そのものである（ADR-0014・design D9）。
  *
  * `server/plugins/01.activate-approved.ts` から Nitro の `$fetch` を渡して呼ばれる。ここでは

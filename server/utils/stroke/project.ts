@@ -18,8 +18,9 @@ const PROJECT_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
  *
  * **やるのは改名だけである**（openspec/specs/project/generation）。新しいディレクトリを
  * 作らず、ファイルを複製も移動もしない。セッションディレクトリの中身はすべてそのまま
- * プロジェクトの中身になる。`.spec-workflow/` の内部構造も作らない——それは承認後に
- * 起こす claude が呼ぶ本家 MCP の仕事である（ADR 0011）。
+ * プロジェクトの中身になる。`.spec-workflow/` の内部構造も作らない——それは承認後の
+ * 起動の前にサーバーが依頼する生成（P2 `POST /api/projects`）を受けた本家の仕事である
+ * （openspec/specs/api/project/generate）。
  *
  * セッションとプロジェクトは同じ親（`projectShareRoot`）の下にあるので、同じ親の下での
  * 改名で昇格が成立する。

@@ -50,19 +50,6 @@ vi.mock('../../../../server/utils/stroke/listen-address', () => ({
 }));
 
 /**
- * ポータル側の設定。`readServerConfig` は `useRuntimeConfig()` を通るので、Nitro の外では
- * 解決できない。ここで見たいのは**その値が本家 MCP の `env` に載ること**だけである
- */
-vi.mock('../../../../server/utils/config', () => ({
-  readServerConfig: () => ({
-    upstreamBaseUrl: 'http://example.test:5000',
-    projectsParentPath: '/tmp/share',
-    specWorkflowHome: '/tmp/share/.spec-workflow-mcp',
-    syncIntervalMs: 30000,
-  }),
-}));
-
-/**
  * 実行そのものは差し替える。見たいのは `kick` の前後の後始末（token の登録・削除）と、
  * `kick` が `invokeAi` へ何を渡すかだけである——`invokeAi` 自身が組み立て失敗をどう
  * 記録するか（`failed`/`error`・回数の進め方）は `ai.test.ts` の責務。
@@ -198,21 +185,48 @@ describe('buildRun の --mcp-config', () => {
     expect(exposedToolsOf('steering')).not.toContain('get-guide');
   });
 
-  it('本家 MCP に SPEC_WORKFLOW_HOME を渡す（渡さないと steering 工程が成立しない）', () => {
-    // 本家 MCP は起動時に「動いているプロジェクト」の登録簿へ自分を書き、dashboard の
-    // 一覧はその登録簿を読む。場所を決めるのがこの環境変数で、未設定だと既定の
-    // `~/.spec-workflow-mcp` へ書く。**書き手と読み手が別の登録簿を見ていた**ので、
-    // 昇格したてのプロジェクトは一覧に現れず `project_not_registered` が返り続けていた
-    // （実測 2026-08-31）
-    const upstream = mcpConfigOf('steering').mcpServers['specworkflow']!;
+  /**
+   * **AI の起動に乗せた生成の削除**（update-project-generation-via-upstream-rest）。
+   *
+   * かつて steering 工程は `--mcp-config` に本家 spec-workflow の MCP を並べ、その起動時の
+   * 自己登録でプロジェクトが本家に現れていた。プロジェクトの生成は P2（`POST /api/projects`）
+   * が本家 REST へ依頼するものになり、claude はプロジェクトを本家に登録する手段を持たない
+   * （openspec/specs/project/generation「AI のプロセスにプロジェクトを生成させてはならない」）。
+   */
+  it('steering 工程の --mcp-config に本家 MCP を並べない（AI の起動はプロジェクトを生成しない）', () => {
+    expect(Object.keys(mcpConfigOf('steering').mcpServers)).toEqual([MCP_SERVER_NAME]);
+  });
 
-    expect(upstream.env).toEqual({ SPEC_WORKFLOW_HOME: '/tmp/share/.spec-workflow-mcp' });
-    // ポータルが読む値と同じ1つを使う。ここで別の解決規則を書くとまた割れる
-    expect(upstream.args).toEqual(['-y', '@pimzino/spec-workflow-mcp@latest', '/tmp/share/session-1']);
+  it('起動の材料のどこにも本家 MCP を起こすものが無い', () => {
+    for (const kind of ['stroke', 'steering'] as const) {
+      const run = buildRun({
+        sessionId: 'session-1',
+        cwd: '/tmp/share/session-1',
+        phase: PHASE_OF[kind],
+        retries: 0,
+        token: 'token-1',
+      });
+      const joined = [run.launch.command, ...run.launch.args].join(' ');
+      expect(joined).not.toContain('spec-workflow-mcp');
+      expect(joined).not.toContain('SPEC_WORKFLOW_HOME');
+      expect(joined).not.toContain('specworkflow');
+    }
   });
 
   it('flontier 工程には本家 MCP を渡さない', () => {
     expect(Object.keys(mcpConfigOf('stroke').mcpServers)).toEqual([MCP_SERVER_NAME]);
+  });
+
+  /**
+   * 起動時の後始末（`reap-match.ts`）は argv に cwd の JSON 文字列が含まれるかで steering の
+   * claude を見分ける。cwd はかつて本家 MCP エントリの `npx` 引数に載っていた。配線を外した
+   * 後は自前 MCP エントリのヘッダで載せる。サーバーはこのヘッダを読まない
+   * （update-project-generation-via-upstream-rest design D4）。
+   */
+  it('自前 MCP エントリのヘッダに cwd を載せる（後始末の照合の手がかり）', () => {
+    for (const kind of ['stroke', 'steering'] as const) {
+      expect(mcpToolServerEntryOf(kind).headers!['x-stroke-cwd']).toBe('/tmp/share/session-1');
+    }
   });
 
   it('両工程とも自前 MCP のツールを --allowedTools に足す', () => {
@@ -230,7 +244,7 @@ describe('buildRun の --mcp-config', () => {
     expect(exposedToolsOf('steering')).toContain('submit-document');
   });
 
-  it('steering 工程は --allowedTools に自前 MCP だけを載せ、本家 MCP は載せない（配線とは別）', () => {
+  it('steering 工程は --allowedTools に自前 MCP だけを載せる', () => {
     const run = buildRun({
       sessionId: 'session-1',
       cwd: '/tmp/share/session-1',
@@ -240,15 +254,7 @@ describe('buildRun の --mcp-config', () => {
     });
     // 肯定で見る。フラグが1本だけ在り、自前ツールは載っている
     expect(run.launch.args.filter(arg => arg === '--allowedTools')).toHaveLength(1);
-    expect(allowedToolsOf('steering')).toContain('mcp__stroke-board');
-    // その上で、本家 MCP は載っていないことを見る
-    expect(allowedToolsOf('steering')).not.toContain('mcp__specworkflow');
-
-    // 本家 MCP は `--mcp-config` の mcpServers には引き続き並ぶ（配線は続けるため）。
-    // 許可（--allowedTools）と配線（--mcp-config）が別であることが、テストの上でも読める
-    const configAt = run.launch.args.indexOf('--mcp-config');
-    const config = JSON.parse(run.launch.args[configAt + 1]!) as { mcpServers: Record<string, unknown> };
-    expect(Object.keys(config.mcpServers)).toContain('specworkflow');
+    expect(allowedToolsOf('steering')).toEqual(['mcp__stroke-board']);
   });
 
   it('flontier 工程には本家 MCP を許可しない（配ってもいない）', () => {
@@ -564,7 +570,7 @@ describe('kick の接続表の後始末', () => {
     expect(hasLaunchSubmission(token)).toBe(false);
   });
 
-  it('kick は組み立て方（build）を invokeAi へ渡すだけで、自分では呼ばない', () => {
+  it('kick は組み立て方（build）を invokeAi へ渡すだけで、自分では呼ばない', async () => {
     config.broken = true;
     let capturedBuild: (() => unknown) | undefined;
     ai.invokeAi.mockImplementationOnce((_sessionId, _retries, build) => {
@@ -576,8 +582,72 @@ describe('kick の接続表の後始末', () => {
     expect(() => kick({ sessionId: 'session-1', cwd: '/tmp/share/session-1', phase: 'stroking', retries: 0 }))
       .not.toThrow();
 
-    // 渡された組み立て方を呼べば、buildRun と同じ理由で同期的に throw する
+    // 渡された組み立て方を呼べば、buildRun と同じ理由で失敗する
     expect(capturedBuild).toBeDefined();
-    expect(() => capturedBuild!()).toThrow('設定を読めない');
+    await expect(capturedBuild!()).rejects.toThrow('設定を読めない');
+  });
+});
+
+/**
+ * 生成の依頼（update-project-generation-via-upstream-rest design D2）。
+ *
+ * steering の起動は、材料を組み立てる中で **AI を起動する前に** P2（`POST /api/projects`）へ
+ * cwd を依頼する。受理されなければ材料を返さず reject し、`invokeAi` が「起動の材料を
+ * 組み立てられない」として記録する（`ai.test.ts`）。初回か継続かを問わず毎回依頼する
+ * （本家の登録は dashboard の再起動で消えるため）。
+ */
+describe('kick の組み立て方（build）が生成を依頼する', () => {
+  /** `kick` が invokeAi へ渡した組み立て方を捕まえる */
+  function captureBuild(options: Parameters<typeof kick>[0]): () => Promise<unknown> {
+    let captured: (() => unknown) | undefined;
+    ai.invokeAi.mockImplementationOnce((_sessionId, _retries, build) => {
+      captured = build;
+      return { built: Promise.resolve(), settled: Promise.resolve() };
+    });
+    kick(options);
+    expect(captured).toBeDefined();
+    return captured as () => Promise<unknown>;
+  }
+
+  beforeEach(() => {
+    config.broken = false;
+    ai.invokeAi.mockReset();
+    $fetch.mockReset();
+    $fetch.mockResolvedValue(undefined);
+  });
+
+  it('steering: /api/projects へ cwd を POST してから材料を返す', async () => {
+    const build = captureBuild({ sessionId: 'project-a', cwd: '/opt/projects/project-a', phase: 'approved', retries: 0 });
+
+    const run = await build() as { cwd: string };
+
+    expect($fetch).toHaveBeenCalledTimes(1);
+    expect($fetch).toHaveBeenCalledWith('/api/projects', { method: 'POST', body: { projectPath: '/opt/projects/project-a' } });
+    expect(run.cwd).toBe('/opt/projects/project-a');
+  });
+
+  it('steering: 続きの起動（runId あり）でも毎回依頼する', async () => {
+    const build = captureBuild({
+      sessionId: 'project-a', cwd: '/opt/projects/project-a', phase: 'activated', retries: 1, runId: 'run-1',
+    });
+
+    await build();
+
+    expect($fetch).toHaveBeenCalledWith('/api/projects', { method: 'POST', body: { projectPath: '/opt/projects/project-a' } });
+  });
+
+  it('steering: 依頼が受理されなければ材料を返さず reject する', async () => {
+    $fetch.mockRejectedValueOnce(Object.assign(new Error('本家に繋がらない'), { statusCode: 503 }));
+    const build = captureBuild({ sessionId: 'project-a', cwd: '/opt/projects/project-a', phase: 'approved', retries: 0 });
+
+    await expect(build()).rejects.toThrow('本家に繋がらない');
+  });
+
+  it('stroke: 生成を依頼しない', async () => {
+    const build = captureBuild({ sessionId: 'session-1', cwd: '/tmp/share/session-1', phase: 'stroking', retries: 0 });
+
+    await build();
+
+    expect($fetch).not.toHaveBeenCalled();
   });
 });

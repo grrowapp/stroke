@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -125,8 +125,89 @@ test.describe('承認して一覧へ戻る', () => {
     // 元のセッションディレクトリは残らない
     expect(existsSync(join(PROJECTS_PARENT, SEEDED_SESSION_ID))).toBe(false);
 
-    // `.spec-workflow/` の内部構造には踏み込まない（本家 MCP が作る）
+    // `.spec-workflow/` の内部構造には踏み込まない（生成の依頼を受けた本家が作る。スタブは作らない）
     expect(existsSync(join(PROJECTS_PARENT, SEEDED_PROJECT_NAME, '.spec-workflow'))).toBe(false);
+  });
+
+  /**
+   * 生成は本家への登録の依頼であり、AI の起動ではない（specs/project/generation・
+   * specs/agent/invocation。change `update-project-generation-via-upstream-rest`）。
+   *
+   * 昇格の成功を見た画面が U13 を叩き、その起動の材料の組み立てが AI を起動する前に P2
+   * （`POST /api/projects`）で本家へ登録を依頼する。claude は `/bin/true` に差し替えてあるので、
+   * 登録がスタブに届いたなら、それは P2 から来たものである。
+   */
+  test('承認して起動が要求されると、本家に昇格先のパスで登録が依頼される', async () => {
+    const { stub } = await import('./support');
+
+    // 画面の起動要求（U13）は昇格の応答の後に飛ぶ。画面は応答を待たずに一覧へ戻るので、
+    // 依頼がスタブへ届くまで待って見る。件数を固定しないのは、巡回（60秒ごと）が `failed` の
+    // 対象を起こし直すたびに依頼が1件増えるためで、届いた依頼がすべて昇格先のパスであることを見る
+    await expect
+      .poll(async () => (await stub.stats()).registrations.length, { timeout: 10_000 })
+      .toBeGreaterThanOrEqual(1);
+    const { registrations } = await stub.stats();
+    expect(registrations.every((entry) => entry.projectPath === join(PROJECTS_PARENT, SEEDED_PROJECT_NAME))).toBe(true);
+  });
+
+  /**
+   * **AI の起動はプロジェクトを生成しない**（削除の検証。design D6）。
+   *
+   * 本家が登録を受け付けない間に起動を要求すると、起動の材料を組み立てられず（503）、AI は
+   * 起動されず `invocation` は `failed` になる。登録は増えない。起動定義に本家 MCP は無いので、
+   * 起動しても本家に登録される道は無い——受け付けるようになった後の起動で、P2 からの登録が
+   * 1件増えるだけである。
+   */
+  test('本家が登録を受け付けなければ起動は 503 で止まり、登録は増えない', async ({ request }) => {
+    const { stub } = await import('./support');
+    const target = `/api/strokes/${SEEDED_PROJECT_NAME}`;
+    const cwd = join(PROJECTS_PARENT, SEEDED_PROJECT_NAME);
+
+    type Status = { invocation: string };
+    const readStatus = async (): Promise<Status> => (await (await request.get(target)).json()) as Status;
+    // 起こし直しの回数は U2 の応答に無い（契約は phase / invocation / path）。`state.json` を直接読む
+    const readRetries = (): number =>
+      (JSON.parse(readFileSync(join(cwd, 'state.json'), 'utf8')) as { retries?: number }).retries ?? 0;
+
+    // **先に断る状態にしてから基準を取る。** 巡回（60秒ごと。`server/plugins/01.retry-failed.ts`）が
+    // `failed` の対象を起こし直すので、受け付ける状態で基準を取ると、その隙に登録が1件増えうる。
+    // 断っている間はどの起動要求も登録を増やさない（スタブは断った依頼を数えない）ので、基準が安定する
+    await stub.refuseRegistration(true);
+    try {
+      // 前の起動（画面が要求したもの。claude は `/bin/true` なので提出が無く `failed`）が畳まれるのを待つ
+      await expect.poll(async () => (await readStatus()).invocation, { timeout: 10_000 }).not.toBe('running');
+      const retriesBefore = readRetries();
+      const registeredBefore = (await stub.stats()).registrations.length;
+
+      // 巡回の起こし直しが走っている瞬間は busy（409）で断られるので、503 が返るまで要求する
+      await expect
+        .poll(async () => (await request.get(`${target}/invoke-agent`, { params: { cwd } })).status(), { timeout: 10_000 })
+        .toBe(503);
+
+      // 「起動の材料を組み立てられない」は起こし直しの回数を進めて `failed`（上限に達していれば
+      // `error`）を書く（`ai.ts` の `recordBuildFailure`）。U13 の 503 は記録の書き込みより先に返るので、
+      // 待って見る。巡回が同じ窓で起こし直すこともあるので、回数は「増えた」ことだけを見る
+      // 上限に達した記録（`error`）は回数を進めないので、回数の増加か `error` への到達のどちらかを待つ
+      await expect
+        .poll(async () => readRetries() > retriesBefore || (await readStatus()).invocation === 'error', { timeout: 10_000 })
+        .toBe(true);
+      expect(['failed', 'error']).toContain((await readStatus()).invocation);
+      expect((await stub.stats()).registrations).toHaveLength(registeredBefore);
+    } finally {
+      await stub.refuseRegistration(false);
+    }
+
+    // 受け付けるようになれば、起動のたびに依頼し直す（続きの起動でも）。断られた実行の
+    // 後始末（busy ガードの解放）が済むまで 409 が返りうるので、200 になるまで要求する。
+    // 上限に達して `error` になっていれば `reset` で回数を戻して起こす（ユーザーの再実行と同じ口）
+    const registeredWhileRefused = (await stub.stats()).registrations.length;
+    await expect
+      .poll(async () => (await request.get(`${target}/invoke-agent`, { params: { cwd, reset: '1' } })).status(), { timeout: 10_000 })
+      .toBe(200);
+    await expect
+      .poll(async () => (await stub.stats()).registrations.length, { timeout: 10_000 })
+      .toBeGreaterThanOrEqual(registeredWhileRefused + 1);
+    expect((await stub.stats()).registrations.at(-1)).toEqual({ projectPath: cwd });
   });
 
   /**
@@ -195,9 +276,9 @@ test.describe('承認して一覧へ戻る', () => {
    * `.spec-workflow/` ができただけでは完了にならない（specs/project/generation・
    * specs/project/directory。change `add-activated-phase`）。
    *
-   * そのディレクトリは本家 MCP が接続した瞬間にでき、成果物が1つも無いうちからできている。
-   * 実行が正常終了して A8 で `idle` が書かれても、完成の記録（U15）が無い限り行は生成中の
-   * ままで、成功の決着も届かない。
+   * そのディレクトリは生成（P2）の依頼を本家が受理したときにでき、AI が起動する前、成果物が
+   * 1つも無いうちからできている。実行が正常終了して A8 で `idle` が書かれても、完成の記録
+   * （U15）が無い限り行は生成中のままで、成功の決着も届かない。
    */
   test('.spec-workflow/ ができて実行が終わっても、完成の記録が無ければ生成中のまま', async ({ page, request }) => {
     await page.goto('/projects');

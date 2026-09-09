@@ -6,12 +6,7 @@ import { initSessionOpenspec } from './openspec'
 import { isPromotedState, readState, sessionExists, withStateLock, writeState } from './session-store'
 import { forgetLaunchSubmission, hasLaunchSubmission, submissionCount } from './submission-signal'
 import { activatePath, submissionPath } from './submission-path'
-import {
-  MCP_SERVER_NAME,
-  UPSTREAM_MCP_SERVER_NAME,
-  withMcpToolsAllowed,
-} from '../mcp/allowed-tools'
-import { readServerConfig } from '../config'
+import { MCP_SERVER_NAME, withMcpToolsAllowed } from '../mcp/allowed-tools'
 import { issueConnectionToken, registerConnection, removeConnection } from '../mcp/connection-table'
 import { exposedToolsHeaderValue, MCP_TOOLS_HEADER, type McpToolPhase } from '../mcp/exposed-tools'
 import { currentApiBaseUrl } from './listen-address'
@@ -186,17 +181,15 @@ export function buildRun(options: {
     return {
       launch: {
         command: claude.command,
-        // 本家 spec-workflow の MCP を与えて起こす（ADR 0011）。設定にも持たず、
-        // ファイルも作らず、cwd から組み立てて args に足す（design.md D7）。
-        // 自前 MCP サーバー（provide-operations-via-mcp）も同じ --mcp-config に並べる
-        // （既存フラグ・本家 MCP の並びは変えない）。
-        // MCP ツールは --allowedTools に載っていないと呼べないため、同じく呼び出し
-        // ごとにここで足す（tasks 4.5）。**本家 MCP の分は足さない**——配線と許可は別で、
-        // 配線の目的（起動時の登録簿への自己登録）は許可なしで果たされる
-        // （`initialize()` が stdio transport を繋ぐ前に自己登録する。本家 2.2.5
-        // `dist/server.js`）。`--allowedTools` は可視性を決めないので、外しても本家の
-        // ツールは一覧から消えない——呼ばせない責務は案内（`get-steering-guide`）が
-        // 併せて負う（adr0016-sub-fix-upstream-mcp-allowance design.md D1）。
+        // 自前 MCP サーバー（provide-operations-via-mcp）を --mcp-config で与えて起こす。
+        // MCP ツールは --allowedTools に載っていないと呼べないため、呼び出しごとにここで
+        // 足す（tasks 4.5）。
+        //
+        // **本家 spec-workflow の MCP は並べない。** かつて並べていた（ADR 0011）が、その
+        // 目的は起動時の登録簿への自己登録——AI の起動に乗せたプロジェクトの生成——だけで、
+        // ツール呼び出しは1つも要らなかった。生成は P2（`POST /api/projects`）が本家 REST へ
+        // 依頼するものになり、`kick` が AI を起動する前に済ませる。claude はプロジェクトを
+        // 本家に登録する手段を持たない（update-project-generation-via-upstream-rest design D3）。
         args: [
           ...withMcpToolsAllowed(claude.args),
           '--mcp-config',
@@ -230,7 +223,8 @@ export function buildRun(options: {
       // （openspec/specs/api/session/activate「既に完成した対象には記録しない」）。
       recordCompletion: phase === 'approved' ? completionRecorder(sessionId) : undefined,
       remember: conversationWriter(sessionId),
-      // 作業場所は昇格済みのプロジェクト。`.spec-workflow/` の内部構造は本家 MCP が作る
+      // 作業場所は昇格済みのプロジェクト。`.spec-workflow/` の内部構造は、`kick` が起動の
+      // 前に依頼する生成（P2）を受けた本家が作る。整える実行環境は無い
       prepare: undefined,
     }
   }
@@ -243,7 +237,7 @@ export function buildRun(options: {
       args: [
         ...withMcpToolsAllowed(claude.args),
         '--mcp-config',
-        mcpToolConfigFor(token, apiBaseUrl),
+        mcpToolConfigFor(token, apiBaseUrl, cwd),
       ],
       apiBaseUrl,
     },
@@ -292,11 +286,24 @@ export function buildRun(options: {
  * 工程は url ではなくヘッダで分ける。`x-mcp-tools` に載せた名前のツールだけが claude の
  * tools 一覧に載るので、その工程で呼べないツールは初めから見えない
  * （`server/utils/mcp/exposed-tools.ts`）。
+ *
+ * **`x-stroke-cwd` はサーバーが読まないヘッダである。** 起動時の後始末（`reap-match.ts`）が
+ * 走っている claude を argv で照合するとき、steering の手がかりは cwd の JSON 文字列が
+ * argv に含まれるかどうかである。かつては本家 MCP エントリの `npx` 引数に cwd が載って
+ * いたが、その配線を外した（`mcpConfigFor`）ので、代わりにここで argv へ残す
+ * （update-project-generation-via-upstream-rest design D4）。
+ *
+ * ヘッダの値は HTTP の制約で ASCII に限る。cwd は `projectShareRoot`（既定 `/opt/projects`）の
+ * 直下で、名前は uuid かプロジェクト名（`project.ts` の `PROJECT_NAME_PATTERN`、ASCII のみ）
+ * なので、`projectShareRoot` が ASCII である限り値も ASCII である。エンコードはしない——
+ * 照合（`reap-match.ts`）が `JSON.stringify(cwd)` の素の形を見るためで、`projectShareRoot` に
+ * 非 ASCII を置く運用はこの前提の外になる。
  */
 function mcpToolServerEntry(
   token: string,
   apiBaseUrl: string,
   phase: McpToolPhase,
+  cwd: string,
 ): Record<string, unknown> {
   return {
     type: 'http',
@@ -304,54 +311,53 @@ function mcpToolServerEntry(
     headers: {
       'x-stroke-token': token,
       [MCP_TOOLS_HEADER]: exposedToolsHeaderValue(phase),
+      'x-stroke-cwd': cwd,
     },
   }
 }
 
 /** flontier 工程の `--mcp-config`。自前 MCP サーバーのみを持つ。 */
-function mcpToolConfigFor(token: string, apiBaseUrl: string): string {
+function mcpToolConfigFor(token: string, apiBaseUrl: string, cwd: string): string {
   return JSON.stringify({
     mcpServers: {
-      [MCP_SERVER_NAME]: mcpToolServerEntry(token, apiBaseUrl, 'flontier'),
+      [MCP_SERVER_NAME]: mcpToolServerEntry(token, apiBaseUrl, 'flontier', cwd),
     },
   })
 }
 
 /**
- * steering 工程の `--mcp-config`。本家 `spec-workflow-mcp` と自前 MCP サーバーを並べる
- * （既存フラグ・本家 MCP の並びは変えない）。
+ * steering 工程の `--mcp-config`。自前 MCP サーバーのみを持つ。
  *
  * `--mcp-config` は JSON 文字列を直接受け取れる（実機確認済み・design.md D7）。
- * 生成先のプロジェクトをそのままワークスペースとして渡す。
  *
- * **`SPEC_WORKFLOW_HOME` を渡す。これが無いと steering 工程は成立しない。**
- * 本家 MCP は起動時に「どのプロジェクトが動いているか」の登録簿へ自分を書き込み、
- * dashboard の `GET /api/projects/list` はその登録簿を読む。登録簿の場所は
- * `SPEC_WORKFLOW_HOME` が決め、未設定なら `~/.spec-workflow-mcp` になる。
- *
- * dashboard は `/opt/projects/.spec-workflow-mcp` を見て動いているのに、claude が起こす
- * 側は環境変数を継がず既定の場所へ書いていた。**別々の登録簿に書いて読んでいた**ので、
- * 昇格したてのプロジェクトは何度起こしても一覧に現れず、`get-steering` /
- * `submit-document`（steering）は `project_not_registered` を返し続けていた
- * （実測 2026-08-31: 本家 MCP は `connected` で「Project registered」も出しているのに、
- * dashboard の一覧にも `/opt/projects/.spec-workflow-mcp/activeProjects.json` にも
- * 現れない。手で起こして突き合わせて確かめた）。
- *
- * 値は**ポータル側が読んでいるものと同じ1つ**を使う（`readServerConfig`）。ここで
- * 別の解決規則を書くと、また読み手と書き手が割れる。
+ * **本家 `spec-workflow-mcp` は並べない。** かつては `npx -y @pimzino/spec-workflow-mcp@latest
+ * <cwd>` を `SPEC_WORKFLOW_HOME` 付きで並べ、その起動時の自己登録でプロジェクトが本家に
+ * 現れていた——プロジェクトの生成が AI のプロセスに乗っていた。生成は P2
+ * （`POST /api/projects`）が本家 REST へ依頼するものになり、`kick` が AI を起動する前に
+ * 済ませる。配線を外した後、claude はプロジェクトを本家に登録する手段を持たない
+ * （openspec/specs/project/generation「AI のプロセスにプロジェクトを生成させてはならない」・
+ * update-project-generation-via-upstream-rest design D3）。
  */
 function mcpConfigFor(cwd: string, token: string, apiBaseUrl: string): string {
   return JSON.stringify({
     mcpServers: {
-      [UPSTREAM_MCP_SERVER_NAME]: {
-        type: 'stdio',
-        command: 'npx',
-        args: ['-y', '@pimzino/spec-workflow-mcp@latest', cwd],
-        env: { SPEC_WORKFLOW_HOME: readServerConfig().specWorkflowHome },
-      },
-      [MCP_SERVER_NAME]: mcpToolServerEntry(token, apiBaseUrl, 'steering'),
+      [MCP_SERVER_NAME]: mcpToolServerEntry(token, apiBaseUrl, 'steering', cwd),
     },
   })
+}
+
+/**
+ * 生成（P2 `POST /api/projects`）を依頼する。昇格先のディレクトリ（cwd）を本家へ登録
+ * させ、`.spec-workflow/` を本家に作らせる。
+ *
+ * **サーバー内から自分の endpoint を相対パスで叩く**（`invocationWriter` と同じ作法）。
+ * 受理されなければ throw のまま返す——`kick` が渡す組み立て方の中で呼ばれるので、
+ * `invokeAi` が「起動の材料を組み立てられない」として `failed` / `error` を書き、
+ * U13 は 503 を返す（openspec/specs/agent/invocation「承認の後の実行は、起動の材料を
+ * 組み立てるたびに生成を依頼する」）。
+ */
+async function generateProject(cwd: string): Promise<void> {
+  await $fetch('/api/projects', { method: 'POST', body: { projectPath: cwd } })
 }
 
 /**
@@ -366,6 +372,11 @@ function mcpConfigFor(cwd: string, token: string, apiBaseUrl: string): string {
  * `AiRun` ではなく「組み立て方」——`buildRun` をこの起動の材料で閉じ込めた関数——である。
  * `invokeAi` が組み立てに失敗しても、その記録（`failed`/`error`）を書くのは `invokeAi`
  * であって `kick` ではない（design.md D1「書き込むのは invokeAi だけ」）。
+ *
+ * **steering の組み立て方は、材料を返す前に生成（P2）を依頼する。** 初回か継続かを問わず
+ * 起動のたびに依頼する——本家の登録は dashboard の再起動で消え、本家 MCP の自己登録を
+ * 外した今、戻す道はこれだけである。受理されなければ材料を返さず reject し、AI は起動
+ * しない（update-project-generation-via-upstream-rest design D2）。
  *
  * **戻り値は2つの完結点を持つ。**
  *
@@ -384,16 +395,19 @@ export function kick(options: {
   runId?: string
 }): InvokeAiOutcome {
   const token = issueConnectionToken()
+  const kind = kindOf(options.phase)
   registerConnection(
     token,
-    kindOf(options.phase) === 'steering' ? { projectPath: options.cwd } : { sessionId: options.sessionId },
+    kind === 'steering' ? { projectPath: options.cwd } : { sessionId: options.sessionId },
   )
 
-  const { built, settled } = invokeAi(
-    options.sessionId,
-    options.retries,
-    () => buildRun({ ...options, token }),
-  )
+  const build = async (): Promise<AiRun> => {
+    // 生成は AI を起動する前、材料の組み立ての中で済ませる（上の docblock）
+    if (kind === 'steering') await generateProject(options.cwd)
+    return buildRun({ ...options, token })
+  }
+
+  const { built, settled } = invokeAi(options.sessionId, options.retries, build)
 
   // 削除は settled の1本に集約する（fix-idle-stuck-on-run-build-failure design.md
   // 「接続の担保」）。起動単位の提出記録（steering）も同じ寿命で捨てる——次の起動が

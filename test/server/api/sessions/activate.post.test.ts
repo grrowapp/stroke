@@ -102,7 +102,7 @@ describe('U15 POST /api/sessions/:id/activate', () => {
    * `error` に倒れた（実機 2026-09-04）。完成したかは呼び手が決める。
    */
   it('成果物の有無を見ない。`.spec-workflow/` が1つも無い approved でも受理する', async () => {
-    // 対象のディレクトリは在るが中は空（本家 MCP がまだ接続していない状態）
+    // 対象のディレクトリは在るが中は空（生成の依頼がまだ本家に受理されていない状態）
     const response = await activateHandler(fakeEvent(NAME, undefined) as never);
 
     expect((response as Response).status).toBe(204);

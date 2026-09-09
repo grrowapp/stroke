@@ -20,8 +20,10 @@
  *
  * - `stroke`: ストロークの往復。`--session-id` （初回）か `--resume`（継続）に
  *   会話 id（uuid）が載る
- * - `steering`: 承認後の steering。cwd は `--mcp-config` の本家 MCP エントリ
- *   （`npx @pimzino/spec-workflow-mcp@latest <cwd>`）に、初回・継続を問わず必ず載る。
+ * - `steering`: 承認後の steering。cwd は `--mcp-config` の自前 MCP エントリのヘッダ
+ *   `x-stroke-cwd` に、初回・継続を問わず必ず載る（サーバーはこのヘッダを読まない。
+ *   後始末の照合のためだけに argv へ残している。かつては本家 MCP エントリの `npx` 引数に
+ *   載っていたが、その配線は外した——update-project-generation-via-upstream-rest design D4）。
  *   `runId`（`state.json` の継続先）は継続時だけ `--resume` に載るが、**一覧
  *   （U12 `/api/strokes`）の応答からは手に入らない**（`SessionSummary` は runId を
  *   持たない）——ファイルを直接読まない制約の下で照合の手がかりに
@@ -38,6 +40,6 @@ export function matchesTarget(argv: string, target: ReapTarget): boolean {
     return argv.includes(`--session-id ${target.sessionId}`) || argv.includes(`--resume ${target.sessionId}`)
   }
   if (target.runId !== undefined && argv.includes(`--resume ${target.runId}`)) return true
-  // cwd は `--mcp-config` の npx args（JSON の文字列要素）にそのまま載る。
+  // cwd は `--mcp-config` の自前 MCP エントリのヘッダ（JSON の文字列値）にそのまま載る。
   return argv.includes(JSON.stringify(target.cwd))
 }

@@ -8,16 +8,10 @@ export const MCP_SERVER_NAME = 'stroke-board'
 /** `--allowedTools` に書く、自前 MCP サーバーのツール一式を指す名前。 */
 export const MCP_SERVER_ALLOWED_TOOL = `mcp__${MCP_SERVER_NAME}`
 
-/**
- * 本家 spec-workflow の MCP サーバーの名前。steering 工程の `--mcp-config` に並ぶ
- * （`server/utils/stroke/invoke.ts` の `mcpConfigFor`、ADR-0011）。
- *
- * `--allowedTools` に足す対応する定数は無い。**配線はするが許可はしない**
- * （adr0016-sub-fix-upstream-mcp-allowance design.md D1）——本家 MCP を起こす目的は
- * 起動時の登録簿への自己登録だけで、ツール呼び出しは1つも要らない。呼ばせない責務は
- * `get-steering-guide` の案内が負う。
- */
-export const UPSTREAM_MCP_SERVER_NAME = 'specworkflow'
+// 本家 spec-workflow の MCP はどの工程にも配線しない。かつて steering 工程の `--mcp-config` に
+// 並べていたが、その目的は起動時の登録簿への自己登録（＝AI の起動に乗せたプロジェクトの生成）
+// だけだった。生成は P2（`POST /api/projects`）が本家 REST へ依頼するものになり、配線ごと
+// 外した（update-project-generation-via-upstream-rest design D3）。
 
 const ALLOWED_TOOLS_FLAG = '--allowedTools'
 
@@ -51,9 +45,8 @@ export function withMcpToolsAllowed(
   tools: readonly string[] = [MCP_SERVER_ALLOWED_TOOL],
 ): string[] {
   // 足す名前は複数取れる形のまま残す。ただし呼び出し側が足してよいのは自前 MCP サーバー
-  // （`stroke-board`）のツールだけである。同じ起動に配線する第三者の MCP（本家
-  // spec-workflow）のツールは足さない——配線と許可は別で、配線の目的（起動時の登録簿への
-  // 自己登録）は許可なしで果たされる（adr0016-sub-fix-upstream-mcp-allowance design.md D1）。
+  // （`stroke-board`）のツールだけである。第三者の MCP のツールは足さない
+  // （adr0016-sub-fix-upstream-mcp-allowance design.md D1）。
   const merge = (base: string): string => tools.reduce(
     (current, tool) => (current.split(/\s+/).includes(tool)
       ? current

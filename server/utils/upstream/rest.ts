@@ -1,18 +1,21 @@
 /**
  * 本家 REST のクライアント。
  *
- * **書き込みは決めた3つだけ**に限る。
+ * **書き込みは決めた4つだけ**に限る。
  *
  * - 承認への応答（`POST /approvals/:id/:action`） — `respondToApproval`
  * - 仕様書の文書の保存（`PUT /specs/:name/:document`） — `saveSpecDocument`
  * - ステアリング文書の保存（`PUT /steering/:name`） — `saveSteeringDocument`
+ * - プロジェクトの登録（`POST /api/projects/add`） — `registerProject`
+ *   （update-project-generation-via-upstream-rest。生成の endpoint P2 だけが呼ぶ）
  *
- * 本家にはタスクの状態更新やプロジェクトの登録と解除も実在するが、呼べる関数を置かない。
- * 呼べる関数が無ければ上位から誤って呼ばれない。「3つだけ」は目視では守れないので、
+ * 本家にはタスクの状態更新や登録の解除も実在するが、呼べる関数を置かない。
+ * 呼べる関数が無ければ上位から誤って呼ばれない。「4つだけ」は目視では守れないので、
  * `test/server/utils/upstream/read-only.test.ts` が機械的に固定している。
  *
- * この3つを通す理由は、書き込むのが stroke-board ではなく本家だからである。ファイルに
- * 触るのは本家（承認は `approvalStorage`、保存は本家の PUT ハンドラ）で、こちらは本家に
+ * この4つを通す理由は、書き込むのが stroke-board ではなく本家だからである。ファイルに
+ * 触るのは本家（承認は `approvalStorage`、保存は本家の PUT ハンドラ、登録で
+ * `.spec-workflow/approvals/` を作るのも本家の `ApprovalStorage.start()`）で、こちらは本家に
  * 依頼するだけなので、「`.spec-workflow/` に書き込む主体を二重に作らない」（ADR-0005）は
  * 保たれる。
  *
@@ -34,12 +37,14 @@ import {
   documentContentSchema,
   projectInfoSchema,
   projectListEntrySchema,
+  projectRegistrationSchema,
   specDataSchema,
   specDocumentsSchema,
   taskProgressSchema,
   type ApprovalRequest,
   type ProjectInfo,
   type ProjectListEntry,
+  type ProjectRegistration,
   type SpecData,
   type SpecDocumentName,
   type SpecDocuments,
@@ -187,6 +192,44 @@ export class UpstreamRestClient {
     }
 
     return { ok: true, value: null };
+  }
+
+  /**
+   * `POST /api/projects/add` — プロジェクトを本家に登録する（生成。specs/api/project/generate）。
+   *
+   * 本家は `projectPath` を自分の規則で解決してから登録簿へ書き、watcher を起こす
+   * （`.spec-workflow/approvals/` はこのとき本家が作る）。登録済みのパスには同じ
+   * `projectId` を返すので、重ねて依頼してよい。登録に使う PID は dashboard 自身のもので、
+   * dashboard を再起動すると消える（本家 2.2.5 `addProjectByPath`）。
+   *
+   * 応答 `{ projectId, success }` は形を検証する。2xx でも `projectId` を持たなければ
+   * `malformed`——取得（`read`）と同じ扱い。
+   */
+  async registerProject(projectPath: string): Promise<UpstreamResult<ProjectRegistration>> {
+    const path = '/api/projects/add';
+
+    if (this.baseUrl === null) {
+      return { ok: false, failure: { kind: 'not-configured' } };
+    }
+
+    let raw: unknown;
+    try {
+      raw = await ofetch(path, {
+        baseURL: this.baseUrl,
+        method: 'POST',
+        body: { projectPath },
+        retry: 0,
+      });
+    } catch (error) {
+      return { ok: false, failure: toFailure(path, error) };
+    }
+
+    const parsed = projectRegistrationSchema.safeParse(raw);
+    if (!parsed.success) {
+      return { ok: false, failure: { kind: 'malformed', path, reason: parsed.error.message } };
+    }
+
+    return { ok: true, value: parsed.data };
   }
 
   /**

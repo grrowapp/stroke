@@ -37,8 +37,8 @@ export type PendingApprovalCounts = ReadonlyMap<string, number>;
  *
  * **走査は母集合を作るだけで、行が生成中か完了かは決めない。** それは昇格の記録
  * （`promoted`）の phase が決める——`approved` は生成中、`activated` は完了。走査に出ている
- * （`.spec-workflow/` が在る）ことを完了の根拠にしない。そのディレクトリは本家 MCP が接続した
- * 瞬間にでき、成果物が1つも無いうちからできている（specs/project/generation・
+ * （`.spec-workflow/` が在る）ことを完了の根拠にしない。そのディレクトリは生成（P2）の依頼を
+ * 本家が受理したときにでき、AI が起動する前、成果物が1つも無いうちからできている（specs/project/generation・
  * add-activated-phase design D8）。
  *
  * 昇格したプロジェクトは走査と**ディレクトリ名**で突き合わせる。承認した直後は

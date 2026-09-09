@@ -62,14 +62,9 @@ server/mcp/tools/                                      MCP ツール8本（フ�
    `NUXT_CLAUDE_API_BASE_URL` も効く。**コードが読まないだけで、値は差し替えられる**
 2. **子プロセスは親の環境を丸ごと継ぐ。** `server/utils/stroke/claude.ts` が
    `env: { ...process.env, STROKE_BASEURL: … }` で spawn する
-3. **steering 工程はポータル側の設定を2つ使う。** `--mcp-config` に載せる
-   `SPEC_WORKFLOW_HOME`（`specWorkflowHome`）と、本家 REST の宛先
-   `upstreamBaseUrl`（`server/utils/mcp/upstream-fetch.ts`）である。**どちらもずらすと
-   steering 工程が成立しない**——前者は本家 MCP が登録簿を書く場所とポータルが読む場所を
-   割り、後者は代行先そのものを失う
-
-`specWorkflowHome` をポータル側と共有しているのは、**書き手と読み手が同じ1つを見ることが
-目的**だからである。ここで別の解決規則を書くと、また割れる。
+3. **steering 工程はポータル側の設定 `upstreamBaseUrl` を使う。** 生成（`POST /api/projects`）の
+   依頼先であり、本家 REST の代行先（`server/utils/mcp/upstream-fetch.ts`）でもある。ずらすと
+   起動の材料を組み立てられず、steering 工程が成立しない
 
 セッション作成（`server/utils/stroke/session-core.ts`）は「ディレクトリ作成 → `openspec init --tools none` → `config.yaml` 上書き → 状態ファイル書き込み」。**サーバは change を作らない**。
 
