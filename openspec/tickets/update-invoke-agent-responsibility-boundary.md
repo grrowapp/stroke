@@ -2,7 +2,7 @@
 origin: user
 date: 2026-09-09
 change: update-invoke-agent-responsibility-boundary
-status: Doing
+status: Wait-for-archive
 tags:
   - proposal
   - specs
