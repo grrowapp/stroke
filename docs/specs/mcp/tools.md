@@ -23,7 +23,7 @@ stroke-board 自身が提供する MCP サーバー（route `/mcp`、Streamable 
 |---|---|---|
 | `get-guide` | flontier 工程の手順 | （無し。本文はツールの定数） |
 | `get-overview` | 概要の取得 | `GET /api/strokes/:id/overview` |
-| `get-strokes` | ストローク記録の取得 | `GET /api/strokes/:id/strokes` |
+| `get-strokes` | ストローク記録の取得 | `GET /api/sessions/:id/strokes` |
 | `get-send-back` | 差し戻しの取得 | `GET /api/strokes/:id/send-back` |
 | `send-question` | 問いの提出 | `POST /api/strokes/:id/question` |
 | `submit-document` | 文書の提出（種別 `flontier` / `steering`） | `POST /api/strokes/:id/proposal` / 本家 `PUT /api/projects/:projectId/steering/:name` |

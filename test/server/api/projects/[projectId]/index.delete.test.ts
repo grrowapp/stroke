@@ -16,7 +16,7 @@ import { deriveProjectId } from '../../../../../server/utils/upstream/project-id
  * add-activated-phase design D5）。
  *
  * `running.ts` と `session-store.ts` は実物のまま使う（`useRuntimeConfig` の差し替えは
- * `sessions/index.delete.test.ts` と同じ）。
+ * `sessions/[id]/index.delete.test.ts` と同じ）。
  */
 
 const config = vi.hoisted(() => ({ root: '' }));

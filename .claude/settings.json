@@ -9,7 +9,7 @@
       "Read(/.claude/**)",
       "Edit(//opt/projects/stroke-board/openspec/**)",
       "Bash(npx -y mdts --port 8522 *)",
-      "Bash(curl -s -X POST http://127.0.0.1*/api/strokes -H \"Content-Type: application/json\" -d '{*}')",
+      "Bash(curl -s -X POST http://127.0.0.1*/api/sessions -H \"Content-Type: application/json\" -d '{*}')",
       "mcp__specworkflow",
       "Bash(claude *)",
       "Bash(* claude *)",

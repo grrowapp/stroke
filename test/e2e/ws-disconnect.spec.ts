@@ -35,7 +35,7 @@ const QUESTION = {
 };
 
 async function startSession(request: APIRequestContext): Promise<string> {
-  const response = await request.post('/api/strokes', {
+  const response = await request.post('/api/sessions', {
     data: { overview: 'E2E: 切断でサーバーが止まらないことを確かめる' },
   });
   expect(response.ok(), await response.text()).toBeTruthy();
@@ -67,7 +67,7 @@ async function submitProposal(request: APIRequestContext, sessionId: string): Pr
 function connectThenVanish(sessionId: string, channel: 'question' | 'proposal'): Promise<void> {
   return new Promise((resolve) => {
     const socket = new WebSocket(
-      `ws://127.0.0.1:${APP_PORT}/api/strokes/${sessionId}/ws/${channel}`,
+      `ws://127.0.0.1:${APP_PORT}/api/sessions/${sessionId}/ws/${channel}`,
     );
 
     const finish = (): void => {

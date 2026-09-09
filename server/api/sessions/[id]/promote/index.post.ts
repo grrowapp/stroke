@@ -30,17 +30,17 @@ function isNameConflict(error: unknown): boolean {
 
 /**
  * 名前の衝突で昇格できなかったセッションの判断を取り下げる。取り消すのは判断だけで、
- * `phase` は `proposed` のまま動かない（U10 の取り下げ `approve.delete.ts` と同じ）。
+ * `phase` は `proposed` のまま動かない（U10 の取り下げ `approve/index.delete.ts` と同じ）。
  *
  * **消すのは `conflictedName` を持つ判断だけである。** 冒頭で読んだ状態は占有を取る前の
  * もので、そこから衝突の検出までの間に判断は入れ替わりうる——承認（U10）は busy ガードの
- * 対象外であり（`approve.post.ts`「busy ガードは U7・U9 のみ」）、昇格の占有も U10 を
+ * 対象外であり（`approve/index.post.ts`「busy ガードは U7・U9 のみ」）、昇格の占有も U10 を
  * 止めない。別の名前の判断（画面が既に下し直したもの）はこの 409 の理由になっていない
  * ——その名前は `assertNameAvailable` で確かめていないので、消す根拠が無い。判断が既に
- * 消えていた場合も何もしない（`approve.delete.ts`「判断が無ければ何も変えない」と同じ）。
+ * 消えていた場合も何もしない（`approve/index.delete.ts`「判断が無ければ何も変えない」と同じ）。
  *
  * **`withStateLock` が排他するのは lock を取る書き手だけである**（`writeInvocation`・
- * `activate.post.ts`・`invoke.ts`）。U10 は lock を取らないので直列化されない——上の名前の
+ * `activate/index.post.ts`・`invoke.ts`）。U10 は lock を取らないので直列化されない——上の名前の
  * 照合が要るのはそのためで、lock はそれに加えて `state.json` の read-modify-write をこの
  * repo の既定の形に揃える。**読み直しと書き込みの間に U10 が挟まる窓は原理上残る**（閉じる
  * には U10 側にも lock が要る。この change の範囲外）。

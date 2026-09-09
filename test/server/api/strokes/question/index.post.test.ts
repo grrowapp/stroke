@@ -4,7 +4,14 @@ import { fakeEvent, stubNitroGlobals, type FakeEvent } from '../../support';
 
 /**
  * 対象は `server/api/strokes/[id]/question/index.post.ts`（A5）。テストの位置はソースの構造を
- * 写すが、`[id]` の段は挟まない——現行のテストがそう置かれているのに倣っている。
+ * 写すが、**Endpoint 名のディレクトリを持つものは `[id]` の段を挟まない。**
+ *
+ * `[id]` の段を書くのは、名前空間の直下の handler（`<namespace>/index.<method>.ts`）と
+ * `[id]` の直下の handler（`<namespace>/[id]/index.<method>.ts`）を区別する必要があるとき
+ * だけである——`sessions/[id]/index.delete.test.ts` と
+ * `projects/[projectId]/index.delete.test.ts` がその形。Endpoint 名のディレクトリ
+ * （`question/`・`answer/` …）はその名前で区別が付くので要らない
+ * （`fix-session-api-namespace` design「テストの移動」）。
  *
  * **かつてここには「vitest の `include` は glob なので `[id]` は文字クラスとして解釈され、
  * そこに置いたテストは1本も拾われない」と書いてあったが、現在の設定では成り立たない。**
@@ -12,8 +19,6 @@ import { fakeEvent, stubNitroGlobals, type FakeEvent } from '../../support';
  * ファイル path にしかないため文字クラスにならない。実際
  * `test/server/api/projects/[projectId]/index.delete.test.ts` は収集されて通る
  * （`fix-session-api-layout` で実測）。
- * `[id]` の段を足すかどうかは、`strokes/**` を `sessions/**` へ動かす
- * `fix-session-api-namespace`（Gitea #17）が決める。
  */
 
 // ステータスの観測点。理由は `../../support.ts` の `stubNitroGlobals` に書いてある

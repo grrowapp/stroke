@@ -20,7 +20,7 @@ function statusOf(error: unknown): number | undefined {
 }
 
 const { data: status, error: loadError } = await useFetch<SessionStatus>(
-  `/api/strokes/${sessionId}`,
+  `/api/sessions/${sessionId}`,
   { key: `status:${sessionId}` },
 )
 
@@ -36,7 +36,7 @@ if (status.value && status.value.phase !== 'stroking') {
   await navigateTo(`/strokes/${sessionId}/proposal`)
 }
 
-const { data: strokesData } = await useFetch<{ strokes: Stroke[] }>(`/api/strokes/${sessionId}/strokes`, {
+const { data: strokesData } = await useFetch<{ strokes: Stroke[] }>(`/api/sessions/${sessionId}/strokes`, {
   key: `strokes:${sessionId}`,
 })
 const strokes = ref<Stroke[]>(strokesData.value?.strokes ?? [])
@@ -92,7 +92,7 @@ watch(
   () => waitingRetry.waiting.value,
   async (isWaiting, wasWaiting) => {
     if (!wasWaiting || isWaiting || waitingRetry.failed.value || waitingRetry.errored.value) return
-    const current = await $fetch<{ phase: Phase }>(`/api/strokes/${sessionId}`)
+    const current = await $fetch<{ phase: Phase }>(`/api/sessions/${sessionId}`)
     if (current.phase !== 'stroking') {
       await navigateTo(`/strokes/${sessionId}/proposal`)
     }
@@ -104,7 +104,7 @@ async function answer(given: Answer) {
   if (waitingRetry.waiting.value || !asked) return
   errorMessage.value = ''
   try {
-    await $fetch(`/api/strokes/${sessionId}/answer`, { method: 'POST', body: given })
+    await $fetch(`/api/sessions/${sessionId}/answer`, { method: 'POST', body: given })
   } catch {
     errorMessage.value = '送信に失敗しました。もう一度送ってください。'
     return

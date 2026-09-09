@@ -25,7 +25,7 @@
  *   後始末の照合のためだけに argv へ残している。かつては本家 MCP エントリの `npx` 引数に
  *   載っていたが、その配線は外した——update-project-generation-via-upstream-rest design D4）。
  *   `runId`（`state.json` の継続先）は継続時だけ `--resume` に載るが、**一覧
- *   （U12 `/api/strokes`）の応答からは手に入らない**（`SessionSummary` は runId を
+ *   （U12 `/api/sessions`）の応答からは手に入らない**（`SessionSummary` は runId を
  *   持たない）——ファイルを直接読まない制約の下で照合の手がかりに
  *   できるのは cwd だけなので、`runId` は任意入力として残しつつ実際の照合は cwd に
  *   拠る

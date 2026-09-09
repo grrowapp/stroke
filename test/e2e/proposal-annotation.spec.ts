@@ -23,7 +23,7 @@ const PROPOSAL_BODY = [
 ].join('\n');
 
 async function startSession(request: APIRequestContext): Promise<string> {
-  const response = await request.post('/api/strokes', {
+  const response = await request.post('/api/sessions', {
     data: { overview: 'E2E: proposal 確認画面の面と指摘を確かめる' },
   });
   expect(response.ok(), await response.text()).toBeTruthy();

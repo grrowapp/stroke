@@ -74,8 +74,8 @@ export function useProposalReview(
 ) {
   const a = useAnnotations()
 
-  /** このセッションの API。`/api/<uuid>` */
-  const base = computed(() => `/api/strokes/${toValue(sessionId)}`)
+  /** このセッションの API。`/api/sessions/<uuid>` */
+  const base = computed(() => `/api/sessions/${toValue(sessionId)}`)
 
   const phase = ref<Phase>(initial.phase)
   const strokes = ref<Stroke[]>(initial.strokes)
@@ -487,7 +487,7 @@ export function useProposalReview(
 
   /** 段3の実体。失敗は起動の段に留め、昇格の結果にも画面の流れにも影響させない。 */
   async function kickSteering(name: string): Promise<void> {
-    const target = `/api/strokes/${encodeURIComponent(name)}`
+    const target = `/api/sessions/${encodeURIComponent(name)}`
     try {
       const status = await $fetch<SessionStatus>(target)
       await $fetch(`${target}/invoke-agent`, { query: { cwd: status.path } })

@@ -3,8 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeEvent, stubNitroGlobals, type FakeEvent } from '../../support';
 
 /**
- * 対象は `server/api/strokes/[id]/invoke-agent/index.get.ts`（U13）。テストの位置はソースの
- * 構造を写すが、`[id]` の段は挟まない（`question/index.post.test.ts` の注記と同じ事情）。
+ * 対象は `server/api/sessions/[id]/invoke-agent/index.get.ts`（U13）。テストの位置はソースの
+ * 構造を写すが、`[id]` の段は挟まない（`test/server/api/strokes/question/index.post.test.ts` の注記と同じ事情）。
  *
  * 見るのは fix-idle-stuck-on-run-build-failure の3点。
  *
@@ -51,7 +51,7 @@ function eventWithQuery(id: string, query: Record<string, string> = {}): QueryEv
 
 vi.stubGlobal('getQuery', (event: QueryEvent) => event.query);
 
-const { default: invokeAgentHandler } = await import('../../../../../server/api/strokes/[id]/invoke-agent/index.get');
+const { default: invokeAgentHandler } = await import('../../../../../server/api/sessions/[id]/invoke-agent/index.get');
 const { missingPrerequisites } = await import('../../../../../server/utils/readiness');
 const { readState } = await import('../../../../../server/utils/stroke/session-store');
 
@@ -63,7 +63,7 @@ function kickResult(built: Promise<void>, settled: Promise<void>): { built: Prom
   return { built, settled };
 }
 
-describe('U13 GET /api/strokes/:id/invoke-agent', () => {
+describe('U13 GET /api/sessions/:id/invoke-agent', () => {
   beforeEach(() => {
     missingPrerequisitesMock.mockClear();
     missingPrerequisitesMock.mockResolvedValue([]);

@@ -44,14 +44,14 @@ test.describe('承認して一覧へ戻る', () => {
    * 昇格の前なら取り下げられる。画面の承認（次のテスト）はこの3段を順に踏む。
    */
   test('承認の判断だけではプロジェクトにならず、昇格の前なら取り下げられる', async ({ request }) => {
-    const approve = `/api/strokes/${SEEDED_SESSION_ID}/approve`;
+    const approve = `/api/sessions/${SEEDED_SESSION_ID}/approve`;
 
     // 段1: 判断を記録する。ディレクトリは改名されず、phase も動かない
     const decided = await request.post(approve, { data: { projectName: SEEDED_PROJECT_NAME } });
     expect(decided.status()).toBe(204);
     expect(existsSync(join(PROJECTS_PARENT, SEEDED_SESSION_ID))).toBe(true);
     expect(existsSync(join(PROJECTS_PARENT, SEEDED_PROJECT_NAME))).toBe(false);
-    const status = (await (await request.get(`/api/strokes/${SEEDED_SESSION_ID}`)).json()) as { phase: string };
+    const status = (await (await request.get(`/api/sessions/${SEEDED_SESSION_ID}`)).json()) as { phase: string };
     expect(status.phase).toBe('proposed');
 
     // プロジェクト一覧には生成中としても現れない
@@ -72,7 +72,7 @@ test.describe('承認して一覧へ戻る', () => {
     expect(existsSync(join(PROJECTS_PARENT, SEEDED_SESSION_ID, 'strokes.json'))).toBe(true);
 
     // 判断が無ければ昇格は受理されない。承認が唯一の引き金
-    const refused = await request.post(`/api/strokes/${SEEDED_SESSION_ID}/promote`);
+    const refused = await request.post(`/api/sessions/${SEEDED_SESSION_ID}/promote`);
     expect(refused.status()).toBe(409);
     expect(existsSync(join(PROJECTS_PARENT, SEEDED_PROJECT_NAME))).toBe(false);
 
@@ -160,7 +160,7 @@ test.describe('承認して一覧へ戻る', () => {
    */
   test('本家が登録を受け付けなければ起動は 503 で止まり、登録は増えない', async ({ request }) => {
     const { stub } = await import('./support');
-    const target = `/api/strokes/${SEEDED_PROJECT_NAME}`;
+    const target = `/api/sessions/${SEEDED_PROJECT_NAME}`;
     const cwd = join(PROJECTS_PARENT, SEEDED_PROJECT_NAME);
 
     type Status = { invocation: string };

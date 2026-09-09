@@ -169,7 +169,7 @@ store（`openspec store register`）への登録は**不要**。
 
 ### セッションを畳む
 
-- サーバが動いているとき: `GET /api/strokes` で一覧、`POST /api/strokes/<uuid>/delete` で削除
+- サーバが動いているとき: `GET /api/sessions` で一覧、`DELETE /api/sessions/<uuid>` で削除
 - サーバが動いていないとき:
 
 ```bash

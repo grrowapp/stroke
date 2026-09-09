@@ -55,7 +55,7 @@ function isBusyRefusal(status: number, body: string): boolean {
  * 導出がずれたということで、それを緑で隠さない。
  */
 async function deleteProjectWhenSettled(request: APIRequestContext, name: string): Promise<ProjectCleanup> {
-  const existing = await request.get(`/api/strokes/${encodeURIComponent(name)}`);
+  const existing = await request.get(`/api/sessions/${encodeURIComponent(name)}`);
   if (existing.status() === 404) return { kind: 'done' };
   if (!existing.ok()) {
     return { kind: 'refused', detail: `状態を読めない: ${existing.status()} ${await existing.text()}` };
@@ -84,7 +84,7 @@ async function deleteProjectWhenSettled(request: APIRequestContext, name: string
 }
 
 async function startSession(request: APIRequestContext): Promise<string> {
-  const response = await request.post('/api/strokes', {
+  const response = await request.post('/api/sessions', {
     data: { overview: 'E2E: 受理した proposal が残ることを確かめる' },
   });
   expect(response.ok(), await response.text()).toBeTruthy();
@@ -200,7 +200,7 @@ test.describe('受理した proposal は残る', () => {
     expect(response.ok(), '残せないのに受理された').toBeFalsy();
 
     // phase は進まない。進むと画面2 へ移ってしまい、本文の無いまま承認へ進める
-    const state = (await (await request.get(`/api/strokes/${sessionId}`)).json()) as {
+    const state = (await (await request.get(`/api/sessions/${sessionId}`)).json()) as {
       phase: string;
     };
     expect(state.phase).toBe('stroking');
