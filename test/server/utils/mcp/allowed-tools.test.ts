@@ -9,12 +9,12 @@ import {
 } from '../../../../server/utils/mcp/allowed-tools';
 
 /**
- * steering 工程の許可（`STEERING_ALLOWED_TOOLS`）。本家 MCP を配線しても許可に載せるのは
- * `approvals` の1本だけで、flontier 工程の既定（自前 MCP サーバーのみ）は変わらない
+ * steering 工程の許可（`STEERING_ALLOWED_TOOLS`）。自前 MCP サーバーの一式と本家 MCP の
+ * `approvals` を持ち、flontier 工程の既定（自前 MCP サーバーの一式）は変わらない
  * （`docs/specs/core/settings-reference.md`「`--allowedTools`」）。
  */
 describe('STEERING_ALLOWED_TOOLS', () => {
-  it('本家 MCP の許可は approvals の1本だけで、サーバー名と揃っている', () => {
+  it('本家 MCP の許可は approvals で、サーバー名と揃っている', () => {
     expect(UPSTREAM_APPROVALS_ALLOWED_TOOL).toBe(`mcp__${UPSTREAM_MCP_SERVER_NAME}__approvals`);
     expect(STEERING_ALLOWED_TOOLS).toEqual([MCP_SERVER_ALLOWED_TOOL, UPSTREAM_APPROVALS_ALLOWED_TOOL]);
     expect(STEERING_ALLOWED_TOOLS.filter(tool => tool.startsWith(`mcp__${UPSTREAM_MCP_SERVER_NAME}`))).toHaveLength(1);

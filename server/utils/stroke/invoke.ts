@@ -424,9 +424,9 @@ function mcpToolConfigFor(token: string, apiBaseUrl: string, cwd: string): strin
  * `--mcp-config` は JSON 文字列を直接受け取れる（実機確認済み・provide-operations-via-mcp
  * design D7）。
  *
- * **本家 MCP を並べる目的は承認依頼を出すことだけである。** 本家 REST に承認依頼を作る
- * route は無く、作れるのは本家 MCP の `approvals` ツールだけなので、steering 工程にだけ
- * 並べ、許可もそのツールに限る（`STEERING_ALLOWED_TOOLS`。docs/specs/mcp/contract.md
+ * **本家 MCP を並べる目的は承認依頼を出すことである。** 本家 REST に承認依頼を作る
+ * route は無く、作れるのは本家 MCP の `approvals` ツールなので、steering 工程に並べて
+ * そのツールを許可する（`STEERING_ALLOWED_TOOLS`。docs/specs/mcp/contract.md
  * 「本家 spec-workflow の MCP との関係」）。
  *
  * 本家 MCP は起動時に登録簿へ自己登録するが、`kick` が P2（`POST /api/projects`）で生成を

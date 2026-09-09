@@ -32,7 +32,7 @@ MCP ツールは特定の工程（flontier / steering）の中でだけ存在す
 
 ## 本家 spec-workflow の MCP との関係
 
-steering 工程には、stroke-board の MCP サーバーに加えて**本家 spec-workflow の MCP を `approvals` ツールに限って配線する**。steering 文書の承認依頼を作る手段が本家 REST に無く、作成は本家 MCP の `approvals`（`action: request`）だけであるためで、それ以外の本家のツールは許可しない。flontier 工程には配線しない。
+steering 工程には、stroke-board の MCP サーバーに加えて**本家 spec-workflow の MCP を配線し、承認依頼のツール `approvals` を許可する**。steering 文書の承認依頼を作る手段が本家 REST に無く、作成は本家 MCP の `approvals`（`action: request`）で行うためである。
 
 本家のツールは stroke-board のこの契約の外にある。結果の形（平坦な `status` / `errorCode` / `error`）を揃えず、stroke-board のツールとして数えない。工程の手順（`get-steering-guide`）が承認依頼の出し方を案内する。
 

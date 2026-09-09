@@ -87,7 +87,7 @@ stroke-board 自身が提供する MCP サーバー（route `/mcp`、Streamable 
 
 全部を見せてツール側で工程を判定して拒否する形は採らない。呼べないものが一覧に出ていれば呼び手は呼ぶし、判別できるのは失敗した後になる（実測: 絞る前は `get-steering` が 51 回中 48 回失敗していた）。
 
-steering 工程には、この一覧の外に**本家 spec-workflow の MCP が `approvals` ツールに限って配線される**（[contract.md](./contract.md)「本家 spec-workflow の MCP との関係」）。stroke-board のツールではないので上の表には載せず、結果の形も揃えない。
+steering 工程には、この一覧の外に**本家 spec-workflow の MCP が配線され、承認依頼のツール `approvals` が使える**（[contract.md](./contract.md)「本家 spec-workflow の MCP との関係」）。stroke-board のツールではないので上の表には載せず、結果の形も揃えない。
 
 ## 接続の担保
 

@@ -274,7 +274,7 @@ describe('buildRun の --mcp-config', () => {
     expect(exposedToolsOf('steering')).toContain('submit-document');
   });
 
-  it('steering 工程は --allowedTools に自前 MCP と本家の approvals だけを載せる', () => {
+  it('steering 工程は --allowedTools に自前 MCP と本家の approvals を載せる', () => {
     const run = buildRun({
       sessionId: 'session-1',
       cwd: '/tmp/share/session-1',
@@ -282,12 +282,12 @@ describe('buildRun の --mcp-config', () => {
       retries: 0,
       token: 'token-1',
     });
-    // 肯定で見る。フラグが1本だけ在り、許可は自前ツール一式と本家の `approvals` の2つだけ
+    // 肯定で見る。フラグが1本だけ在り、許可は自前ツール一式と本家の `approvals`
     expect(run.launch.args.filter(arg => arg === '--allowedTools')).toHaveLength(1);
     expect(allowedToolsOf('steering')).toEqual(['mcp__stroke-board', UPSTREAM_APPROVALS_ALLOWED_TOOL]);
   });
 
-  it('flontier 工程には本家 MCP を許可しない（配ってもいない）', () => {
+  it('flontier 工程の --allowedTools は自前 MCP の一式である', () => {
     // 肯定で見る。許可は自前ツール一式だけで、`STEERING_ALLOWED_TOOLS` が flontier 側へ
     // 渡っていれば `mcp__specworkflow__approvals` が並んでここが落ちる。`not.toContain` では
     // 要素の完全一致でしか比べず、実際の要素名（`__approvals` 付き）を見逃す

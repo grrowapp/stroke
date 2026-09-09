@@ -163,7 +163,7 @@ AI へ渡す定型。**手順の本文をここに書かない。** 手順は MC
 
 **`Read` は残してある。** steering 工程には文脈を取る MCP ツールが無く（公開は `get-steering-guide` / `get-steering` / `submit-document` の3本）、同じ実測で `Read` は5回使われていた。読み取りの手段を MCP ツールへ寄せる作業は未着手で、**道具を用意する前に `Read` を外すと steering が成立しない。**
 
-**本家 spec-workflow の MCP は steering 工程にだけ配線し、許可するのは承認依頼のツール `mcp__specworkflow__approvals` だけとする。** ストローク（flontier）工程の `--mcp-config` に並ぶのは自前 MCP（`stroke-board`）だけである。steering 工程は自前 MCP に加えて本家 MCP（stdio。`@pimzino/spec-workflow-mcp` を cwd＝昇格先プロジェクトで起動し、env に `SPEC_WORKFLOW_HOME`＝ポータル側の `specWorkflowHome` を渡す。起動定義の実体は `server/utils/stroke/invoke.ts`）を並べる。本家 MCP を配線する目的は**承認依頼を出すことだけ**である——本家 REST に承認依頼を作る route は無く、作れるのは本家 MCP の `approvals` ツールだけで、steering 工程は3本の文書それぞれに承認依頼を出して終わる（`docs/specs/architecture/invoke-agent.md`「作業が行われたかの判定」）。本家 MCP の他のツール（`steering-guide` / `spec-workflow-guide` / `spec-status` / `log-implementation` など）は許可しない。
+**配線している MCP。** ストローク（flontier）工程の `--mcp-config` には自前 MCP（`stroke-board`）を並べる。steering 工程には自前 MCP と本家 spec-workflow の MCP（stdio。`@pimzino/spec-workflow-mcp` を cwd＝昇格先プロジェクトで起動し、env に `SPEC_WORKFLOW_HOME`＝ポータル側の `specWorkflowHome` を渡す。起動定義の実体は `server/utils/stroke/invoke.ts`）を並べ、`--allowedTools` に本家の承認依頼のツール `mcp__specworkflow__approvals` を足す。本家 MCP を配線する目的は承認依頼を出すことである——本家 REST に承認依頼を作る route は無く、作れるのは本家 MCP の `approvals` ツールで、steering 工程は3本の文書それぞれに承認依頼を出して終わる（`docs/specs/architecture/invoke-agent.md`「作業が行われたかの判定」）。
 
 プロジェクトの生成は `POST /api/projects`（`docs/specs/api/projects/generate.md`）が AI の起動前に本家 REST へ依頼する。本家 MCP は起動時に登録簿へ自己登録するが、既に登録済みのパスに対しては同じ `projectId` を返すだけで、生成にはならない。**本家 MCP を配線する前に生成が済んでいること**がこの配線の前提であり、生成が受理されなければ AI は起動されない。
 

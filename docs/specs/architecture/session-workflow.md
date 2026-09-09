@@ -49,7 +49,7 @@ server/mcp/tools/                                      MCP ツール8本（フ�
 | 工程ごとの公開ツール | `server/utils/mcp/exposed-tools.ts` | `--mcp-config` の `x-mcp-tools` |
 | 作業場所 | — | cwd だけ。`--add-dir` は渡さない |
 | steering の定型 | `runtimeConfig.claude.steeringPrompt` | 承認の直後、cwd＝生成先で起動するときに渡る |
-| 本家 MCP（steering のみ） | `server/utils/stroke/invoke.ts` | steering 工程の `--mcp-config` に本家 spec-workflow の MCP を並べ、許可するツールは承認依頼（`approvals`）だけ（`docs/specs/core/settings-reference.md`「`--allowedTools`」） |
+| 本家 MCP（steering のみ） | `server/utils/stroke/invoke.ts` | steering 工程の `--mcp-config` に本家 spec-workflow の MCP を並べ、承認依頼のツール `approvals` を許可する（`docs/specs/core/settings-reference.md`「`--allowedTools`」） |
 
 ストローク側の設定を**コードが環境変数から読むことはしない**。値は `nuxt.config.ts` と
 `app/app.config.ts` に書かれたものだけで、読み出す実装は `server/utils/stroke/config.ts` の1本である。

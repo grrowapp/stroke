@@ -29,8 +29,8 @@ const REQUIRED: Array<[string, RegExp[], number]> = [
     /直接書いて/, /approvals.*status.*errorCode.*持たない/s,
   ], 560],
   ['どこで工程が終わるか', [/3本/, /承認依頼/, /承認の結果は終わりの条件に含まれない/], 80],
-  // 本家 MCP は `approvals` だけが配線されている（update-invoke-agent-responsibility-boundary design D4）
-  ['本家 MCP は `approvals` だけが配線されている', [/approvals/, /stroke-board/, /許可されておらず/, /承認依頼/], 150],
+  // 本家 MCP で使うのは `approvals`（update-invoke-agent-responsibility-boundary design D4）
+  ['本家 MCP で使うのは `approvals`', [/approvals/, /stroke-board/, /登録済み/, /承認依頼/], 150],
   ['やらないこと', [/直接読み書き/, /承認依頼を出さずに終わらない/], 50],
 ];
 /**
