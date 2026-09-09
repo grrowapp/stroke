@@ -12,8 +12,8 @@
 import { createError, defineEventHandler, getRouterParam, readBody } from 'h3';
 import { z } from 'zod';
 
-import { isSpecDocumentName } from '../../../../../utils/upstream/schema';
-import { toHttpError, upstreamClient } from '../../../../../utils/control/upstream-proxy';
+import { isSpecDocumentName } from '../../../../../../utils/upstream/schema';
+import { toHttpError, upstreamClient } from '../../../../../../utils/control/upstream-proxy';
 
 /**
  * 本家は body の `content` をファイルの中身として丸ごと書く。

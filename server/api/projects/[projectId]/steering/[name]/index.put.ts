@@ -11,8 +11,8 @@
 import { createError, defineEventHandler, getRouterParam, readBody } from 'h3';
 import { z } from 'zod';
 
-import { isSteeringDocument } from '../../../../utils/upstream/rest';
-import { toHttpError, upstreamClient } from '../../../../utils/control/upstream-proxy';
+import { isSteeringDocument } from '../../../../../utils/upstream/rest';
+import { toHttpError, upstreamClient } from '../../../../../utils/control/upstream-proxy';
 
 const bodySchema = z.object({
   content: z.string(),
