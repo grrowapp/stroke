@@ -478,3 +478,102 @@ test.describe('問いの往復', () => {
     await expect(page.getByTestId('agent-question-submit')).toBeVisible();
   });
 });
+
+/**
+ * 完全な失敗の後の導線（`docs/specs/architecture/failure.md`）。
+ *
+ * `error` はリトライ上限に達した終端で、システムは自動では何もしない。画面が示すのは
+ * 性質の異なる3つ——そのまま再実行する / 時間を置いて再開する / 最初からやり直す——で、
+ * 壊すのは最後の1つだけであり、そこには承諾が挟まる。**承諾の前には何も消えない。**
+ *
+ * `error` は実物では claude が上限まで応答しなかったときにだけ起きるので、E2E では
+ * 待機中のポーリング（U2）の応答を差し替えて作る。
+ */
+test.describe('完全な失敗の後', () => {
+  test.beforeEach(async ({ page }) => {
+    created = [];
+    await stubInvokeAgent(page);
+  });
+
+  test.afterEach(async ({ request }) => {
+    for (const sessionId of created) {
+      await request.delete(`/api/sessions/${sessionId}`).catch(() => undefined);
+    }
+    created = [];
+  });
+
+  /**
+   * 実行の記録を `error` にする（A8）。**画面からは書けない**ので、invokeAi と同じ口を
+   * テストから叩いて作る。実物で `error` になるのはリトライ上限に達したときだけで、
+   * その状態そのものは A8 が書いた値と区別が付かない。
+   */
+  async function markError(request: APIRequestContext, sessionId: string): Promise<void> {
+    const response = await request.post(`/api/strokes/${sessionId}/submission`, {
+      data: { invocation: 'error' },
+    });
+    expect(response.ok(), await response.text()).toBeTruthy();
+  }
+
+  async function reachError(page: Page, request: APIRequestContext): Promise<string> {
+    const sessionId = await startSession(request);
+    await submitQuestion(request, sessionId);
+    await markError(request, sessionId);
+
+    await page.goto(`/strokes/${sessionId}`);
+    await expect(page.getByTestId('invocation-error')).toBeVisible({ timeout: 15_000 });
+    return sessionId;
+  }
+
+  test('待機表示をやめ、性質の違う選択肢が3つ出る', async ({ page, request }) => {
+    await reachError(page, request);
+
+    // 待機のまま置き続けない。問いの面も畳む
+    await expect(page.getByTestId('agent-question-waiting')).toBeHidden();
+    await expect(page.getByTestId('agent-question')).toBeHidden();
+
+    await expect(page.getByTestId('invocation-retry')).toBeVisible();
+    await expect(page.getByTestId('invocation-leave')).toBeVisible();
+    // 壊す1つは頭の位置に、警告色で分けて出る
+    await expect(page.getByTestId('invocation-restart')).toBeVisible();
+  });
+
+  test('一覧へ戻っても対象は残り、開き直すと同じ選択肢が出る', async ({ page, request }) => {
+    const sessionId = await reachError(page, request);
+
+    await page.getByTestId('invocation-leave').click();
+    await expect(page).toHaveURL(/\/projects$/);
+
+    // 消えていない。開き直せば同じ状態から選べる
+    await page.goto(`/strokes/${sessionId}`);
+    await expect(page.getByTestId('invocation-error')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('invocation-restart')).toBeVisible();
+  });
+
+  test('最初に戻るは承諾を経る。承諾しなければ何も消えない', async ({ page, request }) => {
+    const sessionId = await reachError(page, request);
+
+    await page.getByTestId('invocation-restart').click();
+    // 何が消えるかを示す
+    await expect(page.getByTestId('invocation-restart-warning')).toBeVisible();
+
+    await page.getByTestId('invocation-restart-cancel').click();
+    await expect(page.getByTestId('invocation-restart-warning')).toBeHidden();
+
+    // セッションは残っている（U2 が 404 にならない）
+    const status = await request.get(`/api/strokes/${sessionId}`);
+    expect(status.ok(), await status.text()).toBeTruthy();
+  });
+
+  test('承諾すると削除され、概要の入力へ戻る', async ({ page, request }) => {
+    const sessionId = await reachError(page, request);
+
+    await page.getByTestId('invocation-restart').click();
+    await page.getByTestId('invocation-restart-confirm').click();
+
+    await expect(page).toHaveURL(/\/strokes$/);
+    await expect(page.getByText('作りたいシステムを書く')).toBeVisible();
+
+    const status = await request.get(`/api/strokes/${sessionId}`);
+    expect(status.status()).toBe(404);
+  });
+});
