@@ -69,7 +69,7 @@ server/mcp/tools/                                      MCP ツール8本（フ�
    先でもある。`specWorkflowHome` は steering 工程に並べる本家 MCP の env に渡る。どちらもずらすと
    steering 工程が成立しない
 
-セッション作成（`server/utils/stroke/session-core.ts`）は「ディレクトリ作成 → `openspec init --tools none` → `config.yaml` 上書き → 状態ファイル書き込み」。**サーバは change を作らない**。
+セッション作成（`server/handler/session.ts`）は「ディレクトリ作成 → `openspec init --tools none` → `config.yaml` 上書き → 状態ファイル書き込み」。**サーバは change を作らない**。
 
 ### openspec ルートの使い手
 
@@ -82,7 +82,7 @@ server/mcp/tools/                                      MCP ツール8本（フ�
 ## 畳み方
 
 - **サーバが動いているとき**: `GET /api/sessions` で一覧し、`DELETE /api/sessions/<uuid>` で消す（実行中の呼び出しを持つ間は 409）。
-- **サーバが動いていないとき**: `yarn session list` / `yarn session delete <uuid>` / `yarn session create "<概要>"`。endpoint と同じ実体（`session-core.ts`）を呼ぶ。実行中判定は `state.json` の `invocation` を材料にする。設定は `nuxt.config.ts` を直接 import して得る（Nitro の外なので `useRuntimeConfig()` は使えない）。
+- **サーバが動いていないとき**: `yarn session list` / `yarn session delete <uuid>` / `yarn session create "<概要>"`。endpoint と同じ実体（`server/handler/session.ts`）を呼ぶ。実行中判定は `state.json` の `invocation` を材料にする。設定は `nuxt.config.ts` を直接 import して得る（Nitro の外なので `useRuntimeConfig()` は使えない）。
 
 ## 実行の記録（`invocation`）
 

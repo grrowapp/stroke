@@ -178,7 +178,7 @@ yarn session delete <uuid>
 yarn session create "<概要>"
 ```
 
-どちらも同じ実体（`server/utils/stroke/session-core.ts`）を呼ぶ。手順の詳細は
+どちらも同じ実体（`server/handler/session.ts`）を呼ぶ。手順の詳細は
 `docs/specs/architecture/session-workflow.md`。
 
 ## 前提（共通）
