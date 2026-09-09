@@ -147,7 +147,7 @@ export default defineStrokeTool({
           method: 'POST',
           // 候補が無いときは項目そのものを載せない。A7 の `proposalSubmitBody` は
           // `projectName` を optional として受けるので、送らなければ既存の
-          // `state.projectName` がそのまま残る（`server/api/strokes/[id]/proposal.post.ts`）。
+          // `state.projectName` がそのまま残る（`server/handler/proposal.ts` の候補名の決定）。
           body: {
             proposal: args.document,
             ...(args.projectName === undefined ? {} : { projectName: args.projectName }),

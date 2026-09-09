@@ -965,7 +965,7 @@ async function sendBack(
 ): Promise<boolean> {
   // 着地の検知は「承認して作る」ボタンでも通る（URL を見ていない経路がある）。
   // 指摘を付ける口が出るまで待ってから触る
-  // **proposal を出した実行の終了を待ってから触る。** 受理（`proposal/index.post.ts` の publish）は
+  // **proposal を出した実行の終了を待ってから触る。** 受理（`server/handler/proposal.ts` の publish）は
   // 実行の途中で飛ぶので、画面に proposal が出た時点ではまだ動いている。ここで待たないと、
   // 続く `beginRoundWait()` の基準がその実行の終了行を含まず、`approve` の `settle` が
   // 「終わっている」と誤読して素通りする（santa-method レビュー指摘 11周目 2026-08-31）
