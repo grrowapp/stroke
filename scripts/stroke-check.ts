@@ -8,8 +8,9 @@ import { promisify } from 'node:util'
 import { chromium, type Browser, type Locator, type Page } from '@playwright/test'
 
 import nuxtConfig from '../nuxt.config'
+import { removeTarget } from '../server/handler/delete'
 import { parseStrokeConfig } from '../server/utils/stroke/config'
-import { isSafeSegment, removeSessionDir } from '../server/utils/stroke/session-core'
+import { isSafeSegment } from '../server/utils/stroke/paths'
 
 /**
  * ストロークが着地するかを、**動いている dev サーバーへブラウザで当てて**確かめる
@@ -446,7 +447,7 @@ async function run(browser: Browser, policy: Policy): Promise<{
       // **名乗られた名前を鵜呑みにしない。** `approve` は承認の応答を取り逃したときも
       // 名前を返す（`response === null` を成功として扱う）。その名前をそのまま消しに行くと、
       // 承認が名前の衝突で失敗していた場合に**他人が作った同名のプロジェクトを消す**。
-      // 消す先は phase の検査を持たない `removeSessionDir` なので、承認済みでも止まらない。
+      // 消す先は phase の検査を持たない `removeTarget` なので、承認済みでも止まらない。
       // `--cleanup` の約束（消すのはこの実行が作った1本だけ）を破る不可逆な削除になる。
       //
       // 改名が起きたことを、uuid が消えて名前のほうが在ることで確かめてから足す。
@@ -580,24 +581,26 @@ async function draftFreeAnswer(
 /**
  * この実行で作ったセッションを消す（`--cleanup`）。
  *
- * **消す実体はアプリと共有する**（`removeSessionDir`）。ここで `fse.remove` なり `rmSync` なりを
- * 独自に書くと、削除の経路が endpoint・CLI・道具の3本に増える。`session-core.ts` は
- * 「検査は core に置く。endpoint と CLI の両方がここを通るので、片方だけ守っても意味がない」
- * として判定を1箇所に集めており、道具が独自の経路を持つとその設計が崩れる。
+ * **消す実体はアプリと共有する**（`server/handler/delete.ts` の `removeTarget`）。ここで
+ * `fse.remove` なり `rmSync` なりを独自に書くと、削除の経路が endpoint・CLI・道具の3本に
+ * 増える。消す実体は1本という決めがあり（`update-session-api-handler`）、道具が独自の
+ * 経路を持つとその決めが崩れる。
  *
- * 呼ぶのは検査の無い層（`removeSessionDir`）である。本番の削除（U11・`yarn session delete`）は
- * `deleteSessionCore` を通って存在検査と phase の検査を受けるが、道具が片付けるのは自分が
- * 作ったものに限られ、承認まで進めた場合は消す対象がプロジェクトへ変わる。その判定を
- * 通す理由が無い。
+ * 通すのは存在検査までで、phase の検査は通らない。**どの局面のものを消してよいかは削除の口
+ * （endpoint）が持つ**もので、道具が片付けるのは自分が作ったものに限られ、承認まで進めた
+ * 場合は消す対象がプロジェクトへ変わる。その判定を通す理由が無い。
+ *
+ * `state.json` を持たない残骸はここでは消さない（`removeTarget` の存在検査に落ちる）。
+ * **消してよいものの定義を道具だけ緩めない。** 落ちたことは下の `catch` が告げる。
  *
  * 消せなくても実行は落とさない。片付けは検証の結果とは別の関心で、ここで落とすと
  * 合否の報告まで失う。消えなかったことは告げて、あとは人に委ねる。
  */
 async function removeSession(target: string): Promise<void> {
-  // **消す名前は必ず1階層の識別子として検査する。** `removeSessionDir` は `join` するだけで
-  // 検査を持たない（検査の無い層である、というのがそちらの役目）。空文字が混ざれば
+  // **消す名前は必ず1階層の識別子として検査する。** 空文字が混ざれば
   // `join('/opt/projects', '')` は `/opt/projects` そのものになり、`existsSync` を通って
   // 親ごと消える形になる。承認名は画面の入力値を経由してくるので、出どころを信用しない
+  // （`removeTarget` も同じ検査を通すが、その手前でこの道具の言葉で告げる）
   if (!isSafeSegment(target)) {
     console.log(`片付け: 名前として受け付けられないので消さない（${target}）`)
     return
@@ -605,17 +608,16 @@ async function removeSession(target: string): Promise<void> {
 
   const path = join(PROJECTS_ROOT, target)
 
-  // **消す前に在るかを見る。** `removeSessionDir` は無いパスでも黙って成功するので、
-  // 見ずに「消した」と出すと、片付けたつもりの取りこぼしが実行ログからも分からない。
-  // 承認の応答を取り逃したときのように、対象が2つあってどちらか一方しか実在しない
-  // 場合もある（`cleanupTargets`）
+  // **消す前に在るかを見る。** 見ずに「消した」と出すと、片付けたつもりの取りこぼしが
+  // 実行ログからも分からない。承認の応答を取り逃したときのように、対象が2つあって
+  // どちらか一方しか実在しない場合もある（`cleanupTargets`）
   if (!existsSync(path)) {
     console.log(`片付け: ${path} は無かった`)
     return
   }
 
   try {
-    await removeSessionDir(PROJECTS_ROOT, target)
+    await removeTarget(PROJECTS_ROOT, target)
     console.log(`片付け: ${path} を消した`)
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
@@ -650,7 +652,7 @@ function fallbackProjectName(): string {
  * @returns 承認で確定したプロジェクト名
  */
 async function approve(page: Page): Promise<string> {
-  // **承認そのものは busy ガードの対象である**（`approve.post.ts`。fix-rename-during-running-session
+  // **承認そのものは busy ガードの対象である**（`approve/index.post.ts`。fix-rename-during-running-session
   // で対象になった。実行中に承認すると 409 busy で断られる）。それでも実行の終わりを
   // ここで待つのは、断られてやり直すのではなく**一度で通したい**からである——待たずに
   // 投げて 409 を踏むと、この巡回スクリプトはそこで止まってしまう。承認がセッション
@@ -963,7 +965,7 @@ async function sendBack(
 ): Promise<boolean> {
   // 着地の検知は「承認して作る」ボタンでも通る（URL を見ていない経路がある）。
   // 指摘を付ける口が出るまで待ってから触る
-  // **proposal を出した実行の終了を待ってから触る。** 受理（`proposal.post.ts` の publish）は
+  // **proposal を出した実行の終了を待ってから触る。** 受理（`proposal/index.post.ts` の publish）は
   // 実行の途中で飛ぶので、画面に proposal が出た時点ではまだ動いている。ここで待たないと、
   // 続く `beginRoundWait()` の基準がその実行の終了行を含まず、`approve` の `settle` が
   // 「終わっている」と誤読して素通りする（santa-method レビュー指摘 11周目 2026-08-31）

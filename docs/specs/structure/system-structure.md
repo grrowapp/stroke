@@ -43,6 +43,7 @@ base2/
 │   └── markdown/               markdown を描く・直す・位置を出す。外から引く公開インターフェースは `#markdown` の1本
 ├── server/                     Nitro
 │   ├── api/                    契約どおり（sessions と strokes は contract.md、projects は本家仲介）。ファイルの置き方は `docs/specs/api/server.md`
+│   ├── handler/                api が呼ぶ実処理（判定は持たない）
 │   ├── plugins/                起動時処理
 │   ├── routes/                 WebSocket（ws.ts と api/sessions/:id/ws/** = 契約 W1・W2）
 │   └── utils/                  関心単位で切る（§4 に一覧）
@@ -103,7 +104,7 @@ base2/
 
 ## 4. サーバー — `server/`
 
-**api は契約が正。** ファイルの置き方（Endpoint はディレクトリ、Method は `index.<method>.ts`）は `docs/specs/api/server.md`。セッション系（`/api/sessions/**`、WS を含む）は `docs/specs/api/contract.md` の番号どおり。**エージェントが叩く endpoint は `/api/strokes/**` に分かれている**（`docs/specs/api/overview.md` の `strokes/` 5本）。プロジェクト系（`/api/projects/**`）は本家の読み取り10本と書き込み3本（承認応答・仕様書保存・ステアリング保存）で、`read-only.test.ts` が範囲を機械的に固定している。
+**api は契約が正。** ファイルの置き方（Endpoint はディレクトリ、Method は `index.<method>.ts`）は `docs/specs/api/server.md`。セッション系（`/api/sessions/**`、WS を含む）は `docs/specs/api/contract.md` の番号どおり。**エージェントが叩く endpoint は `/api/strokes/**` に分かれている**（`docs/specs/api/overview.md` の `strokes/` 5本）。プロジェクト系（`/api/projects/**`）は本家の読み取り10本と書き込み3本（承認応答・仕様書保存・ステアリング保存）で、`read-only.test.ts` が範囲を機械的に固定している。api の handler ファイルは HTTP 固有の準備（読み取り・検証・id の解決）と後始末（status・エラーの HTTP 化）だけを持ち、実処理は `handler/` を呼ぶ。どの局面を許すかの判定は api が持ち、handler は持たない。
 
 **utils は関心単位で切る。** 区分は4つ — **本家接続 / 監視・通知 / セッション / 設定・起動**。全数の対応は `server-structure.md`。
 

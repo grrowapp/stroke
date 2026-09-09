@@ -3,70 +3,37 @@ import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from 'node:
 import { join } from 'node:path'
 import fse from 'fs-extra'
 import { isPhase, type Invocation, type SessionSummary } from '#shared/stroke'
-import { OPENSPEC_CONFIG_FILE, OPENSPEC_DIR } from './openspec'
-import { sessionDir, sessionFile } from './paths'
+import { OPENSPEC_CONFIG_FILE, OPENSPEC_DIR } from '../utils/stroke/openspec'
+import { SESSION_FILES, sessionDir, sessionFile } from '../utils/stroke/paths'
+import { forgetSubmissions } from '../utils/stroke/submission-signal'
+import { removeTarget } from './delete'
 
 /**
- * セッションの作成・削除・列挙の実体。endpoint（Nitro）と script（tsx）の両方から
- * 同じこの実装を呼ぶ（design.md 決定3: 同じ規定を2つ実装しない）。
+ * セッションの作成・削除・列挙・原子的な書き込みの実行。endpoint（Nitro）と script（tsx）の
+ * 両方が同じこの実装を呼ぶ（同じ規定を2つ実装しない）。
+ *
+ * **api が呼ぶ実処理は handler と呼ぶ**（`core` / `service` / `util` と呼び分けない。
+ * ユーザー決定 2026-09-08）。このファイルは `server/utils/stroke/session-core.ts` を
+ * `update-session-api-handler` でここへ移したもので、`*Core` の名は落とした。
  *
  * Nitro に依存しない: `useRuntimeConfig` は呼ばず必要な値は引数で受け、失敗は
- * `createError` ではなく種別を持つ `SessionCoreError` で表す。HTTP のステータスへの
- * 写しは endpoint 側、終了コードへの写しは script 側の責務。
+ * `createError` ではなく種別を持つ `SessionError` で表す。HTTP のステータスへの写しは
+ * api 側（`session-store.ts` の `sessionErrorToHttp`）、終了コードへの写しは script 側の責務。
  *
  * 保存先（`root` = `projectShareRoot`）も設定から引かず第1引数で受け取る。解決するのは
  * 端だけで、endpoint 側は `session-store.ts`、CLI 側は `scripts/session.ts` が渡す
  * （docs/specs/core/settings-reference.md「設定を引くのは端だけである」）。
  */
 
-export type SessionCoreErrorKind = 'not-found' | 'io' | 'phase'
+export type SessionErrorKind = 'io'
 
-export class SessionCoreError extends Error {
+export class SessionError extends Error {
   constructor(
-    public readonly kind: SessionCoreErrorKind,
+    public readonly kind: SessionErrorKind,
     message: string,
   ) {
     super(message)
-    this.name = 'SessionCoreError'
-  }
-}
-
-/**
- * セッションディレクトリ内のファイル名。中身の書式とセットで決まるものなので、
- * 名前だけを外から差し替えられる意味がない。設定ではない
- * （docs/specs/core/settings-reference.md）。
- */
-export const SESSION_FILES = {
-  state: 'state.json',
-  strokes: 'strokes.json',
-  overview: 'overview.txt',
-  sendBack: 'send-back.json',
-} as const
-
-/** uuid の形をしているか。セッション（昇格前）の id はこの形である。 */
-export function isSessionId(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value)
-}
-
-/**
- * 保存先の直下の1つとして、ディレクトリ名にそのまま使える形か。
- *
- * 対象の id は昇格でプロジェクト名に変わるので、uuid の形では絞れない。代わりに
- * **保存先の外へ出られる形を通さない**ことだけを見る。`project.ts` の
- * `assertProjectName` と同じ線引きで、緩めれば保存先の外を読み書きできてしまう。
- */
-export function isSafeSegment(value: string): boolean {
-  return /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value) && !value.includes('..')
-}
-
-/** 対象として成立しているか。`state.json` が在ることをもって在るとする。 */
-export async function sessionExistsCore(root: string, sessionId: string): Promise<boolean> {
-  if (!isSafeSegment(sessionId)) return false
-  try {
-    const s = await stat(sessionFile(root, sessionId, SESSION_FILES.state))
-    return s.isFile()
-  } catch {
-    return false
+    this.name = 'SessionError'
   }
 }
 
@@ -78,7 +45,7 @@ export async function sessionExistsCore(root: string, sessionId: string): Promis
  * 途中で失敗したら作りかけのディレクトリごと消して失敗を返す
  * （半端なセッションを残さない・design.md 決定1）。
  */
-export async function createSessionCore(
+export async function createSession(
   root: string,
   overview: string,
   invocation: Invocation,
@@ -93,7 +60,7 @@ export async function createSessionCore(
     return sessionId
   } catch (error) {
     await fse.remove(sessionDir(root, sessionId)).catch(() => {})
-    throw new SessionCoreError(
+    throw new SessionError(
       'io',
       `セッションを作れなかった: ${error instanceof Error ? error.message : String(error)}`,
     )
@@ -101,48 +68,21 @@ export async function createSessionCore(
 }
 
 /**
- * セッションを消す。存在検査 → `fs-extra` の `remove(sessionDir)`（design.md 決定4）。
- * 存在しない id は何も消さず失敗にする（`remove` は存在しないパスで沈黙するため、検査を
- * 先に置くことで「無いものを消した」ことにしない）。
+ * セッションを消し、そのセッションの提出の記録も落とす。
+ *
+ * **消す実体は `handler/delete.ts` の1本だけである**（`removeTarget`。存在しない対象は
+ * 消したことにしない）。ここが足すのは、消えた id の提出の記録を落とすことだけ——id が
+ * 使い回されたときに前の分を数えないため。
  *
  * **phase の検査は持たない。** どの局面のものを消してよいかは、削除の口（endpoint）が
  * それぞれ決める——セッションの削除は承認より前、プロジェクトの削除は承認以降。判定を
- * ここに置くと、実行が「誰から呼ばれたか」を知ることになる。
- *
- * **この関数は CLI（`yarn session delete`）の素通しの口である。** endpoint は
- * `server/handler/delete.ts` を通し、その手前で phase を見る。CLI に同じ守りは無い——
- * 名前を直に渡せば昇格済みのプロジェクトも消える。手元の道具として、そう決めてある。
+ * ここに置くと、実行が「誰から呼ばれたか」を知ることになる。CLI（`yarn session delete`）に
+ * その守りは無く、名前を直に渡せば昇格済みのプロジェクトも消える。手元の道具として、
+ * そう決めてある。提出の記録はプロセスごとに持つので、CLI から落としても何も起きない。
  */
-export async function deleteSessionCore(root: string, sessionId: string): Promise<void> {
-  if (!(await sessionExistsCore(root, sessionId))) {
-    throw new SessionCoreError('not-found', `そのセッションは無い: ${sessionId}`)
-  }
-  await removeSessionDir(root, sessionId)
-}
-
-/**
- * ディレクトリを消すだけの層。**検査は一切しない。**
- *
- * `deleteSessionCore` から実体を切り出したもので、本番の削除（endpoint U11・CLI
- * `yarn session delete`）は必ず `deleteSessionCore` を通り、存在検査を受ける。phase の
- * 検査はここにも `deleteSessionCore` にも無い——削除の口（endpoint と
- * `server/handler/delete.ts`）が持つ。ここを直に呼んでよいのは、存在検査を通す理由が
- * 無い呼び出しだけである。
- *
- * **切り出す理由は、消す実体を1箇所に保つためである。** 検証の道具（`yarn check:stroke`）は
- * 自分が作ったセッションを後始末するが、その用途に `fse.remove` を独自に書くと、削除の
- * 経路が3本（endpoint・CLI・道具）に増える。判定を迂回する経路を作るのではなく、判定の
- * 無い層をここに1つ置いて共有する。
- */
-export async function removeSessionDir(root: string, sessionId: string): Promise<void> {
-  try {
-    await fse.remove(sessionDir(root, sessionId))
-  } catch (error) {
-    throw new SessionCoreError(
-      'io',
-      `セッションを消せなかった: ${error instanceof Error ? error.message : String(error)}`,
-    )
-  }
+export async function deleteSession(root: string, sessionId: string): Promise<void> {
+  await removeTarget(root, sessionId)
+  forgetSubmissions(sessionId)
 }
 
 /**
@@ -179,7 +119,7 @@ async function passesListChecks(root: string, sessionId: string): Promise<boolea
  * 保存先には無関係なディレクトリも並びうるが、`state.json` を持たないものは下の検査で
  * 落ちるので載らない。
  */
-export async function listSessionsCore(root: string): Promise<SessionSummary[]> {
+export async function listSessions(root: string): Promise<SessionSummary[]> {
   let entries
   try {
     entries = await readdir(root, { withFileTypes: true })
@@ -204,17 +144,17 @@ export async function listSessionsCore(root: string): Promise<SessionSummary[]> 
       updatedAt: mtime.toISOString(),
       // キックする側がこれを cwd として U13 に渡す。endpoint に導出させない（D5）
       path: sessionDir(root, entry.name),
-      invocation: await readInvocation(root, entry.name),
+      invocation: await listedInvocation(root, entry.name),
     })
   }
   return sessions.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 }
 
 /**
- * `state.json` の `invocation` を読む。script の削除受理判定に使う（design.md 決定5:
+ * `state.json` の `invocation` をそのまま読む。script の削除受理判定に使う（design.md 決定5:
  * サーバ無しの経路では保存された状態を実行中判定の材料にする）。読めなければ null。
  */
-export async function readInvocationCore(
+export async function readStoredInvocation(
   root: string,
   sessionId: string,
 ): Promise<string | null> {
@@ -234,15 +174,15 @@ export async function readInvocationCore(
  * 巡回は `failed` だけを拾うので、読めないものを `failed` に倒すと、壊れた
  * `state.json` を延々と起こし直すことになる。
  */
-async function readInvocation(root: string, sessionId: string): Promise<Invocation> {
-  const raw = await readInvocationCore(root, sessionId)
+async function listedInvocation(root: string, sessionId: string): Promise<Invocation> {
+  const raw = await readStoredInvocation(root, sessionId)
   return raw === 'running' || raw === 'failed' || raw === 'error' ? raw : 'idle'
 }
 
 /**
  * 一覧に載せる phase。読めない・集合に無い値は `unknown` として載せる。
  *
- * ここは Nitro 無しの経路から読まれる core なので、zod を通す `readState`
+ * ここは Nitro 無しの経路から読まれる handler なので、zod を通す `readState`
  * （`session-store.ts`。配信を import する）を持ち込まず、軽い読みを残す。ただし**値の集合は
  * `shared/stroke.ts` の `PHASES` から引く**——ここに literal を並べない
  * （add-activated-phase design D6）。
@@ -276,7 +216,7 @@ export async function writeAtomic(
     await rename(temp, target)
   } catch (error) {
     await unlink(temp).catch(() => {})
-    throw new SessionCoreError(
+    throw new SessionError(
       'io',
       `${name} を書けなかった: ${error instanceof Error ? error.message : String(error)}`,
     )

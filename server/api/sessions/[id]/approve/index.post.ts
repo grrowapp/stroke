@@ -1,9 +1,9 @@
+import { recordDecision, type DecisionRefusal } from '../../../../handler/approve'
 import { readStrokeConfig } from '../../../../utils/stroke/config'
 import { conflict } from '../../../../utils/stroke/conflict'
-import { assertNameAvailable } from '../../../../utils/stroke/project'
 import { approveBody, parseBody } from '../../../../utils/stroke/request-schemas'
 import { requireSessionId } from '../../../../utils/stroke/session-param'
-import { isPromotedState, readState, sessionProposal, withDecision, writeState } from '../../../../utils/stroke/session-store'
+import { isPromotedState, readState } from '../../../../utils/stroke/session-store'
 
 /**
  * U10: 承認の判断を受理して記録する（openspec/specs/api/session/approve）。
@@ -21,7 +21,17 @@ import { isPromotedState, readState, sessionProposal, withDecision, writeState }
  *
  * busy ガードは U7・U9 のみ（design.md ガードの語彙）。承認はエージェントの呼び出しを
  * 起動しないため対象にしない。
+ *
+ * 記録の実処理は `handler/approve.ts`。ここが持つのは局面の述語と、受理しなかった理由を
+ * 409 へ写すことである。
  */
+
+/** 記録が成立しなかったときの文言。理由ごとに1つ */
+const REFUSAL_MESSAGE: Record<DecisionRefusal, string> = {
+  'no-proposal': '承認する proposal が見つからない。',
+  'already-decided': '承認の判断は既に記録されている。取り下げてから下し直すこと。',
+}
+
 export default defineEventHandler(async (event) => {
   const sessionId = await requireSessionId(event)
   const { projectName } = parseBody(approveBody, await readBody(event))
@@ -35,25 +45,15 @@ export default defineEventHandler(async (event) => {
     throw conflict('phase', '承認できるのは proposal が出ているときだけ。')
   }
 
-  // 判断の対象となる proposal が残っていなければ受理しない。A7 は残せたときだけ受理を
-  // 成立させるので、`proposed` に進んだセッションでは通常ここを通る。通らないのは外から
-  // 消された場合で、そのときはセッションを `proposed` のまま残す。
-  if ((await sessionProposal(sessionId).read()) === undefined) {
-    throw conflict('phase', '承認する proposal が見つからない。')
+  const recorded = await recordDecision(
+    readStrokeConfig().projectShareRoot,
+    sessionId,
+    state,
+    projectName,
+  )
+  if (!recorded.ok) {
+    throw conflict('phase', REFUSAL_MESSAGE[recorded.reason])
   }
-
-  // 重ねて判断を下すことは受理しない。取り下げてから下し直す（`DELETE`）。
-  if (state.decision !== undefined) {
-    throw conflict('phase', '承認の判断は既に記録されている。取り下げてから下し直すこと。')
-  }
-
-  // 衝突は昇格の直前にも確認されるが（U14）、判断の時点で分かるものはその場で伝える。
-  // 何も動かさずに 409 で、セッションは `proposed` のまま残る。
-  await assertNameAvailable(readStrokeConfig().projectShareRoot, projectName)
-
-  // 判断を記録する。`withDecision` は `proposed` を受けて `proposed` を返すので、
-  // ここで `phase` が動くことはない。書けなければ失敗が返り、判断は記録されない。
-  await writeState(sessionId, withDecision(state, { projectName }))
 
   return new Response(null, { status: 204 })
 })

@@ -1,5 +1,5 @@
 import type { H3Event } from 'h3'
-import { isSafeSegment } from './session-core'
+import { isSafeSegment } from './paths'
 import { sessionExists } from './session-store'
 
 /**

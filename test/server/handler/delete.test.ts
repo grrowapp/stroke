@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 
-import { DeleteError, isSafeSegment, removeTarget, targetExists } from '../../../server/handler/delete'
+import { DeleteError, removeTarget, targetExists } from '../../../server/handler/delete'
+import { isSafeSegment } from '../../../server/utils/stroke/paths'
 
 /**
  * 削除の実行（design.md D12）。
