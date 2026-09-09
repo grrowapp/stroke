@@ -27,7 +27,7 @@ import { vi } from 'vitest';
  * 使い方（`vi.mock` と違って巻き上げられないので、`await import()` より前に呼ぶ）:
  * ```ts
  * stubNitroGlobals()
- * const { default: handler } = await import('../../../server/api/...')
+ * const { default: handler } = await import('../../../../server/api/...') // 段数はテストの位置で決まる
  * ```
  */
 export function stubNitroGlobals(): void {

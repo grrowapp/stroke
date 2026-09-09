@@ -10,10 +10,10 @@ import { creationOutcomeOf } from '../../../../server/utils/stroke/session-store
  *
  * **成功の決着はここから出ない**（add-activated-phase design D7）。`idle` は「終わった」で
  * あって「できた」ではなく、`done` を流すのは完成の記録（U15）だけである。そちらは
- * `test/server/api/sessions/activate.post.test.ts` が押さえる。
+ * `test/server/api/sessions/activate/index.post.test.ts` が押さえる。
  *
- * 生成の**始まり**（`in-progress`）の起点は昇格の段（U14・`promote.post.ts`）にあり、
- * 承認の判断（U10）では流さない。そちらは `test/server/api/strokes/promote.post.test.ts` が
+ * 生成の**始まり**（`in-progress`）の起点は昇格の段（U14・`promote/index.post.ts`）にあり、
+ * 承認の判断（U10）では流さない。そちらは `test/server/api/strokes/promote/index.post.test.ts` が
  * 押さえる。昇格の直後に A8 で書かれる `failed`（起動の段の引き渡し）は決着ではないので、
  * ここの「リトライ待ちは流さない」がそのまま効く。
  */
