@@ -15,8 +15,8 @@ flowchart TB
   ren --> back["モーダルを閉じて<br>プロジェクト一覧 /projects に戻る"]
   ren --> show["サーバー: 上層へ <b>in-progress</b> を配信<br>一覧の最下部に<b>生成中の行</b>が出る"]
   ren --> launch["画面: U13 で steering 作成の claude を起こす<br>（届かなければ巡回が拾う）"]
-  launch --> steering["本家 spec-workflow MCP で<br>steering 文書を作成して提出する"]
-  steering --> record["提出が受理されて実行が終わったら<br>invokeAi が U15 を叩く → phase = <b>activated</b>"]
+  launch --> steering["stroke-board の MCP で steering 文書を提出し、<br>本家 MCP で承認依頼を出す"]
+  steering --> record["実行が終わったら invoke-agent が本家に<br>3本の文書と承認依頼を確かめ、U15 を叩く → phase = <b>activated</b>"]
   record --> done["U15 が <b>done</b> を配信<br>生成中の表現が外れ、一度だけ祝う"]
 ```
 
@@ -46,48 +46,13 @@ flowchart TB
 
 更新は WS（board の `/ws`）で届く。一覧を開いたままでも再読み込みは要らず、定期取得もしない。
 
-## 起動は1系統 — invokeAi の構造を変え、引数で渡す
+## 起動は1系統 — 呼び出し側が材料を渡す
 
-今の `invokeAi(sessionId)` は起動定義・prompt を**中で** `runtimeConfig` から導出している。この構造をやめ、**呼び出し側が直前に設定 JSON を引き、sessionId の後ろに渡す**形にする。`invokeAi`／`runClaude` は渡されたものを使うだけになる。
-
-```mermaid
-flowchart TB
-  subgraph callers["呼び出し側 — 直前に設定 JSON を引く"]
-    ia["invoke-agent（ストローク）<br>引いた JSON を<b>無加工で</b>渡す"]
-    ap["approve.post.ts（承認処理）<br>args に --mcp-config（生成先パス入り）を<b>足し</b>、<br>prompt を steering 用の定型に<b>替えて</b>渡す"]
-  end
-  ia --> ai["invokeAi(sessionId, 起動定義・prompt・cwd)"]
-  ap --> ai
-  ai --> rc["runClaude — 渡されたものをそのまま使う"]
-```
-
-- **系統は1つ**。`invokeAi` は呼び出し元を区別せず、ストロークと steering の違いは渡す引数の中身だけ
-- 承認処理は rename の直後に `invokeAi` を**完了を待たずに**呼び、応答も起動を待たずに返す（画面はすぐ一覧へ戻れる）
-- **cwd も呼び出し側が渡す**。ストロークはセッションディレクトリ（今と同じ値）、承認処理は**生成先プロジェクト `/opt/projects/<name>`** を渡す。steering の claude は生成されたプロジェクトの中で働く
+起動処理は1つで、ストロークと steering の違いは渡す値（起動定義・定型・cwd）の違いだけである。承認の後は、昇格の成功を見た画面が cwd＝昇格先プロジェクトを添えて U13 を叩き、steering の claude はそのプロジェクトの中で働く。起動から完了検知・作業の判定・完成の記録・実行の記録までの仕組みと責務は [architecture/invoke-agent.md](../architecture/invoke-agent.md) が定める。
 
 ## 完了とリトライ
 
-> **この節は change の design.md D6 に置き換わった（2026-08-25）。** 当初は「claude 自身が API で提出を告知して完了とする」案だったが、並走している invokeAi が子プロセスの output stream を見れば足り、スキルへの依存が増えるだけなので採らなかった。実装は下の形である。
-
-1. **起動**: invokeAi が claude を起こし、`invocation` を `running` にする（A8 経由）
-2. **完了**: invokeAi が子プロセスの **output stream**（`--output-format json` の成功エンベロープ）で検知する。**AI 自身に告知させない**。作業が行われていなければ（提出が無ければ）`failed`
-3. **完成の記録**（生成中の steering だけ・change `add-activated-phase`）: **2 で作業ありと判定できたときだけ**、`idle` にする前に U15 を叩く。受理されれば phase が `activated` になり `idle`、断られるか届かなければ `failed`。**完成の判定は 2 の「作業が行われたか」そのもので、U15 は判定を持たない**（ADR-0014）。完成済みの起こし直しとストロークは U15 を叩かず、2 の判定で `idle` / `failed`
-4. **時間切れ**: タイムアウトで `failed` に変える
-5. **リトライ**: サーバーの巡回が `failed` の件だけを拾い、path を cwd に添えて U13 を叩く。巡回に他の判定は持たせない
-6. **終端**: リトライ上限に達したら起動せず `error`。回復はユーザーの再実行か削除だけ
-
-```mermaid
-flowchart TB
-  launch["1. invokeAi が起動<br>invocation = <b>running</b>（A8 経由）"] --> watch["2. output stream を見る"]
-  watch -- "成功エンベロープ・作業あり・生成中の steering" --> u15["3. U15 を叩く"]
-  u15 -- "受理 → activated" --> idle["<b>idle</b>（完了）"]
-  u15 -- "断られた・不達" --> f["<b>failed</b>"]
-  watch -- "成功エンベロープ・作業あり・それ以外" --> idle
-  watch -- "成功エンベロープ・作業なし" --> f
-  watch -- "timeout" --> f
-  f --> crawl["5. サーバーの巡回"] --> fetch["failed の件だけを拾う"] --> relaunch["U13 を cwd 付きで叩く"] --> launch
-  f -- "上限に達した状態で再キック" --> err["<b>error</b>（終端・ユーザーへ引き渡す）"]
-```
+完了は invoke-agent が子プロセスの output stream で検知し、AI 自身には告知させない。生成中の steering は、終了時点で本家に3本の文書と3件の承認依頼が在ると確かめたときだけ U15 を叩いて `activated` になる。時間切れは `failed`、巡回が `failed` を拾って起動し直し、上限に達したら `error`。流れの全体は [architecture/invoke-agent.md](../architecture/invoke-agent.md)「起動から終了までの流れ」「実行の記録」。
 
 - **提出告知のエンドポイントは足さない。** 完了の検知に AI の協力を要らなくしたため
 - **retry 対象一覧のエンドポイントも足さない。** 巡回はセッション一覧（U12）の `invocation` を見れば足りる
@@ -99,7 +64,7 @@ flowchart TB
 ```mermaid
 flowchart LR
   g["プロジェクト生成の結果:<br>生成先 /opt/projects/&lt;name&gt;"] --> build["承認処理が mcp-config の<br>JSON 文字列を<b>導出</b>して組み立て"] --> pass["args に --mcp-config '&lt;json&gt;' を足す"]
-  s2["設定: steering 用の定型 prompt"] --> ai["invokeAi へ渡す"]
+  s2["設定: steering 用の定型 prompt"] --> ai["invoke-agent へ渡す"]
   pass --> ai
 ```
 
@@ -109,7 +74,7 @@ mcp-config は設定に持たない。**生成先パスから導出**して組�
 
 | 追加先 | 追加するもの | 使われ方 |
 |---|---|---|
-| `nuxt.config.ts` の `runtimeConfig.claude`（非公開側。既存の `firstPrompt`/`continuePrompt` と同じ並び） | **steering 用の定型 prompt** 1キー | 承認処理が引いて `invokeAi` に渡す |
+| `nuxt.config.ts` の `runtimeConfig.claude`（非公開側。既存の `firstPrompt`/`continuePrompt` と同じ並び） | **steering 用の定型 prompt** 1キー | invoke-agent が起動の材料として引く |
 | `docs/specs/core/settings-reference.md`（設定の正） | 上記1キーの記載 | ここに無いものは設定ではない（ADR-0004）。改定には change とユーザー承認が要る |
 
 ## 実装の想定
@@ -118,9 +83,9 @@ mcp-config は設定に持たない。**生成先パスから導出**して組�
 
 | # | 場所 | ファイル | 今 | 変更後 |
 |---|---|---|---|---|
-| ❶ | 実行管理 | `server/utils/stroke/ai.ts`・`claude.ts` | 起動定義・prompt・cwd を中で固定・導出 | 起動定義・prompt・cwd を呼び出し側から受け取る。**実行の記録を足す**: 起動時に session-id = running をメモリに記録し、timeout したら false に変える |
-| ❷ | ストロークの呼び出し元 | `server/api/strokes/[id]/invoke-agent.get.ts` | `invokeAi(sessionId)` | 直前に設定 JSON を引き、無加工で渡す。cwd はセッションディレクトリ（挙動は不変） |
-| ❸ | 承認の処理 | `server/api/strokes/[id]/approve.post.ts`・`server/utils/stroke/project.ts`・`session-store.ts` | サーバーのコードが proposal.md を書いている（A7 提出でサーバーが保存、`generateProject` が `docs/proposal.md` を新規生成。U10） | **サーバーのコードは proposal.md を作らない**。claude 自身がセッション時点から `docs/` 配下に書く。承認は**セッションディレクトリをプロジェクト名へ rename するだけ**（生成もファイル移動も無し）。その後、設定 JSON を引き、`--mcp-config`（生成先パス入り）と steering 用 prompt に差し替え、cwd に生成先を渡して `invokeAi` を**完了を待たずに呼ぶ** |
+| ❶ | 実行管理 | `server/utils/stroke/ai.ts`・`claude.ts` | 起動定義・prompt・cwd を中で固定・導出 | 起動定義・prompt・cwd を呼び出し側から受け取る。実行の記録は [architecture/invoke-agent.md](../architecture/invoke-agent.md) |
+| ❷ | ストロークの呼び出し元 | `server/api/strokes/[id]/invoke-agent.get.ts` | 起動処理を直に呼ぶ | 直前に設定 JSON を引き、無加工で渡す。cwd はセッションディレクトリ（挙動は不変） |
+| ❸ | 承認の処理 | `server/api/strokes/[id]/approve.post.ts`・`server/utils/stroke/project.ts`・`session-store.ts` | サーバーのコードが proposal.md を書いている（A7 提出でサーバーが保存、`generateProject` が `docs/proposal.md` を新規生成。U10） | **サーバーのコードは proposal.md を作らない**。claude 自身がセッション時点から `docs/` 配下に書く。承認は**セッションディレクトリをプロジェクト名へ rename するだけ**（生成もファイル移動も無し）。steering の起動は昇格の成功を見た画面が cwd＝生成先を添えて U13 を叩く |
 | ❹ | 提出告知のエンドポイント | `server/api/strokes/[id]/` に1つ追加 | 無し（既存 A5/A7 は承認済みを拒否） | claude からの提出の告知を受理し、session-id の記録を消す薄いエンドポイント |
 | ❺ | retry 対象一覧のエンドポイント | `server/api/` に1つ追加 | 無し | retry 対象（false の session-id）一覧を返す |
 | ❻ | 巡回 | サーバーの定期処理として登録 | 無し | ❺を拾い、順に起動し直すだけ。条件判定は持たない |

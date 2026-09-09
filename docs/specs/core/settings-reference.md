@@ -163,13 +163,15 @@ AI へ渡す定型。**手順の本文をここに書かない。** 手順は MC
 
 **`Read` は残してある。** steering 工程には文脈を取る MCP ツールが無く（公開は `get-steering-guide` / `get-steering` / `submit-document` の3本）、同じ実測で `Read` は5回使われていた。読み取りの手段を MCP ツールへ寄せる作業は未着手で、**道具を用意する前に `Read` を外すと steering が成立しない。**
 
-**第三者の MCP を配線しない。** 両工程とも `--mcp-config` に並ぶのは自前 MCP（`stroke-board`）だけである。プロジェクトの生成は `POST /api/projects`（`docs/specs/api/projects/generate.md`）が本家 REST へ依頼する。
+**本家 spec-workflow の MCP は steering 工程にだけ配線し、許可するのは承認依頼のツール `mcp__specworkflow__approvals` だけとする。** ストローク（flontier）工程の `--mcp-config` に並ぶのは自前 MCP（`stroke-board`）だけである。steering 工程は自前 MCP に加えて本家 MCP（stdio。`@pimzino/spec-workflow-mcp` を cwd＝昇格先プロジェクトで起動し、env に `SPEC_WORKFLOW_HOME`＝ポータル側の `specWorkflowHome` を渡す。起動定義の実体は `server/utils/stroke/invoke.ts`）を並べる。本家 MCP を配線する目的は**承認依頼を出すことだけ**である——本家 REST に承認依頼を作る route は無く、作れるのは本家 MCP の `approvals` ツールだけで、steering 工程は3本の文書それぞれに承認依頼を出して終わる（`docs/specs/architecture/invoke-agent.md`「作業が行われたかの判定」）。本家 MCP の他のツール（`steering-guide` / `spec-workflow-guide` / `spec-status` / `log-implementation` など）は許可しない。
+
+プロジェクトの生成は `POST /api/projects`（`docs/specs/api/projects/generate.md`）が AI の起動前に本家 REST へ依頼する。本家 MCP は起動時に登録簿へ自己登録するが、既に登録済みのパスに対しては同じ `projectId` を返すだけで、生成にはならない。**本家 MCP を配線する前に生成が済んでいること**がこの配線の前提であり、生成が受理されなければ AI は起動されない。
 
 **`--strict-mcp-config` を外してはならない。** `--mcp-config` は「追加」であって「限定」ではないので、これが無いと開発者個人の MCP 設定が全部読み込まれる（実測 2026-08-30: 8サーバー・約80ツールが、許可されていないので呼べないまま実行に並んでいた）。
 
 `--setting-sources` から `project` を外してはならない（ADR 0001）。**ただし `--add-dir` を外した今、この指定は実効を持たない**——探索先は cwd だけで、そこに `.claude/` は無いのでロードされるスキルは0本である。案内を Skill として配り直したときに要る守りとして残してある。
 
-`-p` / `--output-format json` と、`--session-id` / `--resume` と会話 id、`--mcp-config`、**MCP ツール分の `--allowedTools`**（両工程とも `mcp__stroke-board` だけ）、`--` 以降の prompt は**呼び出しごとに決まる**ため、この定義には含まれない。呼び出し側が `args` の後ろに足す。
+`-p` / `--output-format json` と、`--session-id` / `--resume` と会話 id、`--mcp-config`、**MCP ツール分の `--allowedTools`**（ストローク工程は `mcp__stroke-board` だけ、steering 工程は `mcp__stroke-board` と `mcp__specworkflow__approvals`）、`--` 以降の prompt は**呼び出しごとに決まる**ため、この定義には含まれない。呼び出し側（invoke-agent）が `args` の後ろに足す。
 
 会話 id の与え方は用途で違う。
 
@@ -213,8 +215,8 @@ AI へ渡す定型。**手順の本文をここに書かない。** 手順は MC
 
 **ここに無い値でも、環境変数が効かないわけではない。** `runtimeConfig` は Nitro が `useRuntimeConfig()` のたびに `applyEnv` を掛けるので、**全キーが `NUXT_*` で上書きされうる**（`NUXT_CLAUDE_COMMAND` など）。この資料が定めているのは「**コードが環境変数を読みに行かない**」ことと「値の実体を `nuxt.config.ts` に置く」ことであって、外から差し替えられないことではない。差し替えられたときに何が起きるかは、各項目の説明が持つ。
 
-`specWorkflowHome` はポータルの登録簿の読み（アクティブ判定）にだけ使う。steering 工程の起動には載らない（本家 MCP を配線しないため）。
+`specWorkflowHome` はポータルの登録簿の読み（アクティブ判定）に使うほか、steering 工程に並べる本家 MCP の env `SPEC_WORKFLOW_HOME` として渡る。ポータルが読む登録簿と本家 MCP が書く登録簿を同じ1つにするためで、ずらすと承認依頼が別の登録簿のプロジェクトに立つ。
 
-`upstreamBaseUrl` は steering 工程に効く。生成（`POST /api/projects`）の依頼先であり、`get-steering` と `submit-document`（steering 種別）の代行先そのものなので、ずらせば工程は成立しない（`server/utils/mcp/upstream-fetch.ts`）。
+`upstreamBaseUrl` は steering 工程に効く。生成（`POST /api/projects`）の依頼先であり、`get-steering` と `submit-document`（steering 種別）の代行先であり、invoke-agent が完了時に文書と承認依頼を確かめる先でもあるので、ずらせば工程は成立しない（`server/utils/mcp/upstream-fetch.ts`・`docs/specs/architecture/invoke-agent.md`）。
 
 `projectsParentPath` は廃止した。ストローク側の保存先と同じ場所を指す必要があるため、上の `projectShareRoot` に畳んである。

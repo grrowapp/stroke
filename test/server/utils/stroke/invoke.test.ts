@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { MCP_SERVER_NAME } from '../../../../server/utils/mcp/allowed-tools';
+import { MCP_SERVER_NAME, UPSTREAM_APPROVALS_ALLOWED_TOOL, UPSTREAM_MCP_SERVER_NAME } from '../../../../server/utils/mcp/allowed-tools';
 import { resolveConnection, type ConnectionContext } from '../../../../server/utils/mcp/connection-table';
 import { MCP_TOOLS_HEADER } from '../../../../server/utils/mcp/exposed-tools';
 
@@ -11,7 +11,8 @@ import { MCP_TOOLS_HEADER } from '../../../../server/utils/mcp/exposed-tools';
  *
  * あわせて `kick` の後始末（接続表への登録 → 実行終了で削除）も見る。token が消え残ると、
  * 終わった起動の token でツールを呼べてしまう（specs `server/session-management`
- * 「実行の終了（正常・異常とも）で無効になる」）。
+ * 「実行の終了（正常・異常とも）で無効になる」）。発行・登録・失効を行うのは invoke-agent
+ * （`kick`）だけである。
  */
 
 /** `readStrokeConfig` を throw させる細工。`buildRun` が同期的に落ちる経路を作るのに使う */
@@ -76,6 +77,40 @@ vi.mock('../../../../server/utils/stroke/session-store', async (importOriginal) 
 }));
 
 /**
+ * steering の `didWork` が問い合わせる本家 REST（`upstreamClient` の `getProjectInfo` /
+ * `listPendingApprovals` / `listProjects`）。`resolveProjectId` は `listProjects` の応答から
+ * projectId を解決するので、こちらも同じ差し替えで駆動する。
+ */
+const upstream = vi.hoisted(() => ({
+  listProjects: vi.fn(),
+  getProjectInfo: vi.fn(),
+  listPendingApprovals: vi.fn(),
+}));
+
+vi.mock('../../../../server/utils/control/upstream-proxy', async (importOriginal) => ({
+  // `upstreamClient` だけを差し替え、同じモジュールの他の export（`toHttpError` など。
+  // `invoke.ts` の import 先が間接的に使う）は本物のまま残す。factory で丸ごと置き換えると
+  // 無い export へのアクセスで throw し、判定が warn の分岐ではなく例外の経路で false になる
+  ...(await importOriginal<typeof import('../../../../server/utils/control/upstream-proxy')>()),
+  upstreamClient: () => upstream,
+}));
+
+/**
+ * steering 工程の `--mcp-config` に並べる本家 MCP の env `SPEC_WORKFLOW_HOME` は、ポータルが
+ * 登録簿を読むのと同じ値（`readServerConfig().specWorkflowHome`）から取る。ここで見たいのは
+ * その値がそのまま env に載ることだけなので、固定値で足りる。
+ */
+const SPEC_WORKFLOW_HOME = '/tmp/spec-workflow-home';
+
+vi.mock('../../../../server/utils/config', () => ({
+  readServerConfig: () => ({
+    upstreamBaseUrl: 'http://upstream.test',
+    specWorkflowHome: SPEC_WORKFLOW_HOME,
+    syncIntervalMs: 1000,
+  }),
+}));
+
+/**
  * 接続表の token は `randomBytes` から作られる（`server/utils/mcp/connection-table.ts`）。
  * `kick` が発行した token を外から知りたいので、乱数だけを予測可能な値に差し替える。
  * 呼ぶたびに違う値になる性質（起動ごとに別の token）は保つ。
@@ -102,13 +137,7 @@ const { buildRun, kick, kindOf } = await import('../../../../server/utils/stroke
 
 /** 用途を phase で渡す（add-activated-phase design D4）。テストの語彙は kind のまま残す */
 const PHASE_OF = { stroke: 'stroking', steering: 'approved' } as const;
-const {
-  notifySubmission,
-  forgetSubmissions,
-  recordLaunchSubmission,
-  hasLaunchSubmission,
-  forgetLaunchSubmission,
-} = await import('../../../../server/utils/stroke/submission-signal');
+const { notifySubmission, forgetSubmissions } = await import('../../../../server/utils/stroke/submission-signal');
 
 type McpConfig = {
   mcpServers: Record<string, {
@@ -186,42 +215,43 @@ describe('buildRun の --mcp-config', () => {
   });
 
   /**
-   * **AI の起動に乗せた生成の削除**（update-project-generation-via-upstream-rest）。
+   * **承認依頼のための本家 MCP の配線**（update-invoke-agent-responsibility-boundary design D4）。
    *
-   * かつて steering 工程は `--mcp-config` に本家 spec-workflow の MCP を並べ、その起動時の
-   * 自己登録でプロジェクトが本家に現れていた。プロジェクトの生成は P2（`POST /api/projects`）
-   * が本家 REST へ依頼するものになり、claude はプロジェクトを本家に登録する手段を持たない
-   * （openspec/specs/project/generation「AI のプロセスにプロジェクトを生成させてはならない」）。
+   * steering 工程は `--mcp-config` に自前 MCP と本家 spec-workflow の MCP を並べる。本家を
+   * 並べる目的は承認依頼（`approvals`）だけで、生成は `kick` が P2（`POST /api/projects`）で
+   * 起動前に済ませる（openspec/specs/project/generation「昇格したプロジェクトを本家に存在させる
+   * のは生成の依頼だけであり、AI のプロセスではない」）。
    */
-  it('steering 工程の --mcp-config に本家 MCP を並べない（AI の起動はプロジェクトを生成しない）', () => {
-    expect(Object.keys(mcpConfigOf('steering').mcpServers)).toEqual([MCP_SERVER_NAME]);
+  it('steering 工程の --mcp-config に自前 MCP と本家 MCP を並べる', () => {
+    const config = mcpConfigOf('steering');
+    expect(Object.keys(config.mcpServers).sort()).toEqual([MCP_SERVER_NAME, UPSTREAM_MCP_SERVER_NAME].sort());
   });
 
-  it('起動の材料のどこにも本家 MCP を起こすものが無い', () => {
-    for (const kind of ['stroke', 'steering'] as const) {
-      const run = buildRun({
-        sessionId: 'session-1',
-        cwd: '/tmp/share/session-1',
-        phase: PHASE_OF[kind],
-        retries: 0,
-        token: 'token-1',
-      });
-      const joined = [run.launch.command, ...run.launch.args].join(' ');
-      expect(joined).not.toContain('spec-workflow-mcp');
-      expect(joined).not.toContain('SPEC_WORKFLOW_HOME');
-      expect(joined).not.toContain('specworkflow');
-    }
+  it('本家 MCP は stdio で、cwd＝昇格先を引数に、ポータルと同じ登録簿の場所を env に持つ', () => {
+    const entry = mcpConfigOf('steering').mcpServers[UPSTREAM_MCP_SERVER_NAME]!;
+    expect(entry.command).toBe('npx');
+    expect(entry.args).toEqual(['-y', '@pimzino/spec-workflow-mcp@latest', '/tmp/share/session-1']);
+    expect(entry.env).toEqual({ SPEC_WORKFLOW_HOME });
   });
 
   it('flontier 工程には本家 MCP を渡さない', () => {
     expect(Object.keys(mcpConfigOf('stroke').mcpServers)).toEqual([MCP_SERVER_NAME]);
+    const run = buildRun({
+      sessionId: 'session-1',
+      cwd: '/tmp/share/session-1',
+      phase: PHASE_OF.stroke,
+      retries: 0,
+      token: 'token-1',
+    });
+    const joined = [run.launch.command, ...run.launch.args].join(' ');
+    expect(joined).not.toContain('spec-workflow-mcp');
+    expect(joined).not.toContain('SPEC_WORKFLOW_HOME');
   });
 
   /**
    * 起動時の後始末（`reap-match.ts`）は argv に cwd の JSON 文字列が含まれるかで steering の
-   * claude を見分ける。cwd はかつて本家 MCP エントリの `npx` 引数に載っていた。配線を外した
-   * 後は自前 MCP エントリのヘッダで載せる。サーバーはこのヘッダを読まない
-   * （update-project-generation-via-upstream-rest design D4）。
+   * claude を見分ける。本家 MCP エントリの `npx` 引数にも cwd は載るが、照合はヘッダに拠る
+   * ——本家の配線が変わっても照合が壊れないようにするため。サーバーはこのヘッダを読まない。
    */
   it('自前 MCP エントリのヘッダに cwd を載せる（後始末の照合の手がかり）', () => {
     for (const kind of ['stroke', 'steering'] as const) {
@@ -244,7 +274,7 @@ describe('buildRun の --mcp-config', () => {
     expect(exposedToolsOf('steering')).toContain('submit-document');
   });
 
-  it('steering 工程は --allowedTools に自前 MCP だけを載せる', () => {
+  it('steering 工程は --allowedTools に自前 MCP と本家の approvals だけを載せる', () => {
     const run = buildRun({
       sessionId: 'session-1',
       cwd: '/tmp/share/session-1',
@@ -252,15 +282,16 @@ describe('buildRun の --mcp-config', () => {
       retries: 0,
       token: 'token-1',
     });
-    // 肯定で見る。フラグが1本だけ在り、自前ツールは載っている
+    // 肯定で見る。フラグが1本だけ在り、許可は自前ツール一式と本家の `approvals` の2つだけ
     expect(run.launch.args.filter(arg => arg === '--allowedTools')).toHaveLength(1);
-    expect(allowedToolsOf('steering')).toEqual(['mcp__stroke-board']);
+    expect(allowedToolsOf('steering')).toEqual(['mcp__stroke-board', UPSTREAM_APPROVALS_ALLOWED_TOOL]);
   });
 
   it('flontier 工程には本家 MCP を許可しない（配ってもいない）', () => {
-    // `allowedToolsOf` はフラグが無ければ空を返すので、フラグごと落ちたときに
-    // 別の引数を見にいって否定が通ってしまうことがない
-    expect(allowedToolsOf('stroke')).not.toContain('mcp__specworkflow');
+    // 肯定で見る。許可は自前ツール一式だけで、`STEERING_ALLOWED_TOOLS` が flontier 側へ
+    // 渡っていれば `mcp__specworkflow__approvals` が並んでここが落ちる。`not.toContain` では
+    // 要素の完全一致でしか比べず、実際の要素名（`__approvals` 付き）を見逃す
+    expect(allowedToolsOf('stroke')).toEqual(['mcp__stroke-board']);
   });
 
   it('工程で分けるのはヘッダだけで、url と token の渡し方は変わらない', () => {
@@ -273,79 +304,218 @@ describe('buildRun の --mcp-config', () => {
 });
 
 /**
- * `buildRun` が渡す `didWork` の読み先（fix-steering-empty-completion）。
+ * `buildRun` が渡す `didWork` の読み先（update-invoke-agent-responsibility-boundary design D2・D3）。
  *
- * steering は本家 REST へ直接届くため対象の id に結びつける経路が無く、この起動の
- * token を単位にした記録（`submission-signal.ts` の `recordLaunchSubmission` /
- * `hasLaunchSubmission`）を読む。flontier は既存どおり対象の `sessionId` で数える
+ * steering は実行の終わりに本家 REST へ問い合わせ、**終了時点の本家の状態**で答える——
+ * 3本の文書（`info` の `steering.documents`）と、生成中なら加えて3件の承認依頼
+ * （pending の一覧の `filePath`）。起動ごとの記録は無く、MCP ツールも記録しない
+ * （`docs/specs/mcp/contract.md`）。flontier は既存どおり対象の `sessionId` で数える
  * （`notifySubmission` / `submissionCount`）——ここが変わっていないことも合わせて見る。
  */
 describe('buildRun の didWork', () => {
+  const PROJECT = { projectId: 'PID-A', projectName: 'project-a', projectPath: '/opt/projects/project-a' };
+
+  /** 本家の `info` の応答。3本の有無だけを試験ごとに変える */
+  function info(documents: { product: boolean, tech: boolean, structure: boolean }) {
+    return {
+      ok: true,
+      value: {
+        ...PROJECT,
+        steering: { exists: Object.values(documents).some(Boolean), documents },
+        version: '2.2.5',
+      },
+    };
+  }
+
+  /** 本家の pending の承認依頼。`filePath` だけが判定に効く */
+  function approval(name: string) {
+    return {
+      id: `approval_${name}`,
+      title: `ステアリング: ${name}.md の承認`,
+      filePath: `.spec-workflow/steering/${name}.md`,
+      type: 'document',
+      status: 'pending',
+      createdAt: '2026-09-09T00:00:00.000Z',
+      category: 'steering',
+      categoryName: 'steering',
+    };
+  }
+
+  const ALL_THREE = { product: true, tech: true, structure: true };
+
+  function steeringRun(phase: 'approved' | 'activated') {
+    return buildRun({
+      sessionId: 'project-a',
+      cwd: '/opt/projects/project-a',
+      phase,
+      retries: 0,
+      runId: phase === 'activated' ? 'run-1' : undefined,
+      token: 'token-1',
+    });
+  }
+
+  let warn: ReturnType<typeof vi.spyOn>;
+
+  /** false の理由がどの分岐から出たかを固定する。例外の経路で false になっても通らないように */
+  function expectWarnedWith(phrase: string) {
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('steering の完成を確認できない'),
+      [expect.stringContaining(phrase)],
+    );
+  }
+
+  beforeEach(() => {
+    upstream.listProjects.mockReset().mockResolvedValue({ ok: true, value: [PROJECT] });
+    upstream.getProjectInfo.mockReset().mockResolvedValue(info(ALL_THREE));
+    upstream.listPendingApprovals.mockReset().mockResolvedValue({
+      ok: true,
+      value: [approval('product'), approval('tech'), approval('structure')],
+    });
+    warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  });
+
   afterEach(() => {
     forgetSubmissions('session-1');
-    forgetLaunchSubmission('token-1');
-    forgetLaunchSubmission('token-2');
+    warn.mockRestore();
   });
 
-  it('完成済み（activated）の steering も起動単位の記録を読む', () => {
-    // 生成中（approved）でも完成済みでも、`didWork` は同じ起動単位の記録を読む。
-    // 生成中では**これが完成の判定そのもの**で、false なら U15 を叩かずに `failed` に倒れる
+  it('生成中（approved）: 3本の文書と3件の承認依頼が本家に揃っていれば作業あり', async () => {
+    // **これが完成の判定そのもの**で、true なら呼び出し元が U15 を叩く
     // （add-activated-phase design D4・`ai.ts` の成功経路。U15 は判定を持たない = ADR-0014）
-    const run = buildRun({
-      sessionId: 'project-a',
-      cwd: '/opt/projects/project-a',
-      phase: 'activated',
-      retries: 0,
-      runId: 'run-1',
-      token: 'token-1',
+    const run = steeringRun('approved');
+
+    expect(run.recordCompletion).toBeDefined();
+    expect(await run.didWork!()).toBe(true);
+    expect(upstream.getProjectInfo).toHaveBeenCalledWith('PID-A');
+    expect(upstream.listPendingApprovals).toHaveBeenCalledWith('PID-A');
+  });
+
+  it('生成中（approved）: 承認依頼が2件しか無ければ作業なし', async () => {
+    upstream.listPendingApprovals.mockResolvedValue({ ok: true, value: [approval('product'), approval('tech')] });
+
+    expect(await steeringRun('approved').didWork!()).toBe(false);
+    expectWarnedWith('承認依頼が出ていない steering 文書: structure');
+  });
+
+  it('生成中（approved）: 文書が2本しか無ければ、承認依頼を見るまでもなく作業なし', async () => {
+    upstream.getProjectInfo.mockResolvedValue(info({ product: true, tech: true, structure: false }));
+
+    expect(await steeringRun('approved').didWork!()).toBe(false);
+    expect(upstream.listPendingApprovals).not.toHaveBeenCalled();
+    expectWarnedWith('本家に無い steering 文書: structure');
+  });
+
+  it('生成中（approved）: 承認依頼の filePath が steering の3本と一致しなければ数えない', async () => {
+    // spec の承認依頼（別の category）や、別の名前の文書は steering の3本の代わりにならない
+    upstream.listPendingApprovals.mockResolvedValue({
+      ok: true,
+      value: [
+        approval('product'),
+        approval('tech'),
+        { ...approval('requirements'), filePath: '.spec-workflow/specs/auth/requirements.md', category: 'spec' },
+      ],
     });
+
+    expect(await steeringRun('approved').didWork!()).toBe(false);
+    expectWarnedWith('承認依頼が出ていない steering 文書: structure');
+  });
+
+  it('生成中（approved）: filePath が一致しても category が steering でなければ数えない', async () => {
+    // 照合は `filePath` の形だけに依存しない。category を見るので、spec の承認依頼が
+    // 同じ相対パスを持っていても steering の承認依頼の代わりにならない
+    upstream.listPendingApprovals.mockResolvedValue({
+      ok: true,
+      value: [approval('product'), approval('tech'), { ...approval('structure'), category: 'spec' }],
+    });
+
+    expect(await steeringRun('approved').didWork!()).toBe(false);
+    expectWarnedWith('承認依頼が出ていない steering 文書: structure');
+  });
+
+  it('生成中（approved）: 承認依頼が1件も無ければ作業なし（終了前にユーザーが承認を済ませていた・文書だけ揃えて終わった）', async () => {
+    // 本家の一覧は pending だけを返す。承認済みで消えていても、承認依頼を出さずに終わって
+    // いても、ここからは区別できず、どちらも `failed` に倒して起動し直す（design D3 の既知の制約）
+    upstream.listPendingApprovals.mockResolvedValue({ ok: true, value: [] });
+
+    expect(await steeringRun('approved').didWork!()).toBe(false);
+    expectWarnedWith('承認依頼が出ていない steering 文書: product, tech, structure');
+  });
+
+  it('本家の info の形が違えば作業なし（確かめられないものを完成と扱わない）', async () => {
+    upstream.getProjectInfo.mockResolvedValue({
+      ok: false,
+      failure: { kind: 'malformed', path: '/api/projects/PID-A/info', reason: 'steering が無い' },
+    });
+
+    expect(await steeringRun('approved').didWork!()).toBe(false);
+    expect(upstream.listPendingApprovals).not.toHaveBeenCalled();
+    // 例外の経路ではなく、info の失敗の分岐から false になっている。理由に本家の種別と reason が残る
+    expectWarnedWith('本家の info を取れない: malformed（steering が無い）');
+  });
+
+  it('1回の判定で本家へ問い合わせるのは各 1 回だけ（定期の呼び出しではない）', async () => {
+    // openspec/specs/upstream-connection「invoke-agent の終了時の1度の確認」。判定は
+    // 実行の終わりに1回だけ本家を見る。同じ endpoint を繰り返し叩かない
+    expect(await steeringRun('approved').didWork!()).toBe(true);
+
+    expect(upstream.listProjects).toHaveBeenCalledTimes(1);
+    expect(upstream.getProjectInfo).toHaveBeenCalledTimes(1);
+    expect(upstream.listPendingApprovals).toHaveBeenCalledTimes(1);
+  });
+
+  it('完成済み（activated）: 3本の文書が在れば、承認依頼が無くても作業あり', async () => {
+    // 承認依頼は既に承認されて pending から消えていてよい（design D3）。U15 も叩かない
+    upstream.listPendingApprovals.mockResolvedValue({ ok: true, value: [] });
+    const run = steeringRun('activated');
 
     expect(run.recordCompletion).toBeUndefined();
-    expect(run.didWork).toBeDefined();
-    expect(run.didWork!()).toBe(false);
-
-    recordLaunchSubmission('token-1');
-    expect(run.didWork!()).toBe(true);
+    expect(await run.didWork!()).toBe(true);
+    expect(upstream.listPendingApprovals).not.toHaveBeenCalled();
   });
 
-  it('別の起動（token）の受理は自分の作業にならない', () => {
-    // 起動単位で数える理由そのもの（design.md D1「起動をまたいだ持ち越しが構造的に
-    // 起こらない」）。同じ対象の別の起動が受理していても、この起動は空振りのままである
-    const run = buildRun({
-      sessionId: 'project-a',
-      cwd: '/opt/projects/project-a',
-      phase: 'activated',
-      retries: 0,
-      runId: 'run-1',
-      token: 'token-1',
-    });
+  it('完成済み（activated）: 文書が欠けていれば作業なし', async () => {
+    upstream.getProjectInfo.mockResolvedValue(info({ product: true, tech: false, structure: true }));
 
-    recordLaunchSubmission('token-2');
-    expect(run.didWork!()).toBe(false);
-
-    recordLaunchSubmission('token-1');
-    expect(run.didWork!()).toBe(true);
+    expect(await steeringRun('activated').didWork!()).toBe(false);
+    expectWarnedWith('本家に無い steering 文書: tech');
   });
 
-  it('steering の起動は起動単位（token）の提出記録を読む', () => {
-    const run = buildRun({
-      sessionId: 'project-a',
-      cwd: '/opt/projects/project-a',
-      phase: 'approved',
-      retries: 0,
-      token: 'token-1',
-    });
+  it('本家の一覧に対象のプロジェクトが無ければ作業なし（projectId を解決できない）', async () => {
+    upstream.listProjects.mockResolvedValue({ ok: true, value: [] });
 
-    expect(run.didWork).toBeDefined();
-    // まだ何も受理されていない起動では false
-    expect(run.didWork!()).toBe(false);
-
-    // submit-document の steering 分岐が受理したときと同じ記録
-    recordLaunchSubmission('token-1');
-    expect(run.didWork!()).toBe(true);
+    expect(await steeringRun('approved').didWork!()).toBe(false);
+    expect(upstream.getProjectInfo).not.toHaveBeenCalled();
+    expectWarnedWith('projectId を解決できない');
   });
 
-  it('flontier の起動は対象の sessionId で数える（変わっていない）', () => {
+  it('本家に届かなければ作業なし（確かめられないものを完成と扱わない）', async () => {
+    // 3つの問い合わせのそれぞれで、例外の経路ではなくその段の分岐から false になることを固定する
+    upstream.listProjects.mockResolvedValue({ ok: false, failure: { kind: 'unreachable', path: '/api/projects/list', reason: 'ECONNREFUSED' } });
+    expect(await steeringRun('approved').didWork!()).toBe(false);
+    expectWarnedWith('projectId を解決できない');
+
+    upstream.listProjects.mockResolvedValue({ ok: true, value: [PROJECT] });
+    upstream.getProjectInfo.mockResolvedValue({ ok: false, failure: { kind: 'unreachable', path: '/api/projects/PID-A/info', reason: 'ECONNREFUSED' } });
+    expect(await steeringRun('approved').didWork!()).toBe(false);
+    expectWarnedWith('本家の info を取れない: unreachable（ECONNREFUSED）');
+
+    upstream.getProjectInfo.mockResolvedValue(info(ALL_THREE));
+    upstream.listPendingApprovals.mockResolvedValue({ ok: false, failure: { kind: 'not-configured' } });
+    expect(await steeringRun('approved').didWork!()).toBe(false);
+    expectWarnedWith('本家の承認依頼の一覧を取れない: not-configured');
+
+    expect(warn).not.toHaveBeenCalledWith(expect.anything(), [expect.stringContaining('本家への問い合わせで例外')]);
+  });
+
+  it('本家への問い合わせが例外で落ちても throw せず作業なし', async () => {
+    // ここが投げると `runBuiltInvocation` の成功経路が途中で落ち、`invocation` が running のまま残る
+    upstream.getProjectInfo.mockRejectedValue(new Error('fetch failed'));
+
+    await expect(steeringRun('approved').didWork!()).resolves.toBe(false);
+    expectWarnedWith('本家への問い合わせで例外: fetch failed');
+  });
+
+  it('flontier の起動は対象の sessionId で数える（変わっていない）', async () => {
     const run = buildRun({
       sessionId: 'session-1',
       cwd: '/tmp/share/session-1',
@@ -355,15 +525,13 @@ describe('buildRun の didWork', () => {
     });
 
     expect(run.didWork).toBeDefined();
-    expect(run.didWork!()).toBe(false);
-
-    // steering 用の起動単位の記録（token）を足しても flontier 側は反応しない
-    // ——2つのキーが混ざっていないことの裏返しの確認
-    recordLaunchSubmission('token-1');
-    expect(run.didWork!()).toBe(false);
+    expect(await run.didWork!()).toBe(false);
 
     notifySubmission('session-1');
-    expect(run.didWork!()).toBe(true);
+    expect(await run.didWork!()).toBe(true);
+
+    // flontier は本家に問い合わせない
+    expect(upstream.listProjects).not.toHaveBeenCalled();
   });
 });
 
@@ -554,20 +722,6 @@ describe('kick の接続表の後始末', () => {
     await expect(built).rejects.toThrow('設定を読めない');
     await settled;
     expect(registered(token)).toBeNull();
-  });
-
-  it('実行が終わると起動単位の提出記録も片付く（次の起動が前の起動の提出を数えない）', async () => {
-    const { settled } = kick({ sessionId: 'project-a', cwd: '/opt/projects/project-a', phase: 'approved', retries: 0 });
-    const token = issuedToken();
-
-    // submit-document の steering 分岐が受理を記録した状況をシミュレートする
-    recordLaunchSubmission(token);
-    expect(hasLaunchSubmission(token)).toBe(true);
-
-    await settled;
-
-    // removeConnection(token) と同じ .finally で捨てる（design.md D1）
-    expect(hasLaunchSubmission(token)).toBe(false);
   });
 
   it('kick は組み立て方（build）を invokeAi へ渡すだけで、自分では呼ばない', async () => {

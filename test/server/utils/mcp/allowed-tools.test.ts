@@ -1,6 +1,53 @@
 import { describe, expect, it } from 'vitest';
 
-import { MCP_SERVER_ALLOWED_TOOL, withMcpToolsAllowed } from '../../../../server/utils/mcp/allowed-tools';
+import {
+  MCP_SERVER_ALLOWED_TOOL,
+  STEERING_ALLOWED_TOOLS,
+  UPSTREAM_APPROVALS_ALLOWED_TOOL,
+  UPSTREAM_MCP_SERVER_NAME,
+  withMcpToolsAllowed,
+} from '../../../../server/utils/mcp/allowed-tools';
+
+/**
+ * steering 工程の許可（`STEERING_ALLOWED_TOOLS`）。本家 MCP を配線しても許可に載せるのは
+ * `approvals` の1本だけで、flontier 工程の既定（自前 MCP サーバーのみ）は変わらない
+ * （`docs/specs/core/settings-reference.md`「`--allowedTools`」）。
+ */
+describe('STEERING_ALLOWED_TOOLS', () => {
+  it('本家 MCP の許可は approvals の1本だけで、サーバー名と揃っている', () => {
+    expect(UPSTREAM_APPROVALS_ALLOWED_TOOL).toBe(`mcp__${UPSTREAM_MCP_SERVER_NAME}__approvals`);
+    expect(STEERING_ALLOWED_TOOLS).toEqual([MCP_SERVER_ALLOWED_TOOL, UPSTREAM_APPROVALS_ALLOWED_TOOL]);
+    expect(STEERING_ALLOWED_TOOLS.filter(tool => tool.startsWith(`mcp__${UPSTREAM_MCP_SERVER_NAME}`))).toHaveLength(1);
+  });
+
+  it('steering 工程では自前 MCP と本家 approvals の両方が --allowedTools 1本に入る', () => {
+    const result = withMcpToolsAllowed(['--model', 'sonnet', '--allowedTools', 'Read'], STEERING_ALLOWED_TOOLS);
+
+    expect(result).toEqual([
+      '--model',
+      'sonnet',
+      '--allowedTools',
+      `Read ${MCP_SERVER_ALLOWED_TOOL} ${UPSTREAM_APPROVALS_ALLOWED_TOOL}`,
+    ]);
+    expect(result.filter(arg => arg.startsWith('--allowedTools'))).toHaveLength(1);
+  });
+
+  it('--allowedTools が無くても steering の2本をフラグごと足す', () => {
+    expect(withMcpToolsAllowed(['--model', 'sonnet'], STEERING_ALLOWED_TOOLS)).toEqual([
+      '--model',
+      'sonnet',
+      '--allowedTools',
+      `${MCP_SERVER_ALLOWED_TOOL} ${UPSTREAM_APPROVALS_ALLOWED_TOOL}`,
+    ]);
+  });
+
+  it('flontier 工程の既定には本家のツールが入らない', () => {
+    const result = withMcpToolsAllowed(['--allowedTools', 'Read']);
+
+    expect(result).toEqual(['--allowedTools', `Read ${MCP_SERVER_ALLOWED_TOOL}`]);
+    expect(result.join(' ')).not.toContain(UPSTREAM_MCP_SERVER_NAME);
+  });
+});
 
 describe('withMcpToolsAllowed', () => {
   it('既存の --allowedTools の値に追記し、指定を1本に保つ', () => {

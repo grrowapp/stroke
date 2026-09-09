@@ -8,10 +8,33 @@ export const MCP_SERVER_NAME = 'stroke-board'
 /** `--allowedTools` に書く、自前 MCP サーバーのツール一式を指す名前。 */
 export const MCP_SERVER_ALLOWED_TOOL = `mcp__${MCP_SERVER_NAME}`
 
-// 本家 spec-workflow の MCP はどの工程にも配線しない。かつて steering 工程の `--mcp-config` に
-// 並べていたが、その目的は起動時の登録簿への自己登録（＝AI の起動に乗せたプロジェクトの生成）
-// だけだった。生成は P2（`POST /api/projects`）が本家 REST へ依頼するものになり、配線ごと
-// 外した（update-project-generation-via-upstream-rest design D3）。
+/**
+ * 本家 spec-workflow の MCP サーバーの名前。**steering 工程の `--mcp-config` にだけ並ぶ**
+ * （`server/utils/stroke/invoke.ts` の `mcpConfigFor`）。flontier 工程には配線しない。
+ *
+ * 配線する目的は承認依頼の作成だけである。承認依頼を作る本家 REST は無く、作成は本家
+ * MCP の `approvals` ツールにしか無い（`docs/specs/mcp/contract.md`「本家 spec-workflow の
+ * MCP との関係」）。かつての配線が担っていた起動時の登録簿への自己登録は、生成を P2
+ * （`POST /api/projects`）が起動前に済ませる今、同じ `projectId` を返すだけで生成にならない。
+ */
+export const UPSTREAM_MCP_SERVER_NAME = 'specworkflow'
+
+/**
+ * `--allowedTools` に書く、本家 MCP のうち許可する唯一のツール。
+ *
+ * 本家 MCP を配線しても、許可に載せるのはこれ1本だけである（`docs/specs/core/settings-reference.md`
+ * 「`--allowedTools`」）。`steering-guide` / `spec-workflow-guide` / `spec-status` /
+ * `log-implementation` は載せない——手順は自前の `get-steering-guide` が渡し、文書の提出は
+ * `submit-document` が代行する。本家のそれらを呼べると、提出が `submit-document` を通らない
+ * 経路が開く。
+ */
+export const UPSTREAM_APPROVALS_ALLOWED_TOOL = `mcp__${UPSTREAM_MCP_SERVER_NAME}__approvals`
+
+/**
+ * steering 工程の `--allowedTools` に足す名前。自前 MCP サーバーの一式と、本家 MCP の
+ * `approvals` だけ。flontier 工程は `withMcpToolsAllowed` の既定（自前 MCP サーバーのみ）を使う。
+ */
+export const STEERING_ALLOWED_TOOLS: readonly string[] = [MCP_SERVER_ALLOWED_TOOL, UPSTREAM_APPROVALS_ALLOWED_TOOL]
 
 const ALLOWED_TOOLS_FLAG = '--allowedTools'
 
@@ -19,7 +42,8 @@ const ALLOWED_TOOLS_FLAG = '--allowedTools'
 const ALLOWED_TOOLS_ASSIGNED = `${ALLOWED_TOOLS_FLAG}=`
 
 /**
- * 起動 args の `--allowedTools` に、自前 MCP サーバーのツールを足したものを返す。
+ * 起動 args の `--allowedTools` に、MCP のツールを足したものを返す。既定は自前 MCP
+ * サーバーのツール一式で、steering 工程は `STEERING_ALLOWED_TOOLS` を渡す。
  *
  * MCP ツールは `--allowedTools` に載っていないと claude が呼び出せない。設定
  * （`nuxt.config.ts` の `claude.args`）には持たせず、`--mcp-config` と同じく
@@ -44,9 +68,9 @@ export function withMcpToolsAllowed(
   args: string[],
   tools: readonly string[] = [MCP_SERVER_ALLOWED_TOOL],
 ): string[] {
-  // 足す名前は複数取れる形のまま残す。ただし呼び出し側が足してよいのは自前 MCP サーバー
-  // （`stroke-board`）のツールだけである。第三者の MCP のツールは足さない
-  // （adr0016-sub-fix-upstream-mcp-allowance design.md D1）。
+  // 足す名前は複数取れる。呼び出し側が足してよいのは、自前 MCP サーバー（`stroke-board`）の
+  // ツールと、steering 工程に限って本家 MCP の `approvals`（`STEERING_ALLOWED_TOOLS`）だけで
+  // ある。それ以外の第三者の MCP のツールは足さない。
   const merge = (base: string): string => tools.reduce(
     (current, tool) => (current.split(/\s+/).includes(tool)
       ? current

@@ -32,8 +32,9 @@ describe('matchesTarget（単体）', () => {
   })
 
   it('steering: cwd が --mcp-config の自前 MCP エントリのヘッダに載っていれば true（初回・runId 無し）', () => {
-    // 本家 MCP の配線は外した（update-project-generation-via-upstream-rest design D3・D4）。
-    // cwd は自前 MCP エントリの `x-stroke-cwd` ヘッダで argv に載る
+    // 照合は自前 MCP エントリの `x-stroke-cwd` ヘッダに拠る。承認依頼のために並べた本家 MCP
+    // エントリの `npx` 引数にも cwd は載るが、そちらには依存しない
+    // （update-invoke-agent-responsibility-boundary design D4）
     const argv = 'claude -p --mcp-config {"mcpServers":{"stroke-board":{"type":"http","url":"http://127.0.0.1:3100/mcp","headers":{"x-stroke-token":"t","x-mcp-tools":"get-steering-guide","x-stroke-cwd":"/opt/projects/my-project"}}}}'
     expect(matchesTarget(argv, { kind: 'steering', cwd: '/opt/projects/my-project' })).toBe(true)
   })
@@ -72,6 +73,11 @@ vi.mock('../../../../server/utils/stroke/config', () => ({
     openspec: { bin: 'openspec', initArgs: 'init --yes' },
     wsPathPattern: '/ws/{channel}',
   }),
+}))
+
+/** steering の `--mcp-config` に並ぶ本家 MCP の env に載る登録簿の場所。値は照合に関わらない */
+vi.mock('../../../../server/utils/config', () => ({
+  readServerConfig: () => ({ upstreamBaseUrl: null, specWorkflowHome: '/tmp/spec-workflow-home', syncIntervalMs: 1000 }),
 }))
 
 /** MCP の url に使う base URL は実際の待ち受けから組み立てる（`listen-address.ts`）。ここは固定値で足りる。 */

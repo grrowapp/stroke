@@ -64,18 +64,19 @@ export interface AiRun {
    *
    * プロセスが正常終了しても、何もせずに終わっていることがある。ストロークは1回の
    * 実行が必ず提出（A5・A7）で終わるので、提出が無ければ作業をしていない。steering は
-   * 提出（steering 文書）が代行先（本家）に受理されたかを、起動単位の記録で見る
-   * （`invoke.ts` の `submittedByLaunch`。fix-steering-empty-completion）。渡さなければ
-   * 常に「行われた」とみなす——今はどの用途も渡すので、この既定は工程を問わない安全弁
-   * として残る。
+   * 実行の終わりに invoke-agent が本家 REST へ問い合わせ、3本の文書と承認依頼が本家に
+   * 在るかで答える（`invoke.ts` の `steeringCompletedUpstream`。判定は終了時点の本家の
+   * 状態で行い、起動ごとの記録は持たない——`docs/specs/architecture/invoke-agent.md`）。
+   * 本家への問い合わせを含むので非同期である。渡さなければ常に「行われた」とみなす——
+   * 今はどの用途も渡すので、この既定は工程を問わない安全弁として残る。
    */
-  didWork?: () => boolean
+  didWork?: () => Promise<boolean>
   /**
    * **完成を記録する**。`didWork` と同じ置き方で、渡されているときだけ呼ぶ。
    *
    * 生成中のプロジェクト（phase が `approved`）の steering だけが渡す（`invoke.ts`）。
-   * **`didWork` が true のときだけ呼ぶ**——完成したかを決めるのは `didWork`（その起動で
-   * steering 文書の提出が本家に受理されたか）で、記録先の U15 は判定を持たない
+   * **`didWork` が true のときだけ呼ぶ**——完成したかを決めるのは `didWork`（3本の文書と
+   * その承認依頼が本家に在るか）で、記録先の U15 は判定を持たない
    * （ADR-0014・add-activated-phase design D3・D4）。記録が受理されなければ `failed` に
    * 倒す——404・409・不達はどれも「記録できていない」であり、`idle` にすると完成の記録が
    * 無いまま完了になる。
@@ -272,8 +273,8 @@ async function runBuiltInvocation(sessionId: string, run: AiRun): Promise<void> 
     // **完成の記録より先に見る。** 完成したかを決めるのは `didWork` の方で、記録先の U15 は
     // 判定を持たない（ADR-0014・add-activated-phase design D4）。作業をしていない実行が
     // 完成を記録しに行くと、何も出していない対象が完成として畳まれる。
-    if (didWork !== undefined && !didWork()) {
-      console.warn(`${LOG_PREFIX} AI 呼び出しが失敗: ${sessionId}`, ['プロセスは成功したが提出が届かない'])
+    if (didWork !== undefined && !(await didWork())) {
+      console.warn(`${LOG_PREFIX} AI 呼び出しが失敗: ${sessionId}`, ['プロセスは成功したが作業が確認できない'])
       await setInvocation('failed')
       return
     }
