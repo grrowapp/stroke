@@ -1,2 +1,4 @@
 schema: specs-with-grill
 created: 2026-09-08
+skip_specs: true
+note: 親 change。spec の delta は子 change が持つ

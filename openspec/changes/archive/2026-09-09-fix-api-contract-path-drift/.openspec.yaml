@@ -1,0 +1,4 @@
+schema: specs-with-grill
+created: 2026-09-09
+skip_specs: true
+note: docs/specs/api/contract.md の見出しの追従のみ。openspec/specs/api/session/* は既に /api/sessions/ で書かれており delta は無い
