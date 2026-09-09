@@ -5,6 +5,7 @@ import { parseBody, proposalSubmitBody } from '../../../utils/stroke/request-sch
 import { requireSessionId } from '../../../utils/stroke/session-param'
 import { notifySubmission } from '../../../utils/stroke/submission-signal'
 import {
+  isPromotedState,
   markProposalStrokeIfFirst,
   readState,
   sessionProposal,
@@ -22,13 +23,19 @@ import { proposalChannel } from '../../../utils/stroke/ws-channels'
  *
  * 順序は **残す → phase を進める → 配信する**。残せなければそこで失敗を返し、phase も
  * 配信も行わない。逆順にすると、配信だけ届いて残っていない状態が作れてしまう。
+ *
+ * **出し直しで承認の判断は失効する。** 判断はそれが下された proposal に結びつく
+ * （openspec/specs/api/session/approve）。proposal を書く口はここ1つなので、ここで
+ * 判断を持ち越さなければ足りる——版の印は持たない（design.md 決定2）。失効するのは
+ * proposal が出し直されたこの時点であって、差し戻し（U9）を送った時点ではない。
  */
 export default defineEventHandler(async (event) => {
   const sessionId = await requireSessionId(event)
   const { proposal, projectName } = parseBody(proposalSubmitBody, await readBody(event))
 
   const state = await readState(sessionId)
-  if (state.phase === 'approved') {
+  // 承認以降（`approved` / `activated`）は proposal を受けない
+  if (isPromotedState(state)) {
     throw conflict('phase', '承認済みのセッションには提出できない。')
   }
 
@@ -40,10 +47,14 @@ export default defineEventHandler(async (event) => {
   const candidate = projectName && isKebabCase(projectName) ? projectName : state.projectName
   // `invocation` には触れない。実行の記録を書くのは invokeAi だけである
   // （openspec/specs/agent/invocation の MUST）。
+  //
+  // 前の状態を丸ごと写さない。`proposed` からの出し直しなら `decision` が乗っており、
+  // それを持ち越すと古い proposal への判断で新しい proposal が昇格できてしまう。
   await writeState(sessionId, {
-    ...state,
     phase: 'proposed',
     currentQuestion: null,
+    invocation: state.invocation,
+    ...(state.retries === undefined ? {} : { retries: state.retries }),
     ...(candidate ? { projectName: candidate } : {}),
   })
 
@@ -52,6 +63,5 @@ export default defineEventHandler(async (event) => {
   // 完了の合図ではなく「作業が行われた」ことの記録。invokeAi が起動の前後で比べる。
   notifySubmission(sessionId)
 
-  setResponseStatus(event, 200)
-  return null
+  return new Response(null, { status: 204 })
 })

@@ -4,8 +4,8 @@
 
 軸は **vueuse (@vueuse/core 14.4.0) / @nuxt/ui (4.10.0) / Nuxt 標準機能で代替できるものは置き換える**。あわせて、同型の重複は**1本の composable へ集約する**。
 
-- 棚卸しの本体は `docs/specs/core/file-composables.md`。ここは置換・集約の可否だけを扱う
-- 別軸（責務分離 `separate-composable-responsibilities`・平置き `flatten-composables`）はこの評価に持ち込まない
+- 棚卸しの本体は `docs/specs/structure/file-composables.md`。ここは置換・集約の可否だけを扱う
+- 別軸（責務分離・component との境界の切り直し）はこの評価に持ち込まない
 - 記述は実装と node_modules の実物（型定義・dist ソース）から抽出した事実に限る
 
 ここでの「置換」は、**composable の廃止ではなく、内部の自前機構をライブラリ部品で組み直すこと**。公開インターフェースと参照元は変えない。純粋な一対一の差し替えに近いのは `useRelativeTime` のみ。
@@ -23,9 +23,9 @@
 | --- | --- | --- |
 | プロジェクトの読み書き | `useProjectApi`（192行） | 既に Nuxt 標準（`useFetch` / `$fetch`）の上。エラー文言変換・パス解釈はドメインロジック |
 | ステアリングの読み書き | `useSteeringDocuments`（50行） | 定数と `computed` の組み立てのみ |
-| 注釈 | `useAnnotations`（178行） | ドメイン状態と4層ペイロードの組み立て。色定数の件は `flatten-composables` の軸 |
+| 注釈 | `useAnnotations`（178行） | ドメイン状態と4層ペイロードの組み立て。色定数を `CommentModal.vue` が逆向き import している件は別軸 |
 | 問いの往復 | `useAgentQuestion`（132行） | 全体がオーケストレーション。`statusOf` / `messageOf` の重複は責務分離の軸 |
-| proposal のレビュー | `useProposalReview`（412行） | この軸単独で完結する置換は無い。モーダル開閉の `useOverlay` 化は component 側と不可分のため `realign-component-composable-boundaries` へ委譲 |
+| proposal のレビュー | `useProposalReview`（412行） | この軸単独で完結する置換は無い。モーダル開閉の `useOverlay` 化は component 側と不可分のため、この評価では扱わない |
 
 ```mermaid
 flowchart LR

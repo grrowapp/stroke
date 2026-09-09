@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787814553973_btwiky7iz",
+  "approvalId": "approval_1787814357182_m9gh7z7ji",
+  "approvalTitle": "specs mcp/tools/steering(改訂5): 文書状況の取得を追加 — 文書名省略で各文書の有無を返す(本家 info の応答から。判定し直さない)。あわせて 400 の errorCode を validation_error に変更",
+  "version": 45,
+  "timestamp": "2026-08-27T07:09:13.973Z",
+  "trigger": "revision_requested",
+  "status": "pending",
+  "content": "# mcp/tools/steering Delta\n\n## Purpose\n\nsteering 文書（product / tech / structure）を取得するツール（`get-steering`）の契約を定める。\n\n## ADDED Requirements\n\n### Requirement: 文書名を引数に steering 文書を取得する\n\nツールの引数は文書名（product / tech / structure）とする SHALL。プロジェクトの特定は引数に含めない（サーバーが解決する）。成功の結果は `status` とその文書の文章を持つ SHALL。失敗の結果は `status`（HTTP ステータスコード）・`errorCode`（status から導出する機械可読の失敗種別。検証エラー（400）は `validation_error`、本家に到達できない場合は `unreachable`）・`error`（本家が返したエラー本文）を持つ SHALL（`mcp/server` の形式）。\n\n本家の応答をツール側で変換してはならない（MUST NOT）——文書がまだ無い場合、本家は空の内容の 200 を返す（本家 2.2.7 のソースで確認済み）。本家 dashboard に到達できない場合は `status: 502` と `errorCode: unreachable` で返す SHALL。\n\n#### Scenario: 文書を読む\n\n- **GIVEN** 対象のプロジェクトに product の steering 文書が存在する\n- **WHEN** 文書名に product を指定してこのツールを実行する\n- **THEN** 結果に `status: 200` と product の文章が入り、本家 `GET /api/projects/:projectId/steering/product` の応答と一致する（検証側が突き合わせる）\n\n#### Scenario: 文書がまだ無い\n\n- **GIVEN** 対象のプロジェクトに対象の steering 文書がまだ無い\n- **WHEN** その文書名を指定してこのツールを実行する\n- **THEN** 結果に `status: 200` と空の文章が入る（本家の応答と同値。ツールは「無い」への変換をしない）\n\n#### Scenario: 不正な文書名\n\n- **GIVEN** 対象のプロジェクトが存在する\n- **WHEN** 規定外の文書名を指定してこのツールを実行する\n- **THEN** 結果はエラーで、`status: 400`・`errorCode: validation_error` と、本家が返したエラー本文（`error`）を持つ\n\n#### Scenario: 本家の dashboard が停止している\n\n- **GIVEN** 対象のプロジェクトが存在し、本家の dashboard が停止している\n- **WHEN** このツールを実行する\n- **THEN** 結果はエラーで、`status: 502` と `errorCode: unreachable` を持つ\n\n### Requirement: 文書状況を同じ口で取得する\n\n引数の文書名を省略した場合、ツールは文書状況——各 steering 文書（product / tech / structure）の有無——を返す SHALL。成功の結果は `status: 200` と各文書の有無とする SHALL。有無の値は本家の応答から作り、ツール側で判定し直さない（MUST NOT）。\n\n#### Scenario: 文書状況を読む\n\n- **GIVEN** 対象のプロジェクトに product の steering 文書だけが存在する\n- **WHEN** 文書名を省略してこのツールを実行する\n- **THEN** 結果に `status: 200` と各文書の有無が入り、product だけが有りで、本家 `GET /api/projects/:projectId/info` の応答と一致する（検証側が突き合わせる）\n",
+  "fileStats": {
+    "size": 3225,
+    "lines": 48,
+    "lastModified": "2026-08-27T07:05:45.401Z"
+  },
+  "comments": []
+}

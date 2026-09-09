@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787794732934_jbq9j6ngz",
+  "approvalId": "approval_1787792320481_lph1c5int",
+  "approvalTitle": "specs 6/7(改訂5): mcp/tools/steering — product / tech / structure の種別ごとに取得シナリオを分割",
+  "version": 13,
+  "timestamp": "2026-08-27T01:38:52.934Z",
+  "trigger": "revision_requested",
+  "status": "pending",
+  "content": "# mcp/tools/steering Delta\n\n## Purpose\n\nsteering 文書（product / tech / structure）と文書状況の取得を一元化したツールの契約を定める。\n\n## ADDED Requirements\n\n### Requirement: 文書名を引数に steering 文書を取得する\n\nツールの引数は文書名（product / tech / structure）とする SHALL。プロジェクトの特定は引数に含めない（サーバーが解決する）。結果は次のいずれか1つを返す SHALL。\n\n- **文書の内容**: 指定された steering 文書の内容\n- **エラー**: ステータスとエラー内容\n- **不達**: 取得先に到達できなかったこと\n\n#### Scenario: product を読む\n\n- **GIVEN** プロジェクトに product の steering 文書が存在する\n- **WHEN** 文書名に product を指定してツールを実行する\n- **THEN** product の steering 文書の内容が返る\n\n#### Scenario: tech を読む\n\n- **GIVEN** プロジェクトに tech の steering 文書が存在する\n- **WHEN** 文書名に tech を指定してツールを実行する\n- **THEN** tech の steering 文書の内容が返る\n\n#### Scenario: structure を読む\n\n- **GIVEN** プロジェクトに structure の steering 文書が存在する\n- **WHEN** 文書名に structure を指定してツールを実行する\n- **THEN** structure の steering 文書の内容が返る\n\n#### Scenario: 不正な文書名\n\n- **GIVEN** プロジェクトが存在する\n- **WHEN** 規定外の文書名を指定して実行する\n- **THEN** エラーが返り、ステータスとエラー内容を持つ\n\n#### Scenario: 本家の dashboard が停止している\n\n- **GIVEN** プロジェクトが存在し、本家の dashboard が停止している\n- **WHEN** このツールを実行する\n- **THEN** 不達が返る\n\n### Requirement: 文書状況を同じ口で得られる\n\nツールは文書状況（steering 各文書の有無）を同じ口で返せる SHALL。\n\n#### Scenario: 文書状況を確かめる\n\n- **GIVEN** プロジェクトが存在する\n- **WHEN** 文書状況を要求してツールを実行する\n- **THEN** steering 各文書の有無が返る\n",
+  "fileStats": {
+    "size": 2151,
+    "lines": 56,
+    "lastModified": "2026-08-27T01:06:52.840Z"
+  },
+  "comments": []
+}

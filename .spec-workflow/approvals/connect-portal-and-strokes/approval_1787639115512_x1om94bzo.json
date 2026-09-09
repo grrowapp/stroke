@@ -1,0 +1,29 @@
+{
+  "id": "approval_1787639115512_x1om94bzo",
+  "title": "connect-portal-and-strokes — レビュー18件反映版（U/W=api-session・A8=invocation 操作口・timeout は invokeAi・可否判定全廃）",
+  "filePath": ".spec-workflow/specs/connect-portal-and-strokes/requirements.md",
+  "type": "document",
+  "status": "needs-revision",
+  "createdAt": "2026-08-25T06:25:15.512Z",
+  "category": "spec",
+  "categoryName": "connect-portal-and-strokes",
+  "response": "Feedback Summary (1 comments):\n\nSpecific Text Comments:\n1. \"U13 の再キック（受理処理が `running` にする） |\n\": だれ？\n",
+  "annotations": "{\n  \"decision\": \"needs-revision\",\n  \"comments\": [\n    {\n      \"type\": \"selection\",\n      \"comment\": \"だれ？\",\n      \"timestamp\": \"2026-08-25T06:28:36.534Z\",\n      \"selectedText\": \"U13 の再キック（受理処理が `running` にする） |\\n\",\n      \"highlightColor\": {\n        \"bg\": \"rgba(255, 235, 59, 0.3)\",\n        \"border\": \"#FFEB3B\",\n        \"name\": \"#ffeb3b\"\n      },\n      \"id\": \"comment_1787639316534_wvcq347fv\",\n      \"startOffset\": 5323,\n      \"endOffset\": 5356\n    }\n  ],\n  \"summary\": \"Feedback Summary (1 comments):\\n\\nSpecific Text Comments:\\n1. \\\"U13 の再キック（受理処理が `running` にする） |\\n\\\": だれ？\\n\",\n  \"timestamp\": \"2026-08-25T06:37:26.823Z\"\n}",
+  "respondedAt": "2026-08-25T06:37:26.840Z",
+  "comments": [
+    {
+      "type": "selection",
+      "comment": "だれ？",
+      "timestamp": "2026-08-25T06:28:36.534Z",
+      "selectedText": "U13 の再キック（受理処理が `running` にする） |\n",
+      "highlightColor": {
+        "bg": "rgba(255, 235, 59, 0.3)",
+        "border": "#FFEB3B",
+        "name": "#ffeb3b"
+      },
+      "id": "comment_1787639316534_wvcq347fv",
+      "startOffset": 5323,
+      "endOffset": 5356
+    }
+  ]
+}

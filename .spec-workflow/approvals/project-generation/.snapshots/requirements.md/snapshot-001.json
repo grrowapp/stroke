@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787644269567_dcen1bij3",
+  "approvalId": "approval_1787644269495_zrpsku4zs",
+  "approvalTitle": "specs: project/generation — rename 昇格・proposal は claude が書く（新設・畳み込み）",
+  "version": 1,
+  "timestamp": "2026-08-25T07:51:09.567Z",
+  "trigger": "initial",
+  "status": "pending",
+  "content": "# specs/project/generation — delta\n\n## Purpose\n\n承認されたセッションを、後に spec-workflow がプロジェクトルートとして受け取れるプロジェクトへ昇格させる。昇格はセッションディレクトリの改名だけで行い、`.spec-workflow/` の内部構造には踏み込まない。project-generation を畳んだもの。\n\n## ADDED Requirements\n\n### Requirement: 承認はセッションディレクトリをプロジェクト名へ改名して昇格させる\n\nシステムは承認時に、そのセッションのディレクトリを確定された名前 `<name>` へ改名することでプロジェクトを作る SHALL。セッションとプロジェクトは同じ親（共有の保存先）の下に置き、昇格は同じ親の下での改名で行う SHALL。\n\nシステムは、昇格にあたって新しいディレクトリを作ってはならない（MUST NOT）し、ファイルを別の場所へ複製・移動してはならない（MUST NOT）。セッションディレクトリの中身はすべてそのままプロジェクトの中身になる。\n\nシステムは `.spec-workflow/` の内部構造を作ってはならない（MUST NOT）。\n\n#### Scenario: 承認によって昇格する\n\n- **WHEN** ユーザーが名前 `<name>` で承認する\n- **THEN** そのセッションのディレクトリが同じ親の下で `<name>` へ改名され、プロジェクトになる\n\n#### Scenario: 中身はそのまま引き継がれる\n\n- **WHEN** 昇格が成功した直後にプロジェクトの中身を見る\n- **THEN** セッションの時点にあったファイルがすべて同じ相対位置のまま入っている\n\n#### Scenario: 内部構造には踏み込まない\n\n- **WHEN** 昇格した直後の中身を見る\n- **THEN** `.spec-workflow/` 配下のファイルやディレクトリは1つも作られていない\n\n### Requirement: proposal はセッションの時点から docs 配下にある\n\nproposal を書くのは AI である。システムのコードは proposal のファイルを作ってはならない（MUST NOT）し、上書きしてはならない（MUST NOT）。\n\nAI はセッションの時点から proposal をセッションディレクトリの `docs/proposal.md` に置く SHALL。昇格はこのファイルを動かさないため、昇格後は `<name>/docs/proposal.md` としてそのまま読める。\n\n#### Scenario: セッション中の proposal の在り処\n\n- **WHEN** AI が proposal を起こした後にセッションディレクトリを見る\n- **THEN** `docs/proposal.md` に proposal の全文が入っている\n\n#### Scenario: 昇格後の proposal の在り処\n\n- **WHEN** 昇格が成功した後にプロジェクトの中身を見る\n- **THEN** `<name>/docs/proposal.md` に、承認された proposal と同じ内容が入っている\n\n#### Scenario: システムは proposal を書かない\n\n- **WHEN** 承認の処理が走る\n- **THEN** システムは proposal のファイルを新たに書き出さず、既にある `docs/proposal.md` に触れない\n\n### Requirement: 昇格の直前に既存名との衝突を確認する\n\nシステムは昇格の直前に、保存先に `<name>` が既に存在するかを確認する SHALL。既に存在する場合は改名を行わない。\n\n#### Scenario: 承認の時点で同名が存在する\n\n- **WHEN** 昇格しようとした時点で保存先に `<name>` が既に存在する\n- **THEN** システムは改名を行わず、衝突を伝え、phase を `proposed` のままにする\n\n### Requirement: 昇格に失敗したら承認を確定させず、宙吊りの状態を作らない\n\n改名に失敗した場合、システムは phase を `approved` にしない SHALL。確定された名前を実行環境がディレクトリ名として受け付けない場合も、この失敗として扱う SHALL。失敗は、それが起きた場所のエラーとして伝える。\n\n失敗したとき、セッションは phase `proposed`・元の名前のディレクトリとして残り、ユーザーが再度承認できる状態を保つ SHALL。**phase が `approved` なのに昇格していない**——承認済みとして画面から開けず、改名もされていない——状態を作ってはならない（MUST NOT）。phase の書き換えと改名の順序・巻き戻しは、どの時点で失敗してもこの状態に到達しないように実装する。\n\n#### Scenario: 改名に失敗する\n\n- **WHEN** 保存先での改名が失敗する\n- **THEN** システムはエラーを表示し、phase は `proposed`・ディレクトリは元の名前のままで、同じセッションを再度承認できる\n\n#### Scenario: 環境が名前を受け付けない\n\n- **WHEN** 確定された名前を実行環境がディレクトリ名として受け付けず、改名が失敗する\n- **THEN** システムはその失敗をエラーとして表示し、phase は `proposed` のままで、別の名前で再度承認できる\n\n#### Scenario: phase を書いた後に改名が失敗する\n\n- **WHEN** phase の書き換えの後に改名が失敗する\n- **THEN** phase は `proposed` へ戻り、セッションは元の名前のまま画面から開けて、再度承認できる。`approved` のまま昇格していないセッションは残らない\n",
+  "fileStats": {
+    "size": 5389,
+    "lines": 82,
+    "lastModified": "2026-08-25T07:49:27.287Z"
+  },
+  "comments": []
+}

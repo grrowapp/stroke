@@ -1,0 +1,46 @@
+{
+  "filePath": ".spec-workflow/steering/product.md",
+  "currentVersion": 5,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-19T23:22:53.301Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787181773291_xn0e79ard",
+      "approvalTitle": "Steering: product.md（stroke-board プロダクト概要）"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2026-08-20T00:38:59.355Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787184700222_vd53wmira",
+      "approvalTitle": "Steering: product.md v1.0.3（How it works を追加）"
+    },
+    {
+      "version": 3,
+      "filename": "snapshot-003.json",
+      "timestamp": "2026-08-24T16:07:55.412Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787587110908_pixecdmb3",
+      "approvalTitle": "Out of Scope から承認・却下と文書編集を外す"
+    },
+    {
+      "version": 4,
+      "filename": "snapshot-004.json",
+      "timestamp": "2026-08-24T16:24:08.518Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787588609501_xong2gygt",
+      "approvalTitle": "書き込みの原則を実装に合わせ、認可を Open Questions に積む"
+    },
+    {
+      "version": 5,
+      "filename": "snapshot-005.json",
+      "timestamp": "2026-08-24T16:37:52.038Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787589442910_aqwvxw0uh",
+      "approvalTitle": "認証・認可を「持たない方針」から「未実装の状態」に改め、実装の段階を決める"
+    }
+  ]
+}

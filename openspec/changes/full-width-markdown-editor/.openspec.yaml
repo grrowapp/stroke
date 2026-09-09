@@ -1,3 +1,0 @@
-schema: specs-with-grill
-created: 2026-08-24
-note: "マークダウン編集画面（仕様書・承認・ステアリング共通の DocumentEditor）に全幅トグルを付ける。ON でサイドバーを隠しビューポート全幅で編集、OFF で復帰"

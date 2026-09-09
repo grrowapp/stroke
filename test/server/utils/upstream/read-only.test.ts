@@ -1,16 +1,18 @@
 /**
- * 接点層の書き込みが、決めた3つに限られていることを機械的に確かめる。
+ * 接点層の書き込みが、決めた4つに限られていることを機械的に確かめる。
  *
- * 通すのは次の3つだけである。
+ * 通すのは次の4つだけである。
  *
  * - `POST /approvals/:id/:action` — 承認への応答
  * - `PUT /specs/:name/:document` — 仕様書の文書の保存（specs/document-editing）
  * - `PUT /steering/:name` — ステアリング文書の保存（同上）
+ * - `POST /api/projects/add` — プロジェクトの登録（specs/api/project/generate。
+ *   update-project-generation-via-upstream-rest）
  *
  * ファイルに触るのは本家であり、stroke-board が `.spec-workflow/` を直接書くことは
- * 無い（ADR-0005）。この関係は編集を入れても変わらない。
+ * 無い（ADR-0005）。登録で `.spec-workflow/approvals/` を作るのも本家である。
  *
- * 「3つだけ」は目視では守れないので、ここで固定する。書き込み口を増やすときは、
+ * 「4つだけ」は目視では守れないので、ここで固定する。書き込み口を増やすときは、
  * このテストを通らないと増やせない。
  */
 
@@ -21,9 +23,8 @@ import { describe, expect, it } from 'vitest';
 
 const UPSTREAM_DIR = join(process.cwd(), 'server/utils/upstream');
 
-/** 本家が持つ書き込み系のうち、呼ぶ関数を置かないと決めているもの */
+/** 本家が持つ書き込み系のうち、呼ぶ関数を置かないと決めているもの（登録の解除を含む） */
 const FORBIDDEN_UPSTREAM_WRITES = [
-  '/api/projects/add',
   'approvals/batch',
   'implementation-log',
   '/archive',
@@ -60,10 +61,11 @@ async function sourceFiles(): Promise<{ name: string; content: string }[]> {
   );
 }
 
-describe('接点層の書き込みは決めた3つだけである', () => {
+describe('接点層の書き込みは決めた4つだけである', () => {
   it('検査対象のファイルが存在する', async () => {
     const files = await sourceFiles();
     expect(files.map((file) => file.name).sort()).toEqual([
+      'project-id.ts',
       'registry.ts',
       'rest.ts',
       'scan.ts',
@@ -90,8 +92,10 @@ describe('接点層の書き込みは決めた3つだけである', () => {
       expect(rest, `rest.ts に ${method} がある`).not.toContain(`'${method}'`);
     }
 
-    // POST は承認への応答の1か所。増えていたら書き込み口が増えている
-    expect([...rest.matchAll(/method: 'POST'/g)]).toHaveLength(1);
+    // POST は承認への応答とプロジェクトの登録の2か所。増えていたら書き込み口が増えている
+    expect([...rest.matchAll(/method: 'POST'/g)]).toHaveLength(2);
+    // 登録の解除（DELETE /api/projects/:projectId）は置かない
+    expect(rest).not.toContain("method: 'DELETE'");
 
     // PUT は保存の共通処理1か所。仕様書とステアリングの2つがここを通る
     expect([...rest.matchAll(/method: 'PUT'/g)]).toHaveLength(1);
@@ -129,7 +133,9 @@ describe('接点層の書き込みは決めた3つだけである', () => {
       'getSteeringDocument',
       'getTaskProgress',
       'listPendingApprovals',
+      'listProjects',
       'listSpecs',
+      'registerProject',
       'respondToApproval',
       'saveSpecDocument',
       'saveSteeringDocument',

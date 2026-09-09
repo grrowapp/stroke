@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787609626353_nwt3gpt1r",
+  "approvalId": "approval_1787609626314_7ux74stcr",
+  "approvalTitle": "入口の接合の対応方法（作成ボタン→ストローク概要入力）",
+  "version": 1,
+  "timestamp": "2026-08-24T22:13:46.353Z",
+  "trigger": "initial",
+  "status": "pending",
+  "content": "# 入口の接合 — 作成ボタンからストロークへ\n\n> 提出用の写し。本体はリポジトリの `docs/specs/plan/portal-stroke-entrance.md`。\n\nポータルの一覧からストロークへ入る道を開ける対応方法。実施は change `connect-portal-and-strokes` が持ち、方向の決定は ADR-0009 / ADR-0010 が持つ。この資料は両者を1枚で俯瞰するためのもの。\n\n## 何が繋がっていないか\n\n```\n[ /projects 一覧 ]                        [ ストローク側 ]\n   作成ボタン ──✗ 非活性──▶  /strokes（概要入力 → 往復 → 承認 → 生成）\n      ▲                          ▲\n      │ actions.create =         │ どのナビゲーションからも\n      │ 固定で false             │ 辿れない孤島\n      │ (target-undecided)       │\n```\n\n- `server/utils/control/actions.ts` の `resolveDirectoryActions()` が `create: { available: false, reason: 'target-undecided' }` を無条件に返す\n- これはバグではなく仕様。`openspec/specs/project-directory/` が「登録と作成は非活性の入口として持つ」を SHALL で要求し、「作成の実処理は**接続先の別プロジェクト**が担う」という統合前の前提で書かれている\n- 統合（ADR-0002）でその「別プロジェクト」は同一アプリ内の `/strokes` になり、非活性の理由は消滅した\n\n## 決定（ADR で確定済み）\n\n| ADR | 決定 |\n|---|---|\n| 0009 | 作成＝ストロークの開始。押すと概要入力画面（`/strokes`）が開く。作成のための処理・画面は新設しない |\n| 0010 | ボタンは常に押せる。前提の欠け（置き場に書き込めない等）は入った先のストローク側が表現する（`invoke-agent` の 503・`startup-readiness`） |\n\n## 対応方法\n\n### 実装の落とし方\n\n- `actions.create` は残し、`{ available: true }` を返す。理由コードは付けない。「可否はサーバーが返す状態から決める」の枠は登録（`meaning-undecided`）で引き続き使われており、作成だけ枠の外に出すより差分が小さい。将来作成に可否条件が生まれたときの席も保たれる\n- 理由コード `target-undecided` は `shared/types.ts` の型から削除する\n- `app/pages/projects/index.vue` の作成ボタンは disabled を解き、click で `/strokes` へ navigate するだけ。新しい API・画面・状態は作らない\n- 検証はテストで行う。`actions.test.ts` の期待値更新と、一覧画面の E2E（ボタンが活性・押すと概要入力画面）\n\n### 仕様（project-directory）の置き直し\n\n2要件を撤去し、登録と作成を分けて置き直す。\n\n- 撤去: 「プロジェクトの登録と作成は非活性の入口として持つ」「作成は接続先が無ければ行えず、その状態を画面に出す」\n- 追加: 「登録は非活性の入口として持ち、行えない理由を画面に出す」— 従来の登録側の扱いをそのまま引き継ぐ\n- 追加: 「作成はストロークの概要入力画面への入場である」— 常に活性。前提の充足で可否を切り替えない。独立したメニュー項目にはしない（一覧画面の操作として持つ）\n\n### 対象外\n\n- 登録の中身（`meaning-undecided` のまま。本家 `POST /api/projects/add` との関係は未決）\n- ストローク画面のシェル・ナビゲーション統合（`/strokes` からポータルへ戻る導線は当面ブラウザバック）\n- 出口側（承認後の工程）— `start-steering-after-approval`（ADR-0011）が扱う\n\n## リスク\n\n- [前提が欠けた環境では、押した後のストローク画面で初めて失敗を知る] → ADR-0010 が受け入れたトレードオフ。判定の実体（`missingPrerequisites()`）は `invoke-agent` の 503 として既に画面に出る\n- [`/strokes` からポータルへ戻る導線が無い] → 当面ブラウザバック。ナビゲーションの統合は別件\n",
+  "fileStats": {
+    "size": 4094,
+    "lines": 56,
+    "lastModified": "2026-08-24T22:13:38.343Z"
+  },
+  "comments": []
+}

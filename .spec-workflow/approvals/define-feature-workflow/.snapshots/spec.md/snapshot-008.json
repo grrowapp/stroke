@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787783901613_bmo8fj8am",
+  "approvalId": "approval_1787783640005_sfrbcu9x9",
+  "approvalTitle": "spec: feature/workflow/sync の表記統一の再承認",
+  "version": 8,
+  "timestamp": "2026-08-26T22:38:21.613Z",
+  "trigger": "approved",
+  "status": "pending",
+  "content": "## Purpose\n\nfeature の工程の最終段である sync の定義。tasks が完了した feature の確定した仕様が、openspec で言う archive → sync に相当する工程として `openspec/specs/` へ配置され、openspec の specs が育つ。発火のタイミングと担い手は実装時の設計で決める。\n\n## ADDED Requirements\n\n### Requirement: sync は確定した仕様を openspec の specs に配置する工程である\n\nsync は feature の確定した仕様を、spec 名を `feature/naming` の規約でデコードした先の `openspec/specs/<デコードしたパス>/spec.md` に配置する工程である SHALL。\n\n#### Scenario: 配置先はデコードしたパス\n\n- **WHEN** feature `api__session` の sync が完了している\n- **THEN** その仕様は `openspec/specs/api/session/spec.md` にある\n\n### Requirement: 配置される spec は openspec の spec 形式に適合する\n\nsync で配置される spec.md は openspec の機能的 spec の形式（Requirement + Scenario）に適合する SHALL。\n\n#### Scenario: 配置された spec の形式\n\n- **WHEN** sync で配置された `openspec/specs/` 配下の spec.md（例: `openspec/specs/api/session/spec.md`）を参照する\n- **THEN** Requirement と Scenario で構成された機能的 spec である\n",
+  "fileStats": {
+    "size": 1318,
+    "lines": 24,
+    "lastModified": "2026-08-26T22:33:27.616Z"
+  },
+  "comments": []
+}

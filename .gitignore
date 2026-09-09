@@ -36,11 +36,9 @@ playwright-report/
 .claude/*
 # ただし permission 設定はリポジトリ共通なので追跡する
 !.claude/settings.json
-# セッション API スキルはアプリの配布物なので追跡する
+# assets/.claude/ はアプリの配布物なので追跡する。いま残るのは文書の雛形（template/）だけで、
+# 操作系のセッション API スキルは撤去済み（adr0016-sub-switch-workflow-to-mcp-tools）
 !assets/.claude/
-
-# セッションの change は実行時データ。ワークフロー定義だけを追跡する（docs/session-workflow.md）
-workflow/openspec/changes/
 
 # ローカル専用
 .session_init/
@@ -48,5 +46,32 @@ workflow/openspec/changes/
 # E2E の作業領域
 .e2e-tmp/
 
+# `yarn check:stroke` が書き出すセッションの経過（HTML）
+.stroke-check/
+
 # openspec の store 登録マーカー。マシンローカルな台帳メタデータで、リポジトリの成果物ではない
 .openspec-store/
+
+# cork（ticket の一覧ビュー）の副産物。列の定義はマシンごとの表示設定、
+# `._*` は ticket を開くたびに書かれる AppleDouble。どちらも成果物ではない
+openspec/tickets/.cork.json
+openspec/tickets/._*
+
+# nanopm — local PM state (not for version control)
+.nanopm/
+
+# @nuxt/test-utils がテスト実行時に書く生成物。ツール定義の置き場（ファイル名＝ツール名）に
+# 成果物でないファイルを残さない（provide-operations-via-mcp・santa-method レビュー指摘）
+server/mcp/tools/.nuxtrc
+
+# yarn の移行が残すバックアップ（node_modules.yarn-bak / .nuxt.yarn-bak）。
+# 生成物のコピーであって成果物ではない。一度 11,466 ファイル・307MB を履歴へ入れた
+# ことがあるので、名前で丸ごと落とす
+*.yarn-bak/
+
+# @nuxt/test-utils がテスト実行時に書く生成物。`server/mcp/tools/.nuxtrc` と同じもので、
+# ルート側も追跡しない
+/.nuxtrc
+
+# subagent のリンク解決結果。道具がマシンごとに書き直すロック
+.subagents.lock.json

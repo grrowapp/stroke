@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787807928262_pba86cuab",
+  "approvalId": "approval_1787807771846_lgfzw3xz8",
+  "approvalTitle": "specs server/session-management(改訂4): 第1 Requirement の本文を短文3つ+接続文脈の箇条書きに分割（内容は同じ）",
+  "version": 24,
+  "timestamp": "2026-08-27T05:18:48.262Z",
+  "trigger": "revision_requested",
+  "status": "pending",
+  "content": "# server/session-management Delta\n\n## Purpose\n\nclaude の spawn と MCP 接続を結びつけるセッション管理の契約を定める。spawn 直前に発行する一時 token と、メモリ上の対応表（token → 接続文脈）により、「どの claude からの呼び出しか」の特定と「invoke.ts が起動した claude 以外の拒否」を担保する。\n\n## ADDED Requirements\n\n### Requirement: 接続は起動時発行の一時 token で担保する\n\nサーバーは claude の spawn 直前に一時 token（推測困難な乱数）を発行し、接続文脈とともに対応表へ登録する SHALL。token は MCP 設定のヘッダ `x-stroke-token` で claude に渡す SHALL。ツール呼び出しは token の照合で接続文脈を解決する SHALL。\n\n接続文脈は次を持つ。\n\n- 工程種別（flontier / steering）\n- セッション id（flontier 工程）またはプロジェクトパス（steering 工程）\n- claude の session-id\n\n#### Scenario: flontier 工程の claude が自セッションに届く\n\n- **GIVEN** stroke-board が起動済みで、概要を受理したセッションが存在する\n- **WHEN** そのセッションの flontier 工程で AI を起動し、概要の取得ツールの実行と結果の報告を指示する\n- **THEN** 報告された結果に、そのセッションの概要の本文が含まれている\n\n#### Scenario: steering 工程の claude が対象プロジェクトに届く\n\n- **GIVEN** stroke-board と本家の dashboard が起動済みで、対象のプロジェクトに product の steering 文書が存在する\n- **WHEN** そのプロジェクトの steering 工程で AI を起動し、steering 文書の取得ツールで product を読んで結果を報告するよう指示する\n- **THEN** 報告された結果に、そのプロジェクトの product の文章が含まれている\n\n### Requirement: token の無い・一致しない呼び出しを拒否する\n\ntoken を持たない、または対応表に無い token を持つツール呼び出しは HTTP 401 で拒否する SHALL。拒否では接続文脈を解決せず、既定値で補ってはならない（MUST NOT）（docs/adr/0013 の原則に整合する）。\n\n#### Scenario: token を持たない接続は拒否される\n\n- **GIVEN** stroke-board が起動済みである\n- **WHEN** token を付けずに `/mcp` へツール呼び出しを送る\n- **THEN** HTTP 401 が返る\n\n#### Scenario: 対応表に無い token は拒否される\n\n- **GIVEN** stroke-board が起動済みである\n- **WHEN** 対応表に無い token を付けて `/mcp` へツール呼び出しを送る\n- **THEN** HTTP 401 が返る\n\n### Requirement: token は実行の終了と再起動で失効する\n\n対応表のエントリは invokeAi の実行終了時（正常・異常とも）に削除する SHALL。対応表は永続化してはならない（MUST NOT）——stroke-board の再起動で全エントリが失効し、再起動をまたいで有効な資格情報を作らない。\n\n#### Scenario: 実行終了後の token は拒否される\n\n- **GIVEN** stroke-board が起動済みで、AI 起動で spawn された claude の実行が終了している\n- **WHEN** その起動に発行された token を付けて `/mcp` へツール呼び出しを送る\n- **THEN** HTTP 401 が返る\n\n#### Scenario: 再起動後の token は拒否される\n\n- **GIVEN** token の発行より後に stroke-board が再起動され、起動済みである\n- **WHEN** その token を付けて `/mcp` へツール呼び出しを送る\n- **THEN** HTTP 401 が返る\n",
+  "fileStats": {
+    "size": 3617,
+    "lines": 62,
+    "lastModified": "2026-08-27T05:16:02.222Z"
+  },
+  "comments": []
+}

@@ -1,0 +1,12 @@
+{
+  "id": "approval_1787816869193_o9n5v9aro",
+  "title": "feature ワークフロー定義の承認（器の概念対応を「change に相当する作業単位」に変更・期間の行を削除）",
+  "filePath": "docs/feature/overview.md",
+  "type": "document",
+  "status": "approved",
+  "createdAt": "2026-08-27T07:47:49.193Z",
+  "category": "spec",
+  "categoryName": "define-feature-workflow",
+  "response": "ダッシュボードから承認",
+  "respondedAt": "2026-08-27T07:49:00.018Z"
+}

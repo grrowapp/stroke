@@ -1,0 +1,286 @@
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+import { runClaude, type ClaudeLaunch } from '../../../../server/utils/stroke/claude'
+
+/**
+ * デバッグログ（openspec/specs/debug/logging）。見るのは、出力先を渡したときだけ
+ * 生出力がファイルに残ること、**セッションごとに1ファイルへ追記され過去の呼び出しを
+ * 失わないこと**、失敗した呼び出しでも残ること、書けなくても呼び出しの結果が
+ * 変わらないこと、そして**複数行の出力でも完了の検知が壊れないこと**。
+ *
+ * claude の代わりに `node -e` で子プロセスを立てる。`runClaude` が足すフラグ
+ * （`-p` 以降）は `-e` のスクリプトへの位置引数として渡り、無視される。
+ */
+
+const SESSION_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
+
+/** 打ち切りに掛からない長さ。長さそのものを見るテストは別に持つ */
+const TIMEOUT_MS = 30000
+
+/** 成功エンベロープを stdout に出して 0 で終わる子プロセス。 */
+const ENVELOPE = JSON.stringify({
+  type: 'result',
+  subtype: 'success',
+  is_error: false,
+  session_id: SESSION_ID,
+  result: 'answer',
+})
+
+function launchThat(script: string): ClaudeLaunch {
+  return {
+    command: 'node',
+    // 末尾の `--` で node 自身のオプション解釈を打ち切る。runClaude が足す `-p` 以降は
+    // スクリプトへの位置引数になる
+    args: ['-e', script, '--'],
+    apiBaseUrl: 'http://example.test:9999',
+  }
+}
+
+const SUCCESS_LAUNCH = launchThat(`process.stdout.write(${JSON.stringify(ENVELOPE)})`)
+
+/** 書き出しは呼び出しの完了と切り離されているので、現れるまで少し待つ。 */
+async function waitForFiles(dir: string, count: number): Promise<string[]> {
+  for (let i = 0; i < 50; i++) {
+    const names = await readdir(dir).catch(() => [])
+    if (names.length >= count) return names.sort()
+    await new Promise(resolve => setTimeout(resolve, 20))
+  }
+  return (await readdir(dir).catch(() => [])).sort()
+}
+
+/** 追記も呼び出しの完了と切り離されているので、指定の回数ぶん揃うまで待つ。 */
+async function waitForContent(file: string, entries: number): Promise<string> {
+  for (let i = 0; i < 50; i++) {
+    const text = await readFile(file, 'utf8').catch(() => '')
+    if (text.split('\n').filter(line => line.startsWith('# ')).length >= entries) return text
+    await new Promise(resolve => setTimeout(resolve, 20))
+  }
+  return await readFile(file, 'utf8').catch(() => '')
+}
+
+const cleanups: string[] = []
+
+async function tempDir(): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), 'claude-debug-log-'))
+  cleanups.push(dir)
+  return dir
+}
+
+afterEach(async () => {
+  vi.restoreAllMocks()
+  await Promise.all(cleanups.splice(0).map(dir => rm(dir, { recursive: true, force: true })))
+})
+
+describe('runClaude のデバッグログ', () => {
+  it('出力先を渡さなければ何も書かれない', async () => {
+    const dir = await tempDir()
+
+    const result = await runClaude({
+      sessionId: SESSION_ID,
+      launch: SUCCESS_LAUNCH,
+      cwd: dir,
+      prompt: 'PROMPT',
+      mode: 'new',
+      timeoutMs: TIMEOUT_MS,
+    })
+
+    expect(result.ok).toBe(true)
+    // 書き出しは非同期なので、少し置いてから「増えていない」を見る
+    await new Promise(resolve => setTimeout(resolve, 200))
+    expect(await readdir(dir)).toEqual([])
+  })
+
+  it('セッションごとに1ファイルへ追記され、前の呼び出しが失われない', async () => {
+    const dir = await tempDir()
+    const logDir = join(dir, 'logs')
+    const options = {
+      sessionId: SESSION_ID,
+      launch: SUCCESS_LAUNCH,
+      cwd: dir,
+      prompt: 'PROMPT',
+      mode: 'new' as const,
+      debugLogDir: logDir,
+      timeoutMs: TIMEOUT_MS,
+    }
+
+    expect((await runClaude(options)).ok).toBe(true)
+    const first = await waitForFiles(logDir, 1)
+    // ファイル名からセッションを特定できる
+    expect(first).toEqual([`${SESSION_ID}.json`])
+
+    const after1 = await waitForContent(join(logDir, first[0]!), 1)
+    expect(after1).toContain(ENVELOPE)
+
+    expect((await runClaude({ ...options, mode: 'resume' })).ok).toBe(true)
+
+    // **ファイルは増えない。** 調べる単位はセッションなので、往復のたびに開く先が
+    // 増えると1本を追えなくなる
+    const after2 = await waitForContent(join(logDir, first[0]!), 2)
+    expect(await readdir(logDir)).toEqual([`${SESSION_ID}.json`])
+
+    // 1回目の記録が残ったまま、2回目が後ろに続く
+    expect(after2.split(ENVELOPE)).toHaveLength(3)
+    // 呼び出しの区切りが読み取れる
+    expect(after2.split('\n').filter(line => line.startsWith('# '))).toHaveLength(2)
+  })
+
+  it('書き残す中身は生出力と1文字も違わない（末尾に改行を足さない）', async () => {
+    const dir = await tempDir()
+    const logDir = join(dir, 'logs')
+
+    await runClaude({
+      sessionId: SESSION_ID,
+      launch: SUCCESS_LAUNCH,
+      cwd: dir,
+      prompt: 'PROMPT',
+      mode: 'new',
+      debugLogDir: logDir,
+      timeoutMs: TIMEOUT_MS,
+    })
+
+    const written = await waitForContent(join(logDir, `${SESSION_ID}.json`), 1)
+    const lines = written.split('\n')
+
+    // 見出し行1本 + 生出力1行 + 区切りの改行。中身に手を入れると突き合わせができなくなる
+    expect(lines[0]).toMatch(/^# \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}$/)
+    expect(lines[1]).toBe(ENVELOPE)
+    expect(written).toBe(`${lines[0]}\n${ENVELOPE}\n`)
+  })
+
+  it('失敗した呼び出し（非ゼロ終了）でも出力が残る', async () => {
+    const dir = await tempDir()
+    const logDir = join(dir, 'logs')
+
+    const result = await runClaude({
+      sessionId: SESSION_ID,
+      launch: launchThat('process.stdout.write("broken output"); process.exit(1)'),
+      cwd: dir,
+      prompt: 'PROMPT',
+      mode: 'resume',
+      debugLogDir: logDir,
+      timeoutMs: TIMEOUT_MS,
+    })
+
+    expect(result.ok).toBe(false)
+    const names = await waitForFiles(logDir, 1)
+    expect(names).toEqual([`${SESSION_ID}.json`])
+    expect(await waitForContent(join(logDir, names[0]!), 1)).toContain('broken output')
+  })
+
+  it('出力先を渡したときだけ stream-json で起こす', async () => {
+    const dir = await tempDir()
+    const logDir = join(dir, 'logs')
+    // 子プロセスに届いた引数をそのまま吐かせ、最後にエンベロープを出して成功で終える。
+    // `--` の後ろが位置引数として届くので、`process.argv` に runClaude が足したフラグが並ぶ
+    const echoArgs = launchThat(
+      `process.stdout.write(JSON.stringify(process.argv.slice(1)) + "\\n" + ${JSON.stringify(ENVELOPE)})`,
+    )
+
+    const result = await runClaude({
+      sessionId: SESSION_ID, launch: echoArgs, cwd: dir, prompt: 'PROMPT', mode: 'new',
+      debugLogDir: logDir, timeoutMs: TIMEOUT_MS,
+    })
+
+    // **複数行の出力でも完了の検知が壊れないこと。** ここがこの形の要である——`stdout` を
+    // 最後の1塊だけにしたから `readEnvelope` を無変更で通せる。連結する実装へ戻すと、
+    // `stream-json` のとき `readEnvelope` は必ず null になり全呼び出しが失敗する
+    expect(result).toEqual({ ok: true, sessionId: SESSION_ID })
+
+    const names = await waitForFiles(logDir, 1)
+    const written = await readFile(join(logDir, names[0]!), 'utf8')
+    // ツールの呼び出しと結果はストリームにしか出ない。`json` のままだと、失敗した
+    // ツール呼び出しがどのログにも残らない（実測 2026-08-27）
+    expect(written).toContain('stream-json')
+    // `--print` と併用する `stream-json` の要件（`claude --help`）
+    expect(written).toContain('--verbose')
+  })
+
+  it('出力先を渡さなければ stream-json にしない', async () => {
+    const dir = await tempDir()
+    const seen = join(dir, 'argv.json')
+    const echoArgs = launchThat(
+      `require("fs").writeFileSync(${JSON.stringify(seen)}, JSON.stringify(process.argv.slice(1)));`
+      + `process.stdout.write(${JSON.stringify(ENVELOPE)})`,
+    )
+
+    const result = await runClaude({
+      sessionId: SESSION_ID, launch: echoArgs, cwd: dir, prompt: 'PROMPT', mode: 'new',
+      timeoutMs: TIMEOUT_MS,
+    })
+
+    expect(result.ok).toBe(true)
+    const argv = await readFile(seen, 'utf8')
+    expect(argv).toContain('json')
+    expect(argv).not.toContain('stream-json')
+    expect(argv).not.toContain('--verbose')
+  })
+
+  it('出力先へ書けなくても呼び出しは成功のまま、警告が1行出る', async () => {
+    const dir = await tempDir()
+    // ディレクトリの座をファイルで塞ぎ、mkdir を失敗させる
+    const blocked = join(dir, 'not-a-dir')
+    await writeFile(blocked, 'occupied')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    const result = await runClaude({
+      sessionId: SESSION_ID,
+      launch: SUCCESS_LAUNCH,
+      cwd: dir,
+      prompt: 'PROMPT',
+      mode: 'new',
+      debugLogDir: blocked,
+      timeoutMs: TIMEOUT_MS,
+    })
+
+    expect(result).toEqual({ ok: true, sessionId: SESSION_ID })
+    for (let i = 0; i < 50 && warn.mock.calls.length === 0; i++) {
+      await new Promise(resolve => setTimeout(resolve, 20))
+    }
+    expect(warn).toHaveBeenCalledOnce()
+    expect(String(warn.mock.calls[0]![0])).toContain('デバッグログを書けない')
+    expect(await readFile(blocked, 'utf8')).toBe('occupied')
+  })
+})
+
+/**
+ * 打ち切り（openspec/specs/agent/invocation「タイムアウトで failed に変える」）。
+ * 長さは設定から決まり、算出は呼び出し側（invokeAi）が行う。ここで見るのは
+ * **渡された値がそのまま効くこと**だけである。
+ */
+describe('runClaude の打ち切り', () => {
+  it('渡した時間で打ち切り、その値を detail に載せる', async () => {
+    const dir = await tempDir()
+    // 何も出さずに居座る子プロセス。放っておけば終わらない
+    const hang = launchThat('setTimeout(() => {}, 60000)')
+
+    const result = await runClaude({
+      sessionId: SESSION_ID,
+      launch: hang,
+      cwd: dir,
+      prompt: 'PROMPT',
+      mode: 'new',
+      timeoutMs: 300,
+    })
+
+    expect(result.ok).toBe(false)
+    expect(result).toEqual({ ok: false, sessionMissing: false, detail: 'タイムアウト (300ms)' })
+  })
+
+  it('渡した時間より早く終われば打ち切らない', async () => {
+    const dir = await tempDir()
+
+    const result = await runClaude({
+      sessionId: SESSION_ID,
+      launch: SUCCESS_LAUNCH,
+      cwd: dir,
+      prompt: 'PROMPT',
+      mode: 'new',
+      timeoutMs: TIMEOUT_MS,
+    })
+
+    expect(result).toEqual({ ok: true, sessionId: SESSION_ID })
+  })
+})

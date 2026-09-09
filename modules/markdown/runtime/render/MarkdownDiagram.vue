@@ -1,0 +1,206 @@
+<script setup lang="ts">
+/**
+ * markdown の ```mermaid フェンスを図にする。
+ *
+ * 本家は `mermaidPlugin.tsx` で npm の `mermaid` を直に呼び、返った SVG 文字列を
+ * `.mermaid-container` に流し込んでいる。ここもその手順をそのまま写す
+ * （initialize → render → 差し込み）。本家が持つホバーの「Edit」ボタンは、
+ * 文書がエディタであることに由来する機能なので、読むだけのこの画面には入れない。
+ *
+ * **サーバでは描けない。** mermaid はレイアウトを決めるのに DOM の計測（getBBox など）を
+ * 使うので Nitro では動かない。本文は SSR で出したいので、本文の描画そのものは止めず、
+ * 図の枠だけを「Loading diagram...」としてサーバとクライアントの初期描画で一致させ、
+ * `onMounted` 以降に SVG へ差し替える。こうすると hydration は枠の状態どうしで揃い、
+ * 本文は画面を開いた時点で読める（DocumentView の SSR 前提を壊さない）。
+ *
+ * **注釈の付いた図には生テキストを添える。** 図は絵なので、図の中のある字を指す位置が
+ * 画面上に無い。そこで `showSource` が立った図にだけ、もとになったフェンスの生テキストを
+ * 図の下に出す。絵と、指摘の対象の両方を見せるための足しであって、**図の置き換えではない**
+ * （図は消さない）。立てるかどうかを決めるのは外（`./source-shown.ts`）で、ここは知らない。
+ */
+import { computed, onMounted, ref, watch } from 'vue';
+
+import { useColorMode } from '#imports';
+
+import { SOURCE_END_ATTR, SOURCE_START_ATTR } from '../position/source-span';
+import type { SourceRange } from '../position/types';
+import { FENCE_SOURCE_ATTR } from './source-shown';
+
+const props = withDefaults(
+  defineProps<{
+    code: string;
+    /** 生テキストを添えるか。既定は添えない（図だけを出す） */
+    showSource?: boolean;
+    /** このフェンスが占める生テキストの範囲。添えた生テキストに印として付ける */
+    sourceRange?: SourceRange | null;
+  }>(),
+  { showSource: false, sourceRange: null },
+);
+
+/**
+ * 添えた生テキストに付ける印。
+ *
+ * 中身は `pre.props.code`（タブを開き、器の前置きを剥がした後の文字列）なので、位置の口は
+ * 文字数をそのまま数えられない。**そのための目印と材料**を属性で置いておく
+ * （`./source-shown.ts` の `FENCE_SOURCE_ATTR`）。範囲が分からなければ印も付けない。
+ */
+const sourceMarks = computed<Record<string, string | number>>(() => {
+  const marks: Record<string, string | number> = {};
+  const range = props.sourceRange;
+  if (!range) return marks;
+
+  marks[FENCE_SOURCE_ATTR] = '';
+  marks[SOURCE_START_ATTR] = range.start;
+  marks[SOURCE_END_ATTR] = range.end;
+  return marks;
+});
+
+/**
+ * 本家 `hooks/useMDXEditorTheme.ts` の `mermaidThemeVariables` をそのまま写す。
+ * 値を足したり寄せたりすると本家と絵が変わるので、写し以上のことをしない。
+ */
+const DARK_THEME_VARIABLES = {
+  primaryColor: '#3B82F6',
+  primaryTextColor: '#E5E7EB',
+  primaryBorderColor: '#6B7280',
+  lineColor: '#9CA3AF',
+  secondaryColor: '#1F2937',
+  tertiaryColor: '#374151',
+  background: '#111827',
+  mainBkg: '#1F2937',
+  secondBkg: '#374151',
+  tertiaryBkg: '#4B5563',
+} as const;
+
+const LIGHT_THEME_VARIABLES = {
+  primaryColor: '#3B82F6',
+  lineColor: '#374151',
+} as const;
+
+const colorMode = useColorMode();
+
+/** 描けた SVG。空の間は「まだ描けていない」を意味する（本家の `svg` state と同じ） */
+const svg = ref('');
+/** mermaid が投げた文言。空でなければエラー面を出す */
+const failure = ref('');
+
+async function draw(): Promise<void> {
+  // サーバ側にこの分岐ごと残らないようにする（mermaid をサーバのバンドルに引き込まない）
+  if (!import.meta.client) return;
+  if (!props.code) return;
+
+  try {
+    const { default: mermaid } = await import('mermaid');
+    const dark = colorMode.value === 'dark';
+
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: dark ? 'dark' : 'default',
+      themeVariables: dark ? { ...DARK_THEME_VARIABLES } : { ...LIGHT_THEME_VARIABLES },
+      securityLevel: 'loose',
+    });
+
+    // mermaid は描画中の要素をこの id で body に置くので、図ごとに違う値が要る
+    const id = `mermaid-${Math.random().toString(36).slice(2, 11)}`;
+    const { svg: rendered } = await mermaid.render(id, props.code);
+
+    svg.value = rendered;
+    failure.value = '';
+  } catch (error) {
+    failure.value = error instanceof Error ? error.message : 'Failed to render diagram';
+    svg.value = '';
+  }
+}
+
+onMounted(draw);
+
+// 文書を差し替えたとき・テーマを変えたときは描き直す（本家の useEffect の依存と同じ）
+watch([(): string => props.code, (): string => colorMode.value], draw);
+</script>
+
+<template>
+  <!--
+    エラー: 本家と同じく文言と元ソースを畳んで出す。
+
+    **色も本家の className の写しである**（`bg-red-50 dark:bg-red-900/20 border border-red-200
+    dark:border-red-800 rounded-lg p-4 my-4` / `text-red-700 dark:text-red-300` /
+    `text-red-600 dark:text-red-400`。既定がダークなので dark 側だけを残した）。
+    design token へ寄せないこと——寄せると本家のどれを写したのかが読めなくなり、本家が
+    変わったときに追随できない（change `adopt-upstream-design-tokens` の design D5）。
+  -->
+  <div
+    v-if="failure"
+    class="my-4 rounded-lg border border-red-800 bg-red-900/20 p-4"
+    data-testid="mermaid-error"
+  >
+    <p class="mb-2 text-sm font-medium text-red-300">Mermaid Diagram Error</p>
+    <pre class="overflow-auto text-xs whitespace-pre-wrap text-red-400">{{ failure }}</pre>
+    <details class="mt-2">
+      <summary class="cursor-pointer text-xs text-red-400">Show source</summary>
+      <pre class="mt-2 overflow-auto text-xs whitespace-pre-wrap text-gray-400">{{ code }}</pre>
+    </details>
+  </div>
+
+  <!--
+    描く前。SSR と hydration 直後はここ。図の分の高さを先に取っておく。
+
+    **色も本家の className の写しである**（`bg-gray-100 dark:bg-gray-800 rounded-lg p-4 my-4
+    animate-pulse` / `h-32 bg-gray-200 dark:bg-gray-700 rounded` /
+    `text-gray-500 dark:text-gray-400`）。上のエラーと同じ理由で token へ寄せない。
+  -->
+  <div
+    v-else-if="!svg"
+    class="my-4 animate-pulse rounded-lg bg-gray-800 p-4"
+    data-testid="mermaid-loading"
+  >
+    <div class="flex h-32 items-center justify-center rounded bg-gray-700">
+      <span class="text-sm text-gray-400">Loading diagram...</span>
+    </div>
+  </div>
+
+  <!--
+    成功。`sb-mermaid` は本家の `.mermaid-container` の写し。
+    差し込むのは mermaid が組み立てた SVG で、本家も同じ（`dangerouslySetInnerHTML`）。
+
+    **生テキストを添えないときは、器を1つも増やさない。** 既定の見え方を1画素も変えない
+    ためで、下の枝と共通化しない（`.sb-mermaid` は `display:flex` なので、間に器を挟むと
+    SVG の伸び方が変わる）。
+  -->
+  <div v-else-if="!props.showSource" class="sb-mermaid" data-testid="mermaid-diagram" v-html="svg" />
+
+  <!--
+    成功、かつ生テキストを添える。
+
+    **添えても本文の他の箇所が動かない。** 添えたものを図の枠の中へ絶対配置で収めるので、
+    枠の高さは図だけのときと同じままになる（外側の器は余白も枠線も持たないので、
+    `.sb-mermaid` の margin はそのまま外へ抜ける）。注釈が付いた瞬間に後ろの段落が
+    ずり下がると読めなくなるため、この形は要件である。
+
+    畳めるようにしてあるのは、生テキストが図の下側に重なるからである。既定は開いた状態
+    （注釈の指す字がすぐ見える）で、絵の全体を見たいときに畳む。
+  -->
+  <div v-else class="relative" data-testid="mermaid-with-source">
+    <div class="sb-mermaid" data-testid="mermaid-diagram" v-html="svg" />
+    <!--
+      `not-prose` を付けるのは、この `pre` に Tailwind Typography の `pre` の型
+      （面・余白・字送り）が当たらないようにするため。生テキストの面（`MarkdownSource.vue`）
+      と同じ見え方にしたいので、本文の型を通さない。
+    -->
+    <details
+      open
+      class="not-prose absolute inset-x-4 bottom-4 max-h-[60%] overflow-auto rounded-md border border-gray-700 bg-gray-900 shadow-lg"
+      data-testid="mermaid-source"
+    >
+      <summary class="cursor-pointer px-3 py-1 text-xs text-gray-400">Source</summary>
+      <!--
+        字は生テキストの面の写し（本家 `TextAnnotate` の実測: 0.875rem / 1.625 /
+        pre-wrap / break-word）。**1つの補間として出す**のも同じ理由で、要素を挟むと
+        text ノードが割れて位置の口が数え直しになる。
+      -->
+      <pre
+        v-bind="sourceMarks"
+        class="px-3 pb-3 font-mono text-[0.875rem]/[1.625] whitespace-pre-wrap text-gray-300 [word-break:break-word]"
+      >{{ props.code }}</pre>
+    </details>
+  </div>
+</template>

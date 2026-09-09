@@ -6,7 +6,7 @@
       "args": [
         "-y",
         "@pimzino/spec-workflow-mcp@latest",
-        "/home/vagrant/work/stroke-board/base2"
+        "/opt/projects/stroke-board"
       ],
       "env": {
         "SPEC_WORKFLOW_HOME": "/opt/projects/.spec-workflow-mcp",

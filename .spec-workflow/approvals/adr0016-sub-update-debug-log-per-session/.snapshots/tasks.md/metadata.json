@@ -1,0 +1,14 @@
+{
+  "filePath": "openspec/changes/adr0016-sub-update-debug-log-per-session/tasks.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-30T06:33:49.382Z",
+      "trigger": "initial",
+      "approvalId": "approval_1788071628843_e3ae9d5sf",
+      "approvalTitle": "adr0016-sub-update-debug-log-per-session の tasks.md"
+    }
+  ]
+}

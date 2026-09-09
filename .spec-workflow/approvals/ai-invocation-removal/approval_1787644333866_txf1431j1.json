@@ -1,0 +1,12 @@
+{
+  "id": "approval_1787644333866_txf1431j1",
+  "title": "specs: ai-invocation — 廃止（→ agent/invocation へ全要件移行）",
+  "filePath": ".spec-workflow/specs/ai-invocation-removal/requirements.md",
+  "type": "document",
+  "status": "rejected",
+  "createdAt": "2026-08-25T07:52:13.866Z",
+  "category": "spec",
+  "categoryName": "ai-invocation-removal",
+  "response": "。",
+  "respondedAt": "2026-08-26T22:06:02.590Z"
+}

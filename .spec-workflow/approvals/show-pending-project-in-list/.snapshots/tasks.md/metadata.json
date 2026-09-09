@@ -1,0 +1,14 @@
+{
+  "filePath": "openspec/changes/show-pending-project-in-list/tasks.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-30T07:01:41.055Z",
+      "trigger": "initial",
+      "approvalId": "approval_1788073300446_oihkwjq0z",
+      "approvalTitle": "show-pending-project-in-list の tasks.md"
+    }
+  ]
+}

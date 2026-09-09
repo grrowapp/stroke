@@ -4,10 +4,15 @@
 
 | 項目 | 型 | 必須 | 中身 |
 |---|---|---|---|
-| `phase` | `"stroking"` \| `"proposed"` \| `"approved"` | 必須 | セッションの局面 |
-| `currentQuestion` | `Question` \| `null` | `approved` 以外は必須 | 今ユーザーが答えるべき問い |
-| `invocation` | `"running"` \| `"idle"` \| `"failed"` | `approved` 以外は必須 | `claude -p` の実行状態 |
-| `projectName` | `string` | `approved` は必須、他は任意 | `approved` 前は AI が提案した kebab-case の候補、`approved` は確定した名前 |
+| `phase` | `"stroking"` \| `"proposed"` \| `"approved"` \| `"activated"` | 必須 | セッションの局面。`stroking → proposed → approved → activated` の一方向。値の集合は `shared/stroke.ts` の `PHASES` が持つ。`approved` は生成中、`activated` は完成（steering が文書を出し終えたことを U15 が記録した） |
+| `currentQuestion` | `Question` \| `null` | 昇格前（`stroking` / `proposed`）は必須 | 今ユーザーが答えるべき問い |
+| `invocation` | `"running"` \| `"idle"` \| `"failed"` \| `"error"` | 昇格前は必須。昇格後（`approved` / `activated`）は省略時 `idle` | 実行の記録。`error` はリトライ上限に達した終端（`docs/specs/architecture/session-workflow.md`「実行の記録」） |
+| `retries` | `number` | 任意 | これまでに起こし直した回数。上限とタイムアウトの判定が読む |
+| `runId` | `string` | 任意 | steering の会話の続き先。claude が採番した id を覚えて次回 `--resume` に渡す。完成の記録で消えない |
+| `decision` | `object` | 任意 | 承認の判断。記録されている間もセッションは `proposed` のまま（`docs/specs/api/sessions/approve.md`） |
+| `projectName` | `string` | 昇格後は必須、他は任意 | 昇格前は AI が提案した kebab-case の候補、昇格後は確定した名前 |
+
+昇格後の2つの局面（`approved` / `activated`）は同じ形で、違うのは `phase` の値だけ。完成の記録（`docs/specs/api/sessions/activate.md`）は `phase` だけを書き換え、他の項目に触れない。
 
 ```json
 {
@@ -36,7 +41,19 @@
 ```json
 {
   "phase": "approved",
-  "projectName": "one-memo"
+  "projectName": "one-memo",
+  "invocation": "failed",
+  "retries": 0
+}
+```
+
+```json
+{
+  "phase": "activated",
+  "projectName": "one-memo",
+  "invocation": "idle",
+  "retries": 0,
+  "runId": "8a6e1f4c-2b7d-4e0a-9c31-5d2f7b8e9a10"
 }
 ```
 

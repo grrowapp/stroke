@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/api-stroke/requirements.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-25T07:51:41.543Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787644301490_r33uoras2",
+      "approvalTitle": "specs: api/stroke — A 系の口・A8 追加・A7 保存廃止（新設・畳み込み）"
+    }
+  ]
+}

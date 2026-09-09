@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import fse from 'fs-extra'
-import type { Invocation, SessionSummary } from '#shared/stroke'
+import { isPhase, type Invocation, type SessionSummary } from '#shared/stroke'
 import { OPENSPEC_CONFIG_FILE, OPENSPEC_DIR } from './openspec'
 import { sessionDir, sessionFile } from './paths'
 
@@ -101,25 +101,40 @@ export async function createSessionCore(
 }
 
 /**
- * セッションを消す。存在検査 → phase の検査 → `fs-extra` の `remove(sessionDir)`
- * （design.md 決定4）。存在しない id は何も消さず失敗にする（`remove` は存在しないパスで
- * 沈黙するため、検査を先に置くことで「無いものを消した」ことにしない）。
+ * セッションを消す。存在検査 → `fs-extra` の `remove(sessionDir)`（design.md 決定4）。
+ * 存在しない id は何も消さず失敗にする（`remove` は存在しないパスで沈黙するため、検査を
+ * 先に置くことで「無いものを消した」ことにしない）。
  *
- * **消せるのはセッションだけである。** 承認で昇格した対象（`phase: 'approved'`）はもう
- * プロジェクトなので消さない。保存先にはセッション（uuid）と昇格したプロジェクト（名前）が
- * 並び、一覧（`listSessionsCore`）はどちらも返す。その名前をそのまま渡せてしまうと、
- * `.spec-workflow/` を含む本物のプロジェクトが丸ごと消える。
+ * **phase の検査は持たない。** どの局面のものを消してよいかは、削除の口（endpoint）が
+ * それぞれ決める——セッションの削除は承認より前、プロジェクトの削除は承認以降。判定を
+ * ここに置くと、実行が「誰から呼ばれたか」を知ることになる。
  *
- * **この検査は core に置く。** endpoint（U11）と CLI（`yarn session delete`）の両方が
- * ここを通るので、片方だけ守っても意味がない。
+ * **この関数は CLI（`yarn session delete`）の素通しの口である。** endpoint は
+ * `server/handler/delete.ts` を通し、その手前で phase を見る。CLI に同じ守りは無い——
+ * 名前を直に渡せば昇格済みのプロジェクトも消える。手元の道具として、そう決めてある。
  */
 export async function deleteSessionCore(root: string, sessionId: string): Promise<void> {
   if (!(await sessionExistsCore(root, sessionId))) {
     throw new SessionCoreError('not-found', `そのセッションは無い: ${sessionId}`)
   }
-  if ((await readPhase(root, sessionId)) === 'approved') {
-    throw new SessionCoreError('phase', `承認済みのプロジェクトはここでは消せない: ${sessionId}`)
-  }
+  await removeSessionDir(root, sessionId)
+}
+
+/**
+ * ディレクトリを消すだけの層。**検査は一切しない。**
+ *
+ * `deleteSessionCore` から実体を切り出したもので、本番の削除（endpoint U11・CLI
+ * `yarn session delete`）は必ず `deleteSessionCore` を通り、存在検査を受ける。phase の
+ * 検査はここにも `deleteSessionCore` にも無い——削除の口（endpoint と
+ * `server/handler/delete.ts`）が持つ。ここを直に呼んでよいのは、存在検査を通す理由が
+ * 無い呼び出しだけである。
+ *
+ * **切り出す理由は、消す実体を1箇所に保つためである。** 検証の道具（`yarn check:stroke`）は
+ * 自分が作ったセッションを後始末するが、その用途に `fse.remove` を独自に書くと、削除の
+ * 経路が3本（endpoint・CLI・道具）に増える。判定を迂回する経路を作るのではなく、判定の
+ * 無い層をここに1つ置いて共有する。
+ */
+export async function removeSessionDir(root: string, sessionId: string): Promise<void> {
   try {
     await fse.remove(sessionDir(root, sessionId))
   } catch (error) {
@@ -224,13 +239,21 @@ async function readInvocation(root: string, sessionId: string): Promise<Invocati
   return raw === 'running' || raw === 'failed' || raw === 'error' ? raw : 'idle'
 }
 
+/**
+ * 一覧に載せる phase。読めない・集合に無い値は `unknown` として載せる。
+ *
+ * ここは Nitro 無しの経路から読まれる core なので、zod を通す `readState`
+ * （`session-store.ts`。配信を import する）を持ち込まず、軽い読みを残す。ただし**値の集合は
+ * `shared/stroke.ts` の `PHASES` から引く**——ここに literal を並べない
+ * （add-activated-phase design D6）。
+ */
 async function readPhase(root: string, sessionId: string): Promise<SessionSummary['phase']> {
   try {
     const raw = JSON.parse(
       await readFile(sessionFile(root, sessionId, SESSION_FILES.state), 'utf8'),
     )
-    const phase = raw?.phase
-    return phase === 'stroking' || phase === 'proposed' || phase === 'approved' ? phase : 'unknown'
+    const phase: unknown = raw?.phase
+    return isPhase(phase) ? phase : 'unknown'
   } catch {
     return 'unknown'
   }

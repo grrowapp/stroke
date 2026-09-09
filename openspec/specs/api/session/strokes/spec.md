@@ -1,7 +1,7 @@
 # api/session/strokes Specification
 
 ## Purpose
-済んだストロークの記録を返す endpoint を規定する。
+済んだストロークの記録を返す endpoint（U3）を規定する。画面が往復の履歴を描くための読み取り専用の口であり、保存済みの記録をそのまま返す。状況による判定や加工をここに持ち込まないことを境界として定める。
 
 ## Requirements
 

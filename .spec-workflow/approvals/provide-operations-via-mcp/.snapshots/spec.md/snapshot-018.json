@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787795559073_bscn1jrbq",
+  "approvalId": "approval_1787795132946_n0x8s4u4p",
+  "approvalTitle": "specs 5b(改訂6): mcp/tools/submit — 種別を flontier / steering に。書き込みは受理の受領後、読み取りで反映を確認する形式に",
+  "version": 18,
+  "timestamp": "2026-08-27T01:52:39.073Z",
+  "trigger": "revision_requested",
+  "status": "pending",
+  "content": "# mcp/tools/submit Delta\n\n## Purpose\n\n文書の提出の一本口となるツールの契約を定める。どこへの提出かは引数の種別で決まる。\n\n## ADDED Requirements\n\n### Requirement: 文書を種別の引数で提出する\n\nツールの引数は、提出の種別（flontier / steering）と文書の文章とする SHALL。種別が steering の場合は文書名（product / tech / structure）を併せて取る SHALL。\n\nツールは、種別が flontier の場合は文章を自セッションの proposal として提出し、種別が steering の場合は指定された文書名の steering 文書として書き込む SHALL。提出先の振り分けは引数だけで決まる SHALL。引数に現れない内部状態を見て振り分けや可否を変えてはならない（MUST NOT）（docs/adr/0013 の原則に整合する）。ツール側で文章の検証を行って提出を止めてはならない（MUST NOT）——検証の正は提出先にある。\n\n結果は次のいずれか1つを返す SHALL。\n\n- **受理**: 提出が受け付けられたこと\n- **エラー**: ステータスとエラー内容\n- **不達**: 提出先に到達できなかったこと\n\n#### Scenario: proposal を提出する\n\n- **GIVEN** 把握完了に達したセッションが存在する\n- **WHEN** 種別に flontier を指定し、proposal の文章を渡してツールを実行し、受理を受領する\n- **THEN** 読み取りで、そのセッションの proposal に提出した文章が反映されていることが確認できる\n\n#### Scenario: product の steering 文書を提出する\n\n- **GIVEN** プロジェクトが存在する\n- **WHEN** 種別に steering、文書名に product を指定し、文章を渡してツールを実行し、受理を受領する\n- **THEN** 読み取りで、product の steering 文書に提出した文章が反映されていることが確認できる\n\n#### Scenario: tech の steering 文書を提出する\n\n- **GIVEN** プロジェクトが存在する\n- **WHEN** 種別に steering、文書名に tech を指定し、文章を渡してツールを実行し、受理を受領する\n- **THEN** 読み取りで、tech の steering 文書に提出した文章が反映されていることが確認できる\n\n#### Scenario: structure の steering 文書を提出する\n\n- **GIVEN** プロジェクトが存在する\n- **WHEN** 種別に steering、文書名に structure を指定し、文章を渡してツールを実行し、受理を受領する\n- **THEN** 読み取りで、structure の steering 文書に提出した文章が反映されていることが確認できる\n\n#### Scenario: 提出先の検証に通らない\n\n- **GIVEN** 把握完了に達したセッションが存在する\n- **WHEN** 種別に flontier を指定し、提出先の検証に通らない文章で提出する\n- **THEN** エラーが返り、ステータスとエラー内容を持つ\n\n#### Scenario: 検証エラーの後に出し直す\n\n- **GIVEN** 把握完了に達したセッションが存在し、直前の提出が検証エラーで受理されていない\n- **WHEN** 内容を直した文章を同じツールで提出し、受理を受領する\n- **THEN** 読み取りで、そのセッションの proposal に提出した文章が反映されていることが確認できる\n\n#### Scenario: 本家の dashboard が停止している\n\n- **GIVEN** プロジェクトが存在し、本家の dashboard が停止している\n- **WHEN** 種別に steering を指定して提出する\n- **THEN** 不達が返る\n",
+  "fileStats": {
+    "size": 3590,
+    "lines": 62,
+    "lastModified": "2026-08-27T01:48:01.011Z"
+  },
+  "comments": []
+}

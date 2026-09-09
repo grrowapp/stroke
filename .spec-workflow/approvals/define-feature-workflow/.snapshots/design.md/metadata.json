@@ -1,0 +1,22 @@
+{
+  "filePath": "openspec/changes/define-feature-workflow/design.md",
+  "currentVersion": 2,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-26T22:41:32.255Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787784092200_rbg89gufr",
+      "approvalTitle": "design: define-feature-workflow の承認（決定4つ・未決3点は実装時の設計へ）"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2026-08-26T22:46:18.014Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787784189836_6zwdo7rzw",
+      "approvalTitle": "design: define-feature-workflow の承認（改訂: 全体設計＝流れ・対応モデル・2レーンを追加）"
+    }
+  ]
+}

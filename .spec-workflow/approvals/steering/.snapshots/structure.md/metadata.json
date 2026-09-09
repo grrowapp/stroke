@@ -1,0 +1,94 @@
+{
+  "filePath": ".spec-workflow/steering/structure.md",
+  "currentVersion": 11,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-19T23:22:55.809Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787181775801_huas7zyfz",
+      "approvalTitle": "Steering: structure.md（モジュール境界と規約）"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2026-08-20T00:38:19.920Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787184701811_rg7irxwi5",
+      "approvalTitle": "Steering: structure.md 改訂2（具体的なディレクトリ構成・命名・境界）"
+    },
+    {
+      "version": 3,
+      "filename": "snapshot-003.json",
+      "timestamp": "2026-08-24T18:49:57.996Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787597378166_uuolw8e8x",
+      "approvalTitle": "structure の docs 記述をディレクトリ構造とファイル配置（表）に分けて詳述"
+    },
+    {
+      "version": 4,
+      "filename": "snapshot-004.json",
+      "timestamp": "2026-08-24T20:28:04.601Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787603236652_vrnyofzsu",
+      "approvalTitle": "steering structure — 第1階層のディレクトリ＋ファイルを掲載、prompt/ は規範から外し移行課題へ、詳細参照は system-structure.md 1本"
+    },
+    {
+      "version": 5,
+      "filename": "snapshot-005.json",
+      "timestamp": "2026-08-24T20:29:30.895Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787603328590_i3zqihnvj",
+      "approvalTitle": "steering structure — Module Boundaries を承認済み規範に整合（画面→api→utils→本家接続、書き込み3種のみ）"
+    },
+    {
+      "version": 6,
+      "filename": "snapshot-006.json",
+      "timestamp": "2026-08-24T20:31:46.724Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787603403447_g71o9pkb0",
+      "approvalTitle": "steering structure — Module Boundaries の規定を本文に明記（5層表＋依存の一方向＋越えてはいけない線）"
+    },
+    {
+      "version": 7,
+      "filename": "snapshot-007.json",
+      "timestamp": "2026-08-24T20:33:43.628Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787603552803_l12p48uny",
+      "approvalTitle": "steering structure — Module Boundaries をテンプレート形式（境界パターン＋依存の向き）で記述"
+    },
+    {
+      "version": 8,
+      "filename": "snapshot-008.json",
+      "timestamp": "2026-08-24T20:35:38.741Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787603703598_qwpzr4ivo",
+      "approvalTitle": "steering structure — ファイル配置を置き場×ファイルの圧縮表で復帰（説明列は索引へ委譲）"
+    },
+    {
+      "version": 9,
+      "filename": "snapshot-009.json",
+      "timestamp": "2026-08-24T20:37:30.132Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787603771304_oje06czgw",
+      "approvalTitle": "steering structure — ファイル配置を1ファイル1行の2列表（ファイル×置き場）に整形"
+    },
+    {
+      "version": 10,
+      "filename": "snapshot-010.json",
+      "timestamp": "2026-08-24T20:39:21.675Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787603887802_x8x5kkbsf",
+      "approvalTitle": "steering structure — ファイル配置を置き場ごとの節に分け、ファイル×説明の表に（置き場列を除去）"
+    },
+    {
+      "version": 11,
+      "filename": "snapshot-011.json",
+      "timestamp": "2026-08-30T07:56:22.200Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787867221069_6crtyoyx5",
+      "approvalTitle": "structure.md — テストの置き場の規約を追加（move-conventions-to-steering）"
+    }
+  ]
+}

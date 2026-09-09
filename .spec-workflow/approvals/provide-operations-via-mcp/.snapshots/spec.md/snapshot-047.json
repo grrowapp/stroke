@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787814841438_ryf29rk2h",
+  "approvalId": "approval_1787814617218_tr2d99gqv",
+  "approvalTitle": "specs mcp/tools/question(改訂6): パターンを追加 — セッション無し(404 / session_not_found /「そのセッションは無い。」)と承認済み拒否(409 / phase_conflict /「承認済みのセッションには提出できない。」)。エラー本文は実装で確認済み",
+  "version": 47,
+  "timestamp": "2026-08-27T07:14:01.438Z",
+  "trigger": "approved",
+  "status": "pending",
+  "content": "# mcp/tools/question Delta\n\n## Purpose\n\nストロークの問いを送るツール（`send-question`）の契約を定める。問いは文章ではなく構造化データであり、専用の引数スキーマを持つ。\n\n## ADDED Requirements\n\n### Requirement: 問いを構造化引数で送る\n\nツールの引数は問いの構造——header（話題タグ）・detail（詳細説明）・question（問い本文）・options（選択肢の一覧。各選択肢は label・description・任意の recommended を持つ）——とする SHALL。ツールは問いを自セッションのストロークの問いとして送る SHALL。成功の結果は `status: 204` を持つ SHALL（送信先は本文なしの 204 を返す）。失敗の結果は `status`（HTTP ステータスコード）・`errorCode`（失敗の種別を表す機械可読コード。検証エラー（400）は `validation_error`、セッションが無い場合（404）は `session_not_found`、承認済みで送れない場合（409）は `phase_conflict`）・`error`（送信先が返したエラー本文）を持つ SHALL（`mcp/server` の形式）。\n\nツール側で引数の値の検証を行って送信を止めてはならない（MUST NOT）——検証の正は送信先にある。\n\n#### Scenario: 送った問いが画面に表示される\n\n- **GIVEN** 対象のセッションがストローク中である\n- **WHEN** claude が header・detail・question・options を渡して問いを送る\n- **THEN** 結果に `status: 204` が入り、セッション画面（`/strokes/<セッション id>`）にその問いが表示される（検証側がブラウザで開いて確かめる）\n\n#### Scenario: 送信先の検証に通らない\n\n- **GIVEN** 対象のセッションがストローク中である\n- **WHEN** 送信先の検証に通らない問いを送る\n- **THEN** 結果はエラーで、`status: 400`・`errorCode: validation_error` と、送信先のエラー本文「問いの構造として読み取れない。」（`error`）を持つ\n\n#### Scenario: セッションが存在しない\n\n- **GIVEN** 対象のセッションが削除されている\n- **WHEN** 問いを送る\n- **THEN** 結果はエラーで、`status: 404`・`errorCode: session_not_found` と、送信先のエラー本文「そのセッションは無い。」（`error`）を持つ\n\n#### Scenario: 承認済みのセッションには送れない\n\n- **GIVEN** 対象のセッションが承認済みである\n- **WHEN** 問いを送る\n- **THEN** 結果はエラーで、`status: 409`・`errorCode: phase_conflict` と、送信先のエラー本文「承認済みのセッションには提出できない。」（`error`）を持つ\n\n#### Scenario: 検証エラーの後に送り直す\n\n- **GIVEN** 対象のセッションがストローク中であり、直前の送信が検証エラーで受け付けられていない\n- **WHEN** 内容を直した問いを同じツールで送る\n- **THEN** 結果に `status: 204` が入り、セッション画面にその問いが表示される\n",
+  "fileStats": {
+    "size": 3080,
+    "lines": 44,
+    "lastModified": "2026-08-27T07:09:29.865Z"
+  },
+  "comments": []
+}

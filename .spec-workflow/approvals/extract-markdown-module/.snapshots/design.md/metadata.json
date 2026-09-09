@@ -1,0 +1,22 @@
+{
+  "filePath": "openspec/changes/extract-markdown-module/design.md",
+  "currentVersion": 2,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-28T02:22:52.163Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787883772105_1oxr2cvc9",
+      "approvalTitle": "extract-markdown-module の design（グループ1〜4 実装済み・5〜7 はこの決定に依存）"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2026-08-28T02:35:36.291Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787883772105_1oxr2cvc9",
+      "approvalTitle": "extract-markdown-module の design（グループ1〜4 実装済み・5〜7 はこの決定に依存）"
+    }
+  ]
+}

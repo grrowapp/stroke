@@ -3,10 +3,11 @@ import { isAbsolute } from 'node:path'
 import { describeClaudeArgsError, readStrokeConfig } from './stroke/config'
 
 /**
- * 実行中はじめて気付いては困る前提が揃っているかを確かめる（specs/startup-readiness）。
+ * AI の起動に必要な前提が揃っているかを確かめる
+ * （openspec/specs/api/session/invoke-agent「前提が欠けている間は起動を受け付けない」）。
  *
  * 判定結果は保持しない。呼ばれるたびに実際の書き込み可否と設定を見るため、欠けていた
- * 前提が後から満たされれば、サービスを再起動せずに通るようになる（design.md 決定2）。
+ * 前提が後から満たされれば、サービスを再起動せずに通るようになる。
  *
  * @returns 欠けている前提。1つずつ独立した文言で返し、全て揃っていれば空。
  */
@@ -35,7 +36,11 @@ export async function missingPrerequisites(): Promise<string[]> {
     }
   }
 
-  // ADR 0001: `--setting-sources` から `project` が落ちるとスキルが一切ロードされない。
+  // ADR 0001 の `--setting-sources project` が並びに在るか。**いまこの検査は実効を持たない**
+  // ——`--add-dir` を外して以降、project 設定の探索先はセッションの cwd だけで、そこに
+  // `.claude/` は無いため、`project` の有無に関わらずロードされるスキルは0本である。
+  // 案内スキルを配り直したときに要る守りとして残してある（`describeClaudeArgsError` の
+  // 注記。santa-method レビュー指摘 7周目 2026-08-30）。
   const argsError = describeClaudeArgsError(config.claude.args)
   if (argsError) missing.push(`AI の起動定義が不正: ${argsError}`)
 

@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787795910154_b98rf6lvv",
+  "approvalId": "approval_1787795290255_wtt1nc58a",
+  "approvalTitle": "specs 5a(改訂4): mcp/tools/question — エラーのシナリオと出し直しのシナリオを分離",
+  "version": 19,
+  "timestamp": "2026-08-27T01:58:30.154Z",
+  "trigger": "approved",
+  "status": "pending",
+  "content": "# mcp/tools/question Delta\n\n## Purpose\n\nストロークの問いを提出するツールの契約を定める。問いは文章ではなく構造化データであり、専用の引数スキーマを持つ。\n\n## ADDED Requirements\n\n### Requirement: 問いを構造化引数で提出する\n\nツールの引数は問いの構造——header（話題タグ）・detail（詳細説明）・question（問い本文）・options（選択肢の一覧。各選択肢は label・description・任意の recommended を持つ）——とする SHALL。ツールは問いを自セッションのストロークの問いとして提出する SHALL。結果は次のいずれか1つを返す SHALL。\n\n- **受理**: 提出が受け付けられたこと\n- **エラー**: ステータスとエラー内容\n\n#### Scenario: 問いを提出する\n\n- **GIVEN** 対象のセッションがストローク中である\n- **WHEN** header・detail・question・options を渡してツールを実行する\n- **THEN** 問いがそのセッションに提出され、受理が返る\n\n### Requirement: 検証エラーは同じ口で出し直せる\n\nツール側で引数の値の検証を行って提出を止めてはならない（MUST NOT）——検証の正は提出先（`api/stroke/question`）にある。提出先の検証に通らなかった場合はエラーを返し、その内容を読んで同じツールの呼び直しで出し直せる SHALL。\n\n#### Scenario: 提出先の検証に通らない\n\n- **GIVEN** 対象のセッションがストローク中である\n- **WHEN** 提出先の検証に通らない問いを提出する\n- **THEN** エラーが返り、ステータスとエラー内容を持つ\n\n#### Scenario: 検証エラーの後に出し直す\n\n- **GIVEN** 対象のセッションがストローク中であり、直前の提出が検証エラーで受理されていない\n- **WHEN** 内容を直した問いを同じツールで提出する\n- **THEN** 受理が返る\n",
+  "fileStats": {
+    "size": 1977,
+    "lines": 37,
+    "lastModified": "2026-08-27T01:55:30.570Z"
+  },
+  "comments": []
+}

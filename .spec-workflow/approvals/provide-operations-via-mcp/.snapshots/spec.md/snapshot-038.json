@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787814026060_eq2qavk5v",
+  "approvalId": "approval_1787813875516_aczhrgt13",
+  "approvalTitle": "specs mcp/tools/overview(改訂3): status の具体値を明記 — 成功 200、セッション無し 404",
+  "version": 38,
+  "timestamp": "2026-08-27T07:00:26.060Z",
+  "trigger": "revision_requested",
+  "status": "pending",
+  "content": "# mcp/tools/overview Delta\n\n## Purpose\n\nセッションの概要（ユーザーが最初に投げた、作りたいシステムの説明）を取得するツール（`get-overview`）の契約を定める。\n\n## ADDED Requirements\n\n### Requirement: 概要を引数なしで取得する\n\nツールは引数を取らない SHALL。成功の結果は `status` と `overview`（そのセッションの概要の本文）を持つ SHALL。失敗の結果は `status` と `errorCode`・`error` を持つ SHALL（`mcp/server` の形式）。\n\n#### Scenario: 概要を読む\n\n- **GIVEN** 概要を受理したセッションが存在する\n- **WHEN** このツールを実行する\n- **THEN** 結果に `status: 200` と、そのセッションの概要の本文（`overview`）が入っている\n\n#### Scenario: セッションが存在しない\n\n- **GIVEN** 対象のセッションが削除されている\n- **WHEN** このツールを実行する\n- **THEN** 結果はエラーで、`status: 404` と `errorCode`・`error` を持つ\n",
+  "fileStats": {
+    "size": 1028,
+    "lines": 24,
+    "lastModified": "2026-08-27T06:56:48.829Z"
+  },
+  "comments": []
+}

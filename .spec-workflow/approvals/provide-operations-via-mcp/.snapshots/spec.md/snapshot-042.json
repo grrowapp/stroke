@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787814253429_v47i1p985",
+  "approvalId": "approval_1787814112806_khej6f1zr",
+  "approvalTitle": "specs mcp/tools/question(改訂4): errorCode / error の意味を定義(400 = bad_request、error は送信先のエラー本文)。シナリオに具体値を明記",
+  "version": 42,
+  "timestamp": "2026-08-27T07:04:13.429Z",
+  "trigger": "revision_requested",
+  "status": "pending",
+  "content": "# mcp/tools/question Delta\n\n## Purpose\n\nストロークの問いを送るツール（`send-question`）の契約を定める。問いは文章ではなく構造化データであり、専用の引数スキーマを持つ。\n\n## ADDED Requirements\n\n### Requirement: 問いを構造化引数で送る\n\nツールの引数は問いの構造——header（話題タグ）・detail（詳細説明）・question（問い本文）・options（選択肢の一覧。各選択肢は label・description・任意の recommended を持つ）——とする SHALL。ツールは問いを自セッションのストロークの問いとして送る SHALL。成功の結果は `status: 204` を持つ SHALL（送信先は本文なしの 204 を返す）。失敗の結果は `status`（HTTP ステータスコード）・`errorCode`（status から導出する機械可読の失敗種別。400 は `bad_request`）・`error`（送信先が返したエラー本文）を持つ SHALL（`mcp/server` の形式）。\n\nツール側で引数の値の検証を行って送信を止めてはならない（MUST NOT）——検証の正は送信先にある。\n\n#### Scenario: 送った問いが画面に表示される\n\n- **GIVEN** 対象のセッションがストローク中である\n- **WHEN** claude が header・detail・question・options を渡して問いを送る\n- **THEN** 結果に `status: 204` が入り、セッション画面（`/strokes/<セッション id>`）にその問いが表示される（検証側がブラウザで開いて確かめる）\n\n#### Scenario: 送信先の検証に通らない\n\n- **GIVEN** 対象のセッションがストローク中である\n- **WHEN** 送信先の検証に通らない問いを送る\n- **THEN** 結果はエラーで、`status: 400`・`errorCode: bad_request` と、送信先が返したエラー本文（`error`）を持つ\n\n#### Scenario: 検証エラーの後に送り直す\n\n- **GIVEN** 対象のセッションがストローク中であり、直前の送信が検証エラーで受け付けられていない\n- **WHEN** 内容を直した問いを同じツールで送る\n- **THEN** 結果に `status: 204` が入り、セッション画面にその問いが表示される\n",
+  "fileStats": {
+    "size": 2217,
+    "lines": 32,
+    "lastModified": "2026-08-27T07:01:30.523Z"
+  },
+  "comments": []
+}

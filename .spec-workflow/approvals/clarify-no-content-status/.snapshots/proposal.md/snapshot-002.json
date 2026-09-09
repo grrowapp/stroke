@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787811037403_9bp6wbrga",
+  "approvalId": "approval_1787810813369_ducw5z45k",
+  "approvalTitle": "clarify-no-content-status — proposal（capability を api/contract に修正）",
+  "version": 2,
+  "timestamp": "2026-08-27T06:10:37.403Z",
+  "trigger": "approved",
+  "status": "pending",
+  "content": "## Why\n\n`server/api/strokes/[id]/` の 7 つのハンドラが `setResponseStatus(event, 200)` と書いているのに、実際の応答は 204 になる。h3 はハンドラが `null` を返すと `sendNoContent` を呼び、そこで **200 だけを明示的に捨てて** 204 にするため、この行は効かない。コードだけを読むと 200 だと誤解する。\n\n実害が出ている。`rename-api-contract-doc` のレビューで独立レビュアーの 1 体が「`本文なし（204）` は誤り。実装は `setResponseStatus(event, 200)` なので 200 のはず」と MEDIUM で指摘した。実測して否認したが、コードを読む限り誰でも同じ誤りをする。\n\n根にあるのは個々のハンドラの書き方ではない。**応答の形は API 全体の共通規約なのに、規約として定義された spec がない**ことである。`docs/specs/api/contract.md` は `## 全体設計:23` に「POST は受理だけを返す（本文なし・204）。例外は U1 だけ」を、`## 約束:233-243` に 404 / 409（`busy`・`name-conflict`・`phase`）/ 400 / 502 なしを置いており、これらは endpoint 個別の仕様ではなく全 endpoint に一様にかかる。にもかかわらず `openspec/specs/api/` 側は endpoint 単位の spec しか持たず、共通規約を受け持つ capability が存在しない。そのため規約は 14 本の endpoint 記述と 7 ファイルの実装に散らばり、片方だけが動いたときに食い違う。今回の誤読はその現れである。\n\n## What Changes\n\n- **共通規約を capability として定義する。** 応答の形——受理系 POST が本文を持たないこと、その唯一の例外、エラーの区分——を `api/contract` の spec に置く。これまで `contract.md` にしかなかった横断規約に、spec 上の持ち主を与える\n- 7 ファイルの実装を、その規約と食い違わない形に揃える\n  - `answer.post.ts` / `send-back.post.ts` / `question.post.ts` / `proposal.post.ts` / `approve.post.ts` / `submission.post.ts` / `invoke-agent.get.ts`\n- 応答は変更の前後とも 204。ワイヤ上の振る舞いは変わらない\n- `docs/specs/api/contract.md` は正しいので触らない\n\nBREAKING なし。\n\n## Capabilities\n\n### New Capabilities\n\n- `api/contract`: 全 endpoint に一様にかかる応答の規約。受理系 POST が本文を持たないこと・その例外・エラーの区分を規定する。個別 endpoint の spec は自分の入出力だけを持ち、共通部分はここを参照する\n\n### Modified Capabilities\n\nなし。個別 endpoint の spec が定める振る舞いは変わらない。共通部分の持ち主が増えるだけである。\n\n## Impact\n\n- spec: `openspec/specs/api/contract/` を新設\n- コード: `server/api/strokes/[id]/` の 7 ファイル\n- API: 変更なし。応答は 204 のまま\n- 依存: なし\n- 資料: なし。`docs/specs/api/contract.md` は現状が正\n",
+  "fileStats": {
+    "size": 3017,
+    "lines": 36,
+    "lastModified": "2026-08-27T06:06:24.769Z"
+  },
+  "comments": []
+}

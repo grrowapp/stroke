@@ -141,7 +141,7 @@ store（`openspec store register`）への登録は**不要**。
 
 `yarn session`（CLI）もサーバと同じ設定を読む。`.env` があれば読み込み、無ければ既定で動く。
 
-> **注**: ポータル側の環境変数4件はこの流儀に未統合（settings-reference に載っていない）。
+> **注**: ポータル側の環境変数3件（上の表）はこの流儀に未統合（settings-reference に載っていない）。
 > 設定運用の一本化は `align-settings-conventions` の続きで扱う。
 
 ### 画面
@@ -203,13 +203,15 @@ node .output/server/index.mjs
 | `yarn typecheck` | `vue-tsc` による型チェック | 不要 |
 | `yarn test` | ユニットテスト（vitest） | 不要 |
 | `yarn test:e2e` | E2E（Playwright）。本家スタブを自動で立てる | 不要 |
-| `yarn test:live` | 稼働中の本家に実接続して形を確かめる | **必要** |
+| `yarn check:stroke` | 動いている dev サーバーへブラウザで当て、ストロークが着地するか見る | 不要 |
 
-`yarn test:live` は `NUXT_UPSTREAM_BASE_URL`（既定 `http://127.0.0.1:5000`）が指す本家に
-実際に繋ぐ。本家が動いていない環境で落ちても stroke-board の不具合ではないので、通常の
-`yarn test` からは外してある。
+`yarn check:stroke` はビルドの流れに載せるテストではない。対向の枠組み（スキル・MCP ツール・
+ワークフロースキーマ）を差し替えたときに、人が意図して叩く道具である。別の端末で `yarn dev`
+を起こしてから走らせる。実物の `claude` を起動する。
 
 E2E は本物の本家を使わない。承認依頼やタスクの状態を動かすには本家へ書き込む必要があるが、
 stroke-board はその線を越えないと決めている（`docs/adr/0005-do-not-derive-from-upstream-data.md`）。
-代わりに実測した形と同じペイロードを返すスタブ（`e2e/fixtures/upstream-stub.mjs`）を使い、
-スタブが実物とずれていないことを `yarn test:live` が本物に対して確かめる。
+代わりに実測した形と同じペイロードを返すスタブ（`test/e2e/fixtures/upstream-stub.mjs`）を使う。
+
+**スタブが実物とずれていないことを確かめる手立ては、いま無い。** 本家へ実接続するテストを
+持っていたが撤去した。ずれに気付く仕組みは別途要る。

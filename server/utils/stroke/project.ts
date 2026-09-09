@@ -18,8 +18,9 @@ const PROJECT_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
  *
  * **やるのは改名だけである**（openspec/specs/project/generation）。新しいディレクトリを
  * 作らず、ファイルを複製も移動もしない。セッションディレクトリの中身はすべてそのまま
- * プロジェクトの中身になる。`.spec-workflow/` の内部構造も作らない——それは承認後に
- * 起こす claude が呼ぶ本家 MCP の仕事である（ADR 0011）。
+ * プロジェクトの中身になる。`.spec-workflow/` の内部構造も作らない——それは承認後の
+ * 起動の前にサーバーが依頼する生成（P2 `POST /api/projects`）を受けた本家の仕事である
+ * （openspec/specs/api/project/generate）。
  *
  * セッションとプロジェクトは同じ親（`projectShareRoot`）の下にあるので、同じ親の下での
  * 改名で昇格が成立する。
@@ -53,11 +54,28 @@ export async function promoteSessionToProject(
 }
 
 /**
+ * 昇格を巻き戻す。改名を元へ戻すだけ。
+ *
+ * 承認は「衝突確認 → 改名 → `phase` を書く」の順で行う。`phase` の書き込みに失敗したとき、
+ * **移動を1回戻せば元の状態に返る**。以前の順序（`phase` を書いてから改名）では、巻き戻しが
+ * 「消えたかもしれない古い場所へ `phase` を書き戻す」になっていた。
+ *
+ * ここでは名前の形も衝突も見ない。戻す先は今しがた自分が空けた場所であり、確認する
+ * ものが無いためである。失敗しても投げない——巻き戻しの失敗で元の失敗を覆い隠さない。
+ */
+export async function revertPromotion(
+  shareRoot: string,
+  name: string,
+  sessionId: string,
+): Promise<void> {
+  await rename(projectDir(shareRoot, name), sessionDir(shareRoot, sessionId)).catch(() => {})
+}
+
+/**
  * その名前で昇格できるか。名前の形と、保存先での衝突を見る。
  *
- * **呼び出し側が phase を書き換える前に通すためにここに切り出してある。** 承認は
- * 「衝突確認 → phase 書き換え → 改名」の順でなければならず（design.md D3）、確認が
- * 改名と同じ関数の中にあると、phase を書いた後にしか確認できない。
+ * **改名の前に通すためにここに切り出してある。** 承認は「衝突確認 → 改名 → `phase` を
+ * 書く」の順で行い、既に同じ名前があるときは何も動かさずに 409 で返す。
  *
  * @returns 昇格先のパス
  */

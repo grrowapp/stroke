@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787792542641_tovoo5cka",
+  "approvalId": "approval_1787792264122_j9onfid6w",
+  "approvalTitle": "specs 5a: mcp/tools/question（新設） — 問いは構造化引数（header/detail/question/options）の専用ツールに分離",
+  "version": 10,
+  "timestamp": "2026-08-27T01:02:22.641Z",
+  "trigger": "revision_requested",
+  "status": "pending",
+  "content": "# mcp/tools/question Delta\n\n## Purpose\n\nストロークの問いを提出するツールの契約を定める。問いは文章ではなく構造化データであり、専用の引数スキーマを持つ。\n\n## ADDED Requirements\n\n### Requirement: 問いを構造化引数で提出する\n\nツールの引数は問いの構造——header（話題タグ）・detail（詳細説明）・question（問い本文）・options（選択肢の一覧。各選択肢は label・description・任意の recommended を持つ）——とする SHALL。ツールは問いを自セッションのストロークの問いとして提出する SHALL。結果は次のいずれか1つを返す SHALL。\n\n- **受理**: 提出が受け付けられたこと\n- **エラー**: ステータスとエラー内容\n\n#### Scenario: 問いを提出する\n\n- **GIVEN** ストローク中のセッションが存在する\n- **WHEN** header・detail・question・options を渡してツールを実行する\n- **THEN** 問いがそのセッションに提出され、受理が返る\n\n### Requirement: 検証エラーは同じ口で出し直せる\n\nツール側で引数の値の検証を行って提出を止めてはならない（MUST NOT）——検証の正は提出先にある。提出先の検証に通らなかった場合はエラーを返し、その内容を読んで同じツールの呼び直しで出し直せる SHALL。\n\n#### Scenario: 上限を超えた提出\n\n- **GIVEN** ストローク中のセッションが存在する\n- **WHEN** 規定の長さ・件数の上限を超えた問いを提出する\n- **THEN** エラーが返り、ステータスとエラー内容を読んで同じツールの呼び直しで出し直せる\n",
+  "fileStats": {
+    "size": 1718,
+    "lines": 31,
+    "lastModified": "2026-08-27T00:57:16.456Z"
+  },
+  "comments": []
+}

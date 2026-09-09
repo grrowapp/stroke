@@ -1,0 +1,12 @@
+{
+  "id": "approval_1787840969708_8asrzmqzn",
+  "title": "実装完了 + 検証結果: MCPサーバー提供（6ツール・接続表・invoke.ts配線）。5.1〜5.4すべて本番invoke.ts経路・ブラウザ操作で実機確認済み（詳細はverification/配下の報告ファイル）。santa-method全周PASS",
+  "filePath": "openspec/changes/provide-operations-via-mcp/tasks.md",
+  "type": "document",
+  "status": "rejected",
+  "createdAt": "2026-08-27T14:29:29.709Z",
+  "category": "spec",
+  "categoryName": "provide-operations-via-mcp",
+  "response": "却下",
+  "respondedAt": "2026-08-28T02:20:09.397Z"
+}

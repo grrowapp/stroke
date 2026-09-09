@@ -1,0 +1,14 @@
+{
+  "filePath": "openspec/changes/replace-session-skills-with-mcp/specs/agent/mcp/spec.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-26T21:05:00.355Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787778300248_sfucrkwhu",
+      "approvalTitle": "replace-session-skills-with-mcp: agent/mcp の新設（エージェント操作口の MCP 化）"
+    }
+  ]
+}

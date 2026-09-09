@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787644286174_67udgveyl",
+  "approvalId": "approval_1787644286109_s4up59p96",
+  "approvalTitle": "specs: portal/batch — failed を拾って U13 を叩く巡回（新設）",
+  "version": 1,
+  "timestamp": "2026-08-25T07:51:26.174Z",
+  "trigger": "initial",
+  "status": "pending",
+  "content": "# specs/portal/batch — delta\n\n## Purpose\n\nサーバーの定期的な巡回を規定する。失敗した AI 実行を拾って起動し直すことだけを担い、判定は API の応答のみに拠る。\n\n## ADDED Requirements\n\n### Requirement: 巡回は failed だけを拾って起動し直す\n\nシステムは定期的な巡回を持ち、セッション一覧の API（U12）の応答の `invocation` が **`failed` のものだけ**を拾う SHALL。拾った各件について、応答に載る path を cwd に添えて、サーバー内から自身の AI 起動の API（U13）を HTTP で叩く SHALL。\n\n巡回はそれ以外の条件判定を持ってはならない（MUST NOT）。何の作業をやり直すかも判定しない——実行の中身は会話の継続として再開される（`agent/invocation`）。ファイルを直接読んで判定してはならない（MUST NOT）。\n\n#### Scenario: failed の実行を拾う\n\n- **WHEN** 一覧の応答に `invocation` が `failed` の件がある状態で巡回が走る\n- **THEN** その件の path を cwd に添えて U13 が叩かれ、実行が起動し直される\n\n#### Scenario: failed が無いときの巡回\n\n- **WHEN** `failed` の件が1つも無い状態で巡回が走る\n- **THEN** 何も起動されない\n\n#### Scenario: 取得だけでは状態が変わらない\n\n- **WHEN** 巡回が一覧を取得する\n- **THEN** 取得そのものによって `invocation` は変化しない\n\n### Requirement: running・idle・error は拾わない\n\nシステムは巡回で `running`・`idle`・`error` の件を拾ってはならない（MUST NOT）。`running` の時間切れ判定は invokeAi の責務であり、`idle` にはやり直すものが無く、`error` はリトライ上限に達した終端でユーザーに引き渡す。\n\n#### Scenario: running の件がある\n\n- **WHEN** `invocation` が `running` の件がある状態で巡回が走る\n- **THEN** その件は起動し直されない\n\n#### Scenario: error の件がある\n\n- **WHEN** `invocation` が `error` の件がある状態で巡回が走る\n- **THEN** その件は起動し直されず、`error` のまま残る\n",
+  "fileStats": {
+    "size": 2184,
+    "lines": 43,
+    "lastModified": "2026-08-25T07:49:27.023Z"
+  },
+  "comments": []
+}

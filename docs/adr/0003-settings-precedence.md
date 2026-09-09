@@ -1,5 +1,7 @@
 # 設定値はコードの既定値に優先する
 
+- **状態**: archive（取って代わられ済み。現行の全貌は [`docs/specs/core/settings-reference.md`](../specs/core/settings-reference.md) 冒頭の規定にある）
+
 > **この ADR は [0004](0004-settings-reference-is-authoritative.md) に取って代わられた。**
 > `NUXT_*` の環境変数は、置き場の2件（`NUXT_SESSIONS_ROOT` / `NUXT_PROJECTS_ROOT`）を除いて全廃した。「既定値をモジュールに置き、環境変数があればそれを優先する」という形は、もう設定の一般則ではない。以下は、そう決めていた時期の記録である。**判断の根拠に使わない。**
 
@@ -43,7 +45,7 @@ Nuxt の機構に一本化する案。
 
 ## Consequences
 
-- **不正な値は既定へ倒れる。`resolve*()` は投げない。** 倒れたことは起動時チェック（`server/plugins/00.startup-checks.ts`）が示す。検査する関数は値の定義と同じモジュールに置き、起動時チェックはそれを集めるだけにする
+- **不正な値は既定へ倒れる。`resolve*()` は投げない。** 倒れたことは AI の起動要求への応答（`invoke-agent` の 503）が示す。検査する関数は値の定義と同じモジュールに置き、集める側（`server/utils/readiness.ts`）はそれを呼ぶだけにする
 - **形をなしていない値のまま走り出さない。** 環境変数は文字列で来るため、数値・絶対パス・正規表現・シグナル名は起動の時点で検査し、不正なら全件を並べて止める
 - **実行経路が違っても同じ値に解決される。** endpoint も CLI も同じ `resolve*()` を通るため、サーバが作ったセッションを CLI が同じ置き場で見つけられる
 - **ビルド時に決まる設定はこの規定の外にある。** ビルドが消費して出力を作るもの（`modules` / `css` / `devtools` / `ignore` / `nitro.experimental.websocket`）には優先しようがない。環境変数を与えても動作は変わらず、変えるにはアプリを作り直す。どちらなのかは `nuxt.config.ts` の見出しで分かれている

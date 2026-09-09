@@ -4,8 +4,8 @@
 
 軸は **@nuxt/ui (4.10.0) / vueuse (@vueuse/core 14.4.0) / Nuxt 標準機能で代替できるものは置き換える**。
 
-- 棚卸しの本体は `docs/specs/core/file-components.md`（ストローク側）と `docs/specs/core/file-component.md`（ポータル側）。ここは置換の可否だけを扱う
-- 別軸（component と composable をまたぐ切り直し `realign-component-composable-boundaries`・置き場の再編 `reorganize-components`）はこの評価に持ち込まない
+- 棚卸しの本体は `docs/specs/structure/file-components.md`（以下「棚卸し」）。ここは置換の可否だけを扱う
+- 別軸（component と composable をまたぐ切り直し・置き場の再編）はこの評価に持ち込まない
 - 記述は実装と node_modules の実物（型定義・dist ソース）から抽出した事実に限る
 
 ## 判定の方針
@@ -19,7 +19,7 @@
 
 対象は 19本（.vue 18 + .ts 1。テスト1本は対象外）。結論は**置換可（条件付き）5・部分置換 3・再編 2→1・削除 1・据置 8**。
 
-実装後の本数は **19本**。内訳は、評価対象19本から `SbIcon` / `UpstreamIcon` / `MarkdownNodes.ts` の3本が消え、再編で1本減って **15本**。そこへ範囲を広げて入った4本（後段3 + 承認注釈1）が加わる。棚卸しは `docs/specs/core/file-components.md`。
+実装後の本数は **19本**。内訳は、評価対象19本から `SbIcon` / `UpstreamIcon` / `MarkdownNodes.ts` の3本が消え、再編で1本減って **15本**。そこへ範囲を広げて入った4本（後段3 + 承認注釈1）が加わる。全数は棚卸し。
 
 > **実装後の追記（change `replace-handrolled-with-libraries`）**
 >
@@ -33,7 +33,7 @@
 | `workspace/WorkspacePanel` | 見出し+slot の markup のみ。UCard に載せても markup は残り、消える自前実装が無い |
 | `review/CommentCard` | 同上。中身は注釈ドメインの表示で、外枠だけ UCard 化しても得るものが無い |
 | `StrokeBreadcrumb` | 本体は粒開き（toggle + 往復全文パネル）。`UBreadcrumb` はリンク列のモデルで、nav 行だけ載せ替えても自前実装は消えない |
-| `review/AnnotateSource` | Selection API の一回読取 + オフセット変換。vueuse `useTextSelection` はリアクティブ追跡で用途が異なり、代替できるライブラリが無い |
+| `review/AnnotateSource` | **置換済み（2026-09-02・`create-module-annotation`）。** 据置の根拠だった「オフセット変換を自前で持つ」役目が `#markdown` の位置の対応（`PositionPort`）へ移り、選択の検出は vueuse `useTextSelection`、塗りは CSS Custom Highlight API になった |
 | `WaitingIndicator` | 置換対象の機構が無い |
 | `review/CommentModal` | **@nuxt/ui 採用済み**（UModal/UTextarea/UButton） |
 | `review/Modals` | **@nuxt/ui 採用済み**。構造の問題は責務分離の軸 |
@@ -180,7 +180,7 @@ flowchart LR
 
 **実装で判明（上の前提は誤り。削除の判定自体は変わらない）**
 
-**MDC の既定サニタイズは属性しか落とさない。** 実測では `<img>` も `<script>` も**タグとして AST に残る**（落ちるのは `on*` 属性と危険スキームの href だけ）。旧 `MarkdownNodes` は生 HTML を全て捨てていたため、設定なしで載せ替えると既存の E2E「文書に混ざった生 HTML は描かず、実行もしない」（`e2e/upstream-style.spec.ts`）が落ちる。
+**MDC の既定サニタイズは属性しか落とさない。** 実測では `<img>` も `<script>` も**タグとして AST に残る**（落ちるのは `on*` 属性と危険スキームの href だけ）。旧 `MarkdownNodes` は生 HTML を全て捨てていたため、設定なしで載せ替えると既存の E2E「文書に混ざった生 HTML は描かず、実行もしない」（`test/e2e/upstream-style.spec.ts`）が落ちる。
 
 役割の引き受け先は**設定**である。`nuxt.config.ts` に `mdc.rehypePlugins: { 'rehype-raw': false }` を置くと生 HTML が要素化されなくなり、旧実装と同じ振る舞いに戻る。加えて `mdc.components.prose: false`（下記）にすると `ProseScript` も経由しなくなるため、「Prose コンポーネントが script を握り潰す」という当ての方も無くなる。**生 HTML を描かない根拠は `rehype-raw` を切っている一点**であり、この設定を外すと成立しない。
 
@@ -212,7 +212,7 @@ flowchart LR
 
 実装 change で要調整:
 
-- `docs/specs/core/file-components.md`（規範区切り question/ に2本が載っている）と `docs/specs/reference/stroke-modules.md`（AgentQuestionModal の規定）の改定。承認済み仕様のため change + 承認を通す
+- 棚卸し（規範区切り question/ に2本が載っている）と `docs/specs/reference/stroke-modules.md`（AgentQuestionModal の規定）の改定。承認済み仕様のため change + 承認を通す
 - waiting 分岐・回答数表示を AgentQuestion に含めるかページ側に書くかは design で確定
 
 **実装結果**: 上の形で成立した（`app/components/AgentQuestion.vue` 1本）。design で確定した点は次のとおり。
@@ -249,7 +249,7 @@ component の19本勘定の外だが、markdown 描画の関心として本文�
   - **実装で判明**: `@nuxtjs/mdc` を入れると **@nuxt/ui が自前の Prose 一式（`ProseTable` / `ProseTh` …）を自動登録する**。判定は `hasNuxtModule("@nuxtjs/mdc")` との論理和なので（`node_modules/@nuxt/ui/dist/module.mjs` の 121 行）、**`ui: { prose: false }` では止まらない**。登録されると Tailwind クラスが直付けされ、`.sb-markdown` の本家写しスタイルが丸ごと負ける（表が `border-separate` `rounded-md` `text-start` になっていた）。止めるのは `mdc.components.prose: false` の側で、この値は `runtimeConfig.public.mdc` を通って `MDCRenderer` の tag → `prose-*` 差し替えを切る。2モジュールを同居させて初めて出る現象で、prototype の検証では見えていなかった
 - mermaid は本家（`enableMermaid` + mermaidPlugin）同様、**どの案でも別途後段（mermaid ライブラリで SVG 化）が必要**。prototype で MDC 出力に対する後段適用を動作確認済み
   - **結論（design 決定6・2026-08-25 改訂）: 後段を入れた。** 当初は「入れない」（新しい振る舞いが増え、純粋なリファクタという性格が崩れる）と決めていたが、方針の序列は **本家に近づけるを最大限優先** が上位にある。本家は mermaid を描いており、「現行と同一」を守るために本家との差を残すのは序列の上位を下位で覆すことになるため、覆した
-  - 受け口は `mdc.components.map: { pre: 'MarkdownPre' }`。`MarkdownPre` は `language` を見て mermaid だけ `MermaidDiagram` へ回し、それ以外は `CodeBlock` へ属性ごと素通しする。**置き場は `app/components/global/` が必須**（MDC は map の値を `resolveComponent(名前)` で引き、`app.component()` 登録されるのは `global/` だけ）。props を宣言せず `$attrs` で受ける（宣言すると shiki のクラスが受け側へ届かない）
+  - 差し込み先は `mdc.components.map: { pre: 'MarkdownPre' }`。`MarkdownPre` は `language` を見て mermaid だけ `MermaidDiagram` へ回し、それ以外は `CodeBlock` へ属性ごと素通しする。**置き場は `app/components/global/` が必須**（MDC は map の値を `resolveComponent(名前)` で引き、`app.component()` 登録されるのは `global/` だけ）。props を宣言せず `$attrs` で受ける（宣言すると shiki のクラスが受け側へ届かない）
   - `MermaidDiagram` は `import('mermaid')` の動的 import を `import.meta.client` ガードの内側に置く。**mermaid は `getBBox` などの DOM 計測を使うため Nitro では動かない**。SSR とハイドレーション直後は「Loading diagram...」の枠で両者を一致させ、`onMounted` 以降に SVG へ差し替える（`DocumentView` の SSR 前提を壊さない）。テーマ変数は本家 `hooks/useMDXEditorTheme.ts` の写し
   - **`v-html` は残る。** mermaid が組み立てた SVG の差し込みに使う（本家も `dangerouslySetInnerHTML`）。文書由来の生 HTML を描く経路（`rehype-raw`）は切ったままで、ここに入るのは mermaid 自身の出力に限られる
   - **`skip_specs: true` の根拠が変わる。** 旧決定6 はこれに紐づいていた。後段を入れたことでこの change は「振る舞いを変えない純粋なリファクタ」ではなくなるため、`skip_specs` を維持するか delta spec を起こすかの判断が要る
@@ -265,7 +265,7 @@ component の19本勘定の外だが、markdown 描画の関心として本文�
 | 置換 | 衝突し得る記述 | 変換後の条件 | 検証結果 |
 | --- | --- | --- | --- |
 | SbIcon / UpstreamIcon → UIcon | `SbIcon.vue` 冒頭「アイコンセットの選定は決めていないので、勝手に別のものを選ばない」 | customCollections は**現行パスの登録**であり、別のセットを選ぶことではない。この解釈で進めてよいかを実装前に確認。出どころ2系統の区別はコレクション名で保つ | 満たした。解釈はユーザー確認済み。`sb:` / `upstream:` の2コレクションに現行パスを登録し、`icon.mode: 'svg'` でパスが DOM に出るようにして一致を確認 |
-| NotificationToaster → useToast | `openspec/specs/notification-toast`「形は本家と同じ」「押しても何も起きない」 | theming 後の見た目・挙動が spec の Requirement を満たすことを E2E で検証。満たせなければ採らない | 満たした。Requirement 全件（5秒消滅・手動 dismiss・1行テキスト・押しても何も起きない・4種の色・フォーカスを奪わない・初回ロードで過去分を出さない）を `e2e/toast.spec.ts` で確認（4種の色とアイコンは `e2e/upstream-style.spec.ts`） |
+| NotificationToaster → useToast | `openspec/specs/notification-toast`「形は本家と同じ」「押しても何も起きない」 | theming 後の見た目・挙動が spec の Requirement を満たすことを E2E で検証。満たせなければ採らない | 満たした。Requirement 全件（5秒消滅・手動 dismiss・1行テキスト・押しても何も起きない・4種の色・フォーカスを奪わない・初回ロードで過去分を出さない）を `test/e2e/toast.spec.ts` で確認（4種の色とアイコンは `test/e2e/upstream-style.spec.ts`） |
 | EmptyState / RecordList → UEmpty / UTable | 各ファイル冒頭の本家（SteeringPage.tsx / SpecsPage.tsx）再現コメント | `:ui` 上書き後の描画が**本家と同一**であることを検証（スクリーンショット比較ではなくテストで） | 満たした。いずれも `:ui` の**置換関数**が要る（併記では既定テーマに負ける）。`EmptyState` の `text-lg`/`text-sm` に対の line-height が付く差は、本家も同じユーティリティを使うため許容（2026-08-25 ユーザー確認） |
 
 ---

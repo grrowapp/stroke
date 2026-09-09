@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787808598376_zgfqxkijw",
+  "approvalId": "approval_1787808566072_qn1g7jwfy",
+  "approvalTitle": "specs server/session-management(改訂8): 分離シナリオを「検証側が spawn の MCP 設定から token を採取し /mcp を直接呼び、保存済みの取得値と突き合わせる」形に変更（claude に判定させない・指示の注入を前提にしない）",
+  "version": 28,
+  "timestamp": "2026-08-27T05:29:58.376Z",
+  "trigger": "revision_requested",
+  "status": "pending",
+  "content": "# server/session-management Delta\n\n## Purpose\n\nclaude の起動と MCP 接続を結びつけるセッション管理の契約を定める。起動ごとに渡される一時 token により、ツール呼び出しを起動元の対象（セッション / プロジェクト）に結びつけ、それ以外の呼び出しを拒否する。\n\n## ADDED Requirements\n\n### Requirement: 呼び出しは起動単位で識別され、文脈が混ざらない\n\n同時に複数の claude が接続していても、各ツール呼び出しは自分の起動の接続文脈（工程種別と、flontier 工程ではセッション、steering 工程ではプロジェクト）でだけ解決される SHALL。他の起動の文脈で解決されてはならない（MUST NOT）。\n\n#### Scenario: 2つのセッションが同時に動いても混ざらない\n\n- **GIVEN** stroke-board が起動済みで、概要を受理したセッション A / B が存在し、検証側がセッション API から両方の概要を取得して保存している\n- **WHEN** AI 起動の口（invoke-agent）で双方の flontier 工程の claude を起動し、検証側が各 spawn の MCP 設定から token を採取して、token A / token B それぞれで `/mcp` へ概要の取得ツールを呼び出す\n- **THEN** token A の結果は保存済みのセッション A の概要と、token B の結果は保存済みのセッション B の概要と一致する（検証側が突き合わせる）\n\n#### Scenario: flontier と steering が同時に動いても混ざらない\n\n- **GIVEN** stroke-board と本家の dashboard が起動済みで、概要を受理したセッションと product の steering 文書を持つプロジェクトが存在し、検証側がセッションの概要と product の文章を取得して保存している\n- **WHEN** AI 起動の口（invoke-agent）でセッションの flontier 工程とプロジェクトの steering 工程の claude を起動し、検証側が各 spawn の MCP 設定から token を採取して、flontier の token で概要の取得ツール、steering の token で steering 文書の取得ツール（product）を `/mcp` へ呼び出す\n- **THEN** 前者の結果は保存済みの概要と、後者の結果は保存済みの product の文章と一致する（検証側が突き合わせる）\n\n### Requirement: 有効な token の無い呼び出しを拒否する\n\n有効な token を持たないツール呼び出しは HTTP 401 で拒否する SHALL。有効な token は起動時に claude へ渡されたもののみとする SHALL。拒否で接続文脈を既定値で補ってはならない（MUST NOT）（docs/adr/0013 の原則に整合する）。\n\n#### Scenario: token を持たない接続は拒否される\n\n- **GIVEN** stroke-board が起動済みである\n- **WHEN** token を付けずに `/mcp` へツール呼び出しを送る\n- **THEN** HTTP 401 が返る\n\n#### Scenario: 発行されていない token は拒否される\n\n- **GIVEN** stroke-board が起動済みである\n- **WHEN** 発行されていない token を付けて `/mcp` へツール呼び出しを送る\n- **THEN** HTTP 401 が返る\n\n### Requirement: token は実行の終了と再起動で失効する\n\ntoken は、その起動の実行終了（正常・異常とも）と stroke-board の再起動で失効する SHALL。失効した token の呼び出しは HTTP 401 で拒否する SHALL。再起動をまたいで有効な token を作ってはならない（MUST NOT）。\n\n#### Scenario: 実行終了後の token は拒否される\n\n- **GIVEN** stroke-board が起動済みで、AI 起動の口（invoke-agent）で起動された claude の実行が終了している\n- **WHEN** その起動に発行された token を付けて `/mcp` へツール呼び出しを送る\n- **THEN** HTTP 401 が返る\n\n#### Scenario: 再起動後の token は拒否される\n\n- **GIVEN** token の発行より後に stroke-board が再起動され、起動済みである\n- **WHEN** その token を付けて `/mcp` へツール呼び出しを送る\n- **THEN** HTTP 401 が返る\n",
+  "fileStats": {
+    "size": 4111,
+    "lines": 56,
+    "lastModified": "2026-08-27T05:29:17.192Z"
+  },
+  "comments": []
+}

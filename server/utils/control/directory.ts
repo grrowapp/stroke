@@ -2,13 +2,20 @@
  * 走査結果と registry を突き合わせて、上層のプロジェクト一覧を作る。
  *
  * 突き合わせのキーは `workflowRootPath` である。registry の `projectId` は
- * `projectPath`(workspace のパス) の SHA-1 から作られるため、走査で見つかる
- * `.spec-workflow` を持つディレクトリからは計算できない（design.md 決定1）。
+ * `projectPath`(workspace のパス) から作られるため、走査で見つかる `.spec-workflow` を
+ * 持つディレクトリからは一般には計算できない（design.md 決定1）——外から置かれた
+ * プロジェクトでは workspace のパスが分からないためである。
+ *
+ * **自分で作ったものだけは導ける。** 承認で昇格したプロジェクトは、MCP へ渡した cwd が
+ * そのまま workspace になり、それは `<projectShareRoot>/<name>` に等しい。生成中の行に
+ * 限って `projectId` を導出しているのはそのためである（`upstream/project-id.ts`）。
  */
 
 import type { RegistryEntry } from '../upstream/registry';
 import type { ScanResult } from '../upstream/scan';
-import type { ProjectDirectory, ProjectSummary } from '#shared/types';
+import { deriveProjectId } from '../upstream/project-id';
+import type { PromotedProject } from './creating';
+import type { ProjectCreation, ProjectDirectory, ProjectSummary } from '#shared/types';
 
 export interface RegistryLookup {
   entries: RegistryEntry[];
@@ -25,13 +32,24 @@ export type PendingApprovalCounts = ReadonlyMap<string, number>;
 /**
  * 一覧を組み立てる。
  *
- * 並びはアクティブが上、未接続が下。同じ区分の中では名前順にして、走査の返り順に
- * 依存しないようにする（specs/project-directory）。
+ * 並びはアクティブが上、未接続が下、生成中が最下部。同じ区分の中では名前順にして、
+ * 走査の返り順に依存しないようにする（specs/project/directory）。
+ *
+ * **走査は母集合を作るだけで、行が生成中か完了かは決めない。** それは昇格の記録
+ * （`promoted`）の phase が決める——`approved` は生成中、`activated` は完了。走査に出ている
+ * （`.spec-workflow/` が在る）ことを完了の根拠にしない。そのディレクトリは生成（P2）の依頼を
+ * 本家が受理したときにでき、AI が起動する前、成果物が1つも無いうちからできている（specs/project/generation・
+ * add-activated-phase design D8）。
+ *
+ * 昇格したプロジェクトは走査と**ディレクトリ名**で突き合わせる。承認した直後は
+ * `.spec-workflow` を持たないため `workflowRootPath` が定まらず、走査側のキーが使えない
+ * （design.md D1）。
  */
 export function buildProjectDirectory(
   scan: ScanResult,
   registry: RegistryLookup,
   pendingApprovals: PendingApprovalCounts = new Map(),
+  promoted: readonly PromotedProject[] = [],
 ): ProjectDirectory {
   if (scan.status === 'not-configured') return { status: 'not-configured' };
 
@@ -40,15 +58,37 @@ export function buildProjectDirectory(
   }
 
   const activeByWorkflowRoot = indexActiveEntries(registry.entries);
+  const promotedByName = new Map(promoted.map((entry) => [entry.name, entry]));
 
   const projects: ProjectSummary[] = scan.projects.map((project) => {
+    // 昇格の記録は突き合わせたら落とす。**承認で作ったものかどうか**と**生成中かどうか**は、
+    // 落とす前のここでしか分からない
+    const promotedHere = promotedByName.get(project.name);
+    promotedByName.delete(project.name);
+
+    // 生成中（`approved`）の行は、走査に出ていても registry に載っていても生成中のまま。
+    // 接続の判定に掛けない——掛けると成果物が無いまま入場できる行になる
+    // （specs/project/directory「アクティブと未接続を判定して示す」）
+    if (promotedHere?.phase === 'approved') {
+      return unfinished(project.name, project.workflowRootPath);
+    }
+
     const entry = activeByWorkflowRoot.get(project.workflowRootPath);
 
     return {
       name: project.name,
       workflowRootPath: project.workflowRootPath,
       connection: entry === undefined ? 'disconnected' : 'active',
-      projectId: entry?.projectId ?? null,
+      creation: 'done',
+      // registry から引けないとき、**承認で作ったものに限って**導出で埋める。決着の直後は
+      // 本家がまだ起動しておらず registry に載っていないので、そこで null にすると承認画面を
+      // 開く選択肢が選べなくなる（specs/project/generation）。
+      //
+      // **外から置かれたプロジェクトには導出しない。** workspace のパスが分からず、導出値は
+      // 本家の id と別物になる（design.md D13）。null のままにして「本家に載っていない」ことを
+      // 保つ——`enter()` と `unread()` はその null を見ている
+      projectId:
+        entry?.projectId ?? (promotedHere !== undefined ? deriveProjectId(project.workflowRootPath) : null),
       // アクティブの実体は生きた PID なので、その値をそのまま出す
       pid: entry?.instances[0]?.pid ?? null,
       lastModified: project.lastModified,
@@ -56,6 +96,15 @@ export function buildProjectDirectory(
       pendingApprovals: entry === undefined ? null : (pendingApprovals.get(entry.projectId) ?? null),
     };
   });
+
+  // 走査に出てこなかった昇格分＝`.spec-workflow/` がまだ無い。承認した直後はここに落ちる。
+  // 完成の記録（`activated`）が在るのに走査に出ないことは、**起動時の書き上げが畳んだ
+  // legacy で起こりうる**（design D9・Risks「成果物ゼロの legacy を畳む」）。書き上げは
+  // 成果物を見ずに `approved` + `idle` を `activated` にするので、`.spec-workflow/` を
+  // 持たないものが完成として現れる。完了・未接続として出す（design D8）
+  for (const entry of promotedByName.values()) {
+    projects.push(entry.phase === 'approved' ? unfinished(entry.name, entry.path) : completedUnscanned(entry.name, entry.path));
+  }
 
   projects.sort(compareProjects);
 
@@ -65,6 +114,36 @@ export function buildProjectDirectory(
     projects,
     registryReadable: registry.readable,
   };
+}
+
+/**
+ * 生成中の行。本家から来る値は持たず、接続の判定の対象にもしない
+ * （specs/project/directory「アクティブと未接続を判定して示す」）。本家に載っていても
+ * `active` にしない——`connection` が `disconnected` であることが入場のガードの根拠である。
+ *
+ * **`projectId` だけは導出して入れる。** 破棄のリクエストは `projectId` で組むが
+ * （`DELETE /api/projects/:projectId`）、registry には載っていないことがある。本家と同じ式で
+ * workspace のパスから作る（`upstream/project-id.ts`）。画面は受け取った値を使うだけで、
+ * id の作り方を知らない。
+ */
+function unfinished(name: string, workflowRootPath: string): ProjectSummary {
+  return {
+    name,
+    workflowRootPath,
+    connection: 'disconnected',
+    creation: 'in-progress',
+    projectId: deriveProjectId(workflowRootPath),
+    pid: null,
+    // 走査で拾えても埋めない。生成中に本家の値を見せない
+    lastModified: null,
+    pendingApprovals: null,
+  };
+}
+
+/** 完成の記録は在るが走査に出ない行。起動時の書き上げが畳んだ legacy で起こりうる（上）。
+ * 落とさずに完了・未接続として出す */
+function completedUnscanned(name: string, workflowRootPath: string): ProjectSummary {
+  return { ...unfinished(name, workflowRootPath), creation: 'done' };
 }
 
 /**
@@ -90,7 +169,20 @@ function indexActiveEntries(entries: RegistryEntry[]): Map<string, RegistryEntry
   return index;
 }
 
+/**
+ * アクティブ → 未接続 → 生成中 の順。同じ区分の中は名前順。
+ *
+ * 生成中を最下部に置くのは、まだ入れないものであり、既に在るプロジェクトの並びを
+ * 乱さないためである（specs/project/directory）。
+ */
 function compareProjects(a: ProjectSummary, b: ProjectSummary): number {
-  if (a.connection !== b.connection) return a.connection === 'active' ? -1 : 1;
+  const rankA = rankOf(a);
+  const rankB = rankOf(b);
+  if (rankA !== rankB) return rankA - rankB;
   return a.name.localeCompare(b.name);
+}
+
+function rankOf(project: ProjectSummary): number {
+  if (project.creation !== 'done') return 2;
+  return project.connection === 'active' ? 0 : 1;
 }

@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/project-directory/requirements.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-25T07:51:46.314Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787644306196_bgohg2ii4",
+      "approvalTitle": "specs: project-directory — 作成2要件と可否判定の削除（修正）"
+    }
+  ]
+}

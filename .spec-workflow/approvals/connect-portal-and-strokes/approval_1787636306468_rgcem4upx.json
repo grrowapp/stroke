@@ -1,0 +1,12 @@
+{
+  "id": "approval_1787636306468_rgcem4upx",
+  "title": "connect-portal-and-strokes — capability を資源で分け直した版（session=ライフサイクル / stroke=往復、path は使い手で分ける）",
+  "filePath": ".spec-workflow/specs/connect-portal-and-strokes/requirements.md",
+  "type": "document",
+  "status": "rejected",
+  "createdAt": "2026-08-25T05:38:26.468Z",
+  "category": "spec",
+  "categoryName": "connect-portal-and-strokes",
+  "response": "invocationに指示した作業をもたせるの意味が不明",
+  "respondedAt": "2026-08-25T05:38:46.742Z"
+}

@@ -1,0 +1,12 @@
+{
+  "id": "approval_1787639925186_8xpiuphg7",
+  "title": "connect-portal-and-strokes — 起動の呼び出し側と cwd の出所を明示した版（U13 受理処理／承認処理の2つだけ）",
+  "filePath": ".spec-workflow/specs/connect-portal-and-strokes/requirements.md",
+  "type": "document",
+  "status": "rejected",
+  "createdAt": "2026-08-25T06:38:45.186Z",
+  "category": "spec",
+  "categoryName": "connect-portal-and-strokes",
+  "response": "invoke_agentはcwdを新たに引数で受けとる必要がある。\nsessionsはpathを返す必要がある",
+  "respondedAt": "2026-08-25T06:41:13.816Z"
+}

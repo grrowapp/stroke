@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787795157001_ogednbul6",
+  "approvalId": "approval_1787793449103_uq3h8lefs",
+  "approvalTitle": "specs 4/7(改訂7): mcp/tools/send-back — GIVEN を指定文言に修正（差し戻しが発生した／セッションが存在しない）",
+  "version": 15,
+  "timestamp": "2026-08-27T01:45:57.001Z",
+  "trigger": "approved",
+  "status": "pending",
+  "content": "# mcp/tools/send-back Delta\n\n## Purpose\n\n差し戻し（ユーザーが proposal を承認せず修正を求めて返した指摘一式）を取得するツールの契約を定める。\n\n## ADDED Requirements\n\n### Requirement: 差し戻しを引数なしで取得する\n\nツールは引数を取らない SHALL。結果は次のいずれか1つを返す SHALL。\n\n- **指摘一式**: 保存済みの差し戻しの指摘一式\n- **エラー**: ステータスとエラー内容（差し戻しがまだ無い場合を含む。`api/stroke/send-back` の規定に従う）\n\n#### Scenario: 指摘を読む\n\n- **GIVEN** 対象のセッションで差し戻しが発生した\n- **WHEN** このツールを実行する\n- **THEN** 指摘一式が返る\n\n#### Scenario: セッションが存在しない\n\n- **GIVEN** 対象のセッションが存在しない\n- **WHEN** このツールを実行する\n- **THEN** エラーが返り、ステータスとエラー内容を持つ\n",
+  "fileStats": {
+    "size": 969,
+    "lines": 27,
+    "lastModified": "2026-08-27T01:17:18.557Z"
+  },
+  "comments": []
+}

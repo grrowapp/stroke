@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787798967979_frydiud53",
+  "approvalId": "approval_1787796137673_nvyd73ymq",
+  "approvalTitle": "specs 1/7(改訂2): mcp/server — 全シナリオを指定形式（stroke-board 起動済み→MCP 設定指定で claude 起動→ツール実行指示→確認）に再構成",
+  "version": 20,
+  "timestamp": "2026-08-27T02:49:27.979Z",
+  "trigger": "revision_requested",
+  "status": "pending",
+  "content": "# mcp/server Delta\n\n## Purpose\n\nclaude プロセスへ操作系ツールを提供する MCP サーバー本体の挙動を定める。transport・接続情報の解決・endpoint 代行・入出力スキーマ・エラー処理という、全ツールに共通する契約を持つ。\n\n## ADDED Requirements\n\n### Requirement: サーバーは stdio transport で提供される\n\nMCP サーバーは stdio transport の別プロセスとして起動し、呼び出し側が組み立てる MCP 設定から登録される SHALL。\n\n#### Scenario: 起動した claude からツールが見える\n\n- **GIVEN** stroke-board が起動済みである\n- **WHEN** このサーバーを MCP 設定に指定して claude を起動し、ツール一覧の表示を指示する\n- **THEN** 操作系ツールの一覧が確認できる\n\n### Requirement: 全ツールは endpoint への代行である\n\n各ツールの実行は、対応する既存 endpoint への HTTP 発行のみで行う SHALL。サーバーはセッションディレクトリ・プロジェクトディレクトリのファイルを読み書きしてはならない（MUST NOT）。\n\n#### Scenario: ツールの実行が endpoint に届く\n\n- **GIVEN** stroke-board が起動済みである\n- **WHEN** このサーバーを MCP 設定に指定して claude を起動し、いずれかのツールの実行を指示する\n- **THEN** 対応する endpoint へ HTTP が発行され、その応答だけから結果が作られたことが確認できる\n\n#### Scenario: ファイルには触れない\n\n- **GIVEN** stroke-board が起動済みである\n- **WHEN** このサーバーを MCP 設定に指定して claude を起動し、いずれかのツールの実行を指示する\n- **THEN** セッション・プロジェクトのファイルへの読み書きが発生していないことが確認できる\n\n### Requirement: ツールは入出力スキーマで契約する\n\n各ツールは引数と結果のスキーマを定義する SHALL。結果は endpoint の応答をそのスキーマに整形して返す SHALL。endpoint の生応答を無加工のまま返してはならない（MUST NOT）。整形で応答の情報を欠落させてはならない（MUST NOT）。\n\n#### Scenario: 結果はスキーマに従う\n\n- **GIVEN** stroke-board が起動済みである\n- **WHEN** このサーバーを MCP 設定に指定して claude を起動し、いずれかのツールの実行を指示する\n- **THEN** 結果がそのツールの結果スキーマに従い、元の応答の情報が欠けていないことが確認できる\n\n### Requirement: 接続情報はサーバーが解決する\n\n接続先（stroke-board・本家それぞれの base URL）とセッション id は、起動時に呼び出し側から渡された値でサーバーが解決する SHALL。本家向け操作に要る projectId は、本家の endpoint への問い合わせで解決する SHALL。ツールの引数に接続情報を要求してはならない（MUST NOT）。\n\n#### Scenario: 引数なしで自セッションに届く\n\n- **GIVEN** stroke-board が起動済みで、対象のセッションが存在する\n- **WHEN** そのセッションの接続情報を MCP 設定に指定して claude を起動し、セッション向けの取得ツールを引数なしで実行するよう指示する\n- **THEN** そのセッションの内容が確認できる\n\n#### Scenario: projectId を引数に取らない\n\n- **GIVEN** stroke-board と本家の dashboard が起動済みで、対象のプロジェクトが存在する\n- **WHEN** そのプロジェクトの接続情報を MCP 設定に指定して claude を起動し、projectId を渡さずに本家向けツールの実行を指示する\n- **THEN** 対象のプロジェクトに対する結果が確認できる\n\n### Requirement: エラーを処理して返す\n\nendpoint がエラーを返した場合、ツールはエラーを返し、ステータスとエラー内容を保つ SHALL。本家の dashboard に到達できない場合は、エラーとは区別して不達を返す SHALL（stroke-board 向け操作では、stroke-board 停止中にツールが実行されることは無いため不達は定めない）。エラーの扱いにサーバー独自の判定・状態分岐を足してはならない（MUST NOT）（docs/adr/0013 の原則に整合する）。\n\n#### Scenario: 検証エラーが読める\n\n- **GIVEN** stroke-board が起動済みである\n- **WHEN** このサーバーを MCP 設定に指定して claude を起動し、endpoint の検証に通らない内容でツールの実行を指示する\n- **THEN** エラーが返り、ステータスとエラー内容が確認できる\n\n#### Scenario: 不達が区別できる\n\n- **GIVEN** stroke-board が起動済みで、本家の dashboard が停止している\n- **WHEN** このサーバーを MCP 設定に指定して claude を起動し、本家向けツールの実行を指示する\n- **THEN** 不達が返ることが確認できる\n",
+  "fileStats": {
+    "size": 5043,
+    "lines": 76,
+    "lastModified": "2026-08-27T02:02:08.339Z"
+  },
+  "comments": []
+}

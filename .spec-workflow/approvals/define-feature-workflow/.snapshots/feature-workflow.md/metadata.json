@@ -1,0 +1,54 @@
+{
+  "filePath": "docs/specs/architecture/feature-workflow.md",
+  "currentVersion": 6,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-26T22:48:21.191Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787784501054_hqt4r2cqy",
+      "approvalTitle": "成果物: docs/specs/architecture/feature-workflow.md（feature ワークフロー定義の正）の承認"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2026-08-26T23:02:16.523Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787785140562_y27dnpozg",
+      "approvalTitle": "成果物: feature-workflow.md の承認（改訂3: change 必須を確定事項として全体像・関係・未決に反映）"
+    },
+    {
+      "version": 3,
+      "filename": "snapshot-003.json",
+      "timestamp": "2026-08-26T23:06:24.877Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787785379985_uxs5udp0s",
+      "approvalTitle": "成果物: feature-workflow.md の承認（改訂4: openspec/tickets/ の ticket を追加）"
+    },
+    {
+      "version": 4,
+      "filename": "snapshot-004.json",
+      "timestamp": "2026-08-26T23:12:59.060Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787785816227_8wf2csxt9",
+      "approvalTitle": "成果物: feature-workflow.md の承認（改訂6: 命名の節を正として再構成。spec 名 / ticket / change-id）"
+    },
+    {
+      "version": 5,
+      "filename": "snapshot-005.json",
+      "timestamp": "2026-08-26T23:18:32.583Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787786011865_90tb2kqm6",
+      "approvalTitle": "成果物: feature-workflow.md の承認（改訂7: 命名を単一の置換ルールとして定義）"
+    },
+    {
+      "version": 6,
+      "filename": "snapshot-006.json",
+      "timestamp": "2026-08-26T23:30:45.765Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787786829634_aiso9xjsl",
+      "approvalTitle": "成果物: feature-workflow.md の承認（改訂9: sync → archive の順序で全節を整合）"
+    }
+  ]
+}

@@ -127,12 +127,12 @@ allowedOrigins = [http://localhost:{port}, http://127.0.0.1:{port}]   // 既定 
 
 - `/ws` に origin チェックは**無い**
 - `projectId` クエリでプロジェクトスコープを決める
-- `{type:'subscribe', projectId}` を受け付ける口がある（`multi-server.ts:234-264`）が、これは
+- `{type:'subscribe', projectId}` を受け付ける処理がある（`multi-server.ts:234-264`）が、これは
   projectId の切り替えと `initial` の再送のみで、**データ書き込みには使えない**。本家フロントも
   これを使っていない（projectId 変更時は接続を張り直す）
 
 **書き込み操作**（承認・却下、文書保存、タスク状態変更、アーカイブ）は本家では**すべて REST**。
-WS 経由の書き込み口は存在しない。
+WS 経由の書き込み手段は存在しない。
 
 ## 接続管理の実装（`multi-server.ts:176-266, 1365-1418`）
 
@@ -188,6 +188,29 @@ broadcastToProject(projectId, {type:'spec-update', data:{specs, archivedSpecs}})
 最大遅延 = 500ms + 2000ms + 300ms ≒ **2.8 秒**。これは本家も同じ。
 
 ---
+
+## 登録されるパスは git のトップレベルへ解決される
+
+本家は登録の前に、渡されたパスを自分の規則で解決する。**渡したパスがそのまま登録されるとは限らない。**
+
+- `dist/index.js` — `resolveGitWorkspaceRoot(expandedPath)` を通してから登録へ渡す
+- `dist/core/git-utils.js` — `execSync('git rev-parse --show-toplevel', { cwd })` で解決する。失敗したら渡されたパスへ落とす。環境変数 `SPEC_WORKFLOW_SHARED_ROOT` があればそれを最優先で返す
+- `dist/core/project-registry.js` — 解決後の値を `projectPath` として登録し、`projectId` もその値から作る
+
+`GET /api/projects/list` が返す `projectPath` はこの解決後の値である。**`workflowRootPath` は返らない。**
+
+登録簿には実際に食い違う例がある（`/opt/projects/.spec-workflow-mcp/activeProjects.json`、実測 2026-09-01）。
+
+| projectId | projectPath | workflowRootPath |
+|---|---|---|
+| `EsR5M2woKQ9OUss8` | `/opt/projects/stroke-board` | `/opt/projects/stroke-board` |
+| `tLh761zAISCC1-qU` | `/home/vagrant/work/stroke-board/agent-messanger` | `/opt/projects/agent-messanger` |
+
+後者は git ではなく、同ディレクトリの `.mcp.json` が `SPEC_WORKFLOW_SHARED_ROOT` を渡していることによる。
+
+**効いてくるのは共有ルートが git 管理下へ入ったときである。** いま `projectShareRoot` は `/opt/projects` で git リポジトリではないため解決しても値が変わらないが、git の内側へ動かすと本家の `projectPath` はトップレベルへ化け、パスの完全一致では引き当てられなくなる。
+
+> **読んだ実体は 2.2.5、読んだ日は 2026-09-01**（`npx -y @pimzino/spec-workflow-mcp@latest` の解決先と `node_modules` の両方。`core/git-utils.js` はバイト一致）。基準は 2.2.7（[ADR-0008](../../adr/0008-baseline-is-2-2-7.md)、2026-08-21 に決定）だが、**実行時に走るのは `@latest` が解決した版**なので基準とは一致しない。基準は「何を読んで設計したか」を指す。
 
 ## 参照
 

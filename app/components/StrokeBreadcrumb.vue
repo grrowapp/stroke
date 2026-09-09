@@ -78,7 +78,7 @@ function isPicked(stroke: Extract<Stroke, { proposal: false }>, label: string): 
     </nav>
 
     <!-- 粒を開いたとき: その往復だけを全文で出す -->
-    <div v-if="opened" class="mt-3 rounded-lg border border-default bg-elevated/50 p-4">
+    <div v-if="opened" class="sb-stroke-card mt-3 p-4">
       <p class="mb-1 text-xs text-muted tabular-nums">
         Q{{ (openIndex ?? 0) + 1 }} · {{ opened.question.header }}
       </p>

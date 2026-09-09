@@ -7,13 +7,20 @@
  * 表に置き換えると本家と別物になるので、本家の並びをそのまま写す。
  *
  * 1枚の中身は本家の順で 件名 → 対象ファイル → 状態と発生時刻 → 操作。
- * 操作は本家の Review & Annotate / Quick Approve / Quick Reject に対応させ、
- * 差し戻し（needs-revision）は入れない。本家のそれは注釈コメントを前提にした流れで、
- * stroke-board はコメントを持たないため。
+ * 操作は本家の Review & Annotate / Quick Approve / Quick Reject に対応させ、文言も本家の
+ * 日本語ロケール（レビューと注釈 / 即時承認 / 即時却下 — design 決定4）。
+ * 修正依頼（needs-revision）は入れない。本家のそれは注釈コメントを前提にした流れで、
+ * このカードはコメントを持たないため。
+ *
+ * 即時却下の理由は本家と同じくモーダルで求め（`RejectModal`。design 決定3）、送った結果は
+ * トーストで示す——欄が閉じただけに見える状態にしない（proposal の Why）。
  *
  * 承認・却下は本家の API を呼ぶだけで、`.spec-workflow/` に書くのは本家である。
  */
 import { $fetch, navigateTo, ref } from '#imports';
+
+import RejectModal from '~/components/review/RejectModal.vue';
+import { useUpstreamToast } from '~/composables/useUpstreamToast';
 
 import type { ApprovalDto } from '#shared/types';
 
@@ -46,12 +53,13 @@ function formatDate(iso: string): string {
   return DATE_FORMAT.format(at);
 }
 
+const { show } = useUpstreamToast();
+
 const busy = ref<'approve' | 'reject' | null>(null);
 const failure = ref<string | null>(null);
 
-/** 却下は理由が本家に残る。本家も入力させてから送る */
+/** 却下は理由が本家に残る。本家もモーダルで入力させてから送る */
 const rejecting = ref(false);
-const reason = ref('');
 
 async function respond(action: 'approve' | 'reject', response?: string): Promise<void> {
   busy.value = action;
@@ -63,8 +71,13 @@ async function respond(action: 'approve' | 'reject', response?: string): Promise
       body: { response },
     });
 
-    rejecting.value = false;
-    reason.value = '';
+    // 送った結果を示す。文言は本家の通知（`approvalsPage.notifications`）
+    show(
+      action === 'approve'
+        ? `「${props.approval.title}」が承認されました`
+        : `「${props.approval.title}」が却下されました`,
+      action === 'approve' ? 'success' : 'info',
+    );
     // 本家が保留中から外すので、一覧を取り直させる
     emit('responded');
   } catch {
@@ -137,10 +150,10 @@ async function respond(action: 'approve' | 'reject', response?: string): Promise
 
           <!-- 操作。押しても行の遷移が起きないよう、この列では伝播を止める -->
           <div class="flex flex-wrap items-center gap-3" @click.stop>
-            <!-- 押した先で対象文書がそのまま直せる（specs/document-editing） -->
+            <!-- 押した先で読んで指摘を付け、その場で決められる（specs/project/ui） -->
             <NuxtLink :to="to" class="sb-action" data-testid="record-open">
               <UIcon name="upstream:eye" class="h-4 w-4" />
-              レビューする
+              レビューと注釈
             </NuxtLink>
 
             <button
@@ -151,7 +164,7 @@ async function respond(action: 'approve' | 'reject', response?: string): Promise
               @click="respond('approve')"
             >
               <UIcon name="upstream:check-circle" class="h-4 w-4" />
-              {{ busy === 'approve' ? '承認中…' : '承認' }}
+              {{ busy === 'approve' ? '承認中…' : '即時承認' }}
             </button>
 
             <button
@@ -159,44 +172,11 @@ async function respond(action: 'approve' | 'reject', response?: string): Promise
               class="sb-action"
               :disabled="busy !== null"
               data-testid="approval-reject"
-              @click="rejecting = !rejecting"
+              @click="rejecting = true"
             >
               <UIcon name="upstream:alert-circle" class="h-4 w-4" />
-              却下
+              {{ busy === 'reject' ? '却下中…' : '即時却下' }}
             </button>
-          </div>
-
-          <!-- 却下の理由。本家もモーダルで入力させてから送る -->
-          <div v-if="rejecting" class="mt-3" data-testid="approval-reject-form" @click.stop>
-            <label class="mb-1 block text-sm text-[var(--text-secondary)]" :for="`reason-${approval.id}`">
-              却下の理由（本家に応答として残ります）
-            </label>
-            <textarea
-              :id="`reason-${approval.id}`"
-              v-model="reason"
-              rows="3"
-              class="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-inset)] p-2 text-sm text-[var(--text-primary)]"
-              data-testid="approval-reject-reason"
-            />
-            <div class="mt-2 flex items-center gap-3">
-              <button
-                type="button"
-                class="sb-action"
-                :disabled="busy !== null || reason.trim().length === 0"
-                data-testid="approval-reject-submit"
-                @click="respond('reject', reason)"
-              >
-                {{ busy === 'reject' ? '却下中…' : '却下する' }}
-              </button>
-              <button
-                type="button"
-                class="sb-action sb-action-secondary"
-                data-testid="approval-reject-cancel"
-                @click="rejecting = false"
-              >
-                やめる
-              </button>
-            </div>
           </div>
 
           <p
@@ -211,4 +191,7 @@ async function respond(action: 'approve' | 'reject', response?: string): Promise
       </div>
     </div>
   </div>
+
+  <!-- 即時却下の理由。対象文書を読む画面と同じモーダル（design 決定3） -->
+  <RejectModal v-model:open="rejecting" @submit="(reason) => respond('reject', reason)" />
 </template>

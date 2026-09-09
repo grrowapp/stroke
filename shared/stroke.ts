@@ -100,8 +100,33 @@ export interface SendBackPayload {
   nextSteps: string[]
 }
 
+/**
+ * セッションの局面の値。**値の集合はここ1つ。** zod・一覧の読み・型はすべてここから導く
+ * （openspec/changes/add-activated-phase design D1）。イコール比較の連鎖をどこにも書かない。
+ *
+ * `stroking → proposed → approved → activated` の順で一方向に進む。
+ * - `approved` — 承認で昇格したが、steering がまだ生成を終えていない（生成中）
+ * - `activated` — steering が生成を終えた。完成の記録（U15）だけが書く
+ */
+export const PHASES = ['stroking', 'proposed', 'approved', 'activated'] as const
+
 /** セッションの局面。design.md 決定4: phase では POST の受理の動きを変えない。 */
-export type Phase = 'stroking' | 'proposed' | 'approved'
+export type Phase = (typeof PHASES)[number]
+
+export function isPhase(value: unknown): value is Phase {
+  return (PHASES as readonly unknown[]).includes(value)
+}
+
+/**
+ * 昇格済みか（もうプロジェクトか）。`approved` と `activated` の両方。
+ *
+ * 読みを含まない純関数である。「どの局面を許すか」は各 endpoint が自分の literal で
+ * 持ち（openspec/specs/api/project/delete「局面の判定はこの endpoint が持つ」）、
+ * ここはその判定を代行しない。
+ */
+export function isPromotedPhase(phase: Phase): phase is 'approved' | 'activated' {
+  return phase === 'approved' || phase === 'activated'
+}
 
 /**
  * 実行の記録（U2 の `invocation`）。

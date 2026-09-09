@@ -1,0 +1,38 @@
+{
+  "filePath": "openspec/changes/replace-session-skills-with-mcp/proposal.md",
+  "currentVersion": 4,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-26T21:26:07.197Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787779567111_d5oxcik0h",
+      "approvalTitle": "replace-session-skills-with-mcp: proposal（スキルの操作制御を MCP ツールへ移す）"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2026-08-26T21:46:06.949Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787780026301_klnvonkyy",
+      "approvalTitle": "replace-session-skills-with-mcp: proposal（API は残し、MCP ツールを前段に置く）"
+    },
+    {
+      "version": 3,
+      "filename": "snapshot-003.json",
+      "timestamp": "2026-08-26T21:57:33.084Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787780935907_fy9p7scar",
+      "approvalTitle": "proposal 全面書き換え: 操作のルートとして MCP ツールを新設する"
+    },
+    {
+      "version": 4,
+      "filename": "snapshot-004.json",
+      "timestamp": "2026-08-26T22:07:38.081Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787781498971_hh24mzaqf",
+      "approvalTitle": "proposal: capability は mcp/stroke 新設のみ、設定は変えない"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/document-directory-structure/design.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-24T18:57:22.617Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787597842605_y12tr55pm",
+      "approvalTitle": "document-directory-structure: design（最終 structure の3部構成と連動方式）"
+    }
+  ]
+}

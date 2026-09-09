@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/stroke-session-removal/requirements.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-25T07:51:55.141Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787644315045_xgtntnkxk",
+      "approvalTitle": "specs: stroke-session — 廃止（→ stroke/frontier へ全要件移行）"
+    }
+  ]
+}

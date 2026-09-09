@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787792466933_d0v51w8qg",
+  "approvalId": "approval_1787792157148_adoyjxsco",
+  "approvalTitle": "specs 4/7(改訂5): mcp/tools/send-back — 「差し戻し無し」の GIVEN を肯定形の状態（ストローク中・proposal 未提出）に修正",
+  "version": 9,
+  "timestamp": "2026-08-27T01:01:06.933Z",
+  "trigger": "revision_requested",
+  "status": "pending",
+  "content": "# mcp/tools/send-back Delta\n\n## Purpose\n\n差し戻し（ユーザーが proposal を承認せず修正を求めて返した指摘一式）を取得するツールの契約を定める。\n\n## ADDED Requirements\n\n### Requirement: 差し戻しを引数なしで取得する\n\nツールは引数を取らない SHALL。結果は次のいずれか1つを返す SHALL。\n\n- **指摘一式**: 保存済みの差し戻しの指摘一式\n- **エラー**: ステータスとエラー内容\n\n#### Scenario: 指摘を読む\n\n- **GIVEN** 差し戻しが保存されたセッションが存在する\n- **WHEN** このツールを実行する\n- **THEN** 指摘一式が返る\n\n#### Scenario: 差し戻しが無い\n\n- **GIVEN** ストローク中の（まだ proposal を提出していない）セッションが存在する\n- **WHEN** このツールを実行する\n- **THEN** エラーが返り、ステータスとエラー内容から差し戻しが無いことが読める\n",
+  "fileStats": {
+    "size": 962,
+    "lines": 27,
+    "lastModified": "2026-08-27T00:55:48.232Z"
+  },
+  "comments": []
+}

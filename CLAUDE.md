@@ -1,79 +1,55 @@
 # CLAUDE.md
 
-## Agent skills
+## 前提
 
-### Issue tracker
+**`develop` は各 worktree の親ブランチであり、合流点である。その実体はリポジトリ本体
+（`.git` をディレクトリとして持つ側）に展開されている。以下「親」はこのディレクトリを指す。**
 
-Work is tracked as OpenSpec changes under `openspec/changes/<change-id>/`. See `docs/agents/issue-tracker.md`.
+`openspec/`・`.spec-workflow/` は**運用と管理の資料**。親に有るものが唯一の正
 
-### Triage labels
+- **`openspec/`・`.spec-workflow/` は親だけが持つ**
+- **worktree に `sparseCheckout = true` を設定し、`openspec/`・`.spec-workflow/` を除外する**
+- **`openspec/`・`.spec-workflow/` への読み書きは親の実体へ向ける**
 
-The five canonical triage roles, using the default label strings. See `docs/agents/triage-labels.md`.
+### issue-tracker：`docs/agents/issue-tracker.md`
 
-### Domain docs
+issue-trackerには、change-id の命名・ticket の起票・artifact・参照の方向・更新対応・ADR の archive・repo 直下のフォルダの扱い・進捗と検証などを説明している。作業の状態が変化した場合に参照すること
 
-Single-context — one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
-
-### Subagents
-
-Use fresh agents, not `fork`, when the goal is to keep context out. See `docs/agents/subagents.md`.
+例： change を起票する / artifact を書く / specs に delta を入れる / specs と docs の食い違いを見つけた / ADR の内容が docs に確定した / change を閉じる
 
 ## Dev サーバー
 
 - 起動・ビルドなどの実行は **package.json の scripts 経由**（`yarn dev` / `yarn build` / `yarn test` …）で行う。`node .output/server/index.mjs` のような直接起動をしない
-- ポートは **3399 固定**（`nuxt.config.ts` の `devServer.port`）。ストロークの `claude.apiBaseUrl` と揃えてあり、変えるときは必ず両方を揃えて変える（値の正は `docs/specs/core/settings-reference.md`）
-- 3000 はこのマシンで別のプロセスが使用中。使わない
-- E2E の PORT_SLOT（`playwright.config.ts`）で slot 3 は欠番。APP_PORT が 3399 と被るため（base3 は slot 6 = 5699/3699）
+- ポートは**並走させる worktree ごとにずらす**。決めるのは `package.json` の `dev`（`nuxt dev --port <n>`）と `nuxt.config.ts` の `devServer.port` で、**CLI の `--port` が勝つ**。
+  - **揃える相手はもう無い。** エージェントへ渡す接続先は、サーバーが実際に bind したアドレスから作る（`server/utils/stroke/listen-address.ts`）。かつて `claude.apiBaseUrl` という設定と揃える必要があったが、**その設定は外した**（`docs/specs/core/settings-reference.md`「接続先は設定ではない」）
+- 3000 はこのマシンで別のプロセスが使用中。使わない。5000 は本家 spec-workflow の dashboard
+- E2E の STUB_PORT / APP_PORT（`playwright.config.ts`）は**実行のたびに 50000 から上へ空きを探して取る**（上限 60000）。固定値ではないので、worktree を並べて同時に `yarn test:e2e` を回してよい。どのポートを使ったかは Playwright の起動ログに出る
+  - dev サーバーのポートとは要件が違う。人がブラウザで繋ぎに行く dev は既定を決めて worktree ごとにずらすが、E2E は立てて捨てるだけなので空きを取る
 
 ## Worktree 運用
 
-- 合流点は各 worktree の**もとになった親ブランチ**。main を直接の合流点にしない
-- 成果のマージ先・追随の取り込み元・ユーザー指示で扱う対象は、いずれもこの親ブランチ
-- 各 worktree は親ブランチを**取り込めるタイミングで自主的に** merge して追随する。親から worktree へ配ることはしない（作業途中の土台を動かさないため）
+worktree = `git worktree` で切った作業ディレクトリ。それぞれが**もとになった親ブランチ**を1つ持つ。
+
+- 合流点はこの親ブランチ。main を直接の合流点にしない
+- 成果のマージ先・追随の取り込み元・ユーザー指示で扱う対象は、いずれもこの worktree のブランチ
+- 親ブランチが判定できないときは、推測せずユーザーに確認する
+- 各 worktree は親ブランチに更新が入っていたら、**取り込めるタイミングで自主的に** `git rebase develop` して追随する
 - 取り込みを先延ばしするほどコンフリクトが育つ。**小さく頻繁に**取り込むこと
-- **main へのマージ**は、ユーザー指示を受けてから確認→承認を一回踏んで行う（この手順は将来スキル化する想定）
+- **main・develop へのマージ**は、ユーザー指示を受けてから確認→承認を一回踏んで行う
+- **change の実装（apply）は、この worktree のブランチへ直接コミットする**
+
+## repo 直下のフォルダの扱い
+
+規定の正は `docs/agents/issue-tracker.md`「repo 直下のフォルダの扱い」。
+
+- repo 直下への新規フォルダ作成は、**エージェントの自己判断では行わない**（直下の増殖を禁じる）
+- 作ってよいのは3つ — 1. **ユーザーが初期化・新規プロジェクトの立ち上げを指示した**、2. スキル・エージェントのプロンプト定義に指示がある、3. **docs に規定があり、指定されたフォルダがまだ無い**（`docs/` `test/` のような場合）
+- 3 の根拠にできるのは **docs（`docs/adr/` を除く）だけ**。ADR・specs・ticket・change・steering は根拠にしない
+- 3 で作ったときは、**根拠にしたものと作成したフォルダ名を、作成した直後の応答でユーザーへ簡潔に報告する**
+- 直下にフォルダを足したら、構造の規範のディレクトリ構造へ整合反映する（規範の所在は issue-tracker）
+- どれにも当たらないなら作らない。置き場が無いと感じたら既存フォルダへ収めるか、ユーザーに確認する
 
 ## Docs
 
-`docs/specs/` は**定義としての specs** の置き場（要素で区分）。機能的 specs（Requirement + Scenario）は `openspec/specs/` にある。
+`docs/specs/` は**定義としての specs**。`docs/agents/` は**エージェント向けの運用**。`docs/adr/` は決めの記録。中身の一覧はこのファイルに持たない。各ディレクトリを直接見る（`docs/adr/0020`）。
 
-### `docs/specs/core/`
-
-- `system-structure.md` — 構造の定義。統合後のあるべき配置の規範（ディレクトリ構造・画面とサーバーの区切り・共有型）
-- `schema.md` — 入れ物の形と検証の規定（長さ・件数の上限）
-- `settings-reference.md` — ストローク側設定の**正**。ここに無いものは設定ではない（`docs/adr/0004-settings-reference-is-authoritative.md`）。編集には change とユーザー承認が要る。ポータル側の環境変数4件は未統合（README 参照）
-- `file-component.md` — ポータル側: コンポーネント個別の props と参照元
-- `file-components.md` — ストローク側: components の棚卸し
-- `file-composables.md` — composable 一覧（ポータル側・ストローク側の2系統）
-- `server-structure.md` — server/utils の棚卸しと規範への対応
-
-### `docs/specs/api/`
-
-- `contract.md` — サーバ API の契約。画面・エージェントとサーバの境界
-
-### `docs/feature/`
-
-- `overview.md` — feature のワークフロー定義（`__` 命名・器・工程・締め。2レーンのうち feature レーンの正）
-
-### `docs/specs/architecture/`
-
-- `session-workflow.md` — セッションのワークフロー定義（store・スキル・配線・実測で確定した制約）
-- `question-flow.md` — 問いの往復（誰がいつ何を送り、状態がどう動くか）を図で示す
-- `spec-screen-flow.md` — ポータル側: 仕様書画面の流れ
-- `data-fetching.md` — 画面のデータ取得と SSR の設計
-
-### `docs/specs/reference/`
-
-- `stroke-modules.md` — stroke のモジュール（`useAgentQuestion` / `AgentQuestionModal`）の使い方
-- `upstream-observations.md` — 本家 spec-workflow-mcp をソースから調べた事実（WS メッセージ9種・接続の制約・反映までの遅延）。方針は ADR-0006、基準バージョンは ADR-0008
-
-### `docs/specs/plan/`
-
-- `artifact-extension-plan.md` — 拡張 artifact の検討資料（未決定）
-- `portal-stroke-entrance.md` — 入口の接合の対応方法（作成ボタン→ストローク概要入力。ADR-0009/0010 の俯瞰）
-- `portal-stroke-exit.md` — 出口の接合の対応方法（承認→steering 工程の自動開始。ADR-0011 の俯瞰）
-- `composables-library-replacement.md` — composables のライブラリ置換と集約の可否（置換3・集約2→1・据置5。spec-workflow 承認済み）
-- `components-library-replacement.md` — components のライブラリ置換・再編・markdown 統一の可否（置換5・部分置換3・再編2→1・削除1・据置8 + MDC 統一。spec-workflow 承認済み）
-- `next-agent-run.md` — エージェント実行の3区分への汎用化案（未着手）
-- `mainline-merge.md` — 旧 stroke-board-frontier 統合の道筋（change 一覧・依存・区分の基準・終了条件）
-- `structure-migration.md` — 構造の規範に対する現状の差分（移行課題）

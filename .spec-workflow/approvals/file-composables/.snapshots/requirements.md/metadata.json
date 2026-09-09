@@ -1,0 +1,62 @@
+{
+  "filePath": ".spec-workflow/specs/file-composables/requirements.md",
+  "currentVersion": 7,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-24T21:56:49.495Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787608609467_vnl5rkfu9",
+      "approvalTitle": "composables の一覧と移行後パスの写像（分割の保留・色の CSS 方向を含む）"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2026-08-24T22:15:18.505Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787609564697_oi1er9pk0",
+      "approvalTitle": "composables 一覧"
+    },
+    {
+      "version": 3,
+      "filename": "snapshot-003.json",
+      "timestamp": "2026-08-24T22:18:04.143Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787609820185_tp0d1ea3y",
+      "approvalTitle": "composables 一覧（使い方付き）"
+    },
+    {
+      "version": 4,
+      "filename": "snapshot-004.json",
+      "timestamp": "2026-08-24T22:21:33.942Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787610034927_x8eiwgw0v",
+      "approvalTitle": "composables 一覧（コード例付き）"
+    },
+    {
+      "version": 5,
+      "filename": "snapshot-005.json",
+      "timestamp": "2026-08-24T22:47:53.946Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787611393326_81qrzvq54",
+      "approvalTitle": "composables の定義（図＋セクション）"
+    },
+    {
+      "version": 6,
+      "filename": "snapshot-006.json",
+      "timestamp": "2026-08-24T22:58:29.684Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787612121716_6cnxg4zyr",
+      "approvalTitle": "composables の定義（図＋呼び出し例セクション）"
+    },
+    {
+      "version": 7,
+      "filename": "snapshot-007.json",
+      "timestamp": "2026-08-24T23:06:23.304Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787612641539_rdpj17bd6",
+      "approvalTitle": "composables の定義（例の自己完結化）"
+    }
+  ]
+}

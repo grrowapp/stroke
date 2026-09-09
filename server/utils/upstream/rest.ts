@@ -1,13 +1,27 @@
 /**
  * 本家 REST のクライアント。
  *
- * **書き込みは承認への応答（`POST /approvals/:id/:action`）だけ**に限る。本家には
- * 仕様書の保存・タスクの状態更新・プロジェクトの登録と解除も実在するが、呼べる関数を
- * 置かない。呼べる関数が無ければ上位から誤って呼ばれない。
+ * **書き込みは決めた4つだけ**に限る。
  *
- * 承認への応答を通す理由は、書き込むのが stroke-board ではなく本家だからである。
- * ファイルに触るのは本家の `approvalStorage` で、こちらは本家に依頼するだけなので、
- * 「`.spec-workflow/` に書き込む主体を二重に作らない」（ADR-0005）は保たれる。
+ * - 承認への応答（`POST /approvals/:id/:action`） — `respondToApproval`
+ * - 仕様書の文書の保存（`PUT /specs/:name/:document`） — `saveSpecDocument`
+ * - ステアリング文書の保存（`PUT /steering/:name`） — `saveSteeringDocument`
+ * - プロジェクトの登録（`POST /api/projects/add`） — `registerProject`
+ *   （update-project-generation-via-upstream-rest。生成の endpoint P2 だけが呼ぶ）
+ *
+ * 本家にはタスクの状態更新や登録の解除も実在するが、呼べる関数を置かない。
+ * 呼べる関数が無ければ上位から誤って呼ばれない。「4つだけ」は目視では守れないので、
+ * `test/server/utils/upstream/read-only.test.ts` が機械的に固定している。
+ *
+ * この4つを通す理由は、書き込むのが stroke-board ではなく本家だからである。ファイルに
+ * 触るのは本家（承認は `approvalStorage`、保存は本家の PUT ハンドラ、登録で
+ * `.spec-workflow/approvals/` を作るのも本家の `ApprovalStorage.start()`）で、こちらは本家に
+ * 依頼するだけなので、「`.spec-workflow/` に書き込む主体を二重に作らない」（ADR-0005）は
+ * 保たれる。
+ *
+ * 保存の2つは画面の文書編集を中継する経路である（specs/document-editing。
+ * `server/api/projects/` 配下の PUT ハンドラから呼ばれる）。保存先が広がらないよう、
+ * 文書名は `STEERING_DOCUMENTS` と `specDocumentNames`（`schema.ts`）で固定する。
  *
  * 定期ポーリングもしない。ここを呼ぶのは、画面が要求したときと、接続時に通知の基準を
  * 作るときだけである（tech.md の Performance Requirements）。
@@ -22,11 +36,15 @@ import {
   approvalRequestSchema,
   documentContentSchema,
   projectInfoSchema,
+  projectListEntrySchema,
+  projectRegistrationSchema,
   specDataSchema,
   specDocumentsSchema,
   taskProgressSchema,
   type ApprovalRequest,
   type ProjectInfo,
+  type ProjectListEntry,
+  type ProjectRegistration,
   type SpecData,
   type SpecDocumentName,
   type SpecDocuments,
@@ -52,7 +70,23 @@ export function isSteeringDocument(value: string): value is SteeringDocument {
 
 export type UpstreamFailure =
   | { kind: 'not-configured' }
-  | { kind: 'not-found'; path: string }
+  /**
+   * `detail` は本家が返したエラー本文（`{ error: string }` の `error`）。取れなかった
+   * ときだけ省く——`toHttpError` の固定文言に頼らず本家の実応答を伝えたい呼び出し側
+   * （MCP ツール。`server/utils/mcp/upstream-failure.ts`）のためのもので、既存の
+   * 呼び出し側（`toHttpError` 経由）はこれを読まないので挙動は変わらない。
+   */
+  | { kind: 'not-found'; path: string; detail?: string }
+  /**
+   * 本家に届いた上で、404 以外のエラー応答（4xx / 5xx）が返った。`status` は本家が
+   * 返したものをそのまま持つ。
+   *
+   * 「相手が拒否した」を「相手に届かない」（`unreachable`）へ畳まないために分ける。
+   * 畳むと、到達しているのに「届かない」と報告される。`detail` の意味は `not-found`
+   * と同じ。
+   */
+  | { kind: 'error-response'; path: string; status: number; reason: string; detail?: string }
+  /** 本家に届かなかった。接続拒否・名前解決失敗・タイムアウトなど、状態コードが取れない場合 */
   | { kind: 'unreachable'; path: string; reason: string }
   | { kind: 'malformed'; path: string; reason: string };
 
@@ -64,6 +98,14 @@ export class UpstreamRestClient {
   /** `GET /api/projects/:projectId/info` */
   getProjectInfo(projectId: string): Promise<UpstreamResult<ProjectInfo>> {
     return this.read(`/api/projects/${enc(projectId)}/info`, projectInfoSchema);
+  }
+
+  /**
+   * `GET /api/projects/list` — 起動中のプロジェクト一覧。MCP ツールが projectPath から
+   * projectId を引き当てるのに使う（provide-operations-via-mcp design.md）。
+   */
+  listProjects(): Promise<UpstreamResult<ProjectListEntry[]>> {
+    return this.read('/api/projects/list', projectListEntrySchema.array());
   }
 
   /** `GET /api/projects/:projectId/specs` */
@@ -146,13 +188,48 @@ export class UpstreamRestClient {
         retry: 0,
       });
     } catch (error) {
-      if (statusOf(error) === 404) {
-        return { ok: false, failure: { kind: 'not-found', path } };
-      }
-      return { ok: false, failure: { kind: 'unreachable', path, reason: toReason(error) } };
+      return { ok: false, failure: toFailure(path, error) };
     }
 
     return { ok: true, value: null };
+  }
+
+  /**
+   * `POST /api/projects/add` — プロジェクトを本家に登録する（生成。specs/api/project/generate）。
+   *
+   * 本家は `projectPath` を自分の規則で解決してから登録簿へ書き、watcher を起こす
+   * （`.spec-workflow/approvals/` はこのとき本家が作る）。登録済みのパスには同じ
+   * `projectId` を返すので、重ねて依頼してよい。登録に使う PID は dashboard 自身のもので、
+   * dashboard を再起動すると消える（本家 2.2.5 `addProjectByPath`）。
+   *
+   * 応答 `{ projectId, success }` は形を検証する。2xx でも `projectId` を持たなければ
+   * `malformed`——取得（`read`）と同じ扱い。
+   */
+  async registerProject(projectPath: string): Promise<UpstreamResult<ProjectRegistration>> {
+    const path = '/api/projects/add';
+
+    if (this.baseUrl === null) {
+      return { ok: false, failure: { kind: 'not-configured' } };
+    }
+
+    let raw: unknown;
+    try {
+      raw = await ofetch(path, {
+        baseURL: this.baseUrl,
+        method: 'POST',
+        body: { projectPath },
+        retry: 0,
+      });
+    } catch (error) {
+      return { ok: false, failure: toFailure(path, error) };
+    }
+
+    const parsed = projectRegistrationSchema.safeParse(raw);
+    if (!parsed.success) {
+      return { ok: false, failure: { kind: 'malformed', path, reason: parsed.error.message } };
+    }
+
+    return { ok: true, value: parsed.data };
   }
 
   /**
@@ -208,10 +285,7 @@ export class UpstreamRestClient {
         retry: 0,
       });
     } catch (error) {
-      if (statusOf(error) === 404) {
-        return { ok: false, failure: { kind: 'not-found', path } };
-      }
-      return { ok: false, failure: { kind: 'unreachable', path, reason: toReason(error) } };
+      return { ok: false, failure: toFailure(path, error) };
     }
 
     return { ok: true, value: null };
@@ -221,7 +295,8 @@ export class UpstreamRestClient {
    * 取得して検証する。
    *
    * 想定と違う形のものは通さず、何が起きたかを呼び出し側が区別できる形で返す。
-   * 「繋がらなかった」「無かった」「形が違った」は画面での見せ方が変わるので混ぜない。
+   * 「繋がらなかった」「無かった」「拒否された」「形が違った」は画面での見せ方が
+   * 変わるので混ぜない（分け方は `toFailure`）。
    */
   private async read<T>(path: string, schema: z.ZodType<T>): Promise<UpstreamResult<T>> {
     if (this.baseUrl === null) {
@@ -232,13 +307,7 @@ export class UpstreamRestClient {
     try {
       raw = await ofetch(path, { baseURL: this.baseUrl, retry: 0 });
     } catch (error) {
-      if (statusOf(error) === 404) {
-        return { ok: false, failure: { kind: 'not-found', path } };
-      }
-      return {
-        ok: false,
-        failure: { kind: 'unreachable', path, reason: toReason(error) },
-      };
+      return { ok: false, failure: toFailure(path, error) };
     }
 
     const parsed = schema.safeParse(raw);
@@ -257,6 +326,30 @@ function enc(segment: string): string {
   return encodeURIComponent(segment);
 }
 
+/**
+ * 発行時の例外を失敗へ写す。取得（`read`）と保存（`write` / `respondToApproval`）で
+ * 同じ分け方をする。
+ *
+ * 分ける基準は「本家に届いたか」——状態コードが取れたなら届いている。届いた上での
+ * エラー応答は本家の状態コードをそのまま持たせ、状態コードが取れないもの（接続拒否・
+ * 名前解決失敗・タイムアウト）だけを `unreachable` にする。届いているのに
+ * `unreachable` へ畳むと、出し直せば直るのか環境の問題なのかを呼び出し側が区別できない。
+ */
+function toFailure(path: string, error: unknown): UpstreamFailure {
+  const status = statusOf(error);
+
+  // 404 は「無かった」として先に分ける。呼び出し側での見せ方が他のエラー応答と違う。
+  if (status === 404) {
+    return { kind: 'not-found', path, detail: detailOf(error) };
+  }
+
+  if (status !== undefined) {
+    return { kind: 'error-response', path, status, reason: toReason(error), detail: detailOf(error) };
+  }
+
+  return { kind: 'unreachable', path, reason: toReason(error) };
+}
+
 function statusOf(error: unknown): number | undefined {
   if (typeof error !== 'object' || error === null) return undefined;
   const status = (error as { status?: unknown; statusCode?: unknown }).status
@@ -266,4 +359,13 @@ function statusOf(error: unknown): number | undefined {
 
 function toReason(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/** 本家が返したエラー本文（`{ error: string }` の `error`）。取れなければ undefined。 */
+function detailOf(error: unknown): string | undefined {
+  if (typeof error !== 'object' || error === null) return undefined;
+  const data = (error as { data?: unknown }).data;
+  if (typeof data !== 'object' || data === null) return undefined;
+  const message = (data as { error?: unknown }).error;
+  return typeof message === 'string' ? message : undefined;
 }

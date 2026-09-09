@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787783482844_9fc6btl01",
+  "approvalId": "approval_1787783320245_nzla9w69n",
+  "approvalTitle": "spec: feature/naming の承認（改訂: 「capability パス」を廃し実パス表記のみに）",
+  "version": 7,
+  "timestamp": "2026-08-26T22:31:22.844Z",
+  "trigger": "approved",
+  "status": "pending",
+  "content": "## Purpose\n\nopenspec の `openspec/specs/` 配下のパス（階層あり）と、本家 `.spec-workflow/specs/` 直下のディレクトリ名 = **spec 名**（本家の制約によりフラット）を対応付ける命名の規約と変換ルール。作成（`create-feature`）と sync はこの1つの規約に従う。\n\n## ADDED Requirements\n\n### Requirement: spec 名は openspec 側のパスの `__` 連結である\n\nfeature の spec 名は、openspec 側の対応するパス（`openspec/specs/` からの相対）のセグメントを `__`（2重アンダーバー）で連結したフラット名である SHALL。パスから spec 名へ、spec 名からパスへの両方向の変換が定まる SHALL。\n\n#### Scenario: パスから spec 名へ\n\n- **WHEN** `openspec/specs/api/session/` に対応する spec 名を求める\n- **THEN** `.spec-workflow/specs/api__session/` になる\n\n#### Scenario: spec 名からパスへ\n\n- **WHEN** `.spec-workflow/specs/api__session/` に対応する openspec 側のパスを求める\n- **THEN** `openspec/specs/api/session/` になる\n\n#### Scenario: 階層を持たない場合\n\n- **WHEN** `openspec/specs/portal/` に対応する spec 名を求める\n- **THEN** `.spec-workflow/specs/portal/` になる（名前はそのまま）\n\n### Requirement: セグメントはアンダースコアを含まない kebab-case である\n\nパスの各セグメント（ディレクトリ名）は kebab-case（英小文字・数字・ハイフン）である SHALL。セグメントはアンダースコアを含んではならない MUST NOT。これにより spec 名の中の `__` は常に区切りとしてのみ現れ、変換は可逆になる。\n\n#### Scenario: 規約に適合しないセグメント\n\n- **WHEN** セグメント `api_v2` を規約に照らす\n- **THEN** アンダースコアを含むため適合しない\n\n#### Scenario: 変換の可逆性\n\n- **WHEN** 規約に適合するパスを spec 名に変換し、その spec 名をパスに戻す\n- **THEN** 元のパスに一致する\n\n### Requirement: パスと spec 名は1対1に対応する\n\nopenspec 側のパスと spec 名は1対1に対応する SHALL。同名の feature は存在しない。\n\n#### Scenario: 対応先はただ1つ\n\n- **WHEN** `.spec-workflow/specs/api__session/` の対応先を求める\n- **THEN** `openspec/specs/api/session/` ただ1つに定まる\n",
+  "fileStats": {
+    "size": 2389,
+    "lines": 48,
+    "lastModified": "2026-08-26T22:28:32.897Z"
+  },
+  "comments": []
+}

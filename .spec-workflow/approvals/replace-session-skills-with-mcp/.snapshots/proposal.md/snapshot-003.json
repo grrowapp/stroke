@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787781453084_5acah4wcj",
+  "approvalId": "approval_1787780935907_fy9p7scar",
+  "approvalTitle": "proposal 全面書き換え: 操作のルートとして MCP ツールを新設する",
+  "version": 3,
+  "timestamp": "2026-08-26T21:57:33.084Z",
+  "trigger": "revision_requested",
+  "status": "pending",
+  "content": "# replace-session-skills-with-mcp\n\n## Why\n\nエージェント（`claude -p`）がシステムとやり取りする**ルートが1本しかない**。スキルの `!` フェンスの中で `curl` を組み立てて endpoint を叩く経路である。この経路はスキルの仕組みに丸ごと乗っており、エージェントに何をさせられるかがスキルの表現力で決まる。\n\nMCP はエージェントに操作を渡すための仕組みで、ツールという単位・入力スキーマ・説明を持つ。**操作のルートとして MCP ツールを新設する。**\n\n## What Changes\n\n- エージェントの操作のルートとして **MCP ツールを新設する**。ツールは spawn 時に `--mcp-config` で claude へ与える\n- どの操作をツールとして持たせるか、ツールが何を経由して結果を得るかは、この change の中で `mcp/stroke` の spec として定める\n- claude へ渡す指示（定型・ワークフロー定義の instruction）は、新しいルートを使う形へ書き換える\n\n**この change で決めないこと**: 既存のスキルをどうするか（残す・減らす・撤廃する）。API endpoint の存廃。環境変数 `STROKE_BASEURL` とフェンス内の `${CLAUDE_SESSION_ID}` の扱い。いずれも新しいルートが立った後に、別途判断する。\n\n**実装の規模**: MCP ツールの新設と、claude へ渡す指示の書き換えに留める。ストロークの往復の流れ、`invocation` の4値と完了検知（output stream）、リトライと巡回、画面は変えない。\n\n## Capabilities\n\n### New Capabilities\n\n- `mcp/stroke`: エージェントの操作のルートとしての MCP ツール。公開するツール、入力スキーマと拒否の返し方、対象セッションの決まり方\n\n### Modified Capabilities\n\n- `agent/invocation`: 起動時に MCP の設定を与えることを起動定義の要件に加える\n\n## Impact\n\n- 新設: MCP サーバーの実体（ツール定義と、結果を得る経路）。実装形態——Nitro 同居の HTTP transport か、claude が spawn する独立した stdio サーバーか——は design で決める\n- サーバー: `server/utils/stroke/invoke.ts`（`--mcp-config` の組み立て。steering の起動では既に使っている手を stroke にも広げる）\n- 設定: `nuxt.config.ts` の `claude.args`。正である `docs/specs/core/settings-reference.md` の改定には change とユーザー承認が要る（ADR-0004）\n- 文書: `docs/specs/architecture/session-workflow.md` の配線表に、新しいルートの行が加わる\n",
+  "fileStats": {
+    "size": 2660,
+    "lines": 35,
+    "lastModified": "2026-08-26T21:48:45.755Z"
+  },
+  "comments": []
+}

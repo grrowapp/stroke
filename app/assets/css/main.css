@@ -1,7 +1,20 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
-/* ストローク側（stroke.css / 画面2 の proposal 表示）が typography を使う */
+/* ストローク側（画面2 の proposal 表示）が typography を使う */
 @plugin "@tailwindcss/typography";
+
+/*
+ * `modules/` を走査対象に足す。Tailwind v4 の既定の走査はここを見ない。
+ *
+ * 入れないと、モジュールの中だけが名乗るクラスが生成されない。実際に落ちた:
+ * `MarkdownView` をモジュールへ移した直後、本文が 14px（`prose-sm`）のままで
+ * 16px にならなかった。`prose` / `prose-sm` は他所でも使われているので生成され、
+ * **`sm:prose-base` だけが消えていた**（ビルド成果物を grep してヒット 0 件）。
+ *
+ * モジュール側の CSS に `@source` を書いても効かない。`@import "tailwindcss"` を
+ * 持つこのファイルが Tailwind の入口で、走査の指定はここに集まる。
+ */
+@source "../../../modules";
 
 /*
  * 本家 spec-workflow-mcp の design token。
@@ -189,39 +202,385 @@ body {
     background: var(--surface-hover);
   }
 
-  /* 未接続の行。押せないことが見て分かる（specs/project-directory） */
+  /*
+   * 未接続の行。押せないことが見て分かる（specs/project/directory）。
+   *
+   * **状態の列（2列目）は弱めない。** 行を弱めるのは「その行に入れない」ことを示すため
+   * だが、状態はその理由そのものを名指している。理由まで一緒に沈めると、押せない行を前に
+   * して原因が読み取れなくなる。行全体に `opacity` を掛ける書き方はこの要件を満たさない
+   * （specs/project/directory・ui.md）。
+   */
   .sb-row-off {
+    cursor: not-allowed;
+  }
+
+  .sb-row-off td:nth-child(1) > *,
+  .sb-row-off td:nth-child(3) > * {
     opacity: 0.45;
+  }
+
+  /*
+   * 最終更新の基準の色。**ここが持ち主である。**
+   *
+   * 以前は `<td>` に Tailwind のユーティリティ（`text-[var(--text-secondary)]`）で
+   * 当てていたが、行の状態で沈める指定が `@layer components` にある一方、ユーティリティは
+   * より後のレイヤーに載るため、沈める側が必ず負けていた。1つの property に持ち主を
+   * 2人置かない。
+   */
+  .sb-table td:nth-child(4) {
+    color: var(--text-secondary);
+  }
+
+  /*
+   * 最終更新だけ弱め方が違う。日付は1色の文字で子要素を持たないため、`opacity` ではなく
+   * 文字色を地と混ぜて沈める。
+   */
+  .sb-row-off td:nth-child(4) {
+    color: color-mix(in srgb, var(--text-secondary) 45%, var(--surface-panel));
+  }
+
+  /*
+   * 生成中の行（specs/project/generation「昇格した瞬間から、生成中であることを一覧で示す」）。
+   *
+   * 示すのは2つ。**行の地を変える**ことと、**フォルダのアイコンの位置でローダーを回す**こと。
+   *
+   * **明滅は持たない。** 一覧の行は情報が詰まっており、周期的に薄くすると「進行中」ではなく
+   * 「読みにくい行」になる。prototype で実物を見て決めた（ui.md）。動きはローダーだけが持つ。
+   *
+   * 地は `#161f32`。通常の行の地（`--surface-panel`）を敷いた上に重ねる。下地を敷かずに
+   * 1枚置くと、ページの地（`#0f172a`）が透けて薄めるほど暗く沈むためである。
+   */
+  .sb-row-creating {
     cursor: not-allowed;
   }
 
   /*
-   * 状態チップ。prototype の `.chipOff`（無彩色・枠あり）が既定。
+   * 名前と日付は**未接続の行と同じ薄さ**にする（specs/project/generation・ui.md）。
+   * 生成中を「薄いだけの行」にしないため、薄くするのは中身だけで、地はそのまま残す
+   * ——地は下の `td` の重ねが受け持つ。
+   *
+   * **名前だけは文字色で弱め、`opacity` を掛けない。** 名前セルはローダーと名前を1つの
+   * `span` に収めており、その親へ `opacity` を掛けるとローダーまで沈む。`opacity` は
+   * グループを作るので、子を親より濃くして戻すことができない。ローダーは
+   * `conic-gradient` の背景なので、文字色で弱めても影響を受けない。
+   *
+   * **未処理の通知（3列目）は未接続の行と同じく子要素へ `opacity` を掛ける。** この列の
+   * 「—」はユーティリティで自分の文字色を持つため、`td` の文字色は届かない。ローダーは
+   * 無いので `opacity` で沈めてよい（prototype の `.row-gen td:nth-child(3) > *` と同じ）。
+   *
+   * **状態の列（2列目）は弱めない。** 未接続の行と同じ理由である
+   * （specs/project/directory）。
+   */
+  .sb-row-creating td:nth-child(1) {
+    color: color-mix(in srgb, var(--text-primary) 45%, var(--surface-panel));
+  }
+
+  .sb-row-creating td:nth-child(3) > * {
+    opacity: 0.45;
+  }
+
+  .sb-row-creating td:nth-child(4) {
+    color: color-mix(in srgb, var(--text-secondary) 45%, var(--surface-panel));
+  }
+
+  .sb-row-creating td {
+    background-color: var(--surface-panel);
+    background-image: linear-gradient(#161f32, #161f32);
+  }
+
+  /*
+   * 決着を知らせる面（specs/project/generation「決着したら、知らせてから次を選ばせる」）。
+   *
+   * **画面の半分くらいを埋める。** 小さすぎず、画面全体も覆わない。行の中には収めず、画面遷移も
+   * しない。フェードアウトで自ら消える——消えないと操作ができないためである（ui.md）。
+   *
+   * 下の一覧は見えたまま・操作できたままにする（`pointer-events: none`）。
+   */
+  @keyframes sb-notice-in {
+    from {
+      opacity: 0;
+      transform: translate(-50%, -46%) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+  }
+
+  .sb-notice {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    z-index: 40;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: min(52rem, calc(100vw - 4rem));
+    height: 50vh;
+    padding: 24px 32px;
+    text-align: center;
+    border-radius: 18px;
+    border: 1px solid var(--border-default);
+    background: color-mix(in srgb, var(--surface-panel) 92%, transparent);
+    backdrop-filter: blur(2px);
+    box-shadow: 0 24px 60px -20px rgb(0 0 0 / 0.5);
+    animation: sb-notice-in 260ms ease-out both;
+    transition:
+      opacity 420ms ease,
+      transform 420ms ease;
+  }
+
+  .sb-notice-leaving {
+    opacity: 0;
+    transform: translate(-50%, -54%);
+  }
+
+  .sb-notice-title {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .sb-notice[data-outcome='done'] .sb-notice-title {
+    color: var(--status-success);
+  }
+
+  .sb-notice[data-outcome='failed'] .sb-notice-title {
+    color: var(--status-error);
+  }
+
+  /*
+   * 次を選ばせるモーダル。**選ぶまで閉じない**（specs/project/generation）。
+   *
+   * 知らせる面が引いた後に出る。背後は暗くするが、画面遷移はしない。
+   */
+  .sb-choice-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgb(2 6 23 / 0.55);
+  }
+
+  .sb-choice {
+    width: min(26rem, calc(100vw - 3rem));
+    padding: 22px 24px;
+    border-radius: 14px;
+    border: 1px solid var(--border-default);
+    background: var(--surface-panel);
+    box-shadow: 0 24px 60px -20px rgb(0 0 0 / 0.55);
+  }
+
+  .sb-choice-title {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .sb-choice-note {
+    margin: 6px 0 18px;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .sb-choice-error {
+    margin: 0 0 12px;
+    font-size: 12px;
+    color: var(--status-error);
+  }
+
+  .sb-choice-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
+  .sb-choice-actions button {
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .sb-choice-actions button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .sb-choice-primary {
+    background: var(--interactive-primary);
+    color: #fff;
+    border: 0;
+  }
+
+  .sb-choice-secondary {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-default);
+  }
+
+  .sb-choice-danger {
+    background: transparent;
+    color: var(--status-error);
+    border: 1px solid color-mix(in srgb, var(--status-error) 45%, transparent);
+  }
+
+  /*
+   * 回転するローダー。
+   *
+   * アイコンのコレクション（`app/assets/icons.ts`）は prototype と本家から持ち込んだ絵だけを
+   * 置く場所で、そこに無いものを足さない。だから CSS で作る。
+   */
+  @keyframes sb-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /*
+   * 明滅は2点の行き来。`ease` を入れると中間の濃さに留まって U 字に沈む動きになるので
+   * `linear` のまま、明と暗をそれぞれ長く保持して切り替えだけを短くする（ui.md）。
+   */
+  @keyframes sb-loader-blink {
+    0%,
+    42% {
+      opacity: 1;
+    }
+    50%,
+    92% {
+      opacity: 0.25;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+
+  /*
+   * 生成中のローダー。フォルダのアイコンを外した位置で回る。
+   *
+   * 帯は 180°、輪の太さ 2px、大きさ 15px、白（ui.md の確定値）。円錐グラデーションで帯を
+   * 作り、マスクで中を抜いて輪にする。
+   */
+  .sb-spinner {
+    display: inline-block;
+    width: 15px;
+    height: 15px;
+    flex: none;
+    border-radius: 999px;
+    background: conic-gradient(
+      #fff 0deg,
+      rgb(255 255 255 / 0.72) 54deg,
+      rgb(255 255 255 / 0.34) 112deg,
+      rgb(255 255 255 / 0.1) 180deg,
+      rgb(255 255 255 / 0.1) 360deg
+    );
+    mask: radial-gradient(closest-side, transparent calc(100% - 2px), #000 calc(100% - 2px));
+    -webkit-mask: radial-gradient(closest-side, transparent calc(100% - 2px), #000 calc(100% - 2px));
+    animation:
+      sb-spin 0.9s linear infinite,
+      sb-loader-blink 1.6s linear infinite;
+  }
+
+  /*
+   * 動きを抑える設定に従う（specs/project/generation は「示す」ことを求めており、
+   * 動きそのものは求めていない）。ローダーは回さずに形だけ残す——止まった輪でも
+   * 「まだ何かが続いている」ことは伝わる。
+   *
+   * **ここで行に `opacity` を掛けない。** 弱め方は動きの設定に関わらず同じで、上の
+   * 列ごとの指定（名前は文字色、通知は子要素の `opacity`、最終更新は文字色）が常に
+   * 効いている。ここで行ごと沈めると、動きを抑えている人にだけ状態の列が読めなくなる
+   * （specs/project/directory）。
+   */
+  @media (prefers-reduced-motion: reduce) {
+    .sb-row-creating {
+      animation: none;
+    }
+
+    .sb-spinner {
+      animation: none;
+    }
+
+    /* 知らせる面は残す。動いて出るのをやめるだけ（confetti は component 側で止める） */
+    .sb-notice {
+      animation: none;
+      transition: none;
+    }
+  }
+
+  /*
+   * 状態チップ。prototype（`update-project-list-view` の `prototype/index.html`）の
+   * `.chip`（無彩色・枠あり）が既定で、`.chip.active` が下の `.sb-chip-on` に当たる。
    *
    * ui.md の Visual Language には「アクティブ / 未接続の区別は色ではなく、チップの文言と
    * 行の非活性で示す」とあるが、同じ ui.md が採用した prototype（案A）はアクティブを
    * 緑で出している。両者は食い違っており、prototype の実物に合わせる。
    */
   .sb-chip {
-    display: inline-block;
+    /*
+     * 基調色。アクティブはこれを差し替えるだけで、形はそのまま受け継ぐ。
+     * 3状態で同じ形にする。際立つかどうかだけが違い、幅は揃える（ui.md）。
+     */
+    --sb-chip-base: var(--text-faint);
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 76px;
     font-size: var(--text-xs);
     padding: 2px 8px;
     border-radius: 999px;
     font-weight: 600;
-    background: var(--surface-sunken);
-    color: var(--text-muted);
-    border: 1px solid var(--border-default);
+    /*
+     * 面は3段。中央（55%）をいちばん薄くし、下端で少し戻す。平坦なグラデーションでは
+     * なく、下辺で受けた光が戻る形にしている（ui.md）。
+     */
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--sb-chip-base) 12%, transparent) 0%,
+      color-mix(in srgb, var(--sb-chip-base) 4.8%, transparent) 55%,
+      color-mix(in srgb, var(--sb-chip-base) 8.4%, transparent) 100%
+    );
+    border: 1px solid color-mix(in srgb, var(--sb-chip-base) 30%, transparent);
+    color: color-mix(in srgb, var(--sb-chip-base) 90%, #fff);
+    /* 上辺の照り返しと下辺の落ち込み。ガラスの厚みはこの2枚で出る */
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, #fff 16%, transparent),
+      inset 0 -1px 0 color-mix(in srgb, #000 20%, transparent);
   }
 
   /*
-   * prototype の `.chipOn`。緑を 18% 敷く。
-   * prototype は border を宣言していないので枠幅は 0。色だけ透明にすると 1px ぶん
-   * 大きくなり、chipOff と並んだときに高さが揃わない。
+   * アクティブだけが際立つ。形は `.sb-chip` のまま、基調色を差し替えて濃さを上げる。
+   *
+   * 枠は消さずに残す（`border-width: 0` にしない）。枠を消すと既定のチップと 1px ぶん
+   * 高さが揃わなくなる。
+   *
+   * 外へのにじみが2枚あるのは、近い1枚だけだと縁が硬く見え、遠い1枚だけだと輪郭が
+   * ぼやけるためである。近くで縁を作り、遠くで空気を作る（ui.md）。
    */
   .sb-chip-on {
-    background: color-mix(in srgb, var(--status-success) 18%, transparent);
-    color: var(--status-success);
-    border-width: 0;
+    --sb-chip-base: var(--status-success);
+
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--sb-chip-base) 38%, transparent) 0%,
+      color-mix(in srgb, var(--sb-chip-base) 20%, transparent) 55%,
+      color-mix(in srgb, var(--sb-chip-base) 26%, transparent) 100%
+    );
+    border-color: color-mix(in srgb, var(--sb-chip-base) 55%, transparent);
+    color: color-mix(in srgb, var(--sb-chip-base) 55%, #fff);
+    text-shadow: 0 0 6px color-mix(in srgb, var(--sb-chip-base) 60%, transparent);
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, #fff 34%, transparent),
+      inset 0 -1px 0 color-mix(in srgb, #000 28%, transparent),
+      0 0 7px color-mix(in srgb, var(--sb-chip-base) 45%, transparent),
+      0 0 15px color-mix(in srgb, var(--sb-chip-base) 22%, transparent);
   }
 
   /* 件数バッジ。アクセントは indigo 1色に集約する */
@@ -806,6 +1165,19 @@ body {
   }
 
   /*
+   * 開閉の口（本家 Close Review）。決める操作の並びの先頭に置く。
+   * 実測（稼働中の本家・2026-09-02）で決定の3つ（#6366f1）より一段明るい #818cf8。
+   * blur しても変わらない＝focus ではなく地の色で、開閉と決定を明度で分けている。
+   */
+  .sb-action-light {
+    background: #818cf8;
+  }
+
+  .sb-action-light:hover {
+    background: var(--interactive-primary);
+  }
+
+  /*
    * 承認と却下の色。
    *
    * 本家の JSX には `btn bg-green-600` / `btn bg-red-600` と書いてあるが、本家自身の
@@ -880,340 +1252,173 @@ body {
 }
 
 /*
- * ここから文書本文。**`components` ではなく `sb-doc` レイヤーに置く。**
+ * ここから下は「ストローク」の様式。出どころが上の2区画と違う。
  *
- * `@tailwindcss/typography` が出す `prose` 一式は Tailwind v4 では `utilities` レイヤーに
- * 入る（CSSOM で確認済み）。レイヤーは詳細度より強いので、`components` に置いた
- * `.sb-markdown th`（0,1,1）でも `utilities` の `.prose :where(thead th)`（0,1,0）に負ける。
- * 実際に負けた: table の margin が 16px ではなく prose の 2em(28px)、th の padding が
- * 4px 8px ではなく prose の padding-inline/padding-bottom になっていた。
+ * 上層は prototype（`navigation.prototype.html`）、下層は本家 v2.2.7 の写しである。
+ * **ストロークには写す元が無い。** 本家 spec-workflow-mcp に、AI と往復して概要を詰める
+ * 画面が存在しないためで、ここの値の出どころは change `adopt-upstream-design-tokens` である。
  *
- * `@layer sb-doc;` を `@import "tailwindcss"` より後に宣言することで、レイヤーの並びが
- * theme → base → components → utilities → sb-doc になり、ここの規則が prose に勝つ。
- * prose に任せる型（見出し・段落・箇条書き・引用の骨格・罫線）はここに**書かない**。
- * 書いたものだけが上書きになる。
+ * 本家の密度（bar `10px 14px` / 見出し 15px）へ寄せていないのは、写す元が無いことに加えて
+ * 用途が違うためである。本家の画面は読む画面、ストロークは**長文を読み書きする画面**で、
+ * 余白はその読み書きのために置かれている。
+ *
+ * 色は上の2区画と同じ token を使う。ここで定義するのは**寸法と面**だけである。
+ *
+ * 型（`text-sm` / `text-xs` / `text-lg`）に別名を被せないこと。`@theme` が既に本家の値へ
+ * 上書きしている（12px / 11px / 16px）ので、Tailwind のクラスをそのまま書けば定義済みの値に
+ * 載る。ここで名前を足すと、1つの property に持ち主が2人になる。
  */
-@layer sb-doc;
 
-@layer sb-doc {
-  /*
-   * 文書の本文。
-   *
-   * **型（見出し・段落・箇条書き・引用・罫線）はここに持たない。**
-   * 本家が本文へ当てているのは Tailwind Typography の
-   * `prose prose-sm sm:prose-base dark:prose-invert …`（`MDXEditorWrapper.tsx` の
-   * `contentEditableClassName`）で、その class 列は `DocumentView.vue` /
-   * `ApprovalAnnotator.vue` が本家と同じ並びで名乗っている。
-   *
-   * 以前ここにあった写しの出どころ（本家 `theme.css` の `.markdown-content`）は、
-   * 本家のどの `.tsx` も名乗っていない**使われていない CSS** だった
-   * （`grep -rn "markdown-content" src` のヒットは `theme.css` だけ）。そのため
-   * 本文が本家と別物になっていた（実測: h1 36px→16px / h2 24px→16px / p の余白
-   * 20px→8px / hr 48px→16px）。写しをやめ、本家と同じプラグインに委ねる。
-   *
-   * ここに残すのは **prose では出せない本家側の差分**だけ。本家の本文は素の prose では
-   * なく、その上に MDXEditor（`MDXEditorWrapper.css` と `@mdxeditor/editor` の
-   * scoped CSS）が重なった状態で描かれている。以下はその重なりの実測値。
-   */
-
-  /*
-   * 本文の面。本家は contentEditable の入れ物（`.mdxeditor-root-contenteditable`）に
-   * ダークで #111827 を敷き、その内側 12px から本文が始まる（`MDXEditorWrapper.css`
-   * の `min-height:200px` / `background-color:#111827` ＋ `_contentEditable_` の padding）。
-   * パネル（#1e293b）の中に一段暗い矩形が入るのが本家の見え方（実測・目視とも）。
-   */
-  .sb-markdown {
-    min-height: 200px;
-    padding: 12px;
-    background: #111827;
-    /*
-     * 本家の contentEditable は `word-break: break-word` を持ち、子まで継がれる（実測）。
-     * 切れない長い語（`specs/api/session/approve` のような見出し）が欄からはみ出さず、
-     * 語の途中で折り返る。並列表示のように欄が狭いところでこれが効く。
-     *
-     * 本家は同じ要素に `white-space: pre-wrap` も持つが、そちらは Lexical が編集中の
-     * 空白を保つための指定で、読むだけの MDC 出力に移すと markdown 側の字下げや
-     * 連続空白がそのまま出る。見え方の一致には要らないので写さない。
-     */
-    word-break: break-word;
-  }
-
-  /*
-   * コードブロック。本家（spec-workflow-mcp）は MDXEditor の `codeMirrorPlugin` に渡して
-   * いて `pre` を使わず、`div._codeMirrorWrapper_` > `div._codeMirrorToolbar_` + `.cm-editor`
-   * になる。stroke-board は読み取り表示なので CodeMirror は持ち込まず、本家が画面に出す形
-   * （枠・右上の帯・行番号・折り返し）を素の `pre` で組み立てる（`CodeBlock.vue`）。
-   *
-   * 値の出どころは稼働中の本家（`/#/specs/view`）の実測と、その CSS の重ね
-   * （`@mdxeditor` の `_codeMirrorWrapper_` ＋ `MDXEditorWrapper.css` のダーク時）。
-   * `.sb-mermaid` と同じく、ダーク一本なので重ねた後の値だけを持つ。
-   *
-   * 外枠: margin 16px 0 / padding .8rem / border 1px #374151 / radius 8px / overflow hidden
-   *       / background #1f2937
-   */
-  .sb-code {
-    /* 行番号の桁数。`CodeBlock.vue` が行数から決めて inline で入れる */
-    --sb-code-digits: 1;
-    /* 番号の欄の幅。本家は1桁で 22px（左右 8px の余白＋数字1文字）。9.6px の等幅1文字は約 5.76px */
-    --sb-code-gutter: calc(16px + var(--sb-code-digits) * 5.76px);
-    /*
-     * 本文の左位置。本家は 番号の欄 ＋ 折り畳みの欄 8px ＋ 区切り線 1px ＋ 行の内側 6px。
-     * 折り畳みは編集の仕掛けなので中身は持たないが、幅は空けて同じ位置に本文を置く
-     */
-    --sb-code-indent: calc(var(--sb-code-gutter) + 15px);
-
-    position: relative;
-    margin: 16px 0;
-    padding: 12.8px;
-    border: 1px solid #374151;
-    border-radius: 8px;
-    overflow: hidden;
-    background: #1f2937;
-  }
-
-  /*
-   * 右上に重なる帯。本家の `_codeMirrorToolbar_`（position:absolute / right:0 / top:0 /
-   * padding .5rem 1rem / background #374151 / border-bottom-left-radius 4px / z-index 1）。
-   *
-   * 本家はこの中に言語セレクタと「Delete code block」を置くが、文書表示ではどちらも
-   * `disabled` で押せない。操作としては存在しないので、ここは言語名の札だけを出す。
-   */
-  .sb-code-toolbar {
-    position: absolute;
-    top: 0;
-    right: 0;
-    z-index: 1;
-    display: flex;
-    gap: 4px;
-    padding: 8px 16px;
-    border-bottom-left-radius: 4px;
-    background: #374151;
-    color: #9ca3af;
-    font-size: 12px;
-  }
-
-  /*
-   * 本文。本家の `.cm-scroller`（font-family:monospace / line-height:1.4）と
-   * `.cm-content.cm-lineWrapping`（padding 4px 0 / color #e5e7eb / 折り返す）の重ね。
-   * 横スクロールはさせない（本家は折り返す）。
-   *
-   * 左の番号の欄は本家では別の列（`.cm-gutters`）だが、行が折り返しても背景が続くように
-   * ここでは背景の帯として敷く。色は本家の `.cm-gutters`（#374151 と区切り線 #4b5563）。
-   */
-  /*
-   * `.sb-code` を重ねて詳細度を (0,2,0) にしてある。prose の `.prose :where(pre):not(…)`
-   * は (0,1,0) で `pre` の面・余白・角丸・字送りを全部持つため、同じ強さでは
-   * 並び順しだいで負ける。
-   */
-  .sb-code .sb-code-body {
-    margin: 0;
-    padding: 4px 2px 4px var(--sb-code-indent);
-    border: 0;
-    border-radius: 0;
-    overflow: visible;
-    background: linear-gradient(
-      to right,
-      #374151 0 calc(var(--sb-code-gutter) + 8px),
-      #4b5563 calc(var(--sb-code-gutter) + 8px) calc(var(--sb-code-gutter) + 9px),
-      transparent calc(var(--sb-code-gutter) + 9px)
-    );
-    color: #e5e7eb;
-    font-family: monospace;
-    font-size: 16px;
-    line-height: 1.4;
-    white-space: break-spaces;
-    word-break: break-word;
-    counter-reset: sb-code-line;
-  }
-
-  /*
-   * インラインコードの指定（prose の `code` と `.sb-markdown :not(pre) > code`）を
-   * コードブロックの中へ持ち込ませない。本家のコードブロックは 16px・等幅のまま。
-   */
-  .sb-code .sb-code-body code {
-    padding: 0;
-    background: none;
-    color: inherit;
-    font-family: inherit;
-    font-size: inherit;
-    font-weight: inherit;
-  }
-
-  /*
-   * 行番号。本家の `.cm-lineNumbers .cm-gutterElement`（font-size .6rem / padding 0 .5rem
-   * / 右寄せ / color #6b7280）。`span.line` は shiki が行ごとに出すもので、無い言語のときは
-   * `CodeBlock.vue` が同じ形で組み立てる。
-   *
-   * 番号は行の内側に置いて左の余白へずらす。折り返しても番号が付くのは先頭の1行だけで、
-   * 続きは本文の左端に揃う（本家の CodeMirror と同じ）。
-   */
-  .sb-code .sb-code-body .line::before {
-    counter-increment: sb-code-line;
-    content: counter(sb-code-line);
-    display: inline-block;
-    box-sizing: border-box;
-    width: var(--sb-code-gutter);
-    margin-left: calc(-1 * var(--sb-code-indent));
-    margin-right: 15px;
-    padding: 0 8px;
-    color: #6b7280;
-    font-size: 9.6px;
-    line-height: 1.4;
-    text-align: right;
-    vertical-align: top;
-  }
-
-  /*
-   * インラインコード。
-   *
-   * 本家は Lexical が `code > span._code_` の二重構造で出しており、外の `code` に
-   * prose（`prose-code:` の色 ＋ 前後のバッククォート ＋ 0.875em ＋ 600）が、内の
-   * `span` に MDXEditor の scoped CSS（0.94em / 面 #212225 / padding 1px 4px /
-   * 角丸なし）が当たる。実測（本文 16px の `li` の中）:
-   *   外 code  14px / 600 / 面 gray-800 / padding 0 / radius 0 / ::before ::after = `
-   *   内 span  13.16px / 600 / 面 rgb(33,34,37) / padding 1px 4px / radius 0
-   *
-   * MDC は `code` 1枚しか出さないので、目に入る側（内の span）の値をその `code` に
-   * 持たせる。バッククォートは prose の `code::before/::after` がそのまま出す。
-   * 二重構造でしか出せないのは「バッククォートだけ外の面色になる」ところで、両者の差は
-   * rgb(31,41,55) と rgb(33,34,37) の1段。ここは合わせられないので落としている。
-   */
-  .sb-markdown :not(pre) > code {
-    padding: 1px 4px;
-    border-radius: 0;
-    background: rgb(33, 34, 37);
-    /* 0.875em（prose）× 0.94（MDXEditor の `_code_`）＝ 本文 16px に対して 13.16px */
-    font-size: 0.8225em;
-    font-weight: 600;
-  }
-
-  /*
-   * 表。本家の表は prose ではなく MDXEditor の table editor（`_tableEditor_` /
-   * `_leftAlignedCell_`）が描いている。`MDXEditorWrapper.css` にも表の指定はあるが
-   * （padding .5rem 1rem / border #374151）、あとから読まれる `@mdxeditor/editor` の
-   * scoped CSS が同じ強さで上書きするので、画面に出ているのは下の値のほう。
-   *
-   * 実測（/#/specs/view の design.md）: 罫線 1px rgb(46,49,53) / セル padding 4px 8px /
-   * 字 14px（prose の 0.875em）/ th は 600・白・面 #1f2937 / 縦は baseline 揃え。
-   */
-  .sb-markdown table {
-    margin: 16px 0;
-    border-collapse: collapse;
-    width: 100%;
-  }
-
-  .sb-markdown th,
-  .sb-markdown td {
-    padding: 4px 8px;
-    border: 1px solid rgb(46, 49, 53);
-    text-align: left;
-    vertical-align: baseline;
-  }
-
-  .sb-markdown th {
-    background: #1f2937;
-    color: #fff;
-    font-weight: 600;
-  }
-
-  /* prose は thead と行に区切り線を足す。本家はセルの罫線で格子を引くので重ねない */
-  .sb-markdown thead,
-  .sb-markdown tbody tr {
-    border: 0;
-  }
-
-  /*
-   * リンク。prose（invert）の既定は白。本家は `MDXEditorWrapper.css` の
-   * `.mdx-editor-wrapper a { color: var(--accentText) }` で青にしている。
-   * 実測 rgb(112,184,255)（`--accentText` は @mdxeditor のダークテーマ側が勝つ）。
-   * 太さ 500 と下線は prose のまま。
-   */
-  .sb-markdown a {
-    color: rgb(112, 184, 255);
-  }
-
-  /*
-   * 引用。`MDXEditorWrapper.css` の `blockquote`（border-left 4px var(--accentBase) /
-   * padding-left 1rem / margin 1rem 0 / ダーク時 color #9ca3af）。斜体と 500 は prose のまま。
-   * 実測の枠色 rgb(13,21,32) は @mdxeditor のダークテーマが入れた `--accentBase`。
-   */
-  .sb-markdown blockquote {
-    margin: 16px 0;
-    padding-left: 16px;
-    border-left: 4px solid rgb(13, 21, 32);
-    color: #9ca3af;
-  }
+/*
+ * sticky なヘッダーの高さ。`strokes/[sessionId]/proposal.vue` の実測値
+ * （`px-6 py-3` の bar + 下線 1px）。
+ *
+ * **3箇所が同時に動かないと表示が壊れる**ので、1箇所に置く。本文の最低の高さ
+ * （`calc(100vh - この値)`）、脇の一覧の sticky の位置、脇の一覧の高さの3つで、
+ * ずれると本文と脇の下端が食い違う。
+ */
+:root {
+  --sb-stroke-bar-h: 57px;
 }
 
 @layer components {
   /*
-   * mermaid の図の入れ物。本家の `.mermaid-container` の写し。
+   * 中央寄せ1カラムの器。概要入力（`strokes/index.vue`）と問いの往復
+   * （`strokes/[sessionId]/index.vue`）が使う。
    *
-   * 本家は Tailwind のクラス（`my-4 overflow-auto bg-white dark:bg-gray-800 rounded-lg
-   * p-4 border border-gray-200 dark:border-gray-700`）に `MDXEditorWrapper.css` の
-   * `.mdx-editor-wrapper .mermaid-container` を重ねている。stroke-board はダーク一本
-   * （`:root` がダークの値そのもの）なので、重ねた後のダーク時の値だけを持つ。
-   *
-   * 背景の #1f2937 は本家 CSS の `.mdx-editor-wrapper.dark-theme .mermaid-container`、
-   * 枠の色は Tailwind v4 の gray-700（本家の `dark:border-gray-700`）。
-   * `.sb-markdown pre` に当たらないよう、図は `pre` ではなく `div` で出している。
+   * 下の余白が大きいのは、画面の下に操作の並び（送信・待機）が重なるためである。
+   * 本文が隠れないだけの逃げを取ってある。
    */
-  .sb-mermaid {
-    display: flex;
-    justify-content: center;
-    overflow: auto;
-    margin: 16px 0;
-    padding: 16px;
-    border: 1px solid oklch(0.373 0.034 259.733);
-    border-radius: 8px;
-    background: #1f2937;
+  .sb-stroke-page {
+    margin-inline: auto;
+    max-width: 42rem;
+    padding-inline: 24px;
+    padding-top: 56px;
+    padding-bottom: 160px;
   }
 
   /*
-   * mermaid は SVG に `width="100%"` と `style="max-width: <実寸>px"` を付けて返す。
-   * インラインの max-width が勝つので原寸が上限になり、入れ物が狭いときだけ縮む。
-   * ここは本家と同じく、その指定が無い場合の受けとして置いている。
+   * パネルの面。**角丸・枠・地だけを持ち、内側の余白は持たない。**
+   *
+   * 余白を含めないのは、使う2箇所で用途が違うためである——`AgentQuestion` の詳細説明は
+   * `p-3`、`StrokeBreadcrumb` の往復全文は `p-4`。面が同じであることを名前で示し、
+   * 余白は使う側が役目に合わせて持つ。
+   *
+   * `AgentQuestion` の選択肢のボタンはこの面に含めない。枠の色が選択の状態で変わるので、
+   * 面の定義に混ぜると持ち主が2人になる。
+   *
+   * **混色は `in oklab`。** ここは `bg-elevated/50` を写した先で、Tailwind が透明度付きの色を
+   * `color-mix(in oklab, …)` で出す（生成 CSS で確認）。`in srgb` で書くと色空間が変わり、
+   * 移す前と後で見た目がずれる。**この change は見た目を変える作業ではない。**
    */
-  .sb-mermaid svg {
-    max-width: 100%;
-    height: auto;
+  .sb-stroke-card {
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--ui-border);
+    background: color-mix(in oklab, var(--ui-bg-elevated) 50%, transparent);
   }
 
   /*
-   * 文書を直すときの入力欄。読みのときの `.sb-markdown` と同じ幅・同じ面に置き、
-   * 編集に入った瞬間に見え方が飛ばないようにする。中身は markdown の生テキストなので
-   * 等幅で出す。
+   * 明滅。2つの場面で使う——次の問いを待っている間（`WaitingIndicator`）と、
+   * AI からの問い返しが届いたことを知らせる帯（`strokes/[sessionId]/proposal.vue`）。
+   * 前者は「まだ続いている」、後者は「あなたの番だ」を示す。
+   *
+   * **下層の `sb-loader-blink` と値が違う。揃えないこと。** あちらは生成中のローダーで、
+   * `linear` で明暗を長く保持する形が ui.md の確定値として出ている。こちらは用途が違い、
+   * 値の出どころも違う（ストロークには写す元が無い——`adopt-upstream-design-tokens`）。
+   * 名前が似ているだけで、重複ではない。
+   *
+   * 名前に `sb-stroke-` を付けているのは、`@keyframes` の名前空間が文書全体で1つで、
+   * 同じ `main.css` の中に `sb-loader-blink` が居るためである
+   * （change `fold-stroke-css` で `assets/css/stroke.css` から移した）。
    */
-  .sb-textarea {
-    display: block;
-    width: 100%;
-    min-height: 60vh;
-    padding: 12px;
-    border-radius: 6px;
-    background: var(--surface-sunken);
-    border: 1px solid var(--border-default);
-    color: var(--text-primary);
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: var(--text-sm);
-    line-height: 1.7;
-    resize: vertical;
-    white-space: pre;
-    tab-size: 2;
+  @keyframes sb-stroke-blink {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.35;
+    }
   }
 
-  .sb-textarea:focus {
-    outline: none;
-    border-color: var(--interactive-primary);
+  .sb-stroke-blink {
+    animation: sb-stroke-blink 1.1s ease-in-out infinite;
   }
 
-  /* 保存できなかった理由。消えると何が起きたか分からなくなるので、色だけで示さない */
-  .sb-error {
-    margin-bottom: 12px;
-    padding: 8px 12px;
-    border-radius: 6px;
-    background: var(--surface-sunken);
-    border: 1px solid var(--status-error);
-    color: var(--status-error);
-    font-size: var(--text-sm);
+  /* 動きを抑える設定に従う。示す内容（待機・要注意）は文言が持つので、止めても伝わる */
+  @media (prefers-reduced-motion: reduce) {
+    .sb-stroke-blink {
+      animation: none;
+    }
   }
+}
+
+/*
+ * 注釈の塗り（CSS Custom Highlight API）。
+ *
+ * 塗る側は `app/composables/useAnnotationHighlight.ts`。色ごとに1つの `Highlight` を
+ * `sb-annotation-<色名>` の名で `CSS.highlights` に登録し、ここで見た目を当てる。
+ * `::highlight()` は inline style を受け取れないので、色の実値はここに置くほかない。
+ * 値は `useAnnotations` の `highlightColors`（本家へ渡る保存形が使う実値）と同じ。
+ * **片方だけ変えないこと。**
+ *
+ * 効くプロパティは限られる（実測 Chromium 151、2026-09-01）: 背景色・文字色・下線の類・
+ * 文字の影。枠・余白・`box-shadow` は効かない。以前の「下線を 2px ずつ積む」重なりの
+ * 表し方はここでは組めないので、重なりは下の1本（`sb-annotation-overlap`）で出す。
+ *
+ * `@layer` の外に置く。`::highlight()` は要素のスタイルではなく、Tailwind のユーティリティと
+ * 競合しない。
+ */
+::highlight(sb-annotation-yellow) {
+  background-color: rgba(255, 235, 59, 0.35);
+  text-decoration: underline;
+  text-decoration-color: #fbc02d;
+  text-decoration-skip-ink: none;
+}
+
+::highlight(sb-annotation-green) {
+  background-color: rgba(76, 175, 80, 0.3);
+  text-decoration: underline;
+  text-decoration-color: #388e3c;
+  text-decoration-skip-ink: none;
+}
+
+::highlight(sb-annotation-blue) {
+  background-color: rgba(33, 150, 243, 0.28);
+  text-decoration: underline;
+  text-decoration-color: #1976d2;
+  text-decoration-skip-ink: none;
+}
+
+::highlight(sb-annotation-pink) {
+  background-color: rgba(233, 30, 99, 0.25);
+  text-decoration: underline;
+  text-decoration-color: #c2185b;
+  text-decoration-skip-ink: none;
+}
+
+::highlight(sb-annotation-orange) {
+  background-color: rgba(255, 152, 0, 0.3);
+  text-decoration: underline;
+  text-decoration-color: #f57c00;
+  text-decoration-skip-ink: none;
+}
+
+/*
+ * 2件以上に覆われている範囲。色ごとの塗りとは別に1本だけ持ち、二重線で示す。
+ * 同一範囲・同色の2件目は背景では判別できないので、これが要る。半透明の背景は重なった分だけ
+ * 濃くもなるが、それは色が違うときにしか効かない。
+ */
+::highlight(sb-annotation-overlap) {
+  text-decoration: underline double;
+  text-decoration-color: var(--text-primary);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-skip-ink: none;
+}
+
+/* 一覧から辿ったコメントの範囲。しばらくの間だけ、色の上から強く塗る */
+::highlight(sb-annotation-focus) {
+  background-color: var(--accent-primary);
+  color: #fff;
 }

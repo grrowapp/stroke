@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/structure-migration/requirements.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-24T21:56:50.800Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787608610769_yxjshndh3",
+      "approvalTitle": "構造の移行課題（色は CSS へ・markdown 集約の課題行を追加）"
+    }
+  ]
+}

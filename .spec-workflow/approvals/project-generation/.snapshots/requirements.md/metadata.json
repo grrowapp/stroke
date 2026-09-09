@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/project-generation/requirements.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-25T07:51:09.567Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787644269495_zrpsku4zs",
+      "approvalTitle": "specs: project/generation — rename 昇格・proposal は claude が書く（新設・畳み込み）"
+    }
+  ]
+}

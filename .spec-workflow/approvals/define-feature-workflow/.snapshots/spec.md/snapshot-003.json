@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787782896380_e661ylvfn",
+  "approvalId": "approval_1787782590971_zyo0nb5za",
+  "approvalTitle": "spec: feature/structure の承認（やり直し: 器の構造のみ。1対1は naming へ移動）",
+  "version": 3,
+  "timestamp": "2026-08-26T22:21:36.380Z",
+  "trigger": "approved",
+  "status": "pending",
+  "content": "## Purpose\n\nfeature が本家 `.spec-workflow/specs/` 上でとる器の構造の定義。フラットな配置・3文書の構成・入れ子を持たないことを定める。\n\n## ADDED Requirements\n\n### Requirement: feature は本家のフラットな器に置かれる\n\nfeature は `.spec-workflow/specs/<spec名>/` 直下の文書（requirements.md / design.md / tasks.md）で構成される SHALL。spec 名は `feature/naming` の規約に従う SHALL。\n\n#### Scenario: feature の器の形\n\n- **WHEN** capability パス `api/session` に対応する feature が存在する\n- **THEN** その文書は `.spec-workflow/specs/api__session/` 直下にある\n\n### Requirement: 本家の specs 配下に入れ子ディレクトリを持たない\n\nfeature の器は `.spec-workflow/specs/` 配下の入れ子ディレクトリを持たない SHALL。入れ子は本家の一覧に現れず、本家のファイル監視が親 spec に存在しない文書の更新イベントを飛ばす（実測 2026-08-26、`docs/specs/reference/upstream-observations.md`）。\n\n#### Scenario: 階層は入れ子ではなくフラット名で表れる\n\n- **WHEN** 階層を持つ capability パスに対応する feature が存在する\n- **THEN** その器は入れ子ディレクトリではなく、`__` エンコードのフラット名の1ディレクトリである\n",
+  "fileStats": {
+    "size": 1363,
+    "lines": 24,
+    "lastModified": "2026-08-26T22:16:09.756Z"
+  },
+  "comments": []
+}

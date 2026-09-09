@@ -1,0 +1,12 @@
+{
+  "id": "approval_1787810568175_wqnbblhal",
+  "title": "feature ワークフロー定義の承認（対応の引き方を change 内 delta のパスに修正。proposal.md は change ディレクトリに無い）",
+  "filePath": "docs/feature/overview.md",
+  "type": "document",
+  "status": "rejected",
+  "createdAt": "2026-08-27T06:02:48.175Z",
+  "category": "spec",
+  "categoryName": "define-feature-workflow",
+  "response": "changesの中には期待してるものはない",
+  "respondedAt": "2026-08-27T06:07:41.166Z"
+}

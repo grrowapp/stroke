@@ -2,7 +2,7 @@ import type { Answer, Question, Stroke } from '#shared/stroke'
 import { conflict } from '../../../utils/stroke/conflict'
 import { answerBody, parseBody } from '../../../utils/stroke/request-schemas'
 import { requireSessionId } from '../../../utils/stroke/session-param'
-import { appendAnswerStroke, readState, readStrokes } from '../../../utils/stroke/session-store'
+import { appendAnswerStroke, isPromotedState, readState, readStrokes } from '../../../utils/stroke/session-store'
 
 /** リトライ判定用。invocation が失敗した後、同じ問いへの同じ回答が再送されたか。 */
 function isRetryOfLastStroke(last: Stroke | undefined, question: Question, answer: Answer): boolean {
@@ -26,7 +26,9 @@ export default defineEventHandler(async (event) => {
   const answer = parseBody(answerBody, await readBody(event))
 
   const state = await readState(sessionId)
-  if (state.phase === 'approved') {
+  // 承認以降（`approved` / `activated`）は1つの門で断つ。理由は「承認済み」であって、
+  // 問いの有無ではない（openspec/specs/api/session/answer）
+  if (isPromotedState(state)) {
     throw conflict('phase', '承認済みのセッションには回答できない。')
   }
   const pending = state.currentQuestion
@@ -40,6 +42,5 @@ export default defineEventHandler(async (event) => {
     await appendAnswerStroke(sessionId, pending, answer)
   }
 
-  setResponseStatus(event, 200)
-  return null
+  return new Response(null, { status: 204 })
 })

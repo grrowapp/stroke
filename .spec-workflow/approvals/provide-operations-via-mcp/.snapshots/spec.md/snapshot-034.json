@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787811664351_3jpt9bv92",
+  "approvalId": "approval_1787811589416_3kx12osa8",
+  "approvalTitle": "specs mcp/server(改訂5): 「接続情報を引数に要求しない」Requirement を削除（各ツールの引数契約は mcp/tools/** が個別に定めており重複、projectId 解決の機構は design 側）。残りは改訂4 と同じ",
+  "version": 34,
+  "timestamp": "2026-08-27T06:21:04.351Z",
+  "trigger": "approved",
+  "status": "pending",
+  "content": "# mcp/server Delta\n\n## Purpose\n\nstroke-board 自身が route `/mcp` で提供する MCP サーバーの、全ツール共通の契約を定める。個々のツールの引数・結果は `mcp/tools/**`、接続の担保は `server/session-management` にある。\n\n## ADDED Requirements\n\n### Requirement: MCP は stroke-board 自身の route で提供される\n\nMCP サーバーは stroke-board の route `/mcp`（Streamable HTTP）で提供される SHALL。別プロセスを立ててはならない（MUST NOT）。提供するツールは `get-overview` / `get-strokes` / `get-send-back` / `send-question` / `submit-document` / `get-steering` の6本とする SHALL。\n\n#### Scenario: 6ツールが列挙される\n\n- **GIVEN** stroke-board が起動済みである\n- **WHEN** Nuxt DevTools の MCP Inspector で `/mcp` のツール一覧を開く\n- **THEN** 6ツールがすべて列挙されている\n\n### Requirement: 結果は status と errorCode のフラットな形で返す\n\n各ツールの結果は1階層とし、常に `status`（endpoint の応答の HTTP ステータスコード）を持つ SHALL。失敗時は `errorCode`（機械可読の失敗種別。本家 dashboard に到達できない場合は `unreachable`）と `error`（endpoint が返したエラー本文）を持ち、成功時はそのツールの結果スキーマの項目を持つ SHALL。エラー本文を書き換え・省略・追加してはならない（MUST NOT）。MCP サーバー独自の事前検証・状態分岐を足してはならない（MUST NOT）（docs/adr/0013 の原則に整合する）。\n\n#### Scenario: 結果スキーマが形に従っている\n\n- **GIVEN** stroke-board が起動済みである\n- **WHEN** Nuxt DevTools の MCP Inspector で各ツールの結果スキーマの定義を開く\n- **THEN** すべてのツールで `status` が必須項目にあり、失敗時の `errorCode` / `error` が定義されている\n",
+  "fileStats": {
+    "size": 1946,
+    "lines": 28,
+    "lastModified": "2026-08-27T06:19:39.893Z"
+  },
+  "comments": []
+}

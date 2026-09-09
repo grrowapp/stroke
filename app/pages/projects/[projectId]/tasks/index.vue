@@ -6,12 +6,14 @@ import EmptyState from '~/components/workspace/EmptyState.vue';
 import RecordList from '~/components/workspace/RecordList.vue';
 import WorkspacePanel from '~/components/workspace/WorkspacePanel.vue';
 import { useProjectId, useSpecs } from '~/composables/useProjectApi';
-import { formatRelativeTime } from '~/composables/useRelativeTime';
+import { useRelativeTime } from '~/composables/useRelativeTime';
 
 definePageMeta({ layout: 'workspace' });
 
 const projectId = useProjectId();
 const { data } = await useSpecs(projectId);
+// 最終更新の相対時刻。mount の後にだけ描く（specs/portal/relative-time）
+const relativeTime = useRelativeTime();
 
 const items = computed(() =>
   (data.value ?? [])
@@ -21,7 +23,7 @@ const items = computed(() =>
       label: spec.name,
       icon: 'tasks' as const,
       progress: spec.taskProgress,
-      meta: formatRelativeTime(spec.lastModified),
+      meta: relativeTime(spec.lastModified),
       to: `/projects/${projectId.value}/tasks/${spec.name}`,
     })),
 );

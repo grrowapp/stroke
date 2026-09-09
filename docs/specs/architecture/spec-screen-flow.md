@@ -111,7 +111,7 @@ sequenceDiagram
 
 ## 2. stroke-board — 仕様書画面の流れ
 
-層は5つ（`docs/specs/core/system-structure.md`）。画面 → API → 制御 → 接点 → 本家、と一方向に進む。
+層は5つ（`docs/specs/structure/system-structure.md`）。画面 → API → 制御 → 接点 → 本家、と一方向に進む。
 
 ### 2.1 取得（REST）
 
@@ -119,7 +119,7 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     participant P as pages/.../specs/**.vue
-    participant C as composables/workspace/useProjectApi.ts
+    participant C as composables/useProjectApi.ts
     participant A as server/api/.../specs/**
     participant Pr as control/upstream-proxy.ts
     participant R as upstream/rest.ts (UpstreamRestClient)
@@ -160,7 +160,7 @@ sequenceDiagram
 
 | # | 位置 |
 | --- | --- |
-| `useSpecs` / `useSpecDocuments` | `app/composables/workspace/useProjectApi.ts:41, 46` |
+| `useSpecs` / `useSpecDocuments` | `app/composables/useProjectApi.ts:43, 48` |
 | 一覧 API | `server/api/projects/[projectId]/specs/index.get.ts` |
 | 本文 API | `server/api/projects/[projectId]/specs/[specName]/documents.get.ts` |
 | `upstreamClient()` / `toHttpError()` | `server/utils/control/upstream-proxy.ts:13, 24` |
@@ -181,7 +181,7 @@ sequenceDiagram
     participant M as control/monitor.ts (UpstreamMonitor)
     participant B as control/board.ts
     participant BW as server/routes/ws.ts
-    participant CS as composables/shared/useBoardSocket.ts
+    participant CS as composables/useBoardSocket.ts
     participant T as NotificationToaster.vue
 
     U-->>S: { type: 'spec-update', data }
@@ -204,7 +204,7 @@ sequenceDiagram
 | 本家 WS への接続 | `server/utils/upstream/socket.ts:38-90` |
 | `spec-update` を捨てる箇所 | `server/utils/control/monitor.ts:197-200` |
 | 通知のブロードキャスト | `server/utils/control/board.ts:59-70` |
-| ブラウザ側の受け口 | `app/composables/shared/useBoardSocket.ts:22, 46` |
+| ブラウザ側の受信 | `app/composables/useBoardSocket.ts:67, 71`（`useWebSocket` の `onMessage`） |
 
 **仕様書の画面に push 起点の再描画経路は無い。** `spec-update` は本家から届くが、`UpstreamMonitor` が「再描画用の同期信号」として捨てている。画面が新しい内容を得るのは `useFetch` が走るとき（遷移・リロード）だけである。
 

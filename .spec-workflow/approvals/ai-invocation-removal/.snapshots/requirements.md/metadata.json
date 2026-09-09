@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/ai-invocation-removal/requirements.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-25T07:52:13.924Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787644333866_txf1431j1",
+      "approvalTitle": "specs: ai-invocation — 廃止（→ agent/invocation へ全要件移行）"
+    }
+  ]
+}

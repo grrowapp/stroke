@@ -9,6 +9,7 @@
 import { defineEventHandler } from 'h3';
 
 import { readServerConfig } from '../utils/config';
+import { listPromotedProjects } from '../utils/control/creating';
 import { buildProjectDirectory } from '../utils/control/directory';
 import { readRegistry, type RegistryEntry } from '../utils/upstream/registry';
 import { UpstreamRestClient } from '../utils/upstream/rest';
@@ -18,9 +19,12 @@ import type { ProjectDirectoryResponse } from '#shared/types';
 export default defineEventHandler(async (): Promise<ProjectDirectoryResponse> => {
   const config = readServerConfig();
 
-  const [scan, registry] = await Promise.all([
+  // 昇格の記録は走査と同じ保存先を読む。承認した直後のプロジェクトは走査に出てこないので、
+  // これが無いと一覧に現れない（specs/project/directory）
+  const [scan, registry, promoted] = await Promise.all([
     scanProjects(config.projectsParentPath),
     readRegistry(config.specWorkflowHome),
+    listPromotedProjects(config.projectsParentPath),
   ]);
 
   const entries = registry.status === 'ok' ? registry.entries : [];
@@ -30,6 +34,7 @@ export default defineEventHandler(async (): Promise<ProjectDirectoryResponse> =>
       scan,
       { entries, readable: registry.status === 'ok' },
       await countPendingApprovals(config.upstreamBaseUrl, entries),
+      promoted,
     ),
   };
 });

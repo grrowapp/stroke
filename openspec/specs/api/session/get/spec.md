@@ -7,7 +7,7 @@
 
 ### Requirement: U2 GET /api/sessions/:id — セッションの状態を返す
 
-システムは `GET /api/sessions/:id` を公開する SHALL。そのセッションの phase（`stroking` / `proposed` / `approved`）と `invocation`（`running` / `idle` / `failed` / `error`）を返す SHALL。
+システムは `GET /api/sessions/:id` を公開する SHALL。そのセッションの phase（`stroking` / `proposed` / `approved` / `activated`）と `invocation`（`running` / `idle` / `failed` / `error`）を返す SHALL。
 
 取得は保存済みの状態を返すだけとし、取得によって状態を変えてはならない（MUST NOT）。存在しないセッション id への要求は受理しない SHALL。
 
@@ -25,3 +25,8 @@
 
 - **WHEN** 同じセッションの状態が続けて2回要求される
 - **THEN** 間に他の操作が無ければ2回とも同じ内容が返り、取得によって phase も `invocation` も変化しない
+
+#### Scenario: 完成したプロジェクトの状態を取得する
+
+- **WHEN** 完成を記録したプロジェクトの id で `GET /api/sessions/:id` が要求される
+- **THEN** phase として `activated` が返る

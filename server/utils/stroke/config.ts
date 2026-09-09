@@ -22,8 +22,6 @@ const schema = z.object({
     command: z.string().trim().min(1),
     /** 呼び出しに依らないフラグ一式。ADR 0001 の検査は `describeClaudeArgsError` */
     args: z.array(z.string()).min(1),
-    /** エージェント向け endpoint の base URL。`STROKE_BASEURL` として子へ渡る */
-    apiBaseUrl: z.string().trim().min(1),
     /** セッションの openspec/config.yaml に書くワークフロースキーマ名 */
     workflowSchema: z.string().trim().min(1),
     /** 初回（`--session-id` での新規起動）で渡す定型 */
@@ -34,6 +32,12 @@ const schema = z.object({
     steeringPrompt: z.string().trim().min(1),
     /** 失敗を起こし直す回数の上限。到達したら起動せず `error`（終端）にする */
     maxRetries: z.number().int().min(0),
+    /** 起こし直していない起動を打ち切るまでの時間。`0` は「起動した瞬間に打ち切る」なので許さない */
+    timeoutMs: z.number().int().positive(),
+    /** 起こし直し1回ぶんの刻み。`0` は「伸ばさない」という意味を持つので許す */
+    timeoutStepMs: z.number().int().min(0),
+    /** 呼び出しの生出力を書き残すディレクトリ。空なら書かない（既定・openspec/specs/debug/logging） */
+    debugLogDir: z.string().trim(),
   }),
   openspec: z.object({
     /** セッションの openspec ルートを初期化する CLI */
@@ -69,7 +73,10 @@ export function readStrokeConfig(): StrokeConfig {
   return parseStrokeConfig(useRuntimeConfig())
 }
 
-/** ADR 0001: ここを外すとスキルが一切ロードされない。 */
+/**
+ * ADR 0001 がスキルのロードに要ると定めた値。**いまはロードされるスキルが0本である**
+ * （理由と実測は `nuxt.config.ts` の同名の定数に書いた）。
+ */
 const SETTING_SOURCES_REQUIRED = 'project'
 
 /**
@@ -77,11 +84,17 @@ const SETTING_SOURCES_REQUIRED = 'project'
  *
  * `args` が配列1本なので、`--setting-sources` の値だけを個別に検証することはできない。
  * 並びの中に `--setting-sources project` が在ることを見る。
+ *
+ * **いまこの検査は実効を持たない。** `--add-dir` を外して以降、project 設定の探索先は
+ * セッションの cwd だけで、そこに `.claude/` は無い。`project` の有無でロードされる
+ * スキルの数は変わらない（0本のまま）。それでも検査を残すのは、案内スキルを配り直した
+ * ときに要る守りだからで、外す判断は本 change の範囲外である
+ * （santa-method レビュー指摘 7周目 2026-08-30）。返す文言はその将来を前提にしている。
  */
 export function describeClaudeArgsError(args: readonly string[]): string | null {
   const at = args.indexOf('--setting-sources')
   if (at === -1 || args[at + 1] !== SETTING_SOURCES_REQUIRED) {
-    return `runtimeConfig.claude.args に \`--setting-sources ${SETTING_SOURCES_REQUIRED}\` が無い（ADR 0001: 外すとスキルがロードされない）`
+    return `runtimeConfig.claude.args に \`--setting-sources ${SETTING_SOURCES_REQUIRED}\` が無い（ADR 0001。案内スキルを配り直したときに要る）`
   }
   return null
 }

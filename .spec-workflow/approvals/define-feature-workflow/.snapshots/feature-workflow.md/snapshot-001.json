@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787784501191_d4kh6jpbz",
+  "approvalId": "approval_1787784501054_hqt4r2cqy",
+  "approvalTitle": "成果物: docs/specs/architecture/feature-workflow.md（feature ワークフロー定義の正）の承認",
+  "version": 1,
+  "timestamp": "2026-08-26T22:48:21.191Z",
+  "trigger": "initial",
+  "status": "pending",
+  "content": "# feature のワークフロー定義\n\nfeature（実装のタスクに繋がる文書の組）の定義。stroke-board は文書を **feature** と**仕様書**（システムをドキュメントとして記述し続けるもの）の2レーンで扱い、本書は feature レーンの正である。\n\n確定の経緯は change `define-feature-workflow`（proposal・specs 4本・design を spec-workflow 上で承認済み、2026-08-26）。仕様書レーンは仮決めのみで、器は change `define-spec-document-workflow` にある。\n\n## 全体像\n\n```\nポータル（作成の口は create-feature が実装）\n  │ 作成。名前は `__` 規約でエンコード\n  ▼\n.spec-workflow/specs/<spec名>/            ← 器\n  ├ requirements.md\n  ├ design.md\n  └ tasks.md\n  │ 内容の充填 〜 実装。工程は schema の外部定義で決まる\n  │ tasks 全完了\n  ▼\nsync（openspec で言う archive → sync 相当）\n  │ spec 名をデコード\n  ▼\nopenspec/specs/<デコードしたパス>/spec.md   ← 確定した仕様の置き場\n```\n\n## 命名\n\nopenspec の `openspec/specs/` 配下のパス（階層あり）と、本家 `.spec-workflow/specs/` 直下のディレクトリ名 = **spec 名**（本家の制約によりフラット）を対応付ける。\n\n- spec 名は、openspec 側の対応するパス（`openspec/specs/` からの相対）のセグメントを `__`（2重アンダーバー）で連結したフラット名。両方向の変換が定まる\n  - `openspec/specs/api/session/` ↔ `.spec-workflow/specs/api__session/`\n  - 階層を持たない場合は名前そのまま: `openspec/specs/portal/` ↔ `.spec-workflow/specs/portal/`\n- セグメントはアンダースコアを含まない kebab-case（英小文字・数字・ハイフン）。これにより spec 名の中の `__` は常に区切りとしてのみ現れ、変換は可逆になる\n- パスと spec 名は1対1に対応する。同名の feature は存在しない\n\n決定の記録は [ADR-0013](../../adr/0013-feature-name-encodes-capability-path.md)。\n\n## 器\n\n- feature は `.spec-workflow/specs/<spec名>/` 直下の requirements.md / design.md / tasks.md で構成される\n- `.spec-workflow/specs/` 配下に入れ子ディレクトリを持たない。入れ子は本家の一覧に現れず、本家のファイル監視が親 spec に存在しない文書の更新イベントを飛ばす（実測 2026-08-26、[upstream-observations](../reference/upstream-observations.md)）。階層は入れ子ではなく `__` エンコードのフラット名で表す\n\n## 工程\n\n- 工程は openspec のローカル schema による外部定義で決まり、アプリのコード変更・再ビルドなしに反映される\n- 工程の最終段は sync であり、tasks の完了の後に位置づけられる\n- schema の中身の詳細（artifact 定義・template）は本書では定めない。実装時の設計とする\n\n## sync\n\n- sync は feature の確定した仕様を、spec 名を命名規約でデコードした先の `openspec/specs/<デコードしたパス>/spec.md` に配置する工程\n- 配置される spec.md は openspec の機能的 spec の形式（Requirement + Scenario）に適合する\n\n## 概念の対応\n\n本家の枠組みを器として使い、概念の整理は openspec 側に合わせる。\n\n| 本家の器 | openspec の概念 | 備考 |\n|---|---|---|\n| `.spec-workflow/specs/<spec名>/` | change に相当する作業単位 | 作業中の実体をどちらに持つかは未決 |\n| `requirements.md` | spec（Requirement + Scenario） | 概念がほぼ同じ。「openspec の spec が名前を変えたもの」が最も近いイメージ。requirements 側はスコープが粗め。形式まで縛るかは未決 |\n| `design.md` | change の design | |\n| `tasks.md` | change の tasks | |\n| tasks 完了 → sync | archive → sync | これで `openspec/specs/` が育つ |\n\n## 未決事項\n\nいずれも全体の設計（実装時の設計）で決める。決まるまで、依存 change 側でも決めずに実装時の設計へ送る。\n\n- 中身の正の最終形（概念の対応に留めるか、形式まで縛るか）\n- 作業中の実体の持ち方（openspec change 標準で持つか、本家の器に直接生成するか）\n- sync の発火のタイミングと担い手\n\nfeature への操作（作成・削除等）の挙動は本書では定めない。操作の口を実装する依存 change（`create-feature` ほか）側の仕様が定める。\n",
+  "fileStats": {
+    "size": 4549,
+    "lines": 75,
+    "lastModified": "2026-08-26T22:47:21.379Z"
+  },
+  "comments": []
+}

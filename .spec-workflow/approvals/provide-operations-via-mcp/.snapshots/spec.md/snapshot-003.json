@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787789608710_1704rnjpz",
+  "approvalId": "approval_1787789452753_51f3k19em",
+  "approvalTitle": "specs 2/7(改訂): mcp/tools/overview — エラー処理シナリオを追加（endpoint エラー・不達）",
+  "version": 3,
+  "timestamp": "2026-08-27T00:13:28.710Z",
+  "trigger": "revision_requested",
+  "status": "pending",
+  "content": "# mcp/tools/overview Delta\n\n## Purpose\n\nセッションの概要（ユーザーが最初に投げた、作りたいシステムの説明）を取得するツールの契約を定める。\n\n## ADDED Requirements\n\n### Requirement: 概要を引数なしで取得する\n\nツールは引数を取らず、自セッションの `GET /api/strokes/:id/overview` へ代行し、その応答をそのまま返す SHALL。\n\n#### Scenario: 概要を読む\n\n- **WHEN** claude プロセスがこのツールを実行する\n- **THEN** そのセッションの概要が endpoint の応答のまま返る\n\n#### Scenario: endpoint のエラーを処理する\n\n- **WHEN** endpoint がエラーを返す\n- **THEN** ツールはエラーとして返り、ステータスとエラー内容が読める\n\n#### Scenario: 不達を処理する\n\n- **WHEN** endpoint に到達できない\n- **THEN** ツールはエラーとして返り、endpoint のエラーと区別できる不達のエラーが読める\n",
+  "fileStats": {
+    "size": 981,
+    "lines": 27,
+    "lastModified": "2026-08-27T00:10:09.547Z"
+  },
+  "comments": []
+}

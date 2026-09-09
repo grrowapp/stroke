@@ -115,19 +115,20 @@ async function answer(given: Answer) {
   // 受理と起動は分かれている(specs/api/answer)。成功応答の直後に起動を要求する
   // (design.md 決定6)。cwd は U2 が返した path を渡す——endpoint に導出させない
   // (design.md D5)。
-  try {
-    await $fetch(`/api/strokes/${sessionId}/invoke-agent`, {
-      query: { cwd: status.value?.path },
-    })
-    waitingRetry.startWaiting()
-  } catch {
+  //
+  // **409（前の claude がまだ走っている）は失敗ではない。** 契約どおりの正常な結果で、
+  // 走っている claude がこの回答を拾って次の問いを出す。理由を見ずに一律で
+  // 「AI を起動できませんでした。」を出していたため、ユーザーは同じ問いに二度答える
+  // しかなくなっていた（実測: `strokes.json` に回答が重複）。`requestRun` が待機へ倒す
+  const run = await waitingRetry.requestRun(status.value?.path)
+  if (!run.ok) {
     errorMessage.value = 'AI を起動できませんでした。'
   }
 }
 </script>
 
 <template>
-  <div class="mx-auto max-w-2xl px-6 py-14 pb-40">
+  <div class="sb-stroke-page">
     <!-- 履歴は常に見えている。開閉を挟まないと辿れない形にしない -->
     <StrokeBreadcrumb class="mb-8" current="question" :strokes="strokes" />
 

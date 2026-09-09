@@ -1,0 +1,22 @@
+{
+  "filePath": "openspec/changes/write-proposal-to-docs/proposal.md",
+  "currentVersion": 2,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-26T21:46:37.862Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787780797698_5ffhi1frp",
+      "approvalTitle": "write-proposal-to-docs: proposal（受理した proposal を残す）"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2026-08-26T22:06:57.286Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787780797698_5ffhi1frp",
+      "approvalTitle": "write-proposal-to-docs: proposal（受理した proposal を残す）"
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { deriveProjectId } from '../../../../server/utils/upstream/project-id';
 import { buildProjectDirectory } from '../../../../server/utils/control/directory';
 import type { RegistryEntry } from '../../../../server/utils/upstream/registry';
 import type { ScanResult } from '../../../../server/utils/upstream/scan';
@@ -67,12 +68,25 @@ describe('プロジェクト一覧の組み立て', () => {
       expect(result.projects[0]!.projectId).toBe('PID1');
     });
 
-    it('registry に無ければ未接続。projectId は引けない', () => {
+    it('registry に無ければ未接続。外から置かれたものは projectId を引けない', () => {
       const result = buildProjectDirectory(scanned('old-proto'), lookup());
 
       if (result.status !== 'ok') throw new Error('前提が崩れた');
       expect(result.projects[0]!.connection).toBe('disconnected');
+      // 導出すると本家の id と別物になる。workspace のパスが分からないためで、
+      // null のままにして「本家に載っていない」ことを保つ（design.md D13）
       expect(result.projects[0]!.projectId).toBeNull();
+    });
+
+    it('承認で作ったものは、registry に無くても projectId を導出で埋める', () => {
+      // 決着の直後は本家がまだ起動しておらず registry に載らない。そこで null にすると
+      // 承認画面を開く選択肢が選べなくなる（specs/project/generation）
+      const result = buildProjectDirectory(scanned('old-proto'), lookup(), new Map(), [
+        { name: 'old-proto', path: '/opt/projects/old-proto', phase: 'activated' },
+      ]);
+
+      if (result.status !== 'ok') throw new Error('前提が崩れた');
+      expect(result.projects[0]!.projectId).toBe(deriveProjectId('/opt/projects/old-proto'));
     });
 
     it('instances が空の entry は未接続として扱う', () => {

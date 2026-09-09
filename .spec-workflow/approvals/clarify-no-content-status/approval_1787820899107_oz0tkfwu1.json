@@ -1,0 +1,12 @@
+{
+  "id": "approval_1787820899107_oz0tkfwu1",
+  "title": "clarify-no-content-status — proposal（setResponseStatus(204) + return sendNoContent(event)）",
+  "filePath": "openspec/changes/clarify-no-content-status/proposal.md",
+  "type": "document",
+  "status": "rejected",
+  "createdAt": "2026-08-27T08:54:59.107Z",
+  "category": "spec",
+  "categoryName": "clarify-no-content-status",
+  "response": "許可してない。",
+  "respondedAt": "2026-08-27T08:55:43.582Z"
+}

@@ -29,3 +29,8 @@ feature（本家 spec-workflow の requirements / design / tasks の組）は本
 - サーバ: 本家 `.spec-workflow/specs/` 配下への作成 API を `server/` に追加。
 - 本家との境界: 本家が稼働中に外からファイルが増えたときの本家側の挙動（検出・一覧への反映）は未確認。design の前に実測が要る（ADR 0006 の流儀に従う）。
 - 後続: 作成した feature の内容を stroke フローで詰める change を別途起こす想定。
+- **`define-feature-workflow` の確定による影響**（2026-08-27 承認。正は `docs/feature/overview.md`）:
+  - change の起票と同時に **ticket**（`openspec/tickets/<change名>.md`）が作られる。ticket は起票の概要のみを持ち、**以後追記しない**（capability 等の後書きをしない）
+  - 器は `.spec-workflow/specs/<spec名>/` 直下の proposal.md / requirements.md / design.md / tasks.md。requirements.md は delta 形式を満たす
+  - 配置時は **proposal.md も一緒に置く**。capability が複数のときは、分解された feature 全てに同じ proposal.md を置き、集合定義（change が対象とする capability の全量）の拠り所とする
+  - change ↔ capability の対応の正は proposal の Capabilities 節。capability は proposal が作成されるまで確定しない

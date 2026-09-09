@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787784917728_9heiqeijq",
+  "approvalId": "approval_1787784917384_j2yngrkvs",
+  "approvalTitle": "proposal: 操作系一式を MCP ツール経由で提供する change の proposal 承認",
+  "version": 1,
+  "timestamp": "2026-08-26T22:55:17.728Z",
+  "trigger": "initial",
+  "status": "pending",
+  "content": "# provide-operations-via-mcp\n\n## Why\n\nclaude プロセスが stroke-board と本家へアクションする操作系一式は、現在 curl スキル（`!` フェンス + `STROKE_BASEURL` / dashboard REST）で提供されている。この方式はスキル・curl・jq の組み合わせに依存し、契約（引数の形・件数上限・エラー）が案内スキル（/guidance）の散文でしか表現できない。セッション id の解決もスキルの `!` フェンス内でしか効かない実測制約に縛られている。操作を MCP ツールとして提供し、名前・引数スキーマ・説明をツール契約として一等市民にする。まずは**現行操作の代行**（既存 REST への薄いプロキシ）で方式を固め、MCP ツール自体が実処理を持つ実装は次のステップとする。\n\n## What Changes\n\n- **新規**: stroke-board リポジトリ内に MCP サーバー（TypeScript / stdio）を追加し、現行8操作を MCP ツールとして提供する\n  - stroke 向け5操作: get-overview / get-strokes / get-send-back / question / proposal — `STROKE_BASEURL` の既存セッション API への代行\n  - 本家向け3操作: get-product / get-tech / get-structure — 本家 dashboard REST（steering 文書の取得）への代行\n- **新規**: ツールハンドラは transport 非依存に分離する。今回は stdio のみ実装し、将来 Nitro の Streamable HTTP endpoint へ載せ替え可能な形にする（スピード優先で stdio 先行）\n- **変更**: claude の spawn（セッション工程・steering 工程）の `--mcp-config` にこのサーバーを加える。接続先とセッション id はサーバーの env として呼び出し側が埋める（スキルの `!` フェンス依存を持ち込まない）\n- **範囲外（明示）**:\n  - ワークフロースキーマの instruction・`--allowedTools`・現行スキル群の切り替えは**別 change** で行う。本 change ではツールを「提供」するまでで、既存の入口はそのまま動き続ける\n  - 本家 MCP ツールにしか口が無い操作（承認依頼の作成など、dashboard REST に無いもの）は対象外。本家 MCP の併用を続ける\n  - MCP ツールが自ら実処理を行う実装（代行の先）は次のステップの change とする\n\n## Capabilities\n\n### New Capabilities\n\n- `mcp/tools`: MCP サーバーが claude プロセスへ提供するツールの契約。ツールの一覧、各ツールの引数と代行先（どの既存 endpoint へ何を渡すか）、応答とエラーの素通しの規約、接続情報（base URL・セッション id）の解決方法。\n\n### Modified Capabilities\n\n- `agent/invocation`: 呼び出しの起動定義に MCP サーバーの提供が加わる（`--mcp-config` への追加と、サーバーへ渡す env の組み立て）。\n\n## Impact\n\n- **影響コード**: `server/utils/stroke/invoke.ts`（`--mcp-config` の組み立て。steering の本家 MCP と並べて自前サーバーを追加）、`nuxt.config.ts`（起動定義まわりの設定が要る場合。値の正は `docs/specs/core/settings-reference.md` に従い change で扱う）\n- **新規コード**: MCP サーバー実装一式（リポジトリ内。置き場は design で確定）\n- **新規依存**: `@modelcontextprotocol/sdk`\n- **後続 change（本 change に含めない）**: スキーマ instruction・allowedTools・スキル群を MCP ツールへ向ける切り替え。MCP ツールの実処理化\n- **動作互換**: 既存の curl スキル・API・ワークフロースキーマには手を入れないため、提供期間中の挙動は現行のまま\n",
+  "fileStats": {
+    "size": 3728,
+    "lines": 36,
+    "lastModified": "2026-08-26T22:53:59.585Z"
+  },
+  "comments": []
+}

@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787181775809_vu20t0gsa",
+  "approvalId": "approval_1787181775801_huas7zyfz",
+  "approvalTitle": "Steering: structure.md（モジュール境界と規約）",
+  "version": 1,
+  "timestamp": "2026-08-19T23:22:55.809Z",
+  "trigger": "initial",
+  "status": "pending",
+  "content": "# Project Structure\n\n## Directory Organization\n\nコードはまだ無い。決まっているのは、リポジトリ直下に置く文書の場所と、実装が従う規約だけである。\n\n```\nbase2/\n├── CLAUDE.md          # このリポジトリでの作業の仕方\n├── CONTEXT.md         # 用語（ドメインの語彙）\n├── docs/\n│   ├── adr/           # 設計判断の記録\n│   └── agents/        # エージェント向けの取り決め\n├── openspec/          # 変更の計画（interview / ui / proposal / tasks）\n└── （実装）            # Nuxt4 のディレクトリ規約に従う\n```\n\n実装のディレクトリは **Nuxt4 の規約に従う**。後述の3つの境界を Nuxt4 のどのディレクトリに割り当てるかは、実装着手時に Nuxt4 のディレクトリ規約を確認して確定する。ここで先に発明しない。\n\n## Naming Conventions\n\n### Files\n\n**規定しない。** Nuxt4 とその周辺が要求する命名（ページのファイル名など）に従う。\n\n### Code\n\n**規定しない。** クラス・関数・定数・変数の命名規則をステアリングで縛らない。\n\n決めたのは import の方針だけで、それ以外を発明しないという方針による。必要になった時点で、実際のコードを見て決める。\n\n## Import Patterns\n\n### Import Order\n\n**規定しない。**\n\n### Module/Package Organization\n\n**Nuxt の auto-import を使わない。**\n\n- `imports: { autoImport: false }` で composable / util の自動 import を止める。止めたあとも `#imports` からの明示 import は使える（公式に \"it's still possible to use explicit imports from `#imports`\" と記載）\n- コンポーネントの auto-import は `components.dirs` を空にすることで止まる。ただし公式に \"this will not affect components added by modules\" とあるため、**Nuxt UI がモジュールとして登録するコンポーネントは止まらない**\n\nしたがって実際に守れる規約は「**明示 import を使う。ただし Nuxt UI 由来のコンポーネントは例外**」である。守れない規約を書かない。\n\n`packages/` による deep module 構成は採らない。\n\n## Code Structure Patterns\n\n### Module/Class Organization\n\n**規定しない。**\n\n### Function/Method Organization\n\n**規定しない。**\n\n### File Organization Principles\n\n**規定しない。**\n\nファイル内の構造をステアリングで縛らない。縛るのはモジュール境界（後述）までとする。\n\n## Code Organization Principles\n\nこのプロジェクトが持つ組織原則は1つだけである。\n\n1. **境界は守る、内側は縛らない** — 後述の3つの境界と依存方向は守る。その内側でどう書くかは実装に委ねる\n\n一般論としての設計原則（単一責任、モジュール性など）をここに列挙しない。守られたかどうかを判定できない規約は規約として機能しないため。\n\n## Module Boundaries\n\n構成から素直に下りる3層で切る。\n\n- **本家との接点** — 本家 REST API のクライアント、本家 WebSocket のクライアント、`activeProjects.json` の読み取り、親パスの走査。**本家の形が変わったときに直す範囲をここに閉じる**\n- **制御層（Nitro 側）** — 受信したスナップショットを前回値と比べて「何が起きたか」を割り出し、通知として意味のあるものだけをブラウザ向けの WebSocket に流す。stroke-board 固有の判断はすべてここに集まる\n- **画面（Nuxt 側）** — 上層（プロジェクト横断ポータル: 通知 / プロジェクト一覧）と下層（プロジェクト単位: 仕様書 / ステアリング / タスク / 承認 / 設定）\n\n**依存の向き**: 画面 → 制御層 → 接点 の一方向。\n\n**越えてはいけない線**:\n\n- 画面から本家へ直接触らない。本家に触るのは接点層だけで、画面は制御層が整えた形だけを見る\n- ブラウザから本家 WebSocket へ直接つながない\n- `.spec-workflow/` に書き込まない。読むだけ\n- 本家から受け取った情報を加工・再構成する仕様を、制御層に勝手に足さない。足すかどうかはユーザーが決める（ADR-0001）\n\n## Code Size Guidelines\n\n**規定しない。** ファイル・関数・複雑度・ネスト深さのいずれにも上限を置かない。\n\n## Dashboard/Monitoring Structure (if applicable)\n\n**該当なし。** このプロジェクト自体がダッシュボードであり、その中にさらに独立したダッシュボード部分を持たない。\n\n### Separation of Concerns\n\n上の Module Boundaries が本節を兼ねる。stroke-board は本家 spec-workflow-mcp のプロセスから完全に分離しており、本家の起動・停止に責任を持たない。本家が動いていなければ「未接続」として表示するだけで、stroke-board 自身は動き続ける。\n\n### Documentation Standards\n\n- 用語はルートの `CONTEXT.md` に残す\n- 設計判断は `docs/adr/` に ADR として残す\n- 本家の内部挙動に関する実測（registry の生存判定、ペイロードの形、検出できないイベント）は ADR に残す。後から読む人が同じ調査を繰り返さずに済むようにするため\n- エージェント向けの取り決めは `docs/agents/` に置く（issue tracker、triage labels、domain docs）\n",
+  "fileStats": {
+    "size": 5592,
+    "lines": 108,
+    "lastModified": "2026-08-19T23:22:30.052Z"
+  },
+  "comments": []
+}

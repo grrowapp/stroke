@@ -1,0 +1,206 @@
+{
+  "filePath": "docs/feature/overview.md",
+  "currentVersion": 25,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-27T00:54:35.063Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787792074999_xqx8rub7c",
+      "approvalTitle": "成果物: docs/feature/overview.md の承認（移設 + archive 戻し＝update change 起票 + 後続で決めることを明記）"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2026-08-27T01:08:56.226Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787792074999_xqx8rub7c",
+      "approvalTitle": "成果物: docs/feature/overview.md の承認（移設 + archive 戻し＝update change 起票 + 後続で決めることを明記）"
+    },
+    {
+      "version": 3,
+      "filename": "snapshot-003.json",
+      "timestamp": "2026-08-27T04:17:31.696Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787803961646_3c1ccrory",
+      "approvalTitle": "feature ワークフロー定義の承認（ticket は起票時に change と1対1・概要のみ・以後追記しない）"
+    },
+    {
+      "version": 4,
+      "filename": "snapshot-004.json",
+      "timestamp": "2026-08-27T04:26:26.208Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787804380077_7jc1alrf8",
+      "approvalTitle": "feature ワークフロー定義の承認（proposal 後に spec.md を作り、それが feature として上がる流れに修正）"
+    },
+    {
+      "version": 5,
+      "filename": "snapshot-005.json",
+      "timestamp": "2026-08-27T04:38:05.909Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787804827814_idp1jm0v5",
+      "approvalTitle": "feature ワークフロー定義の承認（openspec が spec.md を起こし、それを spec-workflow に配置する流れに修正）"
+    },
+    {
+      "version": 6,
+      "filename": "snapshot-006.json",
+      "timestamp": "2026-08-27T04:46:28.860Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787805532273_8f9m7cm0l",
+      "approvalTitle": "feature ワークフロー定義の承認（行為者を明示: エージェントが spec.md を書き、stroke-board が配置）"
+    },
+    {
+      "version": 7,
+      "filename": "snapshot-007.json",
+      "timestamp": "2026-08-27T05:10:49.515Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787806718117_caz5zc70r",
+      "approvalTitle": "feature ワークフロー定義の承認（spec-update の流れを主要4ステップに簡約）"
+    },
+    {
+      "version": 8,
+      "filename": "snapshot-008.json",
+      "timestamp": "2026-08-27T05:20:01.739Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787807810914_czhv4iyo5",
+      "approvalTitle": "feature ワークフロー定義の承認（フロー図を整理: 骨格8段の図＋誰が/何を/成果物の表に分離）"
+    },
+    {
+      "version": 9,
+      "filename": "snapshot-009.json",
+      "timestamp": "2026-08-27T05:27:04.616Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787808151747_j0qqgiva1",
+      "approvalTitle": "feature ワークフロー定義の承認（spec-update の流れを5段・各段1〜2行の説明付きに再構成）"
+    },
+    {
+      "version": 10,
+      "filename": "snapshot-010.json",
+      "timestamp": "2026-08-27T05:33:33.936Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787808675112_p3kcobppy",
+      "approvalTitle": "feature ワークフロー定義の承認（混在対応の節を小見出しで再構成: 突き合わせ→戻しへの対応→表示）"
+    },
+    {
+      "version": 11,
+      "filename": "snapshot-011.json",
+      "timestamp": "2026-08-27T05:48:53.120Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787809281389_jufjo680j",
+      "approvalTitle": "feature ワークフロー定義の承認（全体像を元のフロー図1本に戻した。確定事実は反映済み）"
+    },
+    {
+      "version": 12,
+      "filename": "snapshot-012.json",
+      "timestamp": "2026-08-27T06:01:38.627Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787809821482_5vz596td2",
+      "approvalTitle": "feature ワークフロー定義の承認（archive ボックスを元の文言に復元・判定対象は openspec 側のみ＝逆変換廃止 ADR-0005 準拠）"
+    },
+    {
+      "version": 13,
+      "filename": "snapshot-013.json",
+      "timestamp": "2026-08-27T06:15:45.001Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787811237429_9ygzaleek",
+      "approvalTitle": "feature ワークフロー定義の承認（作業中の change を定義し、対応の引き方は制約付きの未決として後続へ送る）"
+    },
+    {
+      "version": 14,
+      "filename": "snapshot-014.json",
+      "timestamp": "2026-08-27T06:18:13.970Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787811453733_fbayly7xi",
+      "approvalTitle": "feature ワークフロー定義の承認（突き合わせを成立する形に再構成: update change は名前で機械的に引く2×2判定）"
+    },
+    {
+      "version": 15,
+      "filename": "snapshot-015.json",
+      "timestamp": "2026-08-27T06:20:58.602Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787811568479_q3kib75dj",
+      "approvalTitle": "feature ワークフロー定義の承認（突き合わせを spec-update が返す specs 一覧を軸に再構成）"
+    },
+    {
+      "version": 16,
+      "filename": "snapshot-016.json",
+      "timestamp": "2026-08-27T06:45:57.956Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787811818580_dg72vm6rv",
+      "approvalTitle": "feature ワークフロー定義の承認（前版に復帰、指摘の集合説明パラグラフのみ簡潔化）"
+    },
+    {
+      "version": 17,
+      "filename": "snapshot-017.json",
+      "timestamp": "2026-08-27T06:54:59.950Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787813227081_z5j30x6zj",
+      "approvalTitle": "feature ワークフロー定義の承認（指摘4件のみ修正: 対応の引き方委譲・起点の主体は規定しない・係り受け・変換しない）"
+    },
+    {
+      "version": 18,
+      "filename": "snapshot-018.json",
+      "timestamp": "2026-08-27T06:59:42.474Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787813747456_p5ptxga2w",
+      "approvalTitle": "feature ワークフロー定義の承認（指摘2件反映: 意味不明の箇条書き削除・delta 充足チェックと proposal.md 全配置を明記）"
+    },
+    {
+      "version": 19,
+      "filename": "snapshot-019.json",
+      "timestamp": "2026-08-27T07:12:43.067Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787814466132_25ncvkc4u",
+      "approvalTitle": "feature ワークフロー定義の承認（明言指定の「全 feature へ同じ proposal.md を配置」の箇条書きを締めの節に復活）"
+    },
+    {
+      "version": 20,
+      "filename": "snapshot-020.json",
+      "timestamp": "2026-08-27T07:18:07.102Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787814794737_jf9zbm80k",
+      "approvalTitle": "feature ワークフロー定義の承認（充足チェックの主体を stroke-board に修正）"
+    },
+    {
+      "version": 21,
+      "filename": "snapshot-021.json",
+      "timestamp": "2026-08-27T07:23:55.676Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787815121748_w0y86is5m",
+      "approvalTitle": "feature ワークフロー定義の承認（update change の流れを自動の挙動とユーザー操作以降に分割）"
+    },
+    {
+      "version": 22,
+      "filename": "snapshot-022.json",
+      "timestamp": "2026-08-27T07:36:08.290Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787815466203_kkb8j5anl",
+      "approvalTitle": "feature ワークフロー定義の承認（再開の入口を「feature の画面から stroke を開始」に修正）"
+    },
+    {
+      "version": 23,
+      "filename": "snapshot-023.json",
+      "timestamp": "2026-08-27T07:41:00.386Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787816217512_4s4hnulpu",
+      "approvalTitle": "feature ワークフロー定義の承認（指摘4件反映: 備考の平易化・delta 形式は前提のみ・表記統一・未決の削除）"
+    },
+    {
+      "version": 24,
+      "filename": "snapshot-024.json",
+      "timestamp": "2026-08-27T07:46:59.626Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787816633694_yx7gucrxt",
+      "approvalTitle": "feature ワークフロー定義の承認（器と change の対応を「アクティブな1回の期間＝配置または復元〜archive」に修正）"
+    },
+    {
+      "version": 25,
+      "filename": "snapshot-025.json",
+      "timestamp": "2026-08-27T07:48:59.989Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787816869193_o9n5v9aro",
+      "approvalTitle": "feature ワークフロー定義の承認（器の概念対応を「change に相当する作業単位」に変更・期間の行を削除）"
+    }
+  ]
+}

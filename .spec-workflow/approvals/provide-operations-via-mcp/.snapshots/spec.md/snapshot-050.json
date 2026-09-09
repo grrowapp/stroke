@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787815489348_xf9u2cr1h",
+  "approvalId": "approval_1787815431937_m1kfur4r4",
+  "approvalTitle": "specs agent/invocation(改訂3): HTTP + token 前提に書き直し — mcp-config に {type: http, url: <apiBaseUrl>/mcp, headers: x-stroke-token} を追加、既存フラグ・本家 MCP の並び維持。prompt 制約と工程列挙は削除(指摘どおり)。確認は spawn された claude のプロセス引数",
+  "version": 50,
+  "timestamp": "2026-08-27T07:24:49.348Z",
+  "trigger": "revision_requested",
+  "status": "pending",
+  "content": "# agent/invocation Delta\n\n## ADDED Requirements\n\n### Requirement: 呼び出しは操作系の MCP サーバーを提供する\n\nシステムは、AI の呼び出しで、操作系 MCP サーバーの定義（`{ \"type\": \"http\", \"url\": \"<apiBaseUrl>/mcp\", \"headers\": { \"x-stroke-token\": <token> } }`）を MCP 設定（`--mcp-config`）に足して claude を起動する SHALL。既存の起動フラグと、steering 工程の本家 MCP の並びは変えてはならない（MUST NOT）。\n\n#### Scenario: 起動に操作系 MCP サーバーが含まれる\n\n- **GIVEN** stroke-board が起動済みで、概要を受理したセッションが存在する\n- **WHEN** `GET /api/strokes/:id/invoke-agent` で AI を起動する\n- **THEN** 検証側が spawn された claude のプロセス引数を見ると、`--mcp-config` に url `<apiBaseUrl>/mcp` と `x-stroke-token` ヘッダを持つサーバー定義が含まれている\n\n#### Scenario: 本家 MCP と並んで含まれる\n\n- **GIVEN** stroke-board と本家の dashboard が起動済みで、把握完了に達し proposal が提出されたセッションが存在する\n- **WHEN** `POST /api/strokes/:id/approve` で承認して steering 工程の claude を起動する\n- **THEN** 検証側が spawn された claude のプロセス引数を見ると、`--mcp-config` に本家 MCP と操作系 MCP サーバーの両方の定義が含まれている\n",
+  "fileStats": {
+    "size": 1414,
+    "lines": 20,
+    "lastModified": "2026-08-27T07:23:41.327Z"
+  },
+  "comments": []
+}

@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787795066184_ks3ymgo5j",
+  "approvalId": "approval_1787792823329_c4jqzeco9",
+  "approvalTitle": "specs 5b(改訂5): mcp/tools/submit — 4指摘対応（question 言及削除・不達の理由明記・「プロジェクトが存在する」に簡素化・proposal にプロジェクト名の提案を追加）",
+  "version": 14,
+  "timestamp": "2026-08-27T01:44:26.184Z",
+  "trigger": "revision_requested",
+  "status": "pending",
+  "content": "# mcp/tools/submit Delta\n\n## Purpose\n\n文書の提出の一本口となるツールの契約を定める。proposal と steering 文書はどちらも文書の本文の提出であり、どちらを提出するかは引数の種別で決まる。\n\n## ADDED Requirements\n\n### Requirement: 文書を種別の引数で提出する\n\nツールの引数は、提出の種別（proposal / steering 文書）と文書の本文とする SHALL。種別の定義はワークフロー定義（flontier-strokeflow）に揃える——proposal の場合はプロジェクト名の提案を併せて渡せる SHALL。steering 文書の場合は文書名（product / tech / structure）を併せて取る SHALL。\n\nツールは proposal を自セッションの proposal として提出し、steering 文書は指定された文書名の steering 文書として書き込む SHALL。提出先の振り分けは引数だけで決まる SHALL。引数に現れない内部状態を見て振り分けや可否を変えてはならない（MUST NOT）（docs/adr/0013 の原則に整合する）。ツール側で本文の検証を行って提出を止めてはならない（MUST NOT）——検証の正は提出先にある。\n\n結果は次のいずれか1つを返す SHALL。\n\n- **受理**: 提出が受け付けられたこと\n- **エラー**: ステータスとエラー内容\n- **不達**: 提出先に到達できなかったこと。proposal の提出先が停止しているときはツール自体が実行され得ないため、不達は steering 文書の提出でのみ起こる\n\n#### Scenario: proposal を提出する\n\n- **GIVEN** 把握完了に達したセッションが存在する\n- **WHEN** 種別に proposal を指定し、本文とプロジェクト名の提案を渡してツールを実行する\n- **THEN** proposal がそのセッションに提出され、受理が返る\n\n#### Scenario: product の steering 文書を提出する\n\n- **GIVEN** プロジェクトが存在する\n- **WHEN** 種別に steering 文書、文書名に product を指定し、本文を渡してツールを実行する\n- **THEN** product の steering 文書として書き込まれ、受理が返る\n\n#### Scenario: tech の steering 文書を提出する\n\n- **GIVEN** プロジェクトが存在する\n- **WHEN** 種別に steering 文書、文書名に tech を指定し、本文を渡してツールを実行する\n- **THEN** tech の steering 文書として書き込まれ、受理が返る\n\n#### Scenario: structure の steering 文書を提出する\n\n- **GIVEN** プロジェクトが存在する\n- **WHEN** 種別に steering 文書、文書名に structure を指定し、本文を渡してツールを実行する\n- **THEN** structure の steering 文書として書き込まれ、受理が返る\n\n#### Scenario: 提出先の検証に通らない\n\n- **GIVEN** 把握完了に達したセッションが存在する\n- **WHEN** 提出先の検証に通らない本文で proposal を提出する\n- **THEN** エラーが返り、ステータスとエラー内容を読んで同じツールの呼び直しで出し直せる\n\n#### Scenario: 本家の dashboard が停止している\n\n- **GIVEN** プロジェクトが存在し、本家の dashboard が停止している\n- **WHEN** 種別に steering 文書を指定して提出する\n- **THEN** 不達が返る\n",
+  "fileStats": {
+    "size": 3355,
+    "lines": 56,
+    "lastModified": "2026-08-27T01:37:09.555Z"
+  },
+  "comments": []
+}

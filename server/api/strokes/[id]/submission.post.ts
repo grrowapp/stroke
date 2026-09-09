@@ -12,15 +12,18 @@ import { writeInvocation } from '../../../utils/stroke/session-store'
  * 書き込みの規則は `session-store.ts` の `writeInvocation` に置いてある。invokeAi へ渡す
  * 書き込み口（`invoke.ts`）も同じ実体を呼ぶので、規則が2箇所に分かれない。
  *
+ * **成功の決着はここから出ない。** `idle` を書いてもプロジェクトは完成にならない——完成の
+ * 記録は別の口（U15 `sessions/[id]/activate.post.ts`）が phase に書く
+ * （openspec/specs/agent/invocation「`invocation` の書き込みを成功の決着の合図にしない」）。
+ *
  * `retries` は省略可。渡されたときだけ回数を上書きする（`error` からの再実行で 0 に
  * 戻すのに使う）。存在しない id は `requireSessionId` が 404 にする。
  */
-export default defineEventHandler(async (event): Promise<null> => {
+export default defineEventHandler(async (event): Promise<Response> => {
   const sessionId = await requireSessionId(event)
   const { invocation, retries } = parseBody(submissionBody, await readBody(event))
 
   await writeInvocation(sessionId, invocation, retries)
 
-  setResponseStatus(event, 200)
-  return null
+  return new Response(null, { status: 204 })
 })

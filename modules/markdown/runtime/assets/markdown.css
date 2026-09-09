@@ -1,0 +1,353 @@
+/*
+ * markdown 本文の見た目。**このファイルは markdown モジュールが自分で足す**
+ * （`modules/markdown/index.ts` の `nuxt.options.css.push`）。`app/assets/css/main.css`
+ * に戻さないこと（`openspec/specs/markdown/module`）。
+ *
+ * 読み込みは main.css より後になる。`@layer sb-doc;` の宣言が
+ * `@import "tailwindcss"`（main.css）より後に来る必要があるため、この順序が要る。
+ */
+
+/*
+ * このモジュールのクラスを Tailwind に生成させる指定（`@source`）は、ここではなく
+ * `app/assets/css/main.css` にある。`@import "tailwindcss"` を持つファイルが
+ * Tailwind の入口で、走査の指定はそこに集まる（ここに書いても効かない。実測）。
+ */
+
+/*
+ * ここから文書本文。**`components` ではなく `sb-doc` レイヤーに置く。**
+ *
+ * `@tailwindcss/typography` が出す `prose` 一式は Tailwind v4 では `utilities` レイヤーに
+ * 入る（CSSOM で確認済み）。レイヤーは詳細度より強いので、`components` に置いた
+ * `.sb-markdown th`（0,1,1）でも `utilities` の `.prose :where(thead th)`（0,1,0）に負ける。
+ * 実際に負けた: table の margin が 16px ではなく prose の 2em(28px)、th の padding が
+ * 4px 8px ではなく prose の padding-inline/padding-bottom になっていた。
+ *
+ * `@layer sb-doc;` を `@import "tailwindcss"` より後に宣言することで、レイヤーの並びが
+ * theme → base → components → utilities → sb-doc になり、ここの規則が prose に勝つ。
+ * prose に任せる型（見出し・段落・箇条書き・引用の骨格・罫線）はここに**書かない**。
+ * 書いたものだけが上書きになる。
+ */
+@layer sb-doc;
+
+@layer sb-doc {
+  /*
+   * 文書の本文。
+   *
+   * **型（見出し・段落・箇条書き・引用・罫線）はここに持たない。**
+   * 本家が本文へ当てているのは Tailwind Typography の
+   * `prose prose-sm sm:prose-base dark:prose-invert …`（`MDXEditorWrapper.tsx` の
+   * `contentEditableClassName`）で、その class 列は `DocumentView.vue` /
+   * `ApprovalAnnotator.vue` が本家と同じ並びで名乗っている。
+   *
+   * 以前ここにあった写しの出どころ（本家 `theme.css` の `.markdown-content`）は、
+   * 本家のどの `.tsx` も名乗っていない**使われていない CSS** だった
+   * （`grep -rn "markdown-content" src` のヒットは `theme.css` だけ）。そのため
+   * 本文が本家と別物になっていた（実測: h1 36px→16px / h2 24px→16px / p の余白
+   * 20px→8px / hr 48px→16px）。写しをやめ、本家と同じプラグインに委ねる。
+   *
+   * ここに残すのは **prose では出せない本家側の差分**だけ。本家の本文は素の prose では
+   * なく、その上に MDXEditor（`MDXEditorWrapper.css` と `@mdxeditor/editor` の
+   * scoped CSS）が重なった状態で描かれている。以下はその重なりの実測値。
+   */
+
+  /*
+   * 本文の面。本家は contentEditable の入れ物（`.mdxeditor-root-contenteditable`）に
+   * ダークで #111827 を敷き、その内側 12px から本文が始まる（`MDXEditorWrapper.css`
+   * の `min-height:200px` / `background-color:#111827` ＋ `_contentEditable_` の padding）。
+   * パネル（#1e293b）の中に一段暗い矩形が入るのが本家の見え方（実測・目視とも）。
+   */
+  .sb-markdown {
+    min-height: 200px;
+    padding: 12px;
+    background: #111827;
+    /*
+     * 本家の contentEditable は `word-break: break-word` を持ち、子まで継がれる（実測）。
+     * 切れない長い語（`specs/api/session/approve` のような見出し）が欄からはみ出さず、
+     * 語の途中で折り返る。並列表示のように欄が狭いところでこれが効く。
+     *
+     * 本家は同じ要素に `white-space: pre-wrap` も持つが、そちらは Lexical が編集中の
+     * 空白を保つための指定で、読むだけの MDC 出力に移すと markdown 側の字下げや
+     * 連続空白がそのまま出る。見え方の一致には要らないので写さない。
+     */
+    word-break: break-word;
+  }
+
+  /*
+   * コードブロック。本家（spec-workflow-mcp）は MDXEditor の `codeMirrorPlugin` に渡して
+   * いて `pre` を使わず、`div._codeMirrorWrapper_` > `div._codeMirrorToolbar_` + `.cm-editor`
+   * になる。stroke-board は読み取り表示なので CodeMirror は持ち込まず、本家が画面に出す形
+   * （枠・右上の帯・行番号・折り返し）を素の `pre` で組み立てる（`CodeBlock.vue`）。
+   *
+   * 値の出どころは稼働中の本家（`/#/specs/view`）の実測と、その CSS の重ね
+   * （`@mdxeditor` の `_codeMirrorWrapper_` ＋ `MDXEditorWrapper.css` のダーク時）。
+   * `.sb-mermaid` と同じく、ダーク一本なので重ねた後の値だけを持つ。
+   *
+   * 外枠: margin 16px 0 / padding .8rem / border 1px #374151 / radius 8px / overflow hidden
+   *       / background #1f2937
+   */
+  .sb-code {
+    /* 行番号の桁数。`CodeBlock.vue` が行数から決めて inline で入れる */
+    --sb-code-digits: 1;
+    /* 番号の欄の幅。本家は1桁で 22px（左右 8px の余白＋数字1文字）。9.6px の等幅1文字は約 5.76px */
+    --sb-code-gutter: calc(16px + var(--sb-code-digits) * 5.76px);
+    /*
+     * 本文の左位置。本家は 番号の欄 ＋ 折り畳みの欄 8px ＋ 区切り線 1px ＋ 行の内側 6px。
+     * 折り畳みは編集の仕掛けなので中身は持たないが、幅は空けて同じ位置に本文を置く
+     */
+    --sb-code-indent: calc(var(--sb-code-gutter) + 15px);
+
+    position: relative;
+    margin: 16px 0;
+    padding: 12.8px;
+    border: 1px solid #374151;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #1f2937;
+  }
+
+  /*
+   * 右上に重なる帯。本家の `_codeMirrorToolbar_`（position:absolute / right:0 / top:0 /
+   * padding .5rem 1rem / background #374151 / border-bottom-left-radius 4px / z-index 1）。
+   *
+   * 本家はこの中に言語セレクタと「Delete code block」を置くが、文書表示ではどちらも
+   * `disabled` で押せない。操作としては存在しないので、ここは言語名の札だけを出す。
+   */
+  .sb-code-toolbar {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 1;
+    display: flex;
+    gap: 4px;
+    padding: 8px 16px;
+    border-bottom-left-radius: 4px;
+    background: #374151;
+    color: #9ca3af;
+    font-size: 12px;
+  }
+
+  /*
+   * 本文。本家の `.cm-scroller`（font-family:monospace / line-height:1.4）と
+   * `.cm-content.cm-lineWrapping`（padding 4px 0 / color #e5e7eb / 折り返す）の重ね。
+   * 横スクロールはさせない（本家は折り返す）。
+   *
+   * 左の番号の欄は本家では別の列（`.cm-gutters`）だが、行が折り返しても背景が続くように
+   * ここでは背景の帯として敷く。色は本家の `.cm-gutters`（#374151 と区切り線 #4b5563）。
+   */
+  /*
+   * `.sb-code` を重ねて詳細度を (0,2,0) にしてある。prose の `.prose :where(pre):not(…)`
+   * は (0,1,0) で `pre` の面・余白・角丸・字送りを全部持つため、同じ強さでは
+   * 並び順しだいで負ける。
+   */
+  .sb-code .sb-code-body {
+    margin: 0;
+    padding: 4px 2px 4px var(--sb-code-indent);
+    border: 0;
+    border-radius: 0;
+    overflow: visible;
+    background: linear-gradient(
+      to right,
+      #374151 0 calc(var(--sb-code-gutter) + 8px),
+      #4b5563 calc(var(--sb-code-gutter) + 8px) calc(var(--sb-code-gutter) + 9px),
+      transparent calc(var(--sb-code-gutter) + 9px)
+    );
+    color: #e5e7eb;
+    font-family: monospace;
+    font-size: 16px;
+    line-height: 1.4;
+    white-space: break-spaces;
+    word-break: break-word;
+    counter-reset: sb-code-line;
+  }
+
+  /*
+   * インラインコードの指定（prose の `code` と `.sb-markdown :not(pre) > code`）を
+   * コードブロックの中へ持ち込ませない。本家のコードブロックは 16px・等幅のまま。
+   */
+  .sb-code .sb-code-body code {
+    padding: 0;
+    background: none;
+    color: inherit;
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+  }
+
+  /*
+   * 行番号。本家の `.cm-lineNumbers .cm-gutterElement`（font-size .6rem / padding 0 .5rem
+   * / 右寄せ / color #6b7280）。`span.line` は shiki が行ごとに出すもので、無い言語のときは
+   * `CodeBlock.vue` が同じ形で組み立てる。
+   *
+   * 番号は行の内側に置いて左の余白へずらす。折り返しても番号が付くのは先頭の1行だけで、
+   * 続きは本文の左端に揃う（本家の CodeMirror と同じ）。
+   */
+  .sb-code .sb-code-body .line::before {
+    counter-increment: sb-code-line;
+    content: counter(sb-code-line);
+    display: inline-block;
+    box-sizing: border-box;
+    width: var(--sb-code-gutter);
+    margin-left: calc(-1 * var(--sb-code-indent));
+    margin-right: 15px;
+    padding: 0 8px;
+    color: #6b7280;
+    font-size: 9.6px;
+    line-height: 1.4;
+    text-align: right;
+    vertical-align: top;
+  }
+
+  /*
+   * インラインコード。
+   *
+   * 本家は Lexical が `code > span._code_` の二重構造で出しており、外の `code` に
+   * prose（`prose-code:` の色 ＋ 前後のバッククォート ＋ 0.875em ＋ 600）が、内の
+   * `span` に MDXEditor の scoped CSS（0.94em / 面 #212225 / padding 1px 4px /
+   * 角丸なし）が当たる。実測（本文 16px の `li` の中）:
+   *   外 code  14px / 600 / 面 gray-800 / padding 0 / radius 0 / ::before ::after = `
+   *   内 span  13.16px / 600 / 面 rgb(33,34,37) / padding 1px 4px / radius 0
+   *
+   * MDC は `code` 1枚しか出さないので、目に入る側（内の span）の値をその `code` に
+   * 持たせる。バッククォートは prose の `code::before/::after` がそのまま出す。
+   * 二重構造でしか出せないのは「バッククォートだけ外の面色になる」ところで、両者の差は
+   * rgb(31,41,55) と rgb(33,34,37) の1段。ここは合わせられないので落としている。
+   */
+  .sb-markdown :not(pre) > code {
+    padding: 1px 4px;
+    border-radius: 0;
+    background: rgb(33, 34, 37);
+    /* 0.875em（prose）× 0.94（MDXEditor の `_code_`）＝ 本文 16px に対して 13.16px */
+    font-size: 0.8225em;
+    font-weight: 600;
+  }
+
+  /*
+   * 表。本家の表は prose ではなく MDXEditor の table editor（`_tableEditor_` /
+   * `_leftAlignedCell_`）が描いている。`MDXEditorWrapper.css` にも表の指定はあるが
+   * （padding .5rem 1rem / border #374151）、あとから読まれる `@mdxeditor/editor` の
+   * scoped CSS が同じ強さで上書きするので、画面に出ているのは下の値のほう。
+   *
+   * 実測（/#/specs/view の design.md）: 罫線 1px rgb(46,49,53) / セル padding 4px 8px /
+   * 字 14px（prose の 0.875em）/ th は 600・白・面 #1f2937 / 縦は baseline 揃え。
+   */
+  .sb-markdown table {
+    margin: 16px 0;
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  .sb-markdown th,
+  .sb-markdown td {
+    padding: 4px 8px;
+    border: 1px solid rgb(46, 49, 53);
+    text-align: left;
+    vertical-align: baseline;
+  }
+
+  .sb-markdown th {
+    background: #1f2937;
+    color: #fff;
+    font-weight: 600;
+  }
+
+  /* prose は thead と行に区切り線を足す。本家はセルの罫線で格子を引くので重ねない */
+  .sb-markdown thead,
+  .sb-markdown tbody tr {
+    border: 0;
+  }
+
+  /*
+   * リンク。prose（invert）の既定は白。本家は `MDXEditorWrapper.css` の
+   * `.mdx-editor-wrapper a { color: var(--accentText) }` で青にしている。
+   * 実測 rgb(112,184,255)（`--accentText` は @mdxeditor のダークテーマ側が勝つ）。
+   * 太さ 500 と下線は prose のまま。
+   */
+  .sb-markdown a {
+    color: rgb(112, 184, 255);
+  }
+
+  /*
+   * 引用。`MDXEditorWrapper.css` の `blockquote`（border-left 4px var(--accentBase) /
+   * padding-left 1rem / margin 1rem 0 / ダーク時 color #9ca3af）。斜体と 500 は prose のまま。
+   * 実測の枠色 rgb(13,21,32) は @mdxeditor のダークテーマが入れた `--accentBase`。
+   */
+  .sb-markdown blockquote {
+    margin: 16px 0;
+    padding-left: 16px;
+    border-left: 4px solid rgb(13, 21, 32);
+    color: #9ca3af;
+  }
+}
+
+@layer components {
+  /*
+   * mermaid の図の入れ物。本家の `.mermaid-container` の写し。
+   *
+   * 本家は Tailwind のクラス（`my-4 overflow-auto bg-white dark:bg-gray-800 rounded-lg
+   * p-4 border border-gray-200 dark:border-gray-700`）に `MDXEditorWrapper.css` の
+   * `.mdx-editor-wrapper .mermaid-container` を重ねている。stroke-board はダーク一本
+   * （`:root` がダークの値そのもの）なので、重ねた後のダーク時の値だけを持つ。
+   *
+   * 背景の #1f2937 は本家 CSS の `.mdx-editor-wrapper.dark-theme .mermaid-container`、
+   * 枠の色は Tailwind v4 の gray-700（本家の `dark:border-gray-700`）。
+   * `.sb-markdown pre` に当たらないよう、図は `pre` ではなく `div` で出している。
+   */
+  .sb-mermaid {
+    display: flex;
+    justify-content: center;
+    overflow: auto;
+    margin: 16px 0;
+    padding: 16px;
+    border: 1px solid oklch(0.373 0.034 259.733);
+    border-radius: 8px;
+    background: #1f2937;
+  }
+
+  /*
+   * mermaid は SVG に `width="100%"` と `style="max-width: <実寸>px"` を付けて返す。
+   * インラインの max-width が勝つので原寸が上限になり、入れ物が狭いときだけ縮む。
+   * ここは本家と同じく、その指定が無い場合の受けとして置いている。
+   */
+  .sb-mermaid svg {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /*
+   * 文書を直すときの入力欄。読みのときの `.sb-markdown` と同じ幅・同じ面に置き、
+   * 編集に入った瞬間に見え方が飛ばないようにする。中身は markdown の生テキストなので
+   * 等幅で出す。
+   */
+  .sb-textarea {
+    display: block;
+    width: 100%;
+    min-height: 60vh;
+    padding: 12px;
+    border-radius: 6px;
+    background: var(--surface-sunken);
+    border: 1px solid var(--border-default);
+    color: var(--text-primary);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: var(--text-sm);
+    line-height: 1.7;
+    resize: vertical;
+    white-space: pre;
+    tab-size: 2;
+  }
+
+  .sb-textarea:focus {
+    outline: none;
+    border-color: var(--interactive-primary);
+  }
+
+  /* 保存できなかった理由。消えると何が起きたか分からなくなるので、色だけで示さない */
+  .sb-error {
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    background: var(--surface-sunken);
+    border: 1px solid var(--status-error);
+    color: var(--status-error);
+    font-size: var(--text-sm);
+  }
+}

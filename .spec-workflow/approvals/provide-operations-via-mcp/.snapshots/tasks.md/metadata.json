@@ -1,0 +1,38 @@
+{
+  "filePath": "openspec/changes/provide-operations-via-mcp/tasks.md",
+  "currentVersion": 4,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-27T00:03:21.596Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787789001528_xmxdexo5u",
+      "approvalTitle": "tasks: 5グループ18タスク（土台→ハンドラ→stdio→spawn 配線→検証）"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2026-08-27T08:01:32.681Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787817473148_5cwgji38d",
+      "approvalTitle": "tasks(改訂3): ユーザーレビューと承認のゲートを追加 — 各実装グループ末尾にレビュー反映タスク(2.4 / 3.9 / 4.4)、最終グループ6に全体レビューと検証結果を添えた承認(承認まで archive に進まない)"
+    },
+    {
+      "version": 3,
+      "filename": "snapshot-003.json",
+      "timestamp": "2026-08-27T08:03:03.326Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787817750912_6r1z1777c",
+      "approvalTitle": "tasks(改訂4): レビュー主体を修正 — 各グループのレビューは typescript-reviewer(最終は + review-master)で実施、最終承認は approvals(dashboard)で依頼し approved を確認"
+    },
+    {
+      "version": 4,
+      "filename": "snapshot-004.json",
+      "timestamp": "2026-08-27T08:04:52.442Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787817830374_wlwvqc3go",
+      "approvalTitle": "tasks(改訂5): レビューを santa-method(独立2レビュアー・両者合格まで修正)に変更 — 2.4 / 3.9 / 4.4 / 6.1 の全レビュータスクに適用"
+    }
+  ]
+}

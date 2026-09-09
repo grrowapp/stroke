@@ -1,0 +1,78 @@
+{
+  "filePath": ".spec-workflow/steering/tech.md",
+  "currentVersion": 9,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-19T23:22:54.599Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787181774594_szud7mf75",
+      "approvalTitle": "Steering: tech.md（技術スタックと決定ログ）"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2026-08-19T23:48:58.084Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787181774594_szud7mf75",
+      "approvalTitle": "Steering: tech.md（技術スタックと決定ログ）"
+    },
+    {
+      "version": 3,
+      "filename": "snapshot-003.json",
+      "timestamp": "2026-08-19T23:58:13.543Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787183451757_uszrgj3kf",
+      "approvalTitle": "Steering: tech.md 改訂（Application Architecture をコンポーネント図＋要点に圧縮）"
+    },
+    {
+      "version": 4,
+      "filename": "snapshot-004.json",
+      "timestamp": "2026-08-20T00:06:40.933Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787184025389_gnejmrox6",
+      "approvalTitle": "Steering: tech.md 改訂2（Application Architecture を構成要素と接続だけに）"
+    },
+    {
+      "version": 5,
+      "filename": "snapshot-005.json",
+      "timestamp": "2026-08-20T00:38:57.946Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787184822996_1ma6t9088",
+      "approvalTitle": "Steering: tech.md 改訂3（6件のコメント反映・具体化）"
+    },
+    {
+      "version": 6,
+      "filename": "snapshot-006.json",
+      "timestamp": "2026-08-24T16:38:13.804Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787589486418_9vew6flfi",
+      "approvalTitle": "認証・認可を未実装として書き、到達範囲を広げる段階で入れると決める"
+    },
+    {
+      "version": 7,
+      "filename": "snapshot-007.json",
+      "timestamp": "2026-08-26T18:01:11.864Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1787766738625_0bgysa7am",
+      "approvalTitle": "tech.md に API Design Principles を追加（ADR-0013）"
+    },
+    {
+      "version": 8,
+      "filename": "snapshot-008.json",
+      "timestamp": "2026-08-26T18:19:50.096Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787768173259_hqifrddbu",
+      "approvalTitle": "API Design Principles を1項目に畳む（規約1つ + 範囲・例外を同項目に）"
+    },
+    {
+      "version": 9,
+      "filename": "snapshot-009.json",
+      "timestamp": "2026-08-30T07:56:20.907Z",
+      "trigger": "approved",
+      "approvalId": "approval_1787867225338_o51e3q1ac",
+      "approvalTitle": "tech.md — 通す門番の規約を追加（move-conventions-to-steering）"
+    }
+  ]
+}

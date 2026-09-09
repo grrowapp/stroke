@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<title>状態の見え方 — 単体プレビュー</title>
+<!--
+  change `update-project-list-view` の prototype。ペラ1・外部依存なし。
+
+  出どころ — change `show-pending-project-in-list` の実装中に作られた単体プレビュー。
+  当時は tasks 11.3 が「止める」とだけ書いて消さずに残り、git には一度も入らなかった。
+  2026-08-30 にセッションの scratchpad から回収し、この change の証拠として持ち込んだ。
+
+  当時から落としたもの（どちらも不採用が確定しており、実装対象ではない）:
+    - 失敗の行（`.row-fail` / `.chip.failed` / broken-app の行）
+      失敗は行として残さず決着モーダルで受ける、と決まった（show-pending-project-in-list の 8.9）
+    - PID の併記（`.pid` / アクティブ行の `PID 3670916`）
+      利用者に出す意味がないため不採用
+
+  ここに残っている3状態（アクティブ / 未接続 / 生成中）が、本来 `main.css` に
+  入っているべき見た目である。ツマミは当時の詰め方をそのまま再現できるように残してある。
+-->
+<style>
+/* 本家 design token（main.css からそのまま） */
+:root {
+  --surface-base: #0f172a;
+  --surface-panel: #1e293b;
+  --surface-sunken: #0f172a;
+  --surface-hover: #334155;
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --text-faint: #64748b;
+  --border-default: #334155;
+  --border-strong: #475569;
+  --interactive-primary: #6366f1;
+  --status-success: #22c55e;
+  --status-error: #ef4444;
+
+  /* ツマミ */
+  --bar: #161f32;      /* 生成中の行の地 */
+  --txt: 90;           /* チップ文字（大きいほど薄い、0 で白） */
+  --fill: 12;          /* チップの面 */
+  --edge: 30;          /* チップの枠 */
+  --chip: var(--text-faint);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 20px;
+  background: var(--surface-base);
+  color: var(--text-primary);
+  font: 14px/1.5 Inter, ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1 { font-size: 15px; font-weight: 600; margin: 0 0 12px; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+th {
+  text-align: left;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 500;
+  padding: 8px 12px;
+  background: var(--surface-sunken);
+}
+
+td {
+  padding: 9px 12px;
+  font-size: 13px;
+  border-top: 1px solid var(--border-default);
+  background: var(--surface-panel);
+  vertical-align: middle;
+}
+
+.cell { display: inline-flex; align-items: center; gap: 6px; }
+.folder { width: 14px; height: 14px; flex: none; }
+.indent { display: inline-block; width: 14px; flex: none; }
+.dash { color: var(--text-muted); }
+.date { font-size: 12px; color: var(--text-secondary); }
+
+/* ── チップ ─────────────────────────────────────────────── */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 76px;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 600;
+  border: 1px solid;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--chip) calc(var(--fill) * 1%), transparent) 0%,
+      color-mix(in srgb, var(--chip) calc(var(--fill) * 0.4%), transparent) 55%,
+      color-mix(in srgb, var(--chip) calc(var(--fill) * 0.7%), transparent) 100%
+    );
+  border-color: color-mix(in srgb, var(--chip) calc(var(--edge) * 1%), transparent);
+  color: color-mix(in srgb, var(--chip) calc(var(--txt) * 1%), #fff);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 16%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, #000 20%, transparent);
+}
+
+/* アクティブだけが灯る */
+.chip.active {
+  --chip: var(--status-success);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--chip) 38%, transparent) 0%,
+      color-mix(in srgb, var(--chip) 20%, transparent) 55%,
+      color-mix(in srgb, var(--chip) 26%, transparent) 100%
+    );
+  border-color: color-mix(in srgb, var(--chip) 55%, transparent);
+  color: color-mix(in srgb, var(--chip) 55%, #fff);
+  text-shadow: 0 0 6px color-mix(in srgb, var(--chip) 60%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 34%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, #000 28%, transparent),
+    0 0 7px color-mix(in srgb, var(--chip) 45%, transparent),
+    0 0 15px color-mix(in srgb, var(--chip) 22%, transparent);
+}
+
+/*
+ * ローダー。
+ *
+ * border で作ると弧は 90°刻みでしか作れない（辺を1〜3本塗るだけなので）。
+ * `conic-gradient` を輪の形にマスクすると、**帯の長さを任意の角度**にできる。
+ *   --arc   帯の長さ（deg）
+ *   --ring  輪の太さ（px）
+ */
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.spinner {
+  width: var(--size, 10px);
+  height: var(--size, 10px);
+  flex: none;
+  border-radius: 999px;
+  /*
+   * 帯は端から端へ徐々に消える。conic-gradient に途中の停止点を置くだけで、
+   * 先頭が濃く、尾へ向かって薄くなる。尾の先は軌道の濃さに着地させ、
+   * 一周ぶんそのまま伸ばす（切れ目を作らない）。
+   */
+  background: conic-gradient(
+    #fff 0deg,
+    rgb(255 255 255 / 0.72) calc(var(--arc, 90deg) * 0.3),
+    rgb(255 255 255 / 0.34) calc(var(--arc, 90deg) * 0.62),
+    var(--track, rgb(255 255 255 / 0.1)) var(--arc, 90deg),
+    var(--track, rgb(255 255 255 / 0.1)) 360deg
+  );
+  -webkit-mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - var(--ring, 1.5px)),
+    #000 calc(100% - var(--ring, 1.5px))
+  );
+  mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - var(--ring, 1.5px)),
+    #000 calc(100% - var(--ring, 1.5px))
+  );
+  animation: spin 0.9s linear infinite;
+}
+
+/* ── 行 ─────────────────────────────────────────────────── */
+.row-active td { background: var(--surface-panel); }
+
+/* 未接続: 状態列以外を薄める。行ごと opacity は掛けない */
+.row-off td:nth-child(1) > *,
+.row-off td:nth-child(3) > * { opacity: 0.45; }
+.row-off td:nth-child(4) { color: color-mix(in srgb, var(--text-secondary) 45%, var(--surface-panel)); }
+
+/* 生成中: 行の地だけが違う。文字の薄さは未接続と同じ */
+.row-gen td {
+  background-color: var(--surface-panel);
+  background-image: linear-gradient(var(--bar), var(--bar));
+}
+
+.row-gen .name,
+.row-gen td:nth-child(3) > * { opacity: 0.45; }
+
+/*
+ * ローダーだけは薄めず、白で明滅させながら回す。
+ * セルごと 0.45 にすると子は親より濃くできないので、薄めるのは名前だけにしている。
+ *
+ * 明滅は2点の行き来。ease を入れると中間の濃さに留まって U 字に沈む動きになるので
+ * linear のまま、明と暗をそれぞれ長く保持して切り替えだけを短くする。
+ */
+@keyframes loader-blink {
+  0%, 42% { opacity: 1; }
+  50%, 92% { opacity: 0.25; }
+  100% { opacity: 1; }
+}
+
+.row-gen .spinner {
+  animation:
+    spin 0.9s linear infinite,
+    loader-blink 1.6s linear infinite;
+}
+
+/* 明滅を切る */
+.no-blink .row-gen .spinner {
+  animation: spin 0.9s linear infinite;
+}
+.row-gen td:nth-child(4) { color: color-mix(in srgb, var(--text-secondary) 45%, var(--surface-panel)); }
+
+/* ── ツマミ ─────────────────────────────────────────────── */
+.panel {
+  display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
+  margin-bottom: 12px; padding: 10px 12px;
+  border: 1px dashed var(--border-default); border-radius: 8px;
+  font-size: 12px; color: var(--text-secondary);
+}
+.panel label { display: flex; align-items: center; gap: 6px; }
+.panel input[type=range] { width: 130px; }
+.panel output { min-width: 44px; font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+code { font-family: "JetBrains Mono", ui-monospace, monospace; color: var(--text-primary); }
+</style>
+</head>
+<body>
+
+<div class="panel">
+  <strong>チップ</strong>
+  <label>文字<input id="txt" type="range" min="0" max="100" value="90"><output id="txtV">90</output></label>
+  <label>面<input id="fill" type="range" min="0" max="40" value="12"><output id="fillV">12</output></label>
+  <label>枠<input id="edge" type="range" min="0" max="80" value="30"><output id="edgeV">30</output></label>
+</div>
+
+<div class="panel">
+  <strong>生成中の行の地</strong>
+  <label>R<input id="r" type="range" min="0" max="255" value="22"><output id="rV">22</output></label>
+  <label>G<input id="g" type="range" min="0" max="255" value="31"><output id="gV">31</output></label>
+  <label>B<input id="b" type="range" min="0" max="255" value="50"><output id="bV">50</output></label>
+  <code id="hex">#161f32</code>
+</div>
+
+<div class="panel">
+  <strong>ローダー</strong>
+  <label>帯の長さ<input id="arc" type="range" min="10" max="350" value="180"><output id="arcV">180</output>°</label>
+  <label>太さ<input id="ring" type="range" min="1" max="6" step="0.5" value="2"><output id="ringV">2</output>px</label>
+  <label>大きさ<input id="size" type="range" min="8" max="28" value="15"><output id="sizeV">15</output>px</label>
+  <label><input id="blink" type="checkbox" checked>明滅する</label>
+</div>
+
+<h1>プロジェクト</h1>
+<table>
+  <thead>
+    <tr>
+      <th>プロジェクト</th><th style="width:224px">状態</th>
+      <th style="width:128px">未処理の通知</th><th style="width:112px">最終更新</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="row-active">
+      <td><span class="cell"><svg class="folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 012-2h4l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>memo-app</span></td>
+      <td><span class="cell"><span class="chip active">アクティブ</span></span></td>
+      <td><span class="dash">—</span></td>
+      <td class="date">2分前</td>
+    </tr>
+    <tr class="row-off">
+      <td><span class="cell"><svg class="folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 012-2h4l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>srvgm</span></td>
+      <td><span class="cell"><span class="chip">未接続</span></span></td>
+      <td><span class="dash">—</span></td>
+      <td class="date">8月16日 17:13</td>
+    </tr>
+    <tr class="row-off">
+      <td><span class="cell"><svg class="folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 012-2h4l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>subagents</span></td>
+      <td><span class="cell"><span class="chip">未接続</span></span></td>
+      <td><span class="dash">—</span></td>
+      <td class="date">8月16日 08:13</td>
+    </tr>
+    <tr class="row-gen">
+      <td><span class="cell"><span class="spinner"></span><span class="name">new-app</span></span></td>
+      <td><span class="cell"><span class="chip">生成中</span></span></td>
+      <td><span class="dash">—</span></td>
+      <td class="date">—</td>
+    </tr>
+  </tbody>
+</table>
+
+<script>
+const root = document.documentElement.style;
+const bind = (id, varName, out) => {
+  const el = document.getElementById(id), o = document.getElementById(out);
+  const apply = () => { root.setProperty(varName, el.value); o.textContent = el.value; };
+  el.addEventListener('input', apply); apply();
+};
+bind('txt', '--txt', 'txtV');
+bind('fill', '--fill', 'fillV');
+bind('edge', '--edge', 'edgeV');
+
+const rgb = ['r', 'g', 'b'].map((k) => document.getElementById(k));
+const outs = ['rV', 'gV', 'bV'].map((k) => document.getElementById(k));
+const hex = document.getElementById('hex');
+const applyBar = () => {
+  const v = rgb.map((el) => Number(el.value));
+  v.forEach((n, i) => (outs[i].textContent = n));
+  const h = '#' + v.map((n) => n.toString(16).padStart(2, '0')).join('');
+  root.setProperty('--bar', h);
+  hex.textContent = h;
+};
+const bindPx = (id, varName, out, unit) => {
+  const el = document.getElementById(id), o = document.getElementById(out);
+  const apply = () => { root.setProperty(varName, el.value + unit); o.textContent = el.value; };
+  el.addEventListener('input', apply); apply();
+};
+bindPx('arc', '--arc', 'arcV', 'deg');
+bindPx('ring', '--ring', 'ringV', 'px');
+bindPx('size', '--size', 'sizeV', 'px');
+
+const blinkEl = document.getElementById('blink');
+const applyBlink = () => document.body.classList.toggle('no-blink', !blinkEl.checked);
+blinkEl.addEventListener('change', applyBlink);
+applyBlink();
+
+rgb.forEach((el) => el.addEventListener('input', applyBar));
+applyBar();
+</script>
+
+<script>
+/*
+ * auto-reload — このファイルの Last-Modified を1秒ごとに見て、変わったら読み直す。
+ * ビルドも watch も要らない。書き換えたら勝手に反映される。
+ */
+(async () => {
+  const stamp = async () => {
+    try {
+      const res = await fetch(location.pathname, { method: 'HEAD', cache: 'no-store' });
+      return res.headers.get('last-modified');
+    } catch { return null; }
+  };
+  let seen = await stamp();
+  setInterval(async () => {
+    const now = await stamp();
+    if (now && seen && now !== seen) location.reload();
+    if (now) seen = now;
+  }, 1000);
+})();
+</script>
+</body>
+</html>

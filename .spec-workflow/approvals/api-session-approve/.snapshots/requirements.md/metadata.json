@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/api-session-approve/requirements.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-25T08:12:14.800Z",
+      "trigger": "initial",
+      "approvalId": "approval_1787645534725_w1rqv82mr",
+      "approvalTitle": "specs: api/session/approve — U10 承認の受理と昇格"
+    }
+  ]
+}

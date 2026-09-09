@@ -17,13 +17,35 @@
 import { createEventHook, createSharedComposable, useWebSocket } from '@vueuse/core';
 import { computed, readonly, ref, type Ref } from 'vue';
 
-import type { BoardMessage, Notification } from '#shared/types';
+import type { BoardMessage, Notification, ProjectCreationOutcome } from '#shared/types';
+
+/** プロジェクトの生成が動いたこと。行の中身は運ばない（design.md D3） */
+export interface ProjectCreationEvent {
+  name: string;
+  state: ProjectCreationOutcome;
+}
 
 interface BoardSocket {
   notifications: Readonly<Ref<Notification[]>>;
   upstreamConnected: Readonly<Ref<boolean>>;
   /** 新しく発生した通知。トーストの発火に使う。初回スナップショットは流れない */
   onNotification: (handler: (notification: Notification) => void) => void;
+  /**
+   * プロジェクトの生成が動いたこと。一覧の取り直しと、完了の祝いの発火に使う。
+   *
+   * `onNotification` と同じく、**接続時の snapshot では流れない**。祝いは「完了の瞬間を
+   * 受け取った画面に対して一度」であり（specs/project/generation）、既に完了していたものを
+   * 祝い直さないためである。
+   */
+  onProjectCreation: (handler: (event: ProjectCreationEvent) => void) => void;
+  /**
+   * 接続の瞬間に現在分（snapshot）が届いたこと。
+   *
+   * 切れている間に生成が始まった・終わった場合、その出来事は届いていない。ここで一覧を
+   * 取り直すと状態が揃う。**祝いはここでは出さない**——snapshot は現在分であって、完了の
+   * 瞬間ではない（design.md D4）。
+   */
+  onSnapshot: (handler: () => void) => void;
 }
 
 export const useBoardSocket = createSharedComposable((): BoardSocket => {
@@ -32,6 +54,8 @@ export const useBoardSocket = createSharedComposable((): BoardSocket => {
 
   // 登録の解除は scope の破棄に任せる。Set の手管理も onScopeDispose も要らない
   const notified = createEventHook<Notification>();
+  const created = createEventHook<ProjectCreationEvent>();
+  const snapshotted = createEventHook<void>();
 
   // SSR では接続しない。ブラウザに渡ってから張る（空の URL では繋がない）
   const url = computed(() => {
@@ -54,9 +78,11 @@ export const useBoardSocket = createSharedComposable((): BoardSocket => {
 
       switch (message.type) {
         case 'snapshot':
-          // 既に一覧にあるものはトーストにしない（specs/notification-toast）
+          // 既に一覧にあるものはトーストにしない（specs/notification-toast）。
+          // 生成の祝いも同じく出さない（specs/project/generation）
           notifications.value = message.notifications;
           upstreamConnected.value = message.upstreamConnected;
+          void snapshotted.trigger();
           return;
 
         case 'notification':
@@ -66,6 +92,10 @@ export const useBoardSocket = createSharedComposable((): BoardSocket => {
 
         case 'upstream-connection':
           upstreamConnected.value = message.connected;
+          return;
+
+        case 'project-creation':
+          void created.trigger({ name: message.name, state: message.state });
           return;
       }
     },
@@ -80,6 +110,12 @@ export const useBoardSocket = createSharedComposable((): BoardSocket => {
     upstreamConnected: readonly(upstreamConnected),
     onNotification: (handler) => {
       notified.on(handler);
+    },
+    onProjectCreation: (handler) => {
+      created.on(handler);
+    },
+    onSnapshot: (handler) => {
+      snapshotted.on(handler);
     },
   };
 });

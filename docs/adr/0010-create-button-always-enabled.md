@@ -1,6 +1,6 @@
 # ADR-0010: 「作成」ボタンは常に押せる
 
-- **状態**: 採用
+- **状態**: archive（2026-08-29。全貌は [`docs/specs/plan/portal-stroke-entrance.md`](../specs/plan/portal-stroke-entrance.md) に確定。対応する節 — 常に押せる・判定の一元化:「エラーの出方（前提が欠けていても押せる）」／project-directory への影響:「仕様（project-directory）の置き直し」）
 - **日付**: 2026-08-25
 
 ## 決定
@@ -10,7 +10,7 @@
 前提の充足で切り替えない。
 
 前提の欠け（置き場に書き込めない・AI の起動定義が不正など）は、入った先のストローク側が表現する。
-判定の実体は従来どおり `missingPrerequisites()`（呼ばれるたびに実際を見る、`startup-readiness`）で、
+判定の実体は従来どおり `missingPrerequisites()`（呼ばれるたびに実際を見る）で、
 AI 起動時の 503 として現れる。
 
 ## 背景
@@ -22,8 +22,8 @@ AI 起動時の 503 として現れる。
 ## 根拠
 
 - ストローク側は前提の欠けを検知して画面に出す仕組みを既に持つ（`invoke-agent` の 503、
-  `openspec/specs/startup-readiness/`）。ボタンを灰色にしても同じ情報を別の場所に重ねるだけで、
-  判定箇所が2つに増える
+  `openspec/specs/api/session/invoke-agent/`）。ボタンを灰色にしても同じ情報を別の場所に
+  重ねるだけで、判定箇所が2つに増える
 - ボタンは画面遷移しかしない。遷移自体に失敗する前提は無い
 
 ## 影響

@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1787811561146_ba8x0coqf",
+  "approvalId": "approval_1787811481479_jfejeumts",
+  "approvalTitle": "specs mcp/server(改訂4): 承認済み design に全面追随 — stroke-board 自身の route /mcp(Streamable HTTP)・6ツール明示・結果は status/errorCode のフラット形・接続情報を引数に要求しない。観測は MCP Inspector(一覧・スキーマ定義)。stdio・旧エラー3種の記述は削除",
+  "version": 33,
+  "timestamp": "2026-08-27T06:19:21.146Z",
+  "trigger": "revision_requested",
+  "status": "pending",
+  "content": "# mcp/server Delta\n\n## Purpose\n\nstroke-board 自身が route `/mcp` で提供する MCP サーバーの、全ツール共通の契約を定める。個々のツールの引数・結果は `mcp/tools/**`、接続の担保は `server/session-management` にある。\n\n## ADDED Requirements\n\n### Requirement: MCP は stroke-board 自身の route で提供される\n\nMCP サーバーは stroke-board の route `/mcp`（Streamable HTTP）で提供される SHALL。別プロセスを立ててはならない（MUST NOT）。提供するツールは `get-overview` / `get-strokes` / `get-send-back` / `send-question` / `submit-document` / `get-steering` の6本とする SHALL。\n\n#### Scenario: 6ツールが列挙される\n\n- **GIVEN** stroke-board が起動済みである\n- **WHEN** Nuxt DevTools の MCP Inspector で `/mcp` のツール一覧を開く\n- **THEN** 6ツールがすべて列挙されている\n\n### Requirement: 結果は status と errorCode のフラットな形で返す\n\n各ツールの結果は1階層とし、常に `status`（endpoint の応答の HTTP ステータスコード）を持つ SHALL。失敗時は `errorCode`（機械可読の失敗種別。本家 dashboard に到達できない場合は `unreachable`）と `error`（endpoint が返したエラー本文）を持ち、成功時はそのツールの結果スキーマの項目を持つ SHALL。エラー本文を書き換え・省略・追加してはならない（MUST NOT）。MCP サーバー独自の事前検証・状態分岐を足してはならない（MUST NOT）（docs/adr/0013 の原則に整合する）。\n\n#### Scenario: 結果スキーマが形に従っている\n\n- **GIVEN** stroke-board が起動済みである\n- **WHEN** Nuxt DevTools の MCP Inspector で各ツールの結果スキーマの定義を開く\n- **THEN** すべてのツールで `status` が必須項目にあり、失敗時の `errorCode` / `error` が定義されている\n\n### Requirement: 接続情報をツールの引数に要求しない\n\nツールの引数に、接続先（base URL）・セッション id・projectId を要求してはならない（MUST NOT）。本家向け操作に要る projectId は、ツールが実行時に本家への問い合わせで解決する SHALL。\n\n#### Scenario: 引数に接続情報が無い\n\n- **GIVEN** stroke-board が起動済みである\n- **WHEN** Nuxt DevTools の MCP Inspector で各ツールの引数スキーマの定義を開く\n- **THEN** どのツールにも接続先・セッション id・projectId の引数が存在しない\n",
+  "fileStats": {
+    "size": 2564,
+    "lines": 38,
+    "lastModified": "2026-08-27T06:17:53.845Z"
+  },
+  "comments": []
+}

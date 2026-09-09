@@ -1,0 +1,22 @@
+{
+  "filePath": "openspec/changes/create-module-markdown/design.md",
+  "currentVersion": 2,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-08-30T07:51:06.737Z",
+      "trigger": "initial",
+      "approvalId": "approval_1788076265189_671mz2d6x",
+      "approvalTitle": "design.md に「作るもの」（コンポーネント図）を追加"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2026-08-30T13:42:55.269Z",
+      "trigger": "approved",
+      "approvalId": "approval_1788081082341_0s03fa48i",
+      "approvalTitle": "design.md（未完成・要確認）UML 記法の構成図。指示された角丸の図は未反映、用語修正も9箇所未了"
+    }
+  ]
+}

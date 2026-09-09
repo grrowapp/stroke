@@ -38,7 +38,7 @@ const { question, waiting, failed, error, answered, send } = useAgentQuestion(se
 `error` は「何が起きたか」の判別まで済ませた形で出る（送信そのものの失敗・まだ前の応答を
 待っている・起動に失敗した）。置く側はそれをどう見せるかだけを決める。
 
-引数はセッション id 1つ。**状態を外から渡す口は無い。**
+引数はセッション id 1つ。**状態を外から渡す引数は無い。**
 composable は内部で持った状態を返す側であって、状態を受け取る側ではない。
 `@vueuse/core` の `useWebSocket(url, options)` が同じ形で、`options` は振る舞いの設定
 （`autoReconnect` / `onMessage`）だけを取り、観測する変数は全て返り値（`data` / `status` / `ws`）
@@ -238,6 +238,7 @@ watch(error, (reason) => {
 
 ## 関連
 
+- `docs/specs/reference/mdc-observations.md` — markdown モジュールが乗っている `@nuxtjs/mdc` の癖（崩れた前提7件と、それを固定しているテスト）
 - `docs/specs/plan/next-agent-run.md` — この2つを汎用のエージェント実行へ広げる案（未着手）
 - `openspec/specs/agent-question/spec.md` — 振る舞いの規定（本体）
 - `openspec/specs/proposal-review/spec.md` — 画面2 に固有の規定
