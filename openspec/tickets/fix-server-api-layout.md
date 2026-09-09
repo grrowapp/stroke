@@ -1,9 +1,10 @@
 ---
 status: Open
-change: fix-server-api-layout
 origin: user
 triage:
   - bug
+change: fix-server-api-layout
+date: 2026-09-08
 ---
 
 # fix-server-api-layout
@@ -120,3 +121,21 @@ triage:
 ## 畳む方向
 
 A〜C の実装と A-5 / B-3 のテストが通り、D の docs 反映が承認済みで、E の delta が `openspec validate --all` を通ること。F の旧 ticket・change の処遇が決まっていること。
+
+## 順序制約（2026-09-08 の分解。Gitea issue #14）
+
+この ticket の範囲は Gitea の issue に分解した（親 #14）。着手の順序は次の制約に従う。
+
+| issue | 内容 | 制約 |
+| --- | --- | --- |
+| #10 | D・E-1（docs の食い違いと specs の追従） | 最初。実装より先 |
+| #11 | C-1（U14 name-conflict） | #13 より先。同じ `promote.post.ts` を触るため並走させない |
+| #12 | B-2・E-2（プロジェクト系の置き方） | 独立。いつでも |
+| #13 | A・B-1・F-2（セッション系の移設と index 化） | #10 と #11 の後 |
+| #15 | api と実処理の分離（handler への切り出し。この ticket の A〜F には無い追加の判定） | #12 と #13 の後。移動が済んでから中身を切り出す |
+
+```
+#10 ──┐
+#11 ──┼──▶ #13 ──┐
+#12 ─────────────┼──▶ #15
+```

@@ -12,7 +12,7 @@
 
 204 は「操作を受理し、返す本文が無い」ことを表す。
 
-対象は次の操作である。回答（U7）・差し戻し（U9）・承認（U10）・問い（A5）・proposal（A7）・実行の記録（A8）。
+対象は次の操作である。回答（U7）・差し戻し（U9）・承認（U10）・問い（A5）・proposal（A7）・実行の記録（A8）・生成（P2）。
 
 受理が成立した応答に本文を載せてはならない（MUST NOT）。
 
@@ -51,6 +51,12 @@
 - **GIVEN** 対象の id を持つセッションが保存されている
 - **WHEN** invokeAi が `POST /api/strokes/:id/submission` へ `{ invocation: 'running' }` を送る
 - **THEN** invokeAi へステータス 204 が返り、応答に本文は無い
+
+#### Scenario: サーバーが生成を送る
+
+- **GIVEN** 昇格したプロジェクトが `projectShareRoot` の直下に在り、本家 dashboard が動いている
+- **WHEN** 承認の後の実行の準備が `POST /api/projects` へ `{ projectPath: '<そのディレクトリ>' }` を送る
+- **THEN** ステータス 204 が返り、応答に本文は無い
 
 ### Requirement: 読み取りの応答に 204 を使わない
 

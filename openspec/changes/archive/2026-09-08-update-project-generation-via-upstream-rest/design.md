@@ -35,7 +35,7 @@
 - 置き場は `server/api/projects/index.post.ts`（`server.md` の規則）。P1 と同じく**メソッドで振り分け、パスに動詞を置かない**
 - **id を取らない。** 作成に id は無く、本家が要るのはパスであり、呼び手（起動の材料の組み立て）は cwd としてパスを既に持っている
 - 本文は `z.object({ projectPath: z.string().min(1) })` で検証し、さらに `path.resolve(projectPath)` が `join(readStrokeConfig().projectShareRoot, basename)` と一致すること（親の直下1階層）を要求する。外れたら 400。**親の外を本家に登録させない**ための入力検証であり、状態の判定ではない（ADR-0014）。`state.json` は読まない
-- 依頼先は `upstreamClient().registerProject(projectPath)`。失敗は `toHttpError(failure)` で写す（未設定・不達・本家のエラー応答 → 503、形違い → 502、`not-found`＝本家が古く `/api/projects/add` が無い → 404）
+- 依頼先は `upstreamClient().registerProject(projectPath)`。失敗は `toHttpError(failure)` で写す（未設定・不達・本家のエラー応答 → 503、形違い → 502）。`not-found`（本家が古く `/api/projects/add` が無い）は P2 で 503 に倒す——作成の要求に「対象が見つからない」を返すと読み違えるうえ、spec は本家のエラー応答を一律 503 と定めている（santa-method レビュー 2周目の指摘で 404 → 503 に改めた。2026-09-08）
 - 成功は 204。`broadcastProjectCreation` を呼ばず、phase も `invocation` も書かない
 
 **Alternatives considered**
@@ -44,7 +44,7 @@
 
 ### D2. 依頼するのは steering の起動の材料の組み立て。起動のたびに、AI を起動する前に
 
-- `invoke.ts` の `buildRun` を **async** にし、steering 分岐では `await generateProject(cwd)` が通ってから `AiRun` を返す。`generateProject` は `$fetch('/api/projects', { method: 'POST', body: { projectPath: cwd } })`（相対パス。`invocationWriter` と同じ作法）。失敗は throw のまま——`invokeAi` の `recordBuildFailure` が「起動の材料を組み立てられない」として `failed` / `error` を書き、`built` が reject して U13 は 503 を返す（既存経路。新しい判定を足さない）
+- `buildRun`（同期の組み立て）は変えず、`kick` が `invokeAi` へ渡す組み立て方（`build`）を async にする。steering では `await generateProject(cwd)` が通ってから `buildRun` を呼んで `AiRun` を返す。`generateProject` は `$fetch('/api/projects', { method: 'POST', body: { projectPath: cwd } })`（相対パス。`invocationWriter` と同じ作法）。失敗は throw のまま——`invokeAi` の `recordBuildFailure` が「起動の材料を組み立てられない」として `failed` / `error` を書き、`built` が reject して U13 は 503 を返す（既存経路。新しい判定を足さない）。**実装時の訂正**: 当初は `buildRun` 自体を async にする案だったが、`buildRun` の既存テストが同期の戻り値を前提にしており、依頼は `kick` の閉包に置くほうが差分が小さい（2026-09-08）
 - `ai.ts` は `build: () => AiRun | Promise<AiRun>` を受けて `await build()` にするだけ。組み立ての成否で分岐する既存の形は変わらない
 - **起動のたびに依頼する。** 本家の登録は dashboard の再起動で消える（Context）。本家 MCP の自己登録を外す（D3）と、続きの起動で登録が戻る道が無くなるので、初回だけ（`prepare`）ではなく毎回にする。本家は登録済みのパスに同じ `projectId` を返すので重ねて無害
 - 生成の受理を待ってから claude を起こすので、steering claude が起きたときには本家の一覧に載っている（`get-steering` / `submit-document` の projectId 引き当てが本家の一覧に依存する。`upstream-connection`）
@@ -98,7 +98,7 @@
 ### D7. P2 のテスト
 
 - **単体** `test/server/api/projects/index.post.test.ts`: `upstreamClient` を差し替え、(1) 親の直下のパス → 204・`registerProject` がそのパスで1回呼ばれる、(2) 本文無し・相対パス・親の外・親そのもの・2階層下 → 400・`registerProject` は呼ばれない、(3) `unreachable` / `error-response` → 503、`malformed` → 502、(4) どのケースでも `writeState`・`broadcastProjectCreation`・`readState` が呼ばれない
-- **単体** `test/server/utils/stroke/invoke.test.ts`: steering の `buildRun` が `/api/projects` へ `{ projectPath: cwd }` を POST してから材料を返し、POST が失敗すれば reject して材料を返さないこと。ストロークの `buildRun` は POST しない
+- **単体** `test/server/utils/stroke/invoke.test.ts`: steering の `kick` が渡す組み立て方が `/api/projects` へ `{ projectPath: cwd }` を POST してから材料を返し、POST が失敗すれば reject して材料を返さないこと。ストロークの組み立て方は POST しない
 - **単体** `test/server/utils/stroke/ai.test.ts`: `build` が Promise を返しても既存の組み立て失敗の記録（`failed` / `error`、`built` の reject）が同じに働くこと
 - **単体** `rest.test.ts`・`read-only.test.ts`（D5）、`reap-match.test.ts`（D4）、`get-steering-guide.test.ts`（D3）
 - **E2E** `upstream-stub.mjs` に `POST /api/projects/add` を足す（`projectPath` 無しは 400。同じパスは同じ `projectId`、新規は採番して登録。`stats.registrations` に積み `__control/stats` で返す）。`stroke-exit.spec.ts` に D6 の (a)(b) を足す
@@ -119,6 +119,11 @@ issue-tracker「更新対応」により、差分をユーザーへ示し承認�
 | `docs/specs/mcp/tools.md` | 本家 MCP の配線に触れる記述があれば外す（着手時に grep で確かめる） |
 
 `CONTEXT.md` の「生成中」の「`.spec-workflow/` が出来ただけでは終わらない——それは本家が接続した瞬間にできる」は、契機が変わるので「それは生成の依頼を本家が受理したときにできる」に改める（用語集の説明文。承認を得てから）。ADR-0006「プロジェクトを新規に作る機能は本家に無い」は事実として正しいまま（登録であって新規作成ではない）なので触らない。ADR-0011（archive 済み）は触らない。
+
+**確定（2026-09-08、ユーザー承認）。** 上の表のうち採ったのは「変更後に事実と食い違う記述の訂正」と「endpoint の目録」だけである。
+
+- 書いた: `overview.md`（P2 の行）、`projects/generate.md`（新規・短い1枚）、`settings-reference.md`（本家 MCP を並べると書いた3箇所）、`session-workflow.md`（「設定を2つ使う」→ `upstreamBaseUrl` の1つ）、`portal-stroke-exit.md` 23行目と `CONTEXT.md`「生成中」の「本家 MCP が接続した瞬間にできる」の句
+- 却下: `contract.md` への追記、`portal-stroke-exit.md` の mermaid と「設定に足すもの」の書き換え、`session-workflow.md` の配線の表への行追加、`settings-reference.md` の図の注記——ユーザー指示「修正を過大に誇張するな。最小限の修正案に出し直せ」。いずれも記述を足す・言い換えるだけで、事実と食い違う記述の訂正ではない
 
 ## Risks / Trade-offs
 
