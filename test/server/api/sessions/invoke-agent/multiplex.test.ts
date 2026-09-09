@@ -6,11 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeEvent, stubNitroGlobals, type FakeEvent } from '../../support';
 
 /**
-<<<<<<<< HEAD:test/server/api/strokes/invoke-agent/multiplex.test.ts
- * 対象は `server/api/strokes/[id]/invoke-agent/index.get.ts`（U13）。ここだけは
-========
  * 対象は `server/api/sessions/[id]/invoke-agent/index.get.ts`（U13）。ここだけは
->>>>>>>> 426ccf1a895dcf35c52c947dee547f82f0357425:test/server/api/sessions/invoke-agent/multiplex.test.ts
  * `server/utils/stroke/running.ts` を実物のまま使い、`fix-rename-during-running-session`
  * の核心——**同じ物理ディレクトリに対し、異なる id で二重起動が通らないこと**
  * （openspec/specs/api/session/invoke-agent「昇格の前後で同じディレクトリに起動が
@@ -51,11 +47,7 @@ function eventWithQuery(id: string, query: Record<string, string> = {}): QueryEv
 
 vi.stubGlobal('getQuery', (event: QueryEvent) => event.query);
 
-<<<<<<<< HEAD:test/server/api/strokes/invoke-agent/multiplex.test.ts
-const { default: invokeAgentHandler } = await import('../../../../../server/api/strokes/[id]/invoke-agent/index.get');
-========
 const { default: invokeAgentHandler } = await import('../../../../../server/api/sessions/[id]/invoke-agent/index.get');
->>>>>>>> 426ccf1a895dcf35c52c947dee547f82f0357425:test/server/api/sessions/invoke-agent/multiplex.test.ts
 
 let dir: string;
 
