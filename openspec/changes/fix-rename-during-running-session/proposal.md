@@ -4,40 +4,36 @@
 
 改名を行う endpoint は U14（`POST /api/sessions/:id/promote`）である。起票した 2026-08-31 の時点では承認（U10）が判断の記録から改名・起動までを一度に行っていたが、その後 develop で承認が3段（U10 判断の記録 / U14 昇格 / U13 起動）に分割され、改名は U14 へ移った。
 
-### 起票後に分かったこと（2026-09-08〜09）
+### 根本原因: 責務境界（2026-09-09 ユーザー指摘）
 
-サーバ側のガードは既に入っている。`c086907e`（2026-09-01）で busy ガードのキーを作業場所ディレクトリの実体（`stat` の `dev`/`ino`）へ変え、改名する段が `beginRun` で lock を取り、実行中なら 409 busy で何も変えずに返す。docs（`docs/specs/api/sessions/promote.md`「実行中は受理しない」）も規定済みで、`openspec/specs/` だけが追従していない。
+**proposal を提出する endpoint（A7）が、提出の記録だけでなく phase の切り替え（`stroking` → `proposed`）と画面への配信（W2）まで持っている。** 問いを提出する endpoint（A5）も同じく、記録と同時に W1 へ配信する。
 
-**しかし、これは症状の入口を塞いでいない。** 画面2 が「AI が動いている」と知るのは、**自分が起動した実行だけ**である（差し戻し → `sendingBack`、問い返しの回答 → `followupWaiting`。どちらもメモリ上の `pendingAction`）。画面が知らない実行が走っている間、承認ボタンは有効なまま押せる。
+phase `proposed` は「proposal が承認を待っている」局面であり、画面2 はこの phase で承認の操作を出す。ところが A7 は claude のプロセスがまだ走っている最中に呼ばれる——claude は提出の後も終了処理（残りの出力・実行の記録）を続ける。**endpoint が phase を切り替えるため、実行が終わる前に承認できる局面が立つ。** 承認 → 昇格 → 改名が走っている claude の下で起こるのはこのためである。
 
-| 承認できる状態なのに AI が走っている場面 | なぜ画面が知らないか |
-|---|---|
-| proposal が届いた直後に承認する | proposal は A7 受理の瞬間に W2 で届くが、claude のプロセスはその後もしばらく生きている（終了処理——残りの出力と実行の記録）。起票の出どころ（`check:stroke` が承認の手前で実行の終わりを待って避けていた）はこれ |
-| 差し戻し中にリロードする | `pendingAction` が消え、承認ボタンが有効に戻る |
-| 巡回が再起動している | 前の実行が `failed` に倒れ、60 秒後に巡回が U13 を叩いて走らせている |
-| 別タブ／別ブラウザ | 一方で差し戻し、他方で承認 |
+claude のプロセスを制御しているのは invokeAi である。実行がいつ終わったかを知るのは invokeAi だけであり（`agent/invocation`「完了は output stream で検知して idle に変える」）、steering の完成の記録（U15）は既に invokeAi が実行の完了時に行っている。**実行の決着——その実行で何が提出されたかに応じて phase を切り替え、画面へ配信すること——は invokeAi の責務であって、提出を受ける endpoint の責務ではない。** endpoint の責務は提出を記録することだけである。
 
-いずれも「画面が実行中を表示できていないのに、サーバは実行中」という状態で承認を押す形である。この状態が**存在すること自体が設計の欠陥**である。押してから 409 busy で断られる形は、ユーザーには「作れなかった」としか見えない（承認画面は 409 busy を汎用の失敗に落としている。ADR 0022「応答の握りつぶしは、いかなる者にも許されない」に当たる）。
+### これまでの対処が入口を塞げなかった理由
 
-**さらに、「実行中だから受理しない（409 busy）」という応答そのものを契約から無くす**（ユーザー指示 2026-09-09）。実行中は断る理由ではなく、順番を待つ理由である。busy を返す限り、呼び手は「待って出し直す」責務を負い、その責務の取りこぼし（`useWaitingRetry` の `pendingRun`・巡回と画面の二重キック・承認画面の握りつぶし）が繰り返し欠陥になってきた。
+サーバ側の busy ガード（`c086907e`、2026-09-01。キーは作業場所の実体 `dev`/`ino`、U14 が `beginRun` で lock を取り、実行中なら 409 busy）は、承認できる局面が実行中に立つことを前提にしたまま、後ろで受け止めているだけである。画面は busy を汎用の失敗に落としており（ADR 0022「応答の握りつぶしは、いかなる者にも許されない」に当たる）、「待って出し直す」責務が呼び手に散って `useWaitingRetry` の `pendingRun`・巡回と画面の二重キックのような取りこぼしを繰り返してきた。
 
-**直すべきは2つ。** (1) 承認できる状態と実行中が同時に存在しないこと——画面が自分の行動で待機に入るのではなく、サーバの実行の記録（`invocation`）から可否を導く。そのために `invocation` の変化を push で届ける。(2) それでも同じ対象へ実行と両立しない操作（起動・昇格・削除）が実行中に届いたら、断らずに**予約**し、実行の終わりにサーバが行う。busy という応答は消える。
+決着が invokeAi に移れば、phase `proposed` は実行が終わった後にしか立たず、承認できる局面と実行中は同時に存在しない。**409 busy は到達不能になるので、契約から消す**（ユーザー指示 2026-09-09）。リロード・複数タブ・サーバの再起動は後始末の問題であり、本 change では扱わない。
 
-出どころ: `provide-operations-via-mcp` の santa-method レビュー 9周目（2026-08-31）。同 change の範囲外として記録していたが、範囲外の扱いは不正だった（ユーザー指摘 2026-09-01）ので change を立てた。2026-09-09 に「409 で逃げず、発生し得ない設計にする」「409 busy を無くす」（ユーザー指示）へ方向を改めた。
+出どころ: `provide-operations-via-mcp` の santa-method レビュー 9周目（2026-08-31）。同 change の範囲外として記録していたが、範囲外の扱いは不正だった（ユーザー指摘 2026-09-01）ので change を立てた。2026-09-09 に「409 で逃げず、発生し得ない設計にする」「409 busy を無くす」「根本原因は責務境界」（ユーザー指示・指摘）へ方向を改めた。
 
 ## What Changes
 
-- **変更（設計の本体 1）: 承認・削除の操作は、サーバの実行の記録が平常（`idle`）のときにだけ存在する。** 画面2 は `invocation` を自分の行動からではなくサーバの事実として受け取り、`idle` 以外の間は操作を出さず、AI が作業中であることを示す
-- **変更: `invocation` の変化を、そのセッションを見ている画面へ push する。** セッション向けの WS 配信（W1・W2）にメッセージの種別 `invocation` を足す（`ws/delivery`「新しい種類の出来事のために配信の口を増やさない」）。A8 が書いた直後に配信し、接続の瞬間にも現在分を配信する
-- **変更（設計の本体 2）: 「実行中だから受理しない」（409 busy）を契約から無くす。** 実行と両立しない操作（起動 U13・昇格 U14・セッション削除 U11・プロジェクト削除 P1）が実行中に届いたら、断らずに**予約**として受理し、実行の終わりにサーバが行う。予約は対象ごと・種類ごとに1件。昇格・削除が予約されていれば起動の予約は捨てる。判定の単位は作業場所の物理ディレクトリ
-- 変更: 承認後の steering の起動は巡回だけが行う。画面のキック（`kickSteering`）を外す——画面と巡回の二重要求が、予約の下では二重の実行になるため。U14 は起動の段へ引き渡した直後に巡回を1回走らせ、待ち時間を作らない
-- 変更: `useWaitingRetry` の busy 後の再送（`pendingRun`・`BUSY_RETRIES`）を消す。予約がサーバへ移る
+- **変更（根本）: 提出の endpoint（A5 問い・A7 proposal）は記録だけを行う。** phase を切り替えず、画面へ配信しない
+- **変更（根本）: 実行の決着は invokeAi が実行の完了時に行う。** その実行で提出されたもの——問いなら W1 へ配信、proposal なら phase を `proposed` に切り替えて W2 へ配信——を、`invocation` を `idle` にする前に行う。steering の完成の記録（U15）と同型
+- 変更: 画面2 の承認の操作は phase `proposed` で出す（現状どおり）。phase `proposed` は決着でしか立たないので、実行中に承認の操作は存在しない
+- **変更: 「実行中だから受理しない」（409 busy）を契約から無くす。** 起動（U13）は冪等——対象が既に走っていれば要求は満たされており、受理して何もしない。昇格（U14）・セッション削除（U11）・プロジェクト削除（P1）に実行中の要求が届く経路は無く、届いたら欠陥として失敗を返す（握りつぶさない）
+- 変更: `useWaitingRetry` の busy 後の再送（`pendingRun`・`BUSY_RETRIES`）を消す。到達しない
 - 変更: 承認画面が昇格の失敗理由を握りつぶさない（ADR 0022）
-- 作り直し: design.md（`running.test.ts` が参照する D2 の宛先）と tasks.md
+- 作り直し: design.md（`running.test.ts` が「D2」として参照する Decision 2 の宛先）と tasks.md
 
 ### 他の change との関係
 
-- `replace-polling-with-push` は「失敗（`failed`）だけを W3 で push し、`useWaitingRetry` のポーリングを撤去する」を本題にしている。本 change の `invocation` 種別は `failed` を含む全遷移を運ぶので、**W3 はこれに吸収される**。ポーリングの撤去はあちらの本題として残す。あちらの proposal の改訂が要る（ユーザー判断）
+- `replace-polling-with-push`（`useWaitingRetry` のポーリングを push へ）: 本 change は `useWaitingRetry` から busy 後の再送を消す。あちらはポーリングの撤去。同じファイルに触るので順序を決める必要がある（ユーザー判断）
+- `api/stroke/proposal`・`api/stroke/submission` の spec は「正として扱わない」と注記されている（ADR 0019。ユーザーが承認したのは「提出は `submission` へ寄せ、A7 は無くなる」形）。本 change の規定は「提出を受ける endpoint は記録だけ」であり、endpoint の path が A7 でも `submission` でも同じに当てはまる
 
 ## Capabilities
 
@@ -47,24 +43,25 @@
 
 ### Modified Capabilities
 
-- `stroke/frontier`: 承認・削除の操作はサーバの実行の記録が `idle` のときにだけ存在する。承認後の起動を画面が要求しない。失敗理由を握りつぶさない
-- `api/session/ws`: セッション向けの配信（W1・W2）に `invocation` の変化を運ぶ種別を加える
-- `api/session/invoke-agent`: 実行中の起動要求は断らず予約する。単位は作業場所の物理ディレクトリ。busy を持たない
-- `api/session/promote`: 実行中の昇格は予約し、実行の終わりに行う。busy を持たない
-- `api/session/delete`: 実行中の削除は予約し、実行の終わりに行う（busy の Requirement を REMOVED）
-- `api/project/delete`: 同上
+- `agent/invocation`: 実行の決着（提出されたものに応じた phase の切り替えと配信）は invokeAi が完了時に行う
+- `api/stroke/question`: A5 は問いを記録するだけ。配信しない
+- `api/stroke/proposal`: A7 は proposal を記録するだけ。phase を切り替えず、配信しない
+- `api/session/ws`: W1・W2 の配信の時点を「提出の受理」から「その提出を行った実行の決着」へ
+- `stroke/frontier`: 承認の操作は実行の決着の後にしか存在しない。失敗理由を握りつぶさない
+- `api/session/invoke-agent`: 起動は冪等。busy を持たない
+- `api/session/promote`: 昇格は実行の決着の後にしか要求されない。busy を持たない
+- `api/session/delete`・`api/project/delete`: busy の Requirement を REMOVED。削除は実行の決着の後にしか要求されない
 
 ## Impact
 
-- `app/composables/useProposalReview.ts` — 承認・削除の可否を `invocation` から導く。`kickSteering` を外す。`promote()` の失敗理由を握りつぶさない
+- `server/utils/stroke/ai.ts`（`invokeAi`）— 完了時の決着。提出されたものを起動 token 単位で読み、phase の切り替えと W1/W2 の配信を `idle` の前に行う
+- `server/api/strokes/[id]/question.post.ts`・`proposal.post.ts` — 記録だけに絞る。phase の書き込みと `publish` を外す
+- `server/utils/stroke/submission-signal.ts` — 提出の内容（問い／proposal）を起動 token 単位で持つ
+- `server/routes/api/strokes/[id]/ws/{question,proposal}.ts` — 接続時配信は現状どおり（記録を読む）
+- `server/utils/stroke/running.ts`・`conflict.ts` — `busy` を消す。U13 は実行中なら受理して何もしない。直列化のキー（Decision 2）は残す
+- `server/api/strokes/[id]/invoke-agent.get.ts`・`promote.post.ts`・`server/api/sessions/[id]/index.delete.ts`・`server/api/projects/[projectId]/index.delete.ts` — 409 busy を外す
+- `app/composables/useProposalReview.ts` — `promote()` の失敗理由を握りつぶさない
 - `app/composables/useWaitingRetry.ts` — `pendingRun`・`BUSY_RETRIES` を消す
-- `app/pages/strokes/[sessionId]/proposal.vue` — `invocation !== 'idle'` の間、承認・削除の操作を出さず作業中を示す
-- `server/utils/stroke/running.ts` — `beginRun`/`isRunning` を「実行中なら予約、平常なら即時」の直列化に置き換える。キーは D2 のまま。`conflict.ts` から `busy` を消す
-- `server/utils/stroke/session-store.ts`（`writeInvocation`）— 書いた直後にセッション向け配信へ publish。`idle` を書いた直後に予約を消化する
-- `server/api/strokes/[id]/invoke-agent.get.ts`・`promote.post.ts`・`server/api/sessions/[id]/index.delete.ts`・`server/api/projects/[projectId]/index.delete.ts` — 実行中なら予約して 202
-- `server/routes/api/strokes/[id]/ws/{question,proposal}.ts` — 接続時に `invocation` の現在分も配信
-- `shared/stroke.ts` — W1/W2 のメッセージ型に `invocation` 種別を足す
-- `server/plugins/01.retry-failed.ts` — 巡回を外から1回走らせる入口
-- docs（design で提案し、承認後に直す）: `docs/specs/api/contract.md`（「約束」の 409 busy 行 → 202 予約、W1/W2 のメッセージ）、`docs/specs/api/sessions/{invoke-agent,promote,delete}.md`・`docs/specs/api/projects/delete.md`（エラー表から busy を消す）、`docs/specs/api/sessions/activate.md`（「busy を見ない」の表現）
+- docs（design で提案し、承認後に直す）: `docs/specs/api/contract.md`（A5/A7 の順序「残す → phase → W2」→「残すだけ」、W1/W2 の配信の時点、「約束」の 409 busy 行）、`docs/specs/api/sessions/{invoke-agent,promote,delete}.md`・`docs/specs/api/projects/delete.md`（エラー表から busy を消す）、`docs/specs/api/sessions/activate.md`（「busy を見ない」の表現）、`docs/specs/architecture/question-flow.md`（phase=proposed と配信の時点）
 - `docs/adr/0022-no-one-swallows-a-response.md` — この change の design で提案し、2026-09-09 に承認を得て登録した ADR
-- MCP ツールの契約は変えない。W1/W2 は種別が増えるだけで endpoint は増えない
+- MCP ツールの契約は変えない。W1/W2 のメッセージの形も変えない——変わるのは配信の時点だけ

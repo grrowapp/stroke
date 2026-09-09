@@ -1,89 +1,76 @@
 ## Context
 
-動機は proposal.md「Why」。ここでは形を決めるのに要る現状だけを置く。
+動機と根本原因は proposal.md「Why」。ここでは形を決めるのに要る現状だけを置く。
 
-- 実行の記録 `invocation` は `state.json` にあり、書き込みは A8（`writeInvocation`）の1箇所。画面へは push されておらず、`useWaitingRetry` が**自分が起動した待機の間だけ** U2 を3秒おきに読む。busy（409）を受けたら `pendingRun` に覚えて `idle` を見てから出し直す
-- 画面2 の待機は `pendingAction`（差し戻し）と `agentQuestion.waiting`（問い返し）で、どちらもメモリ上。承認ボタンの無効化はこの2つから導いている
-- セッション向けの WS は W1（問い）と W2（proposal）の2本。`ws/delivery` は「同じ相手へ届く出来事が増えても endpoint を増やさず、メッセージの種別で分ける」「接続の瞬間に現在分を配信する」を定める
-- busy を返すのは U13（`beginRun`）・U14（`beginRun`）・U11 と P1（`isRunning`）。キーは作業場所の実体（`dev:ino`）。`running.test.ts` は「design.md D2」を参照している
-- 承認後の steering の初回起動は、画面（`kickSteering`）と巡回（`failed` を拾う）の両方が要求し、片方が busy で落ちる形で1回に収まっている
+- A7（`proposal.post.ts`）は「残す → phase を `proposed` に書く → W2 へ publish」を1つの handler で行う。A5（`question.post.ts`）は「今の1問を書く → W1 へ publish」。どちらも claude のプロセスが走っている最中に呼ばれる
+- invokeAi（`ai.ts`）は子プロセスの output stream で完了を検知し、`didWork`（その実行で提出があったか）を確かめてから `invocation` を `idle`/`failed` に書く。steering では `idle` の前に完成の記録（U15）を叩く——**決着を invokeAi が行う形は既に steering に在る**
+- 提出の記録は `submission-signal.ts` が持つ。ストロークはセッション単位の件数（`submittedSince`）、steering は起動 token 単位（`submittedByLaunch`）
+- busy を返すのは U13（`beginRun`）・U14（`beginRun`）・U11 と P1（`isRunning`）。キーは作業場所の実体（`dev:ino`）。`running.test.ts` は「design.md D2」（本 design の Decision 2）を参照している
+- 画面2 は phase `proposed` で開き、承認の操作を出す。承認ボタンの無効化は差し戻し・問い返しの待機（自分の操作）から導いている
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- 「承認できる状態なのに、対象で AI が走っている」が**存在しない**こと。画面が知らない実行（proposal 直後・リロード・巡回・別タブ）を含めて
-- 「実行中だから受理しない」（409 busy）という応答が**契約に無い**こと。実行中に届いた両立しない操作は、断らずに順番を待つ
+- 提出を受ける endpoint の責務を「記録」に限り、実行の決着（phase の切り替え・配信）を invokeAi に置くこと
+- phase `proposed` が実行の終わりにしか立たないこと。承認できる局面と実行中が同時に存在しないこと
+- 「実行中だから受理しない」（409 busy）が契約に無いこと
 - 同じ対象で2つの呼び出しが同時に走らないこと（これは変えない）
 
 **Non-Goals:**
 
-- `useWaitingRetry` のポーリング撤去（`replace-polling-with-push` の本題）。本 change は push を足し、busy 後の再送を消すところまで
-- 画面1（ストローク中）の回答操作に同じ可否の原則を通すこと。回答は受理系で実行中でも受理される（`contract.md`「受理と起動は別」）ので、起動の予約で足りる
-- 差し戻し・問い返しの待機表示の統廃合
+- リロード・複数タブ・サーバの再起動に由来する状態の扱い（後始末の問題。別に扱う）
+- `useWaitingRetry` のポーリング撤去（`replace-polling-with-push` の本題）
+- A7 を `submission` へ寄せること（ADR 0019 で言及される未確定事項。本 change は path を問わない規定にする）
 
 ## Decisions
 
-### D1. 承認・削除の可否はサーバの `invocation` から導く。画面の行動からは導かない
+### Decision 1: 提出の endpoint は記録だけ。実行の決着は invokeAi が完了時に行う
 
-画面2 は `phase === 'proposed' && invocation === 'idle'` のときだけ承認・削除の操作を出す。`running`・`failed`・`error` では出さず、AI が作業中であることを示す。
+A5/A7 は提出を記録して受理を返す。phase を書かず、publish しない。invokeAi は完了を検知し、`didWork` を確かめた後、`idle` を書く前に**決着**する。
 
-- `failed` も出さない。`failed` は「retry 対象」の印で、巡回が 60 秒以内に再び走らせる
-- `error` は既存の規定（再実行／削除）に委ねる
+- 決着の内容は、その実行で提出されたものから導く。問い → W1 へ配信（phase は変えない）。proposal → phase `proposed` を書き、W2 へ配信
+- 何が提出されたかは、起動 token 単位で記録する（`submission-signal.ts`。steering の `submittedByLaunch` と同型）。A5/A7 が受理時に token に紐づけて記録し、invokeAi が完了時に読む。件数（`submittedSince`）はこれで置き換わる
+- 決着は steering の完成の記録（U15）と同じ位置——`runBuiltInvocation` の、`didWork` を確かめた後・`idle` を書く前——に置く。用途の違いは渡す関数の違いだけで表す（`agent/invocation`「起動処理は呼び出し元を区別しない」）。`buildRun` がストロークの起動に `settle`（決着）を渡し、steering には `recordCompletion` を渡す
+- 決着の書き込みも endpoint を通す（`agent/invocation`「書き込みは endpoint を通してのみ」の原則。U15 と同じ）。phase を `proposed` に書く endpoint を1つ持ち、invokeAi だけが叩く。ADR-0014 に反しない——invokeAi は「この実行で proposal が提出された」を自分の記録から知っており、endpoint に判断させない
+- 決着の前に実行が失敗した（タイムアウト・異常終了）ときは決着しない。提出は記録として残るが phase は変わらない。**失敗した実行の扱いは既存の規定のままである**（`agent/invocation`「失敗はサーバ側でリトライし、ユーザーに見せない」「リトライ上限に達したら error に変える」）——巡回が起こし直し、上限に達したら `error` として画面がユーザーへ引き渡す。決着が加わってもこの経路は変わらない
 
-代替: 「押した瞬間に U2 を読んで確認する」——押した時点と昇格の時点の間に隙間が残る。源を1つにする方が単純で、隙間も無い。
+代替: 「A7 は記録し、phase の切り替えだけ invokeAi へ」（配信は A7 に残す）——配信された proposal を画面が表示するのに phase が `stroking` のままでは、画面1 が画面2 へ送る条件（phase）と配信（W2）が食い違う。配信も決着に含める方が単純。
 
-代替: 「A7 の受理を実行の終わりまで遅らせる」——proposal を読み始めるのが遅れる。読めて承認だけ待つ方がよい。
+代替: 「A7 の受理を実行の終わりまで遅らせる」——endpoint が実行の終わりを待つことになり、責務がさらに混ざる。
 
-### D2. 直列化のキーは作業場所ディレクトリの実体（`stat` の `dev`/`ino`）
+### Decision 2: 直列化のキーは作業場所ディレクトリの実体（`stat` の `dev`/`ino`）
 
-`running.test.ts` が参照する D2 はこれ。busy を消しても、同じ対象を同じ対象と認識する単位は要る。
+`running.test.ts` が「D2」として参照するのはこれ。busy を消しても、同じ対象を同じ対象と認識する単位は要る（U13 の冪等の判定に使う）。
 
 - id をキーにすると、昇格の改名で uuid → プロジェクト名に変わった瞬間、同じディレクトリが別物になる。inode は改名で変わらない
 - キーの導出（`keyOf`）は1箇所に置く。endpoint ごとに別の導出を持つと、同じディレクトリが endpoint によって別物に見える
 - `stat` に失敗したら投げる。既定値で補って別のキーに落ちる経路を作らない
 - 解放は取得時に返したキーで行う。実行中に改名・削除されても `stat` し直さずに外せる
 
-### D3. `invocation` の変化はセッション向けの WS（W1・W2）にメッセージ種別として載せる
+### Decision 3: 画面2 の承認の可否は phase だけから導く
 
-`ws/delivery` に従い endpoint は増やさない。W1・W2 のメッセージを判別できる形（種別を持つ union）にし、`invocation` の種別を足す。
+phase `proposed` が決着でしか立たない（Decision 1）ので、承認の操作を phase で出す現状の形が正しくなる。`invocation` を画面へ push する必要は無い。差し戻し・問い返しの待機表示（自分の操作から導く）はそのまま——それは「待っていることを示す」ためのもので、承認の可否の根拠ではない。
 
-- 源は `writeInvocation`（A8 の実体）。書き込みが成功した後に publish する
-- 接続時の現在分は W1・W2 の route が `readState` して配信する
-- W1 と W2 の両方に載せる。運ぶ相手は「そのセッションを見ている画面」で同じ
-- 既存の `ProposalMessage` / `Question` の形が変わる（`docs/specs/api/contract.md` の W1/W2）。**docs の改訂はユーザー承認を経て行う**
+### Decision 4: 409 busy を契約から消す。U13 は冪等
 
-代替: 新しい endpoint W3——`ws/delivery` に反する。代替: 常時ポーリング——push の原則に反する。
+- U13: 対象が実行中なら、要求は満たされているものとして受理し、新しい呼び出しを開始しない（200）。画面が起動を要求できる局面（回答・差し戻し・承認後）はすべて前の実行の決着の後なので、実行中の対象に**新しい**実行を求める要求は存在しない。届くのは同じ意図の重複（承認後の画面のキックと巡回のキック）だけ
+- U14・U11・P1: 実行中に届く経路が無い。`isRunning` の分岐と `busy` を外す。届いたら（後始末の問題に由来する状態）、内部の直列化が取れないことを欠陥として失敗で返し、握りつぶさない（ADR 0022）。409 `busy` という理由は持たない
+- `conflict.ts` の `ConflictReason` から `busy` を消す。`useWaitingRetry` の `pendingRun`・`BUSY_RETRIES` を消す
 
-### D4. 実行と両立しない操作は、実行中なら断らず予約する。busy は無い
+### Decision 5: 決着の書き込みは endpoint を通す
 
-対象（D2 のキー）ごとに、**実行**と**実行と両立しない操作**——起動（U13）・昇格（U14）・セッション削除（U11）・プロジェクト削除（P1）——を直列化する。平常なら即時に行い、実行中なら予約して 202 で受理し、実行の終わり（`writeInvocation` が `idle`/`failed`/`error` を書いた直後）にサーバが行う。
+phase を `proposed` に書く口を invokeAi 専用の endpoint として持つ（A8・U15 と同じ規律）。A7 から phase の書き込みを外した分がここへ移る。W1/W2 の publish は決着の中で行う（U15 が完成の配信を行うのと同じ）。
 
-- 予約は種類ごとに1件。起動は「次の実行を1回」に畳む。昇格・削除が予約されていれば起動の予約は捨てる（対象が変わる／消える）。消化の順は 削除 > 昇格 > 起動
-- 予約の消化は `writeInvocation` の直後、publish と同じ場所で行う。書き手は1つ（A8）なので、消化の入口も1つになる
-- 予約はメモリ上に置く。単一プロセスの MVP で足りる（今の `running` の `Set` と同じ前提）。プロセスの再起動で予約は消えるが、そのとき実行も死んでいる（`01.reap-running.ts` が `failed` に倒す）ので、画面が U2 を読み直して出し直せる状態に戻る
-- 予約された昇格が失敗したら、即時の昇格の失敗と同じ状態（元の名前・`proposed`・判断つき）で残す。応答する相手は既に居ないので、状態だけが残る（Risks）
-- `conflict.ts` の `ConflictReason` から `busy` を消す。`beginRun` が投げる 409 は消え、`running.ts` は「取れたら即時、取れなければ予約」を返す
+代替: invokeAi が `writeState` を直接呼ぶ——書き込み口が2つになり「endpoint を通してのみ」が崩れる。
 
-なぜ予約か——実行中の対象に届く両立しない操作は、(a) 断る、(b) 待たせる（HTTP を保持する）、(c) 予約する、(d) 実行を止める、のどれかで決着する。(a) は busy であり無くす対象。(b) は実行が分単位なので不可。(d) は別の画面が始めた差し戻しを黙って捨てることになる。残るのは (c) で、何も失わない。
+### Decision 6: 承認画面は失敗の理由を握りつぶさない（ADR 0022）
 
-D1 により、1つの画面からは実行中に承認・削除が出ないので、予約に落ちるのは別々の画面が同時に操作した場合だけである。それでも予約が要るのは、その場合に「断る」以外の決着を持つためである。
+`promote()` の失敗は理由ごとに分ける。`name-conflict` は名前の入れ直し、500 は昇格のやり直し／破棄。それ以外はサーバの文言をそのまま失敗に出す。busy は無い。
 
-### D5. 起動の要求元を1つにする。承認後の steering は巡回だけが起動する
+### Decision 7: `ui` artifact は作らない
 
-予約の下では、画面のキックと巡回のキックが両方届くと次の実行が2回になる（1回目は即時、2回目は予約）。2回目の steering は何も提出せずに終わって `failed` に倒れ、巡回が再び走らせる——無駄な実行が連なる。
-
-- 画面の `kickSteering` を外す。U14 は起動の段へ引き渡し（`invocation: failed`）、その直後に巡回を1回走らせる。待ち時間は無い。`portal/batch`「巡回は `failed` だけを拾う」は変えない——走らせる回数を増やすだけ
-- 差し戻し・回答の後の起動は、画面が1回だけ要求する。実行中（終了処理の途中）なら予約に落ち、実行の終わりに走る。`useWaitingRetry` の `pendingRun`・`BUSY_RETRIES` は不要になる
-- 巡回は `failed` の対象を拾う。その対象が既に走っていれば（画面が先に出し直した等）、巡回の要求は予約に落ちて、実行の終わりにもう1回走らせてしまう——ので、**巡回は `running` の対象を拾わない**（既存どおり `failed` だけ）うえ、**巡回の要求は予約に落ちたら捨てる**（巡回の意図は「止まっている対象を動かす」であり、動いていれば満たされている）。U13 に「予約しない」を示す引数は持たせない——巡回が内部から呼ぶ入口で区別する
-
-### D6. 承認画面は失敗の理由を握りつぶさない（ADR 0022）
-
-`promote()` の失敗は理由ごとに分ける。`name-conflict` は名前の入れ直し、500 は昇格のやり直し／破棄。202（予約）は成功と同じに扱い一覧へ戻る。busy は無い。
-
-### D7. `ui` artifact は作らない
-
-画面の変更は「操作が出ない間、AI が作業中であることを示す」だけで、既存の待機の部品（`WaitingIndicator`・opacity を下げた固定バー）で足りる。見比べて選ぶ設計問題が無い。
+画面の見た目は変わらない。画面2 が開く時点が実行の終わりへ動くだけで、部品は既存のまま。
 
 ## docs・ADR への反映
 
@@ -91,41 +78,39 @@ D1 により、1つの画面からは実行中に承認・削除が出ないの�
 
 ### ADR — 承認・登録済み
 
-`docs/adr/0022-no-one-swallows-a-response.md`「応答の握りつぶしは、いかなる者にも許されない」。本 design で提案し、2026-09-09 に承認を得て登録した。D6 の根拠。
+`docs/adr/0022-no-one-swallows-a-response.md`「応答の握りつぶしは、いかなる者にも許されない」。本 design で提案し、2026-09-09 に承認を得て登録した。Decision 6 の根拠。
 
 ### docs — 提案中（承認待ち）
 
 | docs | 直す内容 |
 |---|---|
-| `docs/specs/api/contract.md`「約束」 | `409 busy`（待てば通る）の行を消し、`202`（予約。実行の終わりにサーバが行う。呼び手は出し直さない）の行を足す。「受理と起動は別」「多重起動を止めるのは起動側」は、起動側が止めるのではなく予約する形へ |
-| `docs/specs/api/contract.md` W1/W2 | メッセージが種別を持つ union になり、`invocation` の種別が加わること |
-| `docs/specs/api/contract.md` U13 | 「1回の要求 = 1回の実行。実行中なら次の1回として予約」 |
-| `docs/specs/api/sessions/invoke-agent.md` | エラー表から 409 busy を消し、202 予約を足す |
-| `docs/specs/api/sessions/promote.md` | 「実行中は受理しない」→「実行中は予約し、実行の終わりに昇格する」。エラー表から busy を消す。「占有は…直後に解く」→ 起動の段への引き渡しの後 |
-| `docs/specs/api/sessions/delete.md`・`docs/specs/api/projects/delete.md` | エラー表から 409 busy を消し、202 予約を足す |
-| `docs/specs/api/sessions/activate.md` | 「busy を見ない」→「実行中でも予約に落ちず即時に記録する」の表現へ |
+| `docs/specs/api/contract.md` A5 | 記録だけ。配信は実行の決着で行われる |
+| `docs/specs/api/contract.md` A7 | 「順序は『残す → phase を進める → W2 配信』」→「残すだけ。phase と配信は実行の決着で行われる」 |
+| `docs/specs/api/contract.md` W1/W2 | 配信タイミング「A5/A7 の受理」→「その提出を行った実行の決着」 |
+| `docs/specs/api/contract.md`「約束」 | `409 busy` の行を消す。「多重起動を止めるのは起動側」→「起動は冪等。実行中の対象への要求は満たされている」 |
+| `docs/specs/api/contract.md` U13 | 冪等であること |
+| `docs/specs/api/sessions/invoke-agent.md`・`promote.md`・`delete.md`、`docs/specs/api/projects/delete.md` | エラー表から 409 busy を消す。`promote.md`「実行中は受理しない」の節を「昇格は実行の決着の後にしか要求されない」へ |
+| `docs/specs/api/sessions/activate.md` | 「busy を見ない」の表現を、U15 が実行中に叩かれる前提の説明へ |
+| `docs/specs/architecture/question-flow.md` | 図の「A7 で phase=proposed」→「実行の決着で phase=proposed」。「提出時配信」→「決着時配信」 |
 
-D3・D4・D5 はこの改訂を前提にしている。承認を得てから docs を直し、tasks へ進む。
+Decision 1・4・5 はこの改訂を前提にしている。承認を得てから docs を直し、tasks へ進む。
 
 ## Risks / Trade-offs
 
-- [W1/W2 のメッセージ形が変わる] → 既存の受け手（`useAgentQuestion`・`useProposalReview`・E2E の WS stub）を同じ change で揃える。2種類の形を同時に抱えない
-- [予約された昇格・削除が失敗しても、応答する相手が居ない] → 状態は即時の失敗と同じ（`proposed`・判断つき／消えていない）で残る。画面2 を開き直せば分かる。到達するのは別々の画面の同時操作だけ
-- [`replace-polling-with-push` との重複] → W3 は本 change の種別で吸収。ポーリング撤去はあちらに残す。`pendingRun` を消すのは本 change
-- [`idle` が届く前に画面が承認を出す実装漏れ] → 可否を `computed` 1つに閉じ、源を `invocation` の ref だけにする。E2E で「proposal 到着 → `running` のまま → 承認なし → `idle` → 承認あり」を固定する
-- [予約の消化と publish の順序] → `writeInvocation` の中で「書く → publish → 予約を消化」。消化が新しい実行を始めれば、その `running` はまた publish される
-- [巡回の要求が予約に落ちて二重になる] → D5。巡回の要求は予約しない
-- [予約がメモリ上で、再起動で消える] → 実行も同時に死んでいる。`01.reap-running.ts` が `failed` へ倒し、画面は U2 の読み直しで出し直せる
+- [決着の endpoint を invokeAi 以外が叩ける] → A8・U15 と同じ規律で、規定と docblock で禁じる。認可の仕組みは持たない（既存と同じ）
+- [W1/W2 の配信が実行の終わりまで遅れる] → claude の終了処理の分（数秒〜十数秒）だけ画面に届くのが遅れる。承認できる局面が正しい時点に揃う代償として受け入れる
+- [`replace-polling-with-push` と `useWaitingRetry` で衝突] → 本 change は `pendingRun`・`BUSY_RETRIES` の削除だけ。順序はユーザー判断
+- [U13 が冪等になることで、正当な「次の実行」の要求が捨てられる] → 正当な次の実行の要求は決着の後にしか出ない（Decision 4）。E2E で「問いの提出 → 決着前は回答の操作が無い → 決着 → 回答 → 起動」を固定する
 
 ## Migration Plan
 
-1. サーバ: `writeInvocation` の publish と予約の消化、W1/W2 の接続時配信、メッセージ型の種別化
-2. サーバ: `running.ts` を直列化＋予約へ。U13・U14・U11・P1 を「即時か 202」へ。`conflict.ts` から `busy` を消す
-3. U14: 引き渡し直後の巡回1回。巡回の要求は予約しない
-4. 画面: 受け手を種別で分岐、承認・削除の可否を `invocation` から導く、`kickSteering` と `pendingRun` を消す、失敗理由の分岐
+1. サーバ: `submission-signal.ts` を起動 token 単位の内容付き記録へ。A5/A7 を記録だけに
+2. サーバ: 決着の endpoint と、invokeAi の完了時の決着（`buildRun` が渡す `settle`）
+3. サーバ: `busy` を消す。U13 を冪等に。U14・U11・P1 の `isRunning` 分岐を外す
+4. 画面: `useWaitingRetry` の `pendingRun`・`BUSY_RETRIES` を消す。`promote()` の失敗理由の分岐
 5. docs の反映（承認後）
 
-ロールバックは change 単位。W1/W2 の形と 409/202 が変わるので、サーバと画面を別々に戻さない。
+ロールバックは change 単位。A7 の責務と W2 の配信時点が同時に変わるので、サーバと画面を別々に戻さない。
 
 ## Open Questions
 

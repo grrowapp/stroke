@@ -34,7 +34,7 @@ base2/
 
 - **コンポーネント**: PascalCase（`NotificationTable.vue`、`ProjectRow.vue`）
 - **composable**: `use` で始まる camelCase（`useNotifications.ts`）
-- **server の API ルート**: Nitro の規約に従う（`projects.get.ts`、`projects.post.ts`）
+- **server の API ルート**: Nitro の規約に従う（`projects/index.get.ts`、`projects/index.post.ts`）
 - **テスト**: 対象と同じ名前に `.test.ts` を付ける（`diff.test.ts`）
 
 ### Code

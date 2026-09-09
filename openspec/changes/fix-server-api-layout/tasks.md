@@ -18,36 +18,36 @@
 
 - [x] 3.1 子 change `fix-promote-name-conflict-withdrawal` と ticket を同時起票する（`origin: agent`、経緯＝親と Gitea #11、畳む方向）。Gitea #11 に change-id をコメント
 - [x] 3.2 worktree `/home/vagrant/work/stroke-board/fix-promote-name-conflict-withdrawal` をブランチ同名（base `pre3`）で切り、sparse checkout を揃える
-- [ ] 3.3 opus サブエージェントで ff。specs の delta（`api/session/promote`・`project/generation`）が issue のとおりか親が確認する
-- [ ] 3.4 opus サブエージェントで apply（`promote.post.ts`・テスト・`useProposalReview.ts` の補いの除去）
-- [ ] 3.5 親が worktree で `yarn test`・`yarn typecheck` を通し、Gitea #11 の完了条件（衝突後に `decision` が無い）を照合
-- [ ] 3.6 PR（base `pre3`）を出してマージし、`pre3` を ff で更新、worktree を消す
-- [ ] 3.7 子 change を archive（ticket → `.archive/`）。`openspec validate --all`。Gitea #11 をクローズ
+- [x] 3.3 opus サブエージェントで ff。specs の delta（`api/session/promote`・`project/generation`）が issue のとおりか親が確認する
+- [x] 3.4 opus サブエージェントで apply（`promote.post.ts`・テスト・`useProposalReview.ts` の補いの除去）
+- [x] 3.5 親が worktree で `yarn test`・`yarn typecheck` を通し、Gitea #11 の完了条件（衝突後に `decision` が無い）を照合
+- [x] 3.6 PR（base `pre3`）を出してマージし、`pre3` を ff で更新、worktree を消す
+- [x] 3.7 子 change を archive（ticket → `.archive/`）。`openspec validate --all`。Gitea #11 をクローズ
 
 ## 4. Gitea #12 — `fix-project-api-layout`（並走その1）
 
 - [x] 4.1 子 change `fix-project-api-layout` と ticket を同時起票する（`origin: agent`、経緯＝親と Gitea #12）。Gitea #12 に change-id をコメント
 - [x] 4.2 worktree `/home/vagrant/work/stroke-board/fix-project-api-layout` をブランチ同名（base `pre3`）で切り、sparse checkout を揃える
-- [ ] 4.3 opus サブエージェントで ff。`server.md` の置き方の capability（候補 `server/api-layout`）の置き場と Requirement を親が確認する。`spec-screen-flow.md` の書き換え案をユーザーに提示し承認を得る（design.md「docs の書き換え」）
-- [ ] 4.4 opus サブエージェントで apply（handler 9 本の移動・import・テストの写し・capability・docs 1 行）
-- [ ] 4.5 親が worktree で `yarn test`・`yarn typecheck`・`yarn test:e2e` を通し、Gitea #12 の完了条件（`find server/api/projects -type f` がすべて `index.<method>.ts`）を照合
-- [ ] 4.6 PR（base `pre3`）を出してマージし、`pre3` を ff で更新、worktree を消す
-- [ ] 4.7 子 change を archive（ticket → `.archive/`）。`openspec validate --all`。Gitea #12 をクローズ
+- [x] 4.3 opus サブエージェントで ff。`server.md` の置き方の capability（候補 `server/api-layout`）の置き場と Requirement を親が確認する。`spec-screen-flow.md` の書き換え案をユーザーに提示し承認を得る（design.md「docs の書き換え」）
+- [x] 4.4 opus サブエージェントで apply（handler 9 本の移動・import・テストの写し・capability・docs 1 行）
+- [x] 4.5 親が worktree で `yarn test`・`yarn typecheck`・`yarn test:e2e` を通し、Gitea #12 の完了条件（`find server/api/projects -type f` がすべて `index.<method>.ts`）を照合
+- [x] 4.6 PR（base `pre3`）を出してマージし、`pre3` を ff で更新、worktree を消す
+- [x] 4.7 子 change を archive（ticket → `.archive/`）。`openspec validate --all`。Gitea #12 をクローズ
 
 ## 5. Gitea #13 — `fix-session-api-layout`（#11 の後）
 
-- [ ] 5.1 子 change `fix-session-api-layout` と ticket を同時起票する（`origin: agent`、経緯＝親と Gitea #13）。Gitea #13 に change-id をコメント
-- [ ] 5.2 #11 のマージ後の `pre3` から worktree `/home/vagrant/work/stroke-board/fix-session-api-layout` を切り、sparse checkout を揃える
-- [ ] 5.3 opus サブエージェントで ff。capability は #12 のもの（`server/api-layout`）を使い、二重に作らないことを親が確認する
-- [ ] 5.4 opus サブエージェントで apply（handler 13 本の移動・import・テスト 10 本の写し）
-- [ ] 5.5 親が worktree で `yarn test`・`yarn typecheck`・`yarn test:e2e` を通し、Gitea #13 の完了条件（`server/api/strokes`・`sessions` がすべて `index.<method>.ts`、URL 不変）を照合
-- [ ] 5.6 PR（base `pre3`）を出してマージし、`pre3` を ff で更新、worktree を消す
-- [ ] 5.7 子 change を archive（ticket → `.archive/`）。`openspec validate --all`。Gitea #13 をクローズ
+- [x] 5.1 子 change `fix-session-api-layout` と ticket を同時起票する（`origin: agent`、経緯＝親と Gitea #13）。Gitea #13 に change-id をコメント
+- [x] 5.2 #11 のマージ後の `pre3` から worktree `/home/vagrant/work/stroke-board/fix-session-api-layout` を切り、sparse checkout を揃える
+- [x] 5.3 opus サブエージェントで ff。capability は #12 のもの（`server/api-layout`）を使い、二重に作らないことを親が確認する
+- [x] 5.4 opus サブエージェントで apply（handler 13 本の移動・import・テスト 10 本の写し）
+- [x] 5.5 親が worktree で `yarn test`・`yarn typecheck`・`yarn test:e2e` を通し、Gitea #13 の完了条件（`server/api/strokes`・`sessions` がすべて `index.<method>.ts`、URL 不変）を照合
+- [x] 5.6 PR（base `pre3`）を出してマージし、`pre3` を ff で更新、worktree を消す
+- [x] 5.7 子 change を archive（ticket → `.archive/`）。`openspec validate --all`。Gitea #13 をクローズ
 
 ## 6. Gitea #17 — `fix-session-api-namespace`（#13 の後）
 
-- [ ] 6.1 子 change `fix-session-api-namespace` と ticket を同時起票する（`origin: agent`、経緯＝親と Gitea #17、吸収する旧 ticket 2 本）。Gitea #17 に change-id をコメント
-- [ ] 6.2 #13 のマージ後の `pre3` から worktree `/home/vagrant/work/stroke-board/fix-session-api-namespace` を切り、sparse checkout を揃える
+- [x] 6.1 子 change `fix-session-api-namespace` と ticket を同時起票する（`origin: agent`、経緯＝親と Gitea #17、吸収する旧 ticket 2 本）。Gitea #17 に change-id をコメント
+- [x] 6.2 #13 のマージ後の `pre3` から worktree `/home/vagrant/work/stroke-board/fix-session-api-namespace` を切り、sparse checkout を揃える
 - [ ] 6.3 opus サブエージェントで ff。関連 docs 4 ページ（`system-structure.md`・`session-workflow.md`・`settings-reference.md`・`file-composables.md`）の書き換え案をユーザーに提示し承認を得る（design.md「docs の書き換え」）。spec `server/session-management` の delta を親が確認
 - [ ] 6.4 opus サブエージェントで apply（ディレクトリ移動・WS route・`wsPathPattern`・サーバ内参照・画面 8 本・`useAgentQuestion` の基底・テスト・E2E 5 本・`.claude/settings.json`・spec・docs 4 ページ・`useAgentQuestion` 経路のテスト追加）
 - [ ] 6.5 親が worktree で `yarn test`・`yarn typecheck`・`yarn test:e2e` を通し、Gitea #17 の完了条件（`grep -rn "api/strokes" app server shared test .claude` の残りが A 系と MCP tools だけ。問い返しの回答送信が 404 にならない）を照合

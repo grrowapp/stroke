@@ -46,7 +46,7 @@
 子 change の ff（artifact 作成）と apply（実装）は `general-purpose` サブエージェント（model: opus）に委ねる。渡すものは: change-id・Gitea issue 番号と本文・worktree の path・`CLAUDE.md`／`docs/agents/*.md`／`openspec/config.yaml` を読んでから始めること・`docs/specs/api/overview.md` と `server.md` を触らないこと・完了条件（issue の「完了条件」）・PR を出すところまで。
 
 - 2026-09-09 の再分割で「作業量が多い」issue は無くなったので fable は使わない（ユーザーの指摘「作業量が多いものは split が甘い」を受けての再分割）
-- 子 change の tasks.md にも `openspec/config.yaml` のルール（先頭 2・末尾 2・santa-method）が入る。末尾の「ユーザーから完了承認」は、親が PR のマージをもって代行する（親 change の tasks で確認済みとする）。子 ticket の `Wait-for-archive` と archive は親が行う
+- 子 change の tasks.md にも `openspec/config.yaml` のルール（先頭 2・末尾 2・santa-method）が入る。末尾の「ユーザーから完了承認」は不要とユーザーが決めた（2026-09-09「末尾タスクのユーザー承認は不要。お前の確認で進めろ」）。親が完了条件を確かめ、PR のマージをもって代える。子 ticket の `Wait-for-archive` と archive は親が行う
 
 ### PR とマージ — PR は `tea pr create --base pre3`、マージは親が `tea pr merge --style merge`
 

@@ -1,41 +1,67 @@
+## REMOVED Requirements
+
+### Requirement: W1 /api/sessions/:id/ws/question — 今の1問分を配信する
+
+**Reason**: 配信の時点を「問いの提出（A5）の受理」から「その提出を行った実行の決着」へ移す。受理の時点では claude の実行が終わっておらず、回答できる状態がその前に立ってしまう（`agent/invocation`「完了は output stream で検知して idle に変える」）。
+
+**Migration**: endpoint・メッセージの形・接続時配信は変わらない。変わるのは提出時配信の時点だけで、下の ADDED による。
+
+### Requirement: W2 /api/sessions/:id/ws/proposal — proposal と名前候補を配信する
+
+**Reason**: 配信の時点を「proposal の提出（A7）の受理」から「その提出を行った実行の決着」へ移す。受理の時点では claude の実行が終わっておらず、承認できる局面がその前に立ってしまう。
+
+**Migration**: endpoint・メッセージの形・接続時配信は変わらない。変わるのは提出時配信の時点だけで、下の ADDED による。
+
 ## ADDED Requirements
 
-### Requirement: セッション向けの配信は実行の記録の変化を運ぶ
+### Requirement: W1 /api/sessions/:id/ws/question — 今の1問分を実行の決着で配信する
 
-システムは、セッションの実行の記録（`invocation`。`agent/invocation` が規定する4値）が変わった瞬間に、そのセッションを見ている画面へ新しい値を配信する SHALL。配信は既にあるセッション向けの接続（W1・W2）の上で、メッセージの種別として区別する SHALL。このために新しい配信の口を設けてはならない（MUST NOT）（`ws/delivery`「新しい種類の出来事のために配信の口を増やさない」）。
-
-画面が接続した瞬間にも、その時点の記録を現在分として配信する SHALL（`ws/delivery`「接続した瞬間に現在分を配信する」）。
-
-配信の源は実行の記録の書き込み（`api/session/submission`、A8）である。書き込みが成功した後に配信し、書き込みに失敗したものを配信してはならない（MUST NOT）。
+システムは `/api/sessions/:id/ws/question` の WS 配信を公開する SHALL。**問いを提出した実行が決着した瞬間**（`agent/invocation`「完了は output stream で検知して idle に変える」）、および画面が接続した瞬間に、今の1問分を配信する SHALL。提出の受理（A5）の時点で配信してはならない（MUST NOT）——その時点では実行がまだ終わっていない。
 
 配信はサーバから画面への一方向とし、画面からこの口へ何も送らせてはならない（MUST NOT）。
 
-#### Scenario: 実行が始まる
+#### Scenario: 実行の決着で配信される
 
-- **WHEN** 起動が受理され、記録が `running` に書かれる
-- **THEN** そのセッションを見ている画面へ `running` が配信される
+- **WHEN** 問いを提出した実行が完了し、invokeAi が決着する
+- **THEN** 接続中の画面へ今の1問分が配信される
 
-#### Scenario: 実行が終わる
+#### Scenario: 提出の受理では配信されない
 
-- **WHEN** 実行が完了し、記録が `idle` に書かれる
-- **THEN** そのセッションを見ている画面へ `idle` が配信される
+- **WHEN** 実行中の claude が問いを提出し、受理される
+- **THEN** その時点では配信されない。実行が決着したときに配信される
 
-#### Scenario: 実行が失敗する
+#### Scenario: 接続の瞬間に配信される
 
-- **WHEN** 記録が `failed` または `error` に書かれる
-- **THEN** そのセッションを見ている画面へその値が配信される
+- **WHEN** 画面が `/api/sessions/:id/ws/question` に接続する
+- **THEN** その瞬間の今の1問分が配信される
 
-#### Scenario: 走っている最中に接続する
+#### Scenario: 画面から送信する
 
-- **WHEN** 対象の実行が走っている最中に画面が接続する
-- **THEN** 接続の瞬間に現在分として `running` が配信される
+- **WHEN** 画面がこの口へ何かを送ろうとする
+- **THEN** システムはそれを受け付けず、状態は何も変わらない
 
-#### Scenario: 何も走っていない状態で接続する
+### Requirement: W2 /api/sessions/:id/ws/proposal — proposal と名前候補を実行の決着で配信する
 
-- **WHEN** 対象の記録が `idle` の状態で画面が接続する
-- **THEN** 接続の瞬間に現在分として `idle` が配信される
+システムは `/api/sessions/:id/ws/proposal` の WS 配信を公開する SHALL。**proposal を提出した実行が決着した瞬間**（`agent/invocation`「完了は output stream で検知して idle に変える」。phase が `proposed` に切り替わるのと同時）、および画面が接続した瞬間に、proposal と名前候補を配信する SHALL。提出の受理（A7）の時点で配信してはならない（MUST NOT）——その時点では実行がまだ終わっておらず、承認できる局面ではない。
 
-#### Scenario: 別の画面が起動した実行
+配信はサーバから画面への一方向とし、画面からこの口へ何も送らせてはならない（MUST NOT）。
 
-- **WHEN** 同じセッションを見ている別の画面の操作で実行が始まる
-- **THEN** この画面にも `running` が配信される。配信は誰が起動したかを区別しない
+#### Scenario: 実行の決着で配信される
+
+- **WHEN** proposal を提出した実行が完了し、invokeAi が決着する
+- **THEN** phase が `proposed` になり、接続中の画面へ proposal と名前候補が配信される
+
+#### Scenario: 提出の受理では配信されない
+
+- **WHEN** 実行中の claude が proposal を提出し、受理される
+- **THEN** その時点では配信されず、phase も変わらない。実行が決着したときに配信される
+
+#### Scenario: 接続の瞬間に配信される
+
+- **WHEN** 画面が `/api/sessions/:id/ws/proposal` に接続する
+- **THEN** その瞬間の proposal と名前候補が配信される
+
+#### Scenario: 画面から送信する
+
+- **WHEN** 画面がこの口へ何かを送ろうとする
+- **THEN** システムはそれを受け付けず、状態は何も変わらない
