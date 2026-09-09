@@ -42,7 +42,7 @@ base2/
 ├── modules/                    画面の階層に属さない自己完結の機能（Nuxt module。機能ごとに1つ。§3）
 │   └── markdown/               markdown を描く・直す・位置を出す。外から引く公開インターフェースは `#markdown` の1本
 ├── server/                     Nitro
-│   ├── api/                    契約どおり（strokes は contract.md、projects は本家仲介）。ファイルの置き方は `docs/specs/api/server.md`
+│   ├── api/                    契約どおり（sessions と strokes は contract.md、projects は本家仲介）。ファイルの置き方は `docs/specs/api/server.md`
 │   ├── plugins/                起動時処理
 │   ├── routes/                 WebSocket（ws.ts と api/sessions/:id/ws/** = 契約 W1・W2）
 │   └── utils/                  関心単位で切る（§4 に一覧）
