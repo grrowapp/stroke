@@ -66,7 +66,7 @@ export async function initSessionOpenspec(options: {
   // （`openspec/changes/…` ごと消える。santa-method レビュー指摘 7周目 2026-08-30）。
   //
   // 既に在る状態で `prepare` が走るのは、`config.yaml` に `schema:` が無くて一覧の検査を
-  // 通らないときである（`session-core.ts` の `passesListChecks`）。そこを踏んだときに
+  // 通らないときである（`server/handler/session.ts` の `passesListChecks`）。そこを踏んだときに
   // 埋め戻すと、消してよいものと悪いものの区別が付かなくなる。
   const rootCreatedHere = !(await exists(join(cwd, OPENSPEC_DIR)))
 
@@ -85,7 +85,8 @@ export async function initSessionOpenspec(options: {
   // 掘っている間に消えることがある（`openspec init` は自分で掘り直す）。**成否に
   // 関わらず見る**——途中で落ちたときこそ掘りかけが残る。
   //
-  // `sessionExists` は `stat` の失敗を全部 false に畳む（`sessionExistsCore`）。EACCES や
+  // `sessionExists` は `stat` の失敗を全部 false に畳む（`server/handler/delete.ts` の
+  // `targetExists`）。EACCES や
   // EMFILE でも false になるので、**生きているセッションを消えたと誤認しうる**。だから
   // 埋め戻しは `rootCreatedHere` で二重に守る——誤認しても、こちらが作っていないものには
   // 触れない。

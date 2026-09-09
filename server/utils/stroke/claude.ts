@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process'
 import { appendFile, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { LOG_PREFIX } from './log'
-import { isSafeSegment } from './session-core'
+import { isSafeSegment } from './paths'
 
 /** 打ち切るときに送るシグナル。設定ではない（docs/specs/core/settings-reference.md）。 */
 const CLAUDE_TIMEOUT_SIGNAL = 'SIGKILL' as const

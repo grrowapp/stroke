@@ -6,9 +6,9 @@ import { z } from 'zod'
  * 出どころは `nuxt.config.ts` の `runtimeConfig` だけである
  * （docs/specs/core/settings-reference.md・ADR 0004）。環境変数からは読まない。
  *
- * 読むのは**端**——endpoint・plugin・CLI——だけとする。core（`session-core.ts` /
+ * 読むのは**端**——endpoint・plugin・CLI——だけとする。共有のモジュール（`server/handler/` /
  * `paths.ts` / `claude.ts` / `openspec.ts` / `project.ts`）は設定を知らず、値を引数で
- * 受け取る。core が自分で引くと、endpoint（Nitro）と CLI（Nitro の外）で経路が割れる。
+ * 受け取る。共有の側が自分で引くと、endpoint（Nitro）と CLI（Nitro の外）で経路が割れる。
  *
  * 読むたびに検証するのは、宣言の書き間違い（キーの綴り違い・空文字）が、呼び出しの
  * 実行時まで気付かれずに残るのを防ぐためである。

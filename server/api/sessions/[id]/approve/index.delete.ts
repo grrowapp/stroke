@@ -1,6 +1,7 @@
+import { withdrawDecision } from '../../../../handler/approve'
 import { conflict } from '../../../../utils/stroke/conflict'
 import { requireSessionId } from '../../../../utils/stroke/session-param'
-import { isPromotedState, readState, withoutDecision, writeState } from '../../../../utils/stroke/session-store'
+import { isPromotedState, readState } from '../../../../utils/stroke/session-store'
 
 /**
  * U10 の取り消し: 記録された承認の判断を取り下げる（openspec/specs/api/session/approve
@@ -29,7 +30,7 @@ export default defineEventHandler(async (event) => {
     return new Response(null, { status: 204 })
   }
 
-  await writeState(sessionId, withoutDecision(state))
+  await withdrawDecision(sessionId, state)
 
   return new Response(null, { status: 204 })
 })

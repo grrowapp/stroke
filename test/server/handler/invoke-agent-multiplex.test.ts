@@ -1,55 +1,35 @@
-import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { fakeEvent, stubNitroGlobals, type FakeEvent } from '../../support';
+import { stubNitroGlobals } from '../api/support';
 
 /**
- * 対象は `server/api/sessions/[id]/invoke-agent/index.get.ts`（U13）。ここだけは
+ * 対象は `server/handler/invoke-agent.ts`（U13 の実処理）。ここだけは
  * `server/utils/stroke/running.ts` を実物のまま使い、`fix-rename-during-running-session`
  * の核心——**同じ物理ディレクトリに対し、異なる id で二重起動が通らないこと**
  * （openspec/specs/api/session/invoke-agent「昇格の前後で同じディレクトリに起動が
  * 要求される」）を見る。
  *
- * `./index.get.test.ts` は `running` を丸ごとモックしているので、busy の
+ * `./invoke-agent.test.ts` は `running` を丸ごとモックしているので、busy の
  * 判定そのものは見ない（見るのは endRun/beginRun の呼ばれ方）。
  */
 
-vi.mock('#app/composables/ssr', () => ({
-  setResponseStatus: (event: FakeEvent, status: number) => {
-    event.status = status;
-  },
-}));
-
-vi.mock('../../../../../server/utils/readiness', () => ({
-  missingPrerequisites: vi.fn(async () => []),
-}));
-
-vi.mock('../../../../../server/utils/stroke/session-store', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../../server/utils/stroke/session-store')>()),
-  readState: vi.fn(async () => ({ phase: 'stroking', invocation: 'idle', retries: 0 })),
-  sessionExists: vi.fn(async () => true),
-}));
-
 const invoke = vi.hoisted(() => ({ kick: vi.fn() }));
-vi.mock('../../../../../server/utils/stroke/invoke', () => invoke);
+vi.mock('../../../server/utils/stroke/invoke', () => invoke);
 
+// busy の 409 は `running.ts` が `conflict()`（`createError`）で作る。Nitro の全域が要る
 stubNitroGlobals();
 
-interface QueryEvent extends FakeEvent {
-  query: Record<string, string>;
-}
-
-function eventWithQuery(id: string, query: Record<string, string> = {}): QueryEvent {
-  return { ...fakeEvent(id, undefined), query };
-}
-
-vi.stubGlobal('getQuery', (event: QueryEvent) => event.query);
-
-const { default: invokeAgentHandler } = await import('../../../../../server/api/sessions/[id]/invoke-agent/index.get');
+const { invokeAgent } = await import('../../../server/handler/invoke-agent');
 
 let dir: string;
+
+/** 起動1回分。phase と回数は endpoint が決めて渡すもので、ここでは固定でよい */
+function run(sessionId: string, cwd: string): Promise<void> {
+  return invokeAgent({ sessionId, cwd, phase: 'stroking', retries: 0 });
+}
 
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), 'invoke-multiplex-'));
@@ -69,13 +49,10 @@ describe('U13: 同じ実体のディレクトリへの多重起動', () => {
       settled: new Promise<void>((resolve) => { finishFirstSettled = resolve; }),
     });
 
-    const first = eventWithQuery('session-uuid', { cwd: dir });
-    await invokeAgentHandler(first as never);
-    expect(first.status).toBe(200);
+    await run('session-uuid', dir);
 
     // 2つ目: 別の id（承認後のプロジェクト名を想定）だが、同じ物理ディレクトリを cwd に持つ
-    const second = eventWithQuery('renamed-project', { cwd: dir });
-    await expect(invokeAgentHandler(second as never)).rejects.toMatchObject({
+    await expect(run('renamed-project', dir)).rejects.toMatchObject({
       statusCode: 409,
       data: { reason: 'busy' },
     });
@@ -92,19 +69,15 @@ describe('U13: 同じ実体のディレクトリへの多重起動', () => {
   it('1つ目が終わった後は、同じディレクトリへ別の id で起動できる', async () => {
     invoke.kick.mockReturnValueOnce({ built: Promise.resolve(), settled: Promise.resolve() });
 
-    const first = eventWithQuery('session-uuid', { cwd: dir });
-    await invokeAgentHandler(first as never);
+    await run('session-uuid', dir);
 
     // settled が解決し終わるのを待つ（endRun が finally で呼ばれる）
     await Promise.resolve();
     await Promise.resolve();
 
     invoke.kick.mockReturnValueOnce({ built: Promise.resolve(), settled: Promise.resolve() });
-    const second = eventWithQuery('renamed-project', { cwd: dir });
-    const body = await invokeAgentHandler(second as never);
 
-    expect(second.status).toBe(200);
-    expect(body).toEqual({});
+    await expect(run('renamed-project', dir)).resolves.toBeUndefined();
     expect(invoke.kick).toHaveBeenCalledTimes(2);
   });
 
@@ -117,16 +90,11 @@ describe('U13: 同じ実体のディレクトリへの多重起動', () => {
         settled: new Promise<void>((resolve) => { finishFirstSettled = resolve; }),
       });
 
-      const first = eventWithQuery('session-uuid', { cwd: dir });
-      await invokeAgentHandler(first as never);
-      expect(first.status).toBe(200);
+      await run('session-uuid', dir);
 
       invoke.kick.mockReturnValueOnce({ built: Promise.resolve(), settled: Promise.resolve() });
-      const second = eventWithQuery('other-session', { cwd: otherDir });
-      const body = await invokeAgentHandler(second as never);
 
-      expect(second.status).toBe(200);
-      expect(body).toEqual({});
+      await expect(run('other-session', otherDir)).resolves.toBeUndefined();
 
       finishFirstSettled();
       await Promise.resolve();

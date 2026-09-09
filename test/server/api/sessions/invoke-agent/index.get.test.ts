@@ -6,12 +6,23 @@ import { fakeEvent, stubNitroGlobals, type FakeEvent } from '../../support';
  * 対象は `server/api/sessions/[id]/invoke-agent/index.get.ts`（U13）。テストの位置はソースの
  * 構造を写すが、`[id]` の段は挟まない（`test/server/api/strokes/question/index.post.test.ts` の注記と同じ事情）。
  *
- * 見るのは fix-idle-stuck-on-run-build-failure の3点。
- *
- * - 組み立てに失敗すると（`kick` の `built` が reject すると）200 ではなく 503 を返す
- * - 応答は `built` までしか待たない。`settled`（AI の応答の完了）は待たない
- * - 受理しなかったときも busy ガード（`endRun`）が解ける
+ * **見るのは準備と後始末だけである**——前提の確認（503）、クエリから cwd と再実行を読むこと、
+ * 状態から phase・回数・会話の続き先を組んで handler へ渡すこと、handler の失敗（`InvokeError`）を
+ * 503 へ写すこと、受理したときの 200。占有と `kick` の扱いは
+ * `test/server/handler/invoke-agent.test.ts`・`invoke-agent-multiplex.test.ts`。
  */
+
+const { invokeAgent, InvokeError } = vi.hoisted(() => {
+  class InvokeError extends Error {
+    constructor(public readonly kind: string, message: string) {
+      super(message);
+      this.name = 'InvokeError';
+    }
+  }
+  return { invokeAgent: vi.fn(async () => undefined), InvokeError };
+});
+
+vi.mock('../../../../../server/handler/invoke-agent', () => ({ invokeAgent, InvokeError }));
 
 vi.mock('#app/composables/ssr', () => ({
   setResponseStatus: (event: FakeEvent, status: number) => {
@@ -23,20 +34,15 @@ vi.mock('../../../../../server/utils/readiness', () => ({
   missingPrerequisites: vi.fn(async () => []),
 }));
 
+vi.mock('../../../../../server/utils/stroke/config', () => ({
+  readStrokeConfig: () => ({ projectShareRoot: '/tmp/share' }),
+}));
+
 vi.mock('../../../../../server/utils/stroke/session-store', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../server/utils/stroke/session-store')>()),
   readState: vi.fn(async () => ({ phase: 'stroking', invocation: 'idle', retries: 0 })),
   sessionExists: vi.fn(async () => true),
 }));
-
-const running = vi.hoisted(() => ({
-  beginRun: vi.fn(async (path: string) => `key:${path}`),
-  endRun: vi.fn(),
-}));
-vi.mock('../../../../../server/utils/stroke/running', () => running);
-
-const invoke = vi.hoisted(() => ({ kick: vi.fn() }));
-vi.mock('../../../../../server/utils/stroke/invoke', () => invoke);
 
 stubNitroGlobals();
 
@@ -58,79 +64,58 @@ const { readState } = await import('../../../../../server/utils/stroke/session-s
 const missingPrerequisitesMock = vi.mocked(missingPrerequisites);
 const readStateMock = vi.mocked(readState);
 
-/** `kick` の戻り値を組み立てる。`built`/`settled` は個別に制御できる。 */
-function kickResult(built: Promise<void>, settled: Promise<void>): { built: Promise<void>, settled: Promise<void> } {
-  return { built, settled };
-}
-
 describe('U13 GET /api/sessions/:id/invoke-agent', () => {
   beforeEach(() => {
     missingPrerequisitesMock.mockClear();
     missingPrerequisitesMock.mockResolvedValue([]);
     readStateMock.mockClear();
     readStateMock.mockResolvedValue({ phase: 'stroking', invocation: 'idle', retries: 0 } as never);
-    running.beginRun.mockClear();
-    running.endRun.mockClear();
-    invoke.kick.mockClear();
+    invokeAgent.mockClear();
+    invokeAgent.mockResolvedValue(undefined);
   });
 
-  it('組み立てに成功すれば 200 を返し、AI の応答の完了（settled）は待たない', async () => {
-    let finishSettled = (): void => {};
-    invoke.kick.mockReturnValueOnce(kickResult(
-      Promise.resolve(),
-      new Promise<void>((resolve) => { finishSettled = resolve; }),
-    ));
-
+  it('起動を handler へ渡し、200 を返す', async () => {
     const event = eventWithQuery('session-1', { cwd: '/tmp/share/session-1' });
     const body = await invokeAgentHandler(event as never);
 
     expect(event.status).toBe(200);
     expect(body).toEqual({});
-    // busy ガードはまだ解けていない（settled が終わっていない）
-    expect(running.endRun).not.toHaveBeenCalled();
-
-    finishSettled();
-    await Promise.resolve();
-    await Promise.resolve();
-    // キーは cwd から引く（id ではない）。beginRun が返したキーで endRun する
-    expect(running.beginRun).toHaveBeenCalledWith('/tmp/share/session-1');
-    expect(running.endRun).toHaveBeenCalledWith('key:/tmp/share/session-1');
-  });
-
-  it('組み立てに失敗すれば 503 を返し、理由を message に含める', async () => {
-    invoke.kick.mockReturnValueOnce(kickResult(
-      Promise.reject(new Error('起動の材料を組み立てられない: 設定を読めない')),
-      Promise.resolve(),
-    ));
-
-    const event = eventWithQuery('session-1', { cwd: '/tmp/share/session-1' });
-
-    await expect(invokeAgentHandler(event as never)).rejects.toMatchObject({
-      statusCode: 503,
-      message: expect.stringContaining('設定を読めない'),
+    expect(invokeAgent).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      cwd: '/tmp/share/session-1',
+      phase: 'stroking',
+      retries: 0,
+      runId: undefined,
     });
   });
 
-  it('組み立てに失敗しても busy ガード（endRun）は解ける', async () => {
-    invoke.kick.mockReturnValueOnce(kickResult(
-      Promise.reject(new Error('組み立てに失敗')),
-      Promise.resolve(),
-    ));
+  it('cwd が無ければセッションディレクトリを既定にする', async () => {
+    await invokeAgentHandler(eventWithQuery('session-1') as never);
 
-    const event = eventWithQuery('session-1', { cwd: '/tmp/share/session-1' });
-    await expect(invokeAgentHandler(event as never)).rejects.toThrow();
+    expect(invokeAgent).toHaveBeenCalledWith(expect.objectContaining({ cwd: '/tmp/share/session-1' }));
+  });
 
-    // settled は resolve 済みなので、endRun はすでに解けている
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(running.endRun).toHaveBeenCalledWith('key:/tmp/share/session-1');
+  it('reset が付いていればリトライ回数を 0 に戻して渡す', async () => {
+    readStateMock.mockResolvedValueOnce({ phase: 'stroking', invocation: 'failed', retries: 2 } as never);
+
+    await invokeAgentHandler(eventWithQuery('session-1', { reset: '1' }) as never);
+
+    expect(invokeAgent).toHaveBeenCalledWith(expect.objectContaining({ retries: 0 }));
+  });
+
+  it('reset が無ければ記録されている回数をそのまま渡す', async () => {
+    readStateMock.mockResolvedValueOnce({ phase: 'stroking', invocation: 'failed', retries: 2 } as never);
+
+    await invokeAgentHandler(eventWithQuery('session-1') as never);
+
+    expect(invokeAgent).toHaveBeenCalledWith(expect.objectContaining({ retries: 2 }));
   });
 
   /**
    * U13 は phase を渡すだけで、定型の選び分けも完成の記録の要否も持たない
    * （add-activated-phase design D4）。完成済み（`activated`）の対象も同じ口で受理される。
    */
-  it('完成した（activated）対象への起動を受理し、phase と会話の続き先を kick に渡す', async () => {
+  it('完成した（activated）対象への起動を受理し、phase と会話の続き先を渡す', async () => {
     readStateMock.mockResolvedValueOnce({
       phase: 'activated',
       projectName: 'made-app',
@@ -138,13 +123,12 @@ describe('U13 GET /api/sessions/:id/invoke-agent', () => {
       retries: 0,
       runId: 'run-1',
     } as never);
-    invoke.kick.mockReturnValueOnce(kickResult(Promise.resolve(), Promise.resolve()));
 
     const event = eventWithQuery('made-app', { cwd: '/tmp/share/made-app' });
     await invokeAgentHandler(event as never);
 
     expect(event.status).toBe(200);
-    expect(invoke.kick).toHaveBeenCalledWith({
+    expect(invokeAgent).toHaveBeenCalledWith({
       sessionId: 'made-app',
       cwd: '/tmp/share/made-app',
       phase: 'activated',
@@ -153,22 +137,36 @@ describe('U13 GET /api/sessions/:id/invoke-agent', () => {
     });
   });
 
-  it('ストロークのセッションでは会話の続き先を渡さない', async () => {
-    invoke.kick.mockReturnValueOnce(kickResult(Promise.resolve(), Promise.resolve()));
+  it('組み立てに失敗すれば 503 を返し、理由を message に含める', async () => {
+    invokeAgent.mockRejectedValueOnce(
+      new InvokeError('build', '起動の材料を組み立てられない: 設定を読めない') as never,
+    );
 
-    const event = eventWithQuery('session-1', { cwd: '/tmp/share/session-1' });
-    await invokeAgentHandler(event as never);
-
-    expect(invoke.kick).toHaveBeenCalledWith(expect.objectContaining({ phase: 'stroking', runId: undefined }));
+    await expect(invokeAgentHandler(eventWithQuery('session-1') as never)).rejects.toMatchObject({
+      statusCode: 503,
+      message: expect.stringContaining('設定を読めない'),
+    });
   });
 
-  it('前提が欠けていれば kick を呼ばず 503 を返す', async () => {
+  it('handler が投げた他の失敗（busy の 409 など）はそのまま外へ出す', async () => {
+    invokeAgent.mockRejectedValueOnce(Object.assign(new Error('占有中'), {
+      statusCode: 409,
+      data: { reason: 'busy' },
+    }) as never);
+
+    await expect(invokeAgentHandler(eventWithQuery('session-1') as never)).rejects.toMatchObject({
+      statusCode: 409,
+      data: { reason: 'busy' },
+    });
+  });
+
+  it('前提が欠けていれば handler を呼ばず 503 を返す', async () => {
     missingPrerequisitesMock.mockResolvedValueOnce(['保存先が絶対パスでない: share']);
 
-    const event = eventWithQuery('session-1', { cwd: '/tmp/share/session-1' });
-
-    await expect(invokeAgentHandler(event as never)).rejects.toMatchObject({ statusCode: 503 });
-    expect(invoke.kick).not.toHaveBeenCalled();
-    expect(running.beginRun).not.toHaveBeenCalled();
+    await expect(invokeAgentHandler(eventWithQuery('session-1') as never)).rejects.toMatchObject({
+      statusCode: 503,
+      message: expect.stringContaining('AI を起動できる状態にない'),
+    });
+    expect(invokeAgent).not.toHaveBeenCalled();
   });
 });

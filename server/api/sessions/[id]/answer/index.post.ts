@@ -1,15 +1,8 @@
-import type { Answer, Question, Stroke } from '#shared/stroke'
+import { recordAnswer } from '../../../../handler/answer'
 import { conflict } from '../../../../utils/stroke/conflict'
 import { answerBody, parseBody } from '../../../../utils/stroke/request-schemas'
 import { requireSessionId } from '../../../../utils/stroke/session-param'
-import { appendAnswerStroke, isPromotedState, readState, readStrokes } from '../../../../utils/stroke/session-store'
-
-/** リトライ判定用。invocation が失敗した後、同じ問いへの同じ回答が再送されたか。 */
-function isRetryOfLastStroke(last: Stroke | undefined, question: Question, answer: Answer): boolean {
-  if (!last || last.proposal) return false
-  return JSON.stringify(last.question) === JSON.stringify(question)
-    && JSON.stringify(last.answer) === JSON.stringify(answer)
-}
+import { isPromotedState, readState } from '../../../../utils/stroke/session-store'
 
 /**
  * U7: 今の1問に答える。ストロークの問いへの回答も、差し戻しへの問い返しへの回答も
@@ -18,8 +11,8 @@ function isRetryOfLastStroke(last: Stroke | undefined, question: Question, answe
  *
  * `currentQuestion` はここではクリアしない。次の問い・proposal（A5・A7）が届いて初めて
  * 更新される。`invocation: failed` の後にユーザーが同じ入力を再送したとき（U2 の契約）、
- * 答えるべき問いが無くなって詰むのを避けるため、かつ strokes に重複行が増えないようにする
- * （decisions.md: 同じ入力の再送で往復が二重に入ってはならない）。
+ * 答えるべき問いが無くなって詰むのを避けるためで、再送で往復が二重に入らないようにする
+ * のは記録の側（`handler/answer.ts`）の役目である。
  */
 export default defineEventHandler(async (event) => {
   const sessionId = await requireSessionId(event)
@@ -36,11 +29,7 @@ export default defineEventHandler(async (event) => {
     throw conflict('phase', '答えるべき問いが無い。')
   }
 
-  const strokes = await readStrokes(sessionId)
-  const retry = state.invocation === 'failed' && isRetryOfLastStroke(strokes.at(-1), pending, answer)
-  if (!retry) {
-    await appendAnswerStroke(sessionId, pending, answer)
-  }
+  await recordAnswer(sessionId, pending, answer, state.invocation)
 
   return new Response(null, { status: 204 })
 })

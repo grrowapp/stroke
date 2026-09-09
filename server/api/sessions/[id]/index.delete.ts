@@ -1,11 +1,10 @@
 import type { Phase } from '#shared/stroke'
-import { DeleteError, removeTarget } from '../../../handler/delete'
+import { deleteSession } from '../../../handler/session'
 import { readStrokeConfig } from '../../../utils/stroke/config'
-import { conflict } from '../../../utils/stroke/conflict'
+import { conflict, deleteErrorToHttp } from '../../../utils/stroke/conflict'
 import { isRunning, sessionRunPath } from '../../../utils/stroke/running'
 import { requireSessionId } from '../../../utils/stroke/session-param'
 import { readState, type SessionState } from '../../../utils/stroke/session-store'
-import { forgetSubmissions } from '../../../utils/stroke/submission-signal'
 
 /**
  * U11: セッションを消す（`openspec/specs/api/session/delete`）。
@@ -15,8 +14,8 @@ import { forgetSubmissions } from '../../../utils/stroke/submission-signal'
  *
  * **消せるのは承認より前のものだけである。** 承認で昇格した対象はもうプロジェクトなので、
  * ここでは受理しない——プロジェクトの削除が扱う。**どの局面を許すかはこの endpoint が
- * 自分の literal で持ち**（下の `DELETABLE`）、消す動作（`handler/delete`）は判定を持たない
- * （add-activated-phase design D5）。
+ * 自分の literal で持ち**（下の `DELETABLE`）、消す実行（`handler/session.ts` →
+ * `handler/delete.ts`）は判定を持たない（add-activated-phase design D5）。
  *
  * phase は `readState`（zod）で読む。**壊れた `state.json` は消さない**——読めないものを
  * 「許す」に倒すと、壊れた `state.json` を持つ本物のプロジェクトが消せてしまう。
@@ -52,23 +51,11 @@ export default defineEventHandler(async (event): Promise<Response> => {
   }
 
   try {
-    await removeTarget(root, sessionId)
+    // 消す実行も、消えた id の提出の記録の後始末も handler が持つ
+    await deleteSession(root, sessionId)
   } catch (error) {
-    throw toHttp(error)
+    throw deleteErrorToHttp(error)
   }
 
-  // 消えたセッションの提出の記録も落とす（id が使い回されたときに前の分を数えない）
-  forgetSubmissions(sessionId)
   return new Response(null, { status: 204 })
 })
-
-function toHttp(error: unknown) {
-  if (error instanceof DeleteError && error.kind === 'not-found') {
-    return createError({ statusCode: 404, statusMessage: 'Not Found', message: error.message })
-  }
-  return createError({
-    statusCode: 500,
-    statusMessage: 'Internal Server Error',
-    message: error instanceof Error ? error.message : String(error),
-  })
-}

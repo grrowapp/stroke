@@ -1,17 +1,16 @@
 import nuxtConfig from '../nuxt.config'
-import { parseStrokeConfig } from '../server/utils/stroke/config'
 import {
-  SessionCoreError,
-  createSessionCore,
-  deleteSessionCore,
-  listSessionsCore,
-  readInvocationCore,
-} from '../server/utils/stroke/session-core'
+  createSession,
+  deleteSession,
+  listSessions,
+  readStoredInvocation,
+} from '../server/handler/session'
+import { parseStrokeConfig } from '../server/utils/stroke/config'
 
 /**
  * サーバが動いていなくても使えるセッション管理（specs/tools/session-cli）。
  * `yarn session <create|delete|list>` として tsx で実行する。実体は endpoint と同じ
- * core（server/utils/stroke/session-core.ts）で、endpoint を叩かず、サーバの稼働に依存しない。
+ * handler（server/handler/session.ts）で、endpoint を叩かず、サーバの稼働に依存しない。
  *
  * ここが CLI 側の**設定を引く端**である。`useRuntimeConfig()` は Nitro の外では使えないが、
  * `nuxt.config.ts` は tsx から普通に import できる（実測確認済み）。設定は環境変数から
@@ -32,7 +31,7 @@ async function main(): Promise<void> {
     case 'create': {
       if (!arg?.trim()) fail(`概要が必要。\n${USAGE}`)
       // AI の呼び出しはここでは起きないので invocation は idle で書く（design.md 決定3）
-      const sessionId = await createSessionCore(root, arg, 'idle')
+      const sessionId = await createSession(root, arg, 'idle')
       // 返答は転送予定先（画面1）の URL。開けばセッションが進む。
       //
       // **`claude.apiBaseUrl` はもう無い**（provide-operations-via-mcp 続き。claude に渡す
@@ -47,15 +46,15 @@ async function main(): Promise<void> {
     case 'delete': {
       if (!arg) fail(`セッション uuid が必要。\n${USAGE}`)
       // サーバ無しの実行中判定は state.json の invocation を材料にする（design.md 決定5）
-      if ((await readInvocationCore(root, arg)) === 'running') {
+      if ((await readStoredInvocation(root, arg)) === 'running') {
         fail('このセッションは実行中の記録を持つ。呼び出しが終わってから消すこと。')
       }
-      await deleteSessionCore(root, arg)
+      await deleteSession(root, arg)
       console.log(`deleted: ${arg}`)
       return
     }
     case 'list': {
-      const sessions = await listSessionsCore(root)
+      const sessions = await listSessions(root)
       if (sessions.length === 0) {
         console.log('セッションは残っていない。')
         return
@@ -88,5 +87,7 @@ function displayUrl(devServer: { host?: string, port: number }): string {
 }
 
 main().catch((error) => {
-  fail(error instanceof SessionCoreError ? error.message : String(error))
+  // handler が投げるもの（`SessionError` / `DeleteError`）はどれも `Error` で、
+  // 種別ではなく文言だけを人に見せる。終了コードは `fail` が 1 に固定する。
+  fail(error instanceof Error ? error.message : String(error))
 })

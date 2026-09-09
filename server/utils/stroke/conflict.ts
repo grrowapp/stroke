@@ -1,3 +1,12 @@
+import { DeleteError } from '../../handler/delete'
+
+/**
+ * api の後始末——handler の失敗を HTTP へ写す語彙。
+ *
+ * ここに置くのは endpoint が2つ以上で共有するものだけである。同じ写しが endpoint ごとに
+ * 並ぶと、同じ失敗が口によって違う status になりうる。
+ */
+
 /**
  * 409 の理由。
  *
@@ -20,5 +29,27 @@ export function conflict(reason: ConflictReason, message: string) {
     statusMessage: 'Conflict',
     message,
     data: { reason },
+  })
+}
+
+/**
+ * 消す実行（`server/handler/delete.ts`）の失敗を HTTP へ写す。
+ *
+ * 対象が無いのは 404、それ以外（I/O）は 500。同じ実行の同じ失敗なので、口ごとに写しを
+ * 持たない。局面の判定（消してよい局面か）はここへ来る前に endpoint が済ませている。
+ *
+ * **今の呼び手はセッションの削除（U11）だけである。** プロジェクトの削除（P1・
+ * `server/api/projects/[projectId]/index.delete.ts`）は同じ写しを自分の中に持ったままで、
+ * ここへ寄せるのは Gitea #19（`update-project-api-handler`）である——プロジェクトの
+ * endpoint はそちらの範囲なので、この change では触らない。
+ */
+export function deleteErrorToHttp(error: unknown) {
+  if (error instanceof DeleteError && error.kind === 'not-found') {
+    return createError({ statusCode: 404, statusMessage: 'Not Found', message: error.message })
+  }
+  return createError({
+    statusCode: 500,
+    statusMessage: 'Internal Server Error',
+    message: error instanceof Error ? error.message : String(error),
   })
 }

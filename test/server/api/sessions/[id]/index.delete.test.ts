@@ -21,6 +21,11 @@ import { fakeEvent, stubNitroGlobals } from '../../support';
  * `running.ts` と `session-store.ts` は実物のまま使う。`readState` は `useRuntimeConfig` を
  * 通るので、差し込み先を差し替えて保存先を一時ディレクトリへ向ける
  * （`session-decision.test.ts` と同じ）。
+ *
+ * **消す実行（`handler/session.ts` → `handler/delete.ts`）も実物のまま通す。** ここが見たい
+ * のは「断ったときに**何も消えていない**」ことで、それは保存先の実物でしか観測できない。
+ * 実行そのものの検査（存在しない対象を消したことにしない・保存先の外へ出る名前を通さない）は
+ * `test/server/handler/delete.test.ts`・`session.test.ts` が持ち、ここでは重ねない。
  */
 
 const config = vi.hoisted(() => ({ root: '' }));

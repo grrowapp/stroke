@@ -1,7 +1,7 @@
-import { broadcastProjectCreation } from '../../../../utils/control/board'
+import type { Phase } from '#shared/stroke'
+import { recordActivation, type ObservedPhase } from '../../../../handler/activate'
 import { conflict } from '../../../../utils/stroke/conflict'
 import { requireSessionId } from '../../../../utils/stroke/session-param'
-import { readState, withStateLock, writeState, type SessionState } from '../../../../utils/stroke/session-store'
 
 /**
  * U15: 昇格したプロジェクトの完成を記録する（openspec/specs/api/session/activate）。
@@ -34,42 +34,35 @@ import { readState, withStateLock, writeState, type SessionState } from '../../.
  * ここを叩くのは invokeAi が `invocation` を `idle` に変える**前**である。その時点で対象の
  * 実行はまだ占有中なので、busy を見ると自分の実行に弾かれる（design D3）。
  *
- * ## 読んで書くはセッション単位で直列化する
+ * ## 局面の述語はここが持ち、記録は handler が持つ
  *
- * `invocation` には触れないが、`state.json` は1ファイルなので書き込みは丸ごとである。起動時の
- * 後始末（A8）と同じ対象に同時に触れると、古い写しで互いを上書きしうる。`withStateLock` で
- * 「読む → 判定 → 書く」を1区間にする（A8 の `writeInvocation` も同じ待ち行列を通る）。
+ * 完成へ動かしてよい局面（下の `ACTIVATABLE`）はこの endpoint の literal である。読みと
+ * 書きを1区間に閉じる必要があるので（A8 と同じ待ち行列）、状態の読みと書き込みは
+ * `handler/activate.ts` が lock の中で行い、当てはまらなかったときは観測した局面を返す。
  *
  * ## 409 はすべて `phase` で返す
  *
  * 呼び手は invokeAi と起動時の書き上げだけで、どちらも 409 を「この対象は今この責務を
  * 成立させない」と読む。壊れた `state.json` は書き換えない（「分からないものを通さない」）。
  */
+
+/** この口が完成を記録してよい局面。昇格した後だけ */
+const ACTIVATABLE: readonly Phase[] = ['approved']
+
+/** 記録できなかったときの文言。観測されたものごとに1つ */
+function refusalMessage(observed: ObservedPhase): string {
+  if (observed === 'unreadable') return 'state.json を読めない。完成を記録しない。'
+  if (observed === 'activated') return 'このプロジェクトは既に完成している。'
+  return 'まだ昇格していない。完成を記録できるのはプロジェクトだけ。'
+}
+
 export default defineEventHandler(async (event): Promise<Response> => {
   const name = await requireSessionId(event)
 
-  await withStateLock(name, async () => {
-    let state: SessionState
-    try {
-      state = await readState(name)
-    } catch {
-      throw conflict('phase', 'state.json を読めない。完成を記録しない。')
-    }
-
-    if (state.phase === 'activated') {
-      throw conflict('phase', 'このプロジェクトは既に完成している。')
-    }
-    if (state.phase !== 'approved') {
-      throw conflict('phase', 'まだ昇格していない。完成を記録できるのはプロジェクトだけ。')
-    }
-
-    // 一方向の遷移。phase 以外は触らない（`runId` は完成後の起こし直しの続き先になる）
-    await writeState(name, { ...state, phase: 'activated' })
-  })
-
-  // 成功の決着はここだけが流す（openspec/specs/api/session/activate「完成の記録は決着として
-  // 上層へ届く」）。配信は接続中のブラウザへ送るだけで、失敗しても記録の成否に関わらない。
-  broadcastProjectCreation(name, 'done')
+  const recorded = await recordActivation(name, ACTIVATABLE)
+  if (!recorded.ok) {
+    throw conflict('phase', refusalMessage(recorded.observed))
+  }
 
   return new Response(null, { status: 204 })
 })
