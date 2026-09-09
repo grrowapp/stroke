@@ -38,12 +38,12 @@
 
 ## 各 endpoint の入出力
 
-### U1 `POST /api/strokes`
+### U1 `POST /api/sessions`
 
 - input: `{ overview: string }`（空・空白のみは 400）
 - output: `{ sessionId: string }`
 
-### U2 `GET /api/strokes/:id`
+### U2 `GET /api/sessions/:id`
 
 - output: `{ phase: 'stroking' | 'proposed' | 'approved' | 'activated', invocation: 'running' | 'idle' | 'failed' | 'error', path: string }`
 - `path` は対象のディレクトリ。画面はこれを cwd として U13 に渡す（endpoint に導出させない）
@@ -57,28 +57,28 @@
   （`U13?reset=1`。回数のリセットは U13 が行う）か削除（U11）を出す。**画面は A8 を叩かない。**
 - エラー: 404 セッションなし
 
-### U3 `GET /api/strokes/:id/strokes`
+### U3 `GET /api/sessions/:id/strokes`
 
 - output: `{ strokes: Stroke[] }`
 - `Stroke` は `proposal: false`（問いと回答のペア。問い返しも同じ形）か
   `proposal: true`（proposal 初提出のマーカー。`question` / `answer` は null）のどちらか。
 - エラー: 404 セッションなし
 
-### U7 `POST /api/strokes/:id/answer`
+### U7 `POST /api/sessions/:id/answer`
 
 - input: `Answer`（`{ kind: 'option' | 'free', value: string }`）
 - output: 本文なし（204）
 - 実行中でも受理する（busy は見ない。多重起動は U13 が止める）
 - エラー: 400 形式不正 / 404 / 409 phase（承認以降＝`approved` / `activated`・答えるべき問いが無い）
 
-### U9 `POST /api/strokes/:id/send-back`
+### U9 `POST /api/sessions/:id/send-back`
 
 - input: `SendBackPayload`（`response` / `comments[]` / `annotations` / `nextSteps`）
 - output: 本文なし（204）
 - 実行中でも受理する（busy は見ない。多重起動は U13 が止める）
 - エラー: 400 指摘0件・形式不正 / 404 / 409 phase（`proposed` のみ受理）
 
-### U12 `GET /api/strokes`
+### U12 `GET /api/sessions`
 
 - output: `SessionSummary[]`（`{ id, phase, updatedAt, path, invocation }`。`updatedAt` は
   `state.json` の mtime。読めない `state.json` は `phase: 'unknown'`）。新しいものから並ぶ。
@@ -136,13 +136,13 @@
   完成の記録（U15）だけ。生成中（`approved`）の対象が `error` に達したときの `failed` だけをここから流す。
 - エラー: 400 形式不正 / 404 セッションなし
 
-### W1 `/api/strokes/:id/ws/question`
+### W1 `/api/sessions/:id/ws/question`
 
 - メッセージ: `Question`
 - 配信タイミング: A5 の受理・接続の瞬間（現在の1問があれば1件）
 - 画面は最後に届いた1件で表示を上書きする
 
-### W2 `/api/strokes/:id/ws/proposal`
+### W2 `/api/sessions/:id/ws/proposal`
 
 - メッセージ: `ProposalMessage`（`{ proposal: string, projectName: string | null }`）
 - 配信タイミング: A7 の受理・接続の瞬間（現在の proposal があれば1件）
