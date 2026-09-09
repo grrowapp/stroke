@@ -47,5 +47,5 @@
 
 ## 8. 完了
 
-- [ ] 8.1 change の成果物を commit する（worktree のブランチ `update-invoke-agent-responsibility-boundary` へ docs・実装・テストを commit 済み: `046a4ac5`。親の `develop` への openspec の artifact と ticket の commit はユーザーの指示待ち）
+- [x] 8.1 change の成果物を commit する（ブランチ `update-invoke-agent-responsibility-boundary` へ docs・実装・テスト `046a4ac5`・`2de6491a`・`55209f26`、openspec の artifact と ticket `f9810d0e`。PR: http://192.168.1.202/gitea/grrowapp/stroke/pulls/24、base は `develop`）
 - [ ] 8.2 ユーザーから完了承認を得て、`openspec/tickets/update-invoke-agent-responsibility-boundary.md` の `status` を `Wait-for-archive` にする
