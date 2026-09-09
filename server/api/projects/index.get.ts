@@ -8,12 +8,12 @@
 
 import { defineEventHandler } from 'h3';
 
-import { readServerConfig } from '../utils/config';
-import { listPromotedProjects } from '../utils/control/creating';
-import { buildProjectDirectory } from '../utils/control/directory';
-import { readRegistry, type RegistryEntry } from '../utils/upstream/registry';
-import { UpstreamRestClient } from '../utils/upstream/rest';
-import { scanProjects } from '../utils/upstream/scan';
+import { readServerConfig } from '../../utils/config';
+import { listPromotedProjects } from '../../utils/control/creating';
+import { buildProjectDirectory } from '../../utils/control/directory';
+import { readRegistry, type RegistryEntry } from '../../utils/upstream/registry';
+import { UpstreamRestClient } from '../../utils/upstream/rest';
+import { scanProjects } from '../../utils/upstream/scan';
 import type { ProjectDirectoryResponse } from '#shared/types';
 
 export default defineEventHandler(async (): Promise<ProjectDirectoryResponse> => {

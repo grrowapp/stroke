@@ -1,7 +1,7 @@
 import { createError, defineEventHandler, getRouterParam } from 'h3';
 
-import { isSteeringDocument } from '../../../../utils/upstream/rest';
-import { toHttpError, upstreamClient } from '../../../../utils/control/upstream-proxy';
+import { isSteeringDocument } from '../../../../../utils/upstream/rest';
+import { toHttpError, upstreamClient } from '../../../../../utils/control/upstream-proxy';
 
 export default defineEventHandler(async (event) => {
   const projectId = getRouterParam(event, 'projectId') ?? '';
