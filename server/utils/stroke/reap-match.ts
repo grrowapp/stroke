@@ -22,8 +22,10 @@
  *   会話 id（uuid）が載る
  * - `steering`: 承認後の steering。cwd は `--mcp-config` の自前 MCP エントリのヘッダ
  *   `x-stroke-cwd` に、初回・継続を問わず必ず載る（サーバーはこのヘッダを読まない。
- *   後始末の照合のためだけに argv へ残している。かつては本家 MCP エントリの `npx` 引数に
- *   載っていたが、その配線は外した——update-project-generation-via-upstream-rest design D4）。
+ *   後始末の照合のためだけに argv へ残している。承認依頼のために並べ直した本家 MCP
+ *   エントリの `npx` 引数にも同じ cwd が載るが、照合はヘッダの方に拠る——本家の配線が
+ *   また変わっても照合が壊れないようにするため。update-invoke-agent-responsibility-boundary
+ *   design D4）。
  *   `runId`（`state.json` の継続先）は継続時だけ `--resume` に載るが、**一覧
  *   （U12 `/api/strokes`）の応答からは手に入らない**（`SessionSummary` は runId を
  *   持たない）——ファイルを直接読まない制約の下で照合の手がかりに

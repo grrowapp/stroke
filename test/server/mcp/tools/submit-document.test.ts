@@ -18,7 +18,6 @@ const { default: submitDocumentTool } = await import('../../../../server/mcp/too
 const { issueConnectionToken, registerConnection, removeConnection } = await import('../../../../server/utils/mcp/connection-table');
 const { resolveProjectId } = await import('../../../../server/utils/mcp/resolve-project-id');
 const { upstreamFetch } = await import('../../../../server/utils/mcp/upstream-fetch');
-const { hasLaunchSubmission, forgetLaunchSubmission } = await import('../../../../server/utils/stroke/submission-signal');
 const { $fetch } = await import('#build/fetch.mjs') as unknown as {
   $fetch: ReturnType<typeof vi.fn> & { raw: ReturnType<typeof vi.fn> },
 };
@@ -320,146 +319,57 @@ describe('submit-document', () => {
   });
 
   /**
-   * 受理された steering の提出を、起動（token）の作業として記録する
-   * （fix-steering-empty-completion specs `mcp/tools/submit`）。
-   *
-   * 数えるのは本家 PUT が応答を返して受理した経路だけ——拒否・不達・手前で弾いた
-   * 提出・flontier の提出のいずれでも記録しない（design.md D2）。記録を足しても
-   * ツールの結果の形（`status`・`errorCode`・`error`）は変わらない（design.md D5）。
+   * このツールの責務は文書を代行先へ登録することだけである（`docs/specs/mcp/contract.md`
+   * 「代行以外の固定の処理を受け持たない」。update-invoke-agent-responsibility-boundary）。
+   * かつて steering の受理を起動単位の記録に残していたが、判定の材料を作るのは
+   * invoke-agent の責務なので外した——受理の判定は invoke-agent が実行の終わりに本家 REST へ
+   * 問い合わせる（`server/utils/stroke/invoke.ts` の `steeringCompletedUpstream`）。
    */
-  describe('起動単位の提出記録（steering）', () => {
-    it('本家が受理した提出は、その起動（token）の作業として記録される', async () => {
+  describe('登録の代行のみ（steering）', () => {
+    it('本家が受理した提出は、本家の実応答の status だけを返し、記録のための項目を足さない', async () => {
       const token = issueConnectionToken();
       registerConnection(token, { projectPath: '/opt/projects/example' });
       resolveProjectIdMock.mockResolvedValue({ ok: true, projectId: 'PID1' });
       upstreamFetchMock.mockResolvedValue({ status: 200, data: { success: true } });
 
-      expect(hasLaunchSubmission(token)).toBe(false);
-
       const result = await submitDocumentHandler(
         { type: 'steering', document: '# product', name: 'product' },
         { 'x-stroke-token': token },
       );
 
-      // 記録を足しても結果の形は変わらない（status だけ。項目は増えない）
       expect(result).toEqual({ status: 200 });
-      expect(hasLaunchSubmission(token)).toBe(true);
-
-      forgetLaunchSubmission(token);
+      expect(Object.keys(result)).toEqual(['status']);
       removeConnection(token);
     });
 
-    it('本家が 2xx 以外で拒否した提出は記録しない', async () => {
+    it('本家が受理しても、phase（U15）も実行の記録（A8）も動かさない', async () => {
+      // ツールは登録の代行だけで、完成の記録も実行の記録も invoke-agent の責務
+      // （docs/specs/mcp/contract.md「代行以外の固定の処理を受け持たない」）。stroke-board
+      // 自身の endpoint へは1つも発行しない
       const token = issueConnectionToken();
       registerConnection(token, { projectPath: '/opt/projects/example' });
       resolveProjectIdMock.mockResolvedValue({ ok: true, projectId: 'PID1' });
-      upstreamFetchMock.mockRejectedValue(fetchErrorWith(500, { error: 'Failed to save steering document: disk full' }));
-
-      const result = await submitDocumentHandler(
-        { type: 'steering', document: '# product', name: 'product' },
-        { 'x-stroke-token': token },
-      );
-
-      expect(result).toEqual({
-        status: 500,
-        errorCode: 'upstream_error',
-        error: 'Failed to save steering document: disk full',
-      });
-      expect(hasLaunchSubmission(token)).toBe(false);
-      removeConnection(token);
-    });
-
-    it('本家に届かなかった提出（unreachable）は記録しない', async () => {
-      const token = issueConnectionToken();
-      registerConnection(token, { projectPath: '/opt/projects/example' });
-      resolveProjectIdMock.mockResolvedValue({ ok: true, projectId: 'PID1' });
-      upstreamFetchMock.mockRejectedValue(new Error('connect ECONNREFUSED'));
+      upstreamFetchMock.mockResolvedValue({ status: 200, data: { success: true } });
 
       await submitDocumentHandler(
         { type: 'steering', document: '# product', name: 'product' },
         { 'x-stroke-token': token },
       );
 
-      expect(hasLaunchSubmission(token)).toBe(false);
+      expect($fetch).not.toHaveBeenCalled();
+      expect($fetch.raw).not.toHaveBeenCalled();
       removeConnection(token);
     });
 
-    it('project_not_registered で終わった提出は記録しない（代行先へ要求を出していない）', async () => {
-      const token = issueConnectionToken();
-      registerConnection(token, { projectPath: '/opt/projects/example' });
-      resolveProjectIdMock.mockResolvedValue({
-        ok: false,
-        status: 404,
-        errorCode: 'project_not_registered',
-        error: '対象のプロジェクトが本家の一覧に無い。',
-      });
-
-      const result = await submitDocumentHandler(
-        { type: 'steering', document: '# product', name: 'product' },
-        { 'x-stroke-token': token },
-      );
-
-      expect(result.status).toBe(404);
-      expect(upstreamFetchMock).not.toHaveBeenCalled();
-      expect(hasLaunchSubmission(token)).toBe(false);
-      removeConnection(token);
-    });
-
-    it('手前で弾いた 400（文書名が本家のルートに届かない形）は記録しない', async () => {
-      const token = issueConnectionToken();
-      registerConnection(token, { projectPath: '/opt/projects/example' });
-
-      await submitDocumentHandler(
-        { type: 'steering', document: '# product', name: '..' },
-        { 'x-stroke-token': token },
-      );
-
-      expect(resolveProjectIdMock).not.toHaveBeenCalled();
-      expect(hasLaunchSubmission(token)).toBe(false);
-      removeConnection(token);
-    });
-
-    it('connection_mismatch（flontier 接続から type: steering）は記録しない', async () => {
-      const token = issueConnectionToken();
-      registerConnection(token, { sessionId: 'session-1' });
-
-      await submitDocumentHandler(
-        { type: 'steering', document: '# product', name: 'product' },
-        { 'x-stroke-token': token },
-      );
-
-      expect(hasLaunchSubmission(token)).toBe(false);
-      removeConnection(token);
-    });
-
-    it('振り分け先を決められない type（steering 接続から）は記録しない', async () => {
-      // 手前で弾く 400 のもう1本（tasks 2.3）。`name` 側だけでなく `type` 側も見る
-      const token = issueConnectionToken();
-      registerConnection(token, { projectPath: '/opt/projects/example' });
-
-      const result = await submitDocumentHandler(
-        { type: 'design', document: '# product', name: 'product' },
-        { 'x-stroke-token': token },
-      );
-
-      expect(result.status).toBe(400);
-      expect(upstreamFetchMock).not.toHaveBeenCalled();
-      expect(hasLaunchSubmission(token)).toBe(false);
-      removeConnection(token);
-    });
-
-    it('実行が先に畳まれた後に本家の応答が戻っても記録しない（起動が終わった後まで残さない）', async () => {
-      // 打ち切りで claude を殺しても、飛行中のツールハンドラは中断されない。`kick` の
-      // `.finally`（removeConnection → forgetLaunchSubmission）が済んだ後に記録すると、
-      // 誰も捨てないエントリが残る（specs `mcp/tools/submit` の MUST NOT。
-      // santa-method レビュー指摘 2026-09-04）
+    it('実行が先に畳まれた後に本家の応答が戻っても、代行先の応答をそのまま返す', async () => {
+      // 打ち切りで claude を殺しても、応答待ちのツールハンドラは中断されない。ツールは接続の
+      // 生存を見ず、記録も残さないので、畳まれた後に戻った応答をそのまま返すだけでよい
       const token = issueConnectionToken();
       registerConnection(token, { projectPath: '/opt/projects/example' });
       resolveProjectIdMock.mockResolvedValue({ ok: true, projectId: 'PID1' });
       upstreamFetchMock.mockImplementation(async () => {
-        // 提出が飛行中のまま実行が畳まれる（`kick` の `.finally` と同じ2手）
+        // 提出が応答待ちのまま実行が畳まれる（`kick` の `.finally`）
         removeConnection(token);
-        forgetLaunchSubmission(token);
         return { status: 200, data: { success: true } };
       });
 
@@ -468,25 +378,7 @@ describe('submit-document', () => {
         { 'x-stroke-token': token },
       );
 
-      // 代行先の応答はそのまま返す（結果の形は変えない）
       expect(result).toEqual({ status: 200 });
-      // その起動はもう無いので、記録は作り直されない
-      expect(hasLaunchSubmission(token)).toBe(false);
-    });
-
-    it('flontier の提出は受理されても記録しない（受理を数えるのは A7 側。二重に数えない）', async () => {
-      const token = issueConnectionToken();
-      registerConnection(token, { sessionId: 'session-1' });
-      $fetch.raw.mockResolvedValueOnce({ status: 204 });
-
-      const result = await submitDocumentHandler(
-        { type: 'flontier', document: '# proposal' },
-        { 'x-stroke-token': token },
-      );
-
-      expect(result).toEqual({ status: 204 });
-      expect(hasLaunchSubmission(token)).toBe(false);
-      removeConnection(token);
     });
   });
 

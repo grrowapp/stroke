@@ -26,14 +26,15 @@
 - HTTP はステートレス。POST は受理・返却して即完結し、AI の呼び出し結果を待たない。結果は
   エージェントの提出（A5・A7）を受理した瞬間、サーバが WS（W1・W2）でブラウザへ中継する。
 - **AI の起動は U13 が唯一の入口。** 受理系（U1・U7・U9・U10・U14・U15）は受理と記録で完結し、
-  AI を起動しない。画面は受理の成功応答の直後に U13 を呼ぶ（specs/api/invoke-agent）。承認の
-  流れは U10（判断）→ U14（昇格）→ U13（steering の起こし）→ U15（完成の記録）の4段で、U13 が
-  届かなければ巡回が拾う。U15 は画面ではなく invokeAi が叩く（[sessions/activate.md](./sessions/activate.md)）。
+  AI を起動しない。画面は受理の成功応答の直後に U13 を呼ぶ。承認の流れは U10（判断）→ U14（昇格）
+  → U13（steering の起動）→ U15（完成の記録）の4段で、U13 が届かなければ巡回が拾う。U15 は画面では
+  なく invoke-agent が叩く。起動から実行の記録までの仕組みと責務は
+  [architecture/invoke-agent.md](../architecture/invoke-agent.md)。
 - **phase は `stroking → proposed → approved → activated` の一方向。** 値の集合は `shared/stroke.ts` の
-  `PHASES` が1つ持つ。`approved` は生成中、`activated` は完成（steering が文書を出し終えた）。
-  生成中か完了かは phase だけで決まり、`.spec-workflow/` の有無も `invocation` も見ない。
-  完成したかを判定するのは U15 ではなく呼び手（invokeAi）である
-  （[sessions/activate.md](./sessions/activate.md)・ADR-0014）。
+  `PHASES` が1つ持つ。`approved` は生成中、`activated` は完成（steering の3文書と承認依頼が本家に
+  揃った）。生成中か完了かは phase だけで決まり、`.spec-workflow/` の有無も `invocation` も見ない。
+  完成したかを判定するのは U15 ではなく invoke-agent である
+  （[architecture/invoke-agent.md](../architecture/invoke-agent.md)「作業が行われたかの判定」）。
 
 ## 各 endpoint の入出力
 
@@ -127,7 +128,7 @@
 - input: `{ invocation: 'running' | 'idle' | 'failed' | 'error', retries?: number }`
 - output: 本文なし（204）
 - 実行の記録を指定の値に変えるだけの endpoint。**`invocation` を書き込めるのはここだけ**であり、
-  叩くのは invokeAi だけとする。claude（エージェント）と画面は叩かない
+  叩くのは invoke-agent だけとする。claude（エージェント）と画面は叩かない
   A5・A7 も `invocation` に触れない。
 - 値の意味づけも遷移の判定もここでは持たない。`retries` は渡されたときだけ上書きする
   （`error` からの再実行で 0 に戻すのに使う）。
@@ -180,4 +181,4 @@
 | `/submission` | A8 | U2（`invocation`） |
 
 A8 だけはエージェント側に置かれているが、**claude は叩かない**。実行の記録を書くのは
-invokeAi だけである。
+invoke-agent だけである（[architecture/invoke-agent.md](../architecture/invoke-agent.md)）。

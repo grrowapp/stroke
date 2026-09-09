@@ -1,6 +1,6 @@
 # MCP ツールの契約
 
-stroke-board 自身が提供する MCP サーバー（route `/mcp`、Streamable HTTP）の定義。**claude プロセスとサーバーの境界**を扱う。画面・エージェントとサーバーの境界は [contract.md](./contract.md) の側にある。
+stroke-board 自身が提供する MCP サーバー（route `/mcp`、Streamable HTTP）の定義。**claude プロセスとサーバーの境界**を扱う。全ツールに共通する約束（工程の中でだけ存在する・代行以外の固定の処理を受け持たない・token を発行しない）は [contract.md](./contract.md) にある。画面・エージェントとサーバーの境界は [../api/contract.md](../api/contract.md) の側にある。
 
 操作の入口はこれだけである。ファイルの直読み・直書きも、コマンドによる代行も採らない。
 
@@ -26,7 +26,7 @@ stroke-board 自身が提供する MCP サーバー（route `/mcp`、Streamable 
 | `get-strokes` | ストローク記録の取得 | `GET /api/strokes/:id/strokes` |
 | `get-send-back` | 差し戻しの取得 | `GET /api/strokes/:id/send-back` |
 | `send-question` | 問いの提出 | `POST /api/strokes/:id/question` |
-| `submit-document` | 文書の提出（種別 `flontier` / `steering`） | `POST /api/strokes/:id/proposal` / 本家 `PUT /api/projects/:projectId/steering/:name` |
+| `submit-document` | 文書の提出（種別 `flontier` / `steering`）。責務は代行先への登録のみで、提出の受理を記録しない（[contract.md](./contract.md)） | `POST /api/strokes/:id/proposal` / 本家 `PUT /api/projects/:projectId/steering/:name` |
 | `get-steering-guide` | steering 工程の手順 | （無し。本文はツールの定数） |
 | `get-steering` | steering 文書の取得 | 本家 `GET /api/projects/:projectId/steering/:name` ＋ `GET /api/projects/:projectId/info` |
 
@@ -87,12 +87,14 @@ stroke-board 自身が提供する MCP サーバー（route `/mcp`、Streamable 
 
 全部を見せてツール側で工程を判定して拒否する形は採らない。呼べないものが一覧に出ていれば呼び手は呼ぶし、判別できるのは失敗した後になる（実測: 絞る前は `get-steering` が 51 回中 48 回失敗していた）。
 
+steering 工程には、この一覧の外に**本家 spec-workflow の MCP が配線され、承認依頼のツール `approvals` が使える**（[contract.md](./contract.md)「本家 spec-workflow の MCP との関係」）。stroke-board のツールではないので上の表には載せず、結果の形も揃えない。
+
 ## 接続の担保
 
 | 項目 | 内容 |
 |---|---|
 | ヘッダ | `x-stroke-token` |
-| 発行 | claude の spawn の直前。暗号学的に推測困難な乱数 |
+| 発行 | claude の spawn の直前に invoke-agent が発行する（[../architecture/invoke-agent.md](../architecture/invoke-agent.md)）。暗号学的に推測困難な乱数 |
 | 持ち方 | Nitro プロセス内のメモリのみ。永続化しない |
 | 失効 | その実行の終了時（正常・異常とも）。stroke-board の再起動で全エントリが失効する |
 | 内容 | セッション id（flontier）またはプロジェクトパス（steering） |
@@ -103,6 +105,7 @@ token は `--mcp-config` の JSON に載るので、**同一ホストの他ユ�
 
 ## 関連
 
+- 全ツール共通の契約 — [contract.md](./contract.md)
 - 起動フラグと定型 — [settings-reference.md](../core/settings-reference.md)
-- セッション API の契約 — [contract.md](./contract.md)
+- セッション API の契約 — [../api/contract.md](../api/contract.md)
 - 決めの記録 — [ADR 0016](../../adr/0016-delegate-provide-operations-via-mcp.md)・[ADR 0014](../../adr/0014-api-has-no-implicit-state-branching.md)

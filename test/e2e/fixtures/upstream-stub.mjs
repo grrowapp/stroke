@@ -78,9 +78,12 @@ function seed() {
         },
       ],
       approvals: [],
-      // 保存された文書。本家はファイルに書くので、次の取得で保存後の内容が返る
+      // 保存された文書。本家はファイルに書くので、次の取得で保存後の内容が返る。
+      // steering は product / tech を最初から持ち、structure は未作成（`info` がこれを返す）
       savedSpecDocuments: new Map(),
-      savedSteeringDocuments: new Map(),
+      savedSteeringDocuments: new Map(
+        ['product', 'tech'].map((docName) => [docName, defaultSteeringDocument(docName)]),
+      ),
       /*
        * 承認対象の本文の仕込み（承認 id → 本文）。`request-approval` に `content` を
        * 渡すと入る。本家はファイルを読むだけなので、ここは「そのファイルに何が書いて
@@ -307,14 +310,23 @@ function handleApi(segments, respond, method = 'GET', body = null) {
 
   const rest = segments.slice(3);
 
+  /*
+   * 3本の有無は保存された文書から導く。本家はファイルの有無を返すので、PUT で保存した
+   * 文書が次の `info` で在ることになる。invoke-agent は steering の実行の終わりにこれを
+   * 見て完成を判定する（update-invoke-agent-responsibility-boundary）。seed したプロジェクトは
+   * product / tech を持ち、structure は未作成のまま（画面の E2E がそれを前提にしている）。
+   */
   if (rest[0] === 'info') {
+    const documents = Object.fromEntries(
+      STEERING_DOCUMENTS.map((name) => [name, project.savedSteeringDocuments.has(name)]),
+    );
     return respond(200, {
       projectId: project.projectId,
       projectName: project.projectName,
       projectPath: project.projectPath,
       steering: {
-        exists: true,
-        documents: { product: true, tech: true, structure: false },
+        exists: Object.values(documents).some(Boolean),
+        documents,
         lastModified: '2026-08-21T00:00:00.000Z',
       },
       version: '2.2.7',
@@ -470,41 +482,52 @@ function handleApi(segments, respond, method = 'GET', body = null) {
     const saved = project.savedSteeringDocuments.get(rest[1]);
     if (saved !== undefined) return respond(200, { content: saved });
 
-    return respond(200, {
-      content: [
-        `# ${rest[1]}`,
-        '',
-        '本文と `インラインコード`。',
-        '',
-        // 見出しの段（h1 と h2 で寸法が変わることを押さえる）
-        '## 見出し2',
-        '',
-        '2段目の本文。',
-        '',
-        '- 箇条書き1',
-        '- 箇条書き2',
-        '',
-        '| 見出しA | 見出しB |',
-        '| --- | --- |',
-        '| 値1 | 値2 |',
-        '',
-        '```ts',
-        "const x = 'コードブロック';",
-        '```',
-        '',
-        '```mermaid',
-        'flowchart LR',
-        '  a["はじめ"] --> b["おわり"]',
-        '```',
-        '',
-        '<img src=x onerror="window.__xss = true">',
-        '',
-        '<script>window.__xss = true;</script>',
-      ].join('\n'),
-    });
+    // 保存されていない文書も本文を返す（画面の描画の E2E のため）。有無は `info` が持つ
+    return respond(200, { content: defaultSteeringDocument(rest[1]) });
   }
 
   return false;
+}
+
+/** steering 文書の3本。本家の `info` の `steering.documents` のキーと同じ */
+const STEERING_DOCUMENTS = ['product', 'tech', 'structure'];
+
+/**
+ * seed したプロジェクトが最初から持つ steering 文書の本文。markdown の描画の E2E が
+ * 見出し・表・コード・mermaid・XSS の混入を1本で試すための素材で、`product` / `tech` の
+ * 2本に入れる（`structure` は未作成のまま）。
+ */
+function defaultSteeringDocument(name) {
+  return [
+    `# ${name}`,
+    '',
+    '本文と `インラインコード`。',
+    '',
+    // 見出しの段（h1 と h2 で寸法が変わることを押さえる）
+    '## 見出し2',
+    '',
+    '2段目の本文。',
+    '',
+    '- 箇条書き1',
+    '- 箇条書き2',
+    '',
+    '| 見出しA | 見出しB |',
+    '| --- | --- |',
+    '| 値1 | 値2 |',
+    '',
+    '```ts',
+    "const x = 'コードブロック';",
+    '```',
+    '',
+    '```mermaid',
+    'flowchart LR',
+    '  a["はじめ"] --> b["おわり"]',
+    '```',
+    '',
+    '<img src=x onerror="window.__xss = true">',
+    '',
+    '<script>window.__xss = true;</script>',
+  ].join('\n');
 }
 
 seed();

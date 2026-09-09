@@ -16,7 +16,10 @@ import { parseBody } from '../../utils/stroke/request-schemas'
  * サーバーが AI を起動する前に叩く（`server/utils/stroke/invoke.ts` の `kick`）。かつては
  * steering 用 claude の `--mcp-config` に並べた本家 MCP の自己登録でプロジェクトが本家に
  * 現れていた——生成が AI のプロセスに乗っていた。その配線は外し、生成はここだけになった
- * （update-project-generation-via-upstream-rest）。
+ * （update-project-generation-via-upstream-rest）。本家 MCP は承認依頼のためにだけ steering の
+ * 起動定義へ並べ直したが、並べるのはここが受理された後に限る——登録済みのパスへの自己登録は
+ * 同じ projectId を返すだけで、生成にはならない
+ * （update-invoke-agent-responsibility-boundary design D4）。
  *
  * **id を取らない。** 作成に id は無く、本家が要るのはパスであり、呼び手は cwd としてパスを
  * 既に持っている。id を受けてパスを導出し直すのは、呼び手が持つ事実を別の規則で決め直す

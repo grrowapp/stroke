@@ -136,6 +136,7 @@ base2/
 | `docs/specs/core/settings-reference.md` | 設定の正 |
 | `docs/specs/structure/file-components.md` / `file-composables.md` / `server-structure.md` | 部品・composable・utils の全数と規範への対応（`modules/` は含まない。§3） |
 | `docs/specs/architecture/data-fetching.md` | データ取得・SSR の設計 |
+| `docs/specs/architecture/invoke-agent.md` | AI の起動と実行の管理（invoke-agent）の仕組みと責務範囲 |
 | `docs/specs/plan/structure-migration.md` | 現状との差分（移行課題） |
 | `.spec-workflow/steering/structure.md` / `tech.md` | コーディング規約（命名・import・テストの置き場・通す門番・書き方の原則） |
 | `docs/adr/0002` / `0005`〜`0008` | 統合・本家の扱いの決定 |

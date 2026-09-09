@@ -1,27 +1,22 @@
 /**
- * 提出（A5 question・A7 proposal・steering 文書）が届いたことの記録。
+ * 提出（A5 question・A7 proposal）が届いたことの記録。
  *
  * **完了の合図ではない。** 完了は invokeAi が子プロセスの output stream で検知する
  * （openspec/specs/agent/invocation）。ここが答えるのは「その実行で作業が行われたか」で、
  * 完了の検知とは別の問いである。
  *
- * **キーの取り方が2つある。** 受理する endpoint が誰かで変わる。
+ * ここに載るのは flontier（A5・A7）だけである。受理する endpoint がこの stroke-board 自身に
+ * あり、対象の `sessionId` で数えられる。数えるのは受理した endpoint 自身で、MCP ツールは
+ * 数えない（`docs/specs/mcp/contract.md`「代行以外の固定の処理を受け持たない」）。
  *
- * - flontier（A5・A7）: 受理する endpoint がこの stroke-board 自身にあり、対象の
- *   `sessionId` で数えられる。以下の `counts`（既存）がこちらを持つ
- * - steering: 受理するのは代行先（本家 spec-workflow）で、stroke-board の endpoint を
- *   1つも通らない。`sessionId` に結びつける経路が無いので、ツール
- *   （`server/mcp/tools/submit-document.ts`）がその場で「どの起動から呼ばれたか」
- *   （接続 token）を単位に、受理された提出の有無で持つ。以下の `launchSubmissions` が
- *   こちらを持つ
+ * steering の判定はここに無い。かつては `submit-document` が本家 PUT の受理を起動 token の
+ * 記録に残していたが、MCP ツールに判定の材料を作らせない形へ改め、invoke-agent が実行の
+ * 終わりに本家 REST へ問い合わせて判定する（`invoke.ts` の `steeringCompletedUpstream`・
+ * `docs/specs/architecture/invoke-agent.md`。update-invoke-agent-responsibility-boundary）。
  *
- * 2種類のキーを1つの `Map` に混ぜない——`forgetSubmissions(sessionId)` が何を消して
- * いるのかが読めなくなる（fix-steering-empty-completion design.md D3）。
- *
- * ストロークの1回の実行は、必ず A5 か A7 のどちらかの提出で終わる。steering の1回の
- * 実行は、steering 文書の提出（本家が受理したもの）で終わる。プロセスが正常終了しても
- * 提出が1つも無ければ、それは作業をせずに終わったということで、失敗として扱って
- * 起こし直す。これが無いと、`invocation` が `idle` のまま何も進まないセッションが残り、
+ * ストロークの1回の実行は、必ず A5 か A7 のどちらかの提出で終わる。プロセスが正常終了
+ * しても提出が1つも無ければ、それは作業をせずに終わったということで、失敗として扱って
+ * 起動し直す。これが無いと、`invocation` が `idle` のまま何も進まないセッションが残り、
  * 巡回（`failed` しか拾わない）も回収できない。
  *
  * 単一ユーザー・単一プロセスの MVP なのでメモリ上で足りる。
@@ -43,37 +38,4 @@ export function submissionCount(sessionId: string): number {
 /** セッションが消えたら記録も落とす。 */
 export function forgetSubmissions(sessionId: string): void {
   counts.delete(sessionId)
-}
-
-/**
- * 起動（接続 token）単位の提出記録。steering の提出はここに載る。
- *
- * 数えるのは代行先（本家 spec-workflow）が受理した経路だけ——拒否・不達・手前で弾いた
- * 400 では記録しない（`submit-document.ts` の責務）。
- *
- * **生成中のプロジェクト（phase が `approved`）では、この記録が完成の判定そのものである。**
- * 完成の記録（U15）は判定を持たない（ADR-0014・add-activated-phase design D3）ので、
- * 「生成が終わったか」に答えるのはここだけになる。受理された提出が1つも無い起動は
- * U15 を叩かずに `failed` へ倒れる（`ai.ts` の成功経路・design D4）。完成済み
- * （`activated`）の steering の起こし直しでも、同じこの記録が `idle` / `failed` を分ける。
- *
- * **数ではなく有無で持つ（`Set`）。** 問いは「その起動で受理された提出が1つ以上あるか」
- * だけで、件数を読む者は居ない（`counts` 側は起動の前後で比べるので数が要る。こちらは
- * 起動と1対1なので比べる相手が無い。santa-method レビュー指摘 2026-09-04）。
- */
-const launchSubmissions = new Set<string>()
-
-/** その起動（token）で提出が1つ受理された。`submit-document` の steering 分岐が呼ぶ。 */
-export function recordLaunchSubmission(token: string): void {
-  launchSubmissions.add(token)
-}
-
-/** その起動（token）で、これまでに受理された提出があるか。 */
-export function hasLaunchSubmission(token: string): boolean {
-  return launchSubmissions.has(token)
-}
-
-/** 起動が終わったら記録を捨てる。`kick` の `.finally`（`removeConnection` と並べる）が呼ぶ。 */
-export function forgetLaunchSubmission(token: string): void {
-  launchSubmissions.delete(token)
 }

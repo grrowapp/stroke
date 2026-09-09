@@ -28,7 +28,13 @@ export type ConnectionHeaders = Record<string, string | string[] | undefined>
 
 const connections = new Map<string, ConnectionContext>()
 
-/** 推測困難な一時 token を発行する。登録はしない（呼び出し側が `registerConnection` する）。 */
+/**
+ * 推測困難な一時 token を発行する。登録はしない（呼び出し側が `registerConnection` する）。
+ *
+ * 発行・登録・失効を行うのは invoke-agent（`server/utils/stroke/invoke.ts` の `kick`）だけで
+ * ある（specs `server/session-management`）。MCP ツールは `resolveConnection` で解決する
+ * だけで、この表に書き込まない（`docs/specs/mcp/contract.md`）。
+ */
 export function issueConnectionToken(): string {
   return randomBytes(32).toString('hex')
 }
@@ -41,26 +47,6 @@ export function registerConnection(token: string, context: ConnectionContext): v
 /** 登録を消す。invokeAi の実行終了時（正常・異常とも）に呼ぶ。 */
 export function removeConnection(token: string): void {
   connections.delete(token)
-}
-
-/**
- * その token の起動がまだ実行中か（＝接続表に載ったままか）。
- *
- * ツールの中で、**代行先を待っている間に実行が畳まれていないか**を確かめるために要る。
- * ハンドラの先頭で `resolveConnection` を通っていても、`await` の向こう側では実行が
- * 終わっていることがある——打ち切り（タイムアウト）で claude を殺しても、サーバー側の
- * ツールハンドラは中断されないためである。
- *
- * これを見ずに起動単位の記録を足すと、`kick` の `.finally`（`removeConnection` →
- * `forgetLaunchSubmission`）が済んだ後に記録が作り直され、誰も捨てないまま残る
- * （specs `mcp/tools/submit`「起動が終わった後まで残してはならない」。santa-method
- * レビュー指摘 2026-09-04）。
- *
- * **判定と記録の間に `await` を置かないこと。** 片付けは1つの同期ブロックなので、
- * 間に `await` が無ければ「片付けの前」か「片付けの後」のどちらかにしかならない。
- */
-export function isConnectionActive(token: string): boolean {
-  return connections.has(token)
 }
 
 /**

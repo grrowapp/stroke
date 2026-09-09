@@ -13,18 +13,25 @@ const call = (headers: Record<string, string>) => structuredResult(getSteeringGu
 /** 節ごとに、その節へ入っていなければならない内容（`get-guide.test.ts` と同じ考え）。 */
 const REQUIRED: Array<[string, RegExp[], number]> = [
   ['状況を確認', [/get-steering/, /exists: false/, /exists: true/, /上書き/], 100],
-  ['書く順序', [/product → tech → structure/, /1本ずつ/], 120],
-  ['提出する', [/submit-document/, /type: "steering"/, /product/], 80],
+  ['書く順序', [/product → 承認依頼 → tech → 承認依頼 → structure/, /1本ずつ/], 120],
+  // 承認依頼（3-1）は「提出する」の小節なので、同じ節の中に在る（`sectionBodies` は `## ` で
+  // 割るため `### ` は親の節に含まれる）。本家 `approvals` の引数と「承認を待たない」を固定する
+  ['提出する', [
+    /submit-document/, /type: "steering"/, /product/,
+    /approvals/, /action.*"request"/, /\.spec-workflow\/steering\/<name>\.md/,
+    /type.*"document"/, /category.*"steering"/, /categoryName.*"steering"/,
+    /受理された文書にだけ/, /承認を待たない/,
+  ], 400],
   ['終わりとみなす基準', [/書き終わり|終わりである/], 75],
   ['うまくいかないとき', [
     /errorCode/, /project_not_registered/, /unreachable/,
     /upstream_error/, /upstream_malformed/, /connection_mismatch/,
-    /直接書いて/,
-  ], 510],
-  ['どこで工程が終わるか', [/3本/], 35],
-  // 本家 MCP はこの工程に配線されていない（update-project-generation-via-upstream-rest design D3）
-  ['本家 MCP は配線されていない', [/配線されていない/, /stroke-board/, /並ばない/], 120],
-  ['やらないこと', [/直接読み書き/], 30],
+    /直接書いて/, /approvals.*status.*errorCode.*持たない/s,
+  ], 560],
+  ['どこで工程が終わるか', [/3本/, /承認依頼/, /承認の結果は終わりの条件に含まれない/], 80],
+  // 本家 MCP で使うのは `approvals`（update-invoke-agent-responsibility-boundary design D4）
+  ['本家 MCP で使うのは `approvals`', [/approvals/, /stroke-board/, /登録済み/, /承認依頼/], 150],
+  ['やらないこと', [/直接読み書き/, /承認依頼を出さずに終わらない/], 50],
 ];
 /**
  * 手順が**節として**書かれていることを見る。
@@ -91,8 +98,9 @@ describe('get-steering-guide', () => {
     removeConnection(token);
   });
 
-  it('説明が「先に呼べ」と述べている', () => {
+  it('説明が「先に呼べ」と述べ、承認依頼の出し方を含むと述べている', () => {
     expect(getSteeringGuideTool.description).toMatch(/先に/);
+    expect(getSteeringGuideTool.description).toMatch(/承認依頼/);
   });
 
   it('手順が節ごとに書かれ、それぞれの節に要る内容が入っている', async () => {

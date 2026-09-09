@@ -45,10 +45,11 @@ server/mcp/tools/                                      MCP ツール8本（フ�
 | スキーマ名 | `runtimeConfig.claude.workflowSchema` | セッション作成時に `openspec/config.yaml` へ書かれる |
 | 手順の入口 | `runtimeConfig.claude.firstPrompt` ほか | 定型が案内ツール（`get-guide`）の名前を指す。手順の本文は定型に書かない |
 | 接続先 | `server/utils/stroke/listen-address.ts` | 起動ごとに組み立てる `--mcp-config` の url。**設定ではなく、サーバーが実際に bind したアドレスから作る**（かつての `claude.apiBaseUrl` は外した）。spawn 時の環境変数 `STROKE_BASEURL` としても渡るが、**読み手はもう居ない** |
-| どのセッションか | — | `--mcp-config` の `x-stroke-token`。接続表がセッション id へ引き当てる |
+| どのセッションか | — | `--mcp-config` の `x-stroke-token`。接続表がセッション id へ解決する。発行・登録・失効は invoke-agent（[invoke-agent.md](./invoke-agent.md)「接続 token の寿命」） |
 | 工程ごとの公開ツール | `server/utils/mcp/exposed-tools.ts` | `--mcp-config` の `x-mcp-tools` |
 | 作業場所 | — | cwd だけ。`--add-dir` は渡さない |
-| steering の定型 | `runtimeConfig.claude.steeringPrompt` | 承認の直後、cwd＝生成先で起こすときに渡る |
+| steering の定型 | `runtimeConfig.claude.steeringPrompt` | 承認の直後、cwd＝生成先で起動するときに渡る |
+| 本家 MCP（steering のみ） | `server/utils/stroke/invoke.ts` | steering 工程の `--mcp-config` に本家 spec-workflow の MCP を並べ、承認依頼のツール `approvals` を許可する（`docs/specs/core/settings-reference.md`「`--allowedTools`」） |
 
 ストローク側の設定を**コードが環境変数から読むことはしない**。値は `nuxt.config.ts` と
 `app/app.config.ts` に書かれたものだけで、読み出す実装は `server/utils/stroke/config.ts` の1本である。
@@ -62,9 +63,11 @@ server/mcp/tools/                                      MCP ツール8本（フ�
    `NUXT_CLAUDE_API_BASE_URL` も効く。**コードが読まないだけで、値は差し替えられる**
 2. **子プロセスは親の環境を丸ごと継ぐ。** `server/utils/stroke/claude.ts` が
    `env: { ...process.env, STROKE_BASEURL: … }` で spawn する
-3. **steering 工程はポータル側の設定 `upstreamBaseUrl` を使う。** 生成（`POST /api/projects`）の
-   依頼先であり、本家 REST の代行先（`server/utils/mcp/upstream-fetch.ts`）でもある。ずらすと
-   起動の材料を組み立てられず、steering 工程が成立しない
+3. **steering 工程はポータル側の設定 `upstreamBaseUrl` と `specWorkflowHome` を使う。**
+   `upstreamBaseUrl` は生成（`POST /api/projects`）の依頼先であり、本家 REST の代行先
+   （`server/utils/mcp/upstream-fetch.ts`）であり、invoke-agent が完了時に文書と承認依頼を確かめる
+   先でもある。`specWorkflowHome` は steering 工程に並べる本家 MCP の env に渡る。どちらもずらすと
+   steering 工程が成立しない
 
 セッション作成（`server/utils/stroke/session-core.ts`）は「ディレクトリ作成 → `openspec init --tools none` → `config.yaml` 上書き → 状態ファイル書き込み」。**サーバは change を作らない**。
 
@@ -83,36 +86,10 @@ server/mcp/tools/                                      MCP ツール8本（フ�
 
 ## 実行の記録（`invocation`）
 
-`state.json` が4値で持つ。書き込みは A8（`POST /api/strokes/:id/submission`）を通す。
-claude（エージェント）と画面からは書けない（`openspec/specs/agent/invocation`）。
-
-```mermaid
-stateDiagram-v2
-    [*] --> idle: セッション作成
-    idle --> running: U13 で起動
-    running --> idle: 完了を検知（提出あり。生成中の steering は完成の記録が受理された）
-    running --> failed: タイムアウト・起動失敗・提出なしの完了・完成の記録（U15）が受理されない
-    running --> error: 起動時に後始末できない
-    failed --> running: 巡回が起こし直す（上限内）
-    failed --> error: 上限に達した状態で再キック
-    error --> running: ユーザーの再実行（回数リセット）
-    error --> [*]: ユーザーの削除
-```
-
-- 昇格後（`approved` / `activated`）の対象も `invocation` を持つ。昇格後は steering の実行が起こる
-- 上限（`runtimeConfig.claude.maxRetries`）の判定は invokeAi。巡回は `failed` だけを拾う
-- **正常終了でも、その起動で提出が1つも受理されていなければ `failed` に倒す。** 提出は
-  flontier が問い・proposal、steering が steering 文書。空振りを `idle` にすると成功と
-  区別できず、誰も起こし直さない
-- **生成中（`approved`）の steering では、提出の判定（その起動で steering 文書の提出が本家に
-  受理されたか）が完成の判定そのものである。** 提出があった実行だけが完成の記録（U15）へ進み、
-  受理されて `idle` になる。記録に届かなければ `failed`。提出が無ければ記録を試みずに `failed` に
-  倒す——**U15 の側に判定は無い**（ADR-0014。`docs/specs/api/sessions/activate.md`）
-- サーバー再起動で宙に浮いた `running` は、**まずその claude を終了させてから** `failed` へ
-  倒して巡回に拾わせる（`server/plugins/01.reap-running.ts`）。終了させられない場合と、
-  走っているものを調べられない場合は `error` へ倒してユーザーに引き渡す
-- **どのインスタンスが起こしたかは見ない。** 起動の引数の照合で対象を指していると分かれば、
-  それはこのアプリが起こした実行として扱う
+`state.json` が4値で持つ。書き込みは A8（`POST /api/strokes/:id/submission`）を通し、書くのは
+invoke-agent だけである。claude（エージェント）と画面からは書けない。値の遷移・作業が行われた
+かの判定・完成の記録との関係は [invoke-agent.md](./invoke-agent.md)「実行の記録」「作業が行われた
+かの判定」。
 
 ## 実測で確定していること
 

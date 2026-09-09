@@ -12,9 +12,10 @@ import { readState, withStateLock, writeState, type SessionState } from '../../.
  *
  * ## 判定を持たない（ADR-0014）
  *
- * **完成したかを、ここは決めない。** 決めるのは呼び手である——invokeAi はその起動で
- * steering 文書の提出が本家に受理されたか（`didWork`）を見て、起動時の書き上げは一覧が
- * 持つ実行の記録（`invocation: 'idle'`）で対象を選ぶ。この endpoint がするのは
+ * **完成したかを、ここは決めない。** 決めるのは呼び手である——invoke-agent は実行の終わりに
+ * 本家 REST を確認する判定（`invoke.ts` の `steeringCompletedUpstream`。`didWork`）で決め、
+ * 生成中は3本の steering 文書と3件の承認依頼が本家に在るときだけここを叩く。起動時の
+ * 書き上げは一覧が持つ実行の記録（`invocation: 'idle'`）で対象を選ぶ。この endpoint がするのは
  * `approved` → `activated` の一方向の遷移を記録することだけである。
  *
  * ファイルシステム（`.spec-workflow/` 配下）も本家の REST も読まない。呼び出し側が渡して
@@ -22,10 +23,11 @@ import { readState, withStateLock, writeState, type SessionState } from '../../.
  * 対してこの責務が成立するか」——存在しない・読めない・局面が違う——だけである
  * （ADR-0014「責務の不成立は対象外」・add-activated-phase design D3）。
  *
- * かつては `.spec-workflow/approvals/` に承認依頼のファイルが在ることを完成の根拠にして
- * いたが、2026-09-04 に退けた。API が状態を判定していたこと（ADR-0014）に加え、steering
- * 工程には承認依頼を出す手段が無く（本家 `request-approval` は allowedTools に無い）、
- * 文書を出し終えた実行がすべて 409 で断られて `failed` → 巡回 → `error` に倒れていた。
+ * かつては `.spec-workflow/approvals/` に承認依頼のファイルが在ることを、この endpoint
+ * 自身が読んで完成の根拠にしていたが、2026-09-04 に退けた——API が状態を判定していた
+ * （ADR-0014）。承認依頼を根拠にすること自体は残り、判定は呼び手（invoke-agent）が本家
+ * REST へ問い合わせる形で持つ。承認依頼は steering 工程の claude が本家 MCP の `approvals`
+ * で出す（update-invoke-agent-responsibility-boundary design D4）。
  *
  * ## busy ガードを持たない
  *
