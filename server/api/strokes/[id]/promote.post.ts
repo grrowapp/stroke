@@ -5,9 +5,54 @@ import { LOG_PREFIX } from '../../../utils/stroke/log'
 import { assertNameAvailable, promoteSessionToProject, revertPromotion } from '../../../utils/stroke/project'
 import { beginRun, endRun, sessionRunPath } from '../../../utils/stroke/running'
 import { requireSessionId } from '../../../utils/stroke/session-param'
-import { isPromotedState, readState, writeState } from '../../../utils/stroke/session-store'
+import { isPromotedState, readState, withoutDecision, withStateLock, writeState } from '../../../utils/stroke/session-store'
 import { forgetSubmissions } from '../../../utils/stroke/submission-signal'
 import { submissionPath } from '../../../utils/stroke/submission-path'
+
+/**
+ * その失敗が「名前の衝突」か。`conflict()` が 409 に載せる理由の印（`data.reason`）で見る
+ * （`server/utils/stroke/conflict.ts`）。画面側（`useProposalReview.ts`）と同じく status と
+ * 印の両方を見る。**入れ子の深さは画面側と違う**——あちらは `$fetch` が応答を包むので
+ * `error.data.data.reason` を辿るが、ここは `createError` が作ったものを直に受けるので
+ * `error.data.reason` である。
+ *
+ * status だけで見ない——衝突の確認と改名を包む `catch` には3種の失敗が入る。衝突の 409、
+ * 名前の形が不正な 400（`assertProjectName`）、改名が転んだ 500（`promoteSessionToProject`）
+ * である。判断を取り下げてよいのは衝突のときだけで、他の2つは同じ判断のままやり直せる。
+ */
+function isNameConflict(error: unknown): boolean {
+  const e = error as { statusCode?: unknown, data?: unknown } | null
+  if (e?.statusCode !== 409) return false
+  const data = e.data
+  if (typeof data !== 'object' || data === null) return false
+  return (data as { reason?: unknown }).reason === 'name-conflict'
+}
+
+/**
+ * 名前の衝突で昇格できなかったセッションの判断を取り下げる。取り消すのは判断だけで、
+ * `phase` は `proposed` のまま動かない（U10 の取り下げ `approve.delete.ts` と同じ）。
+ *
+ * **消すのは `conflictedName` を持つ判断だけである。** 冒頭で読んだ状態は占有を取る前の
+ * もので、そこから衝突の検出までの間に判断は入れ替わりうる——承認（U10）は busy ガードの
+ * 対象外であり（`approve.post.ts`「busy ガードは U7・U9 のみ」）、昇格の占有も U10 を
+ * 止めない。別の名前の判断（画面が既に下し直したもの）はこの 409 の理由になっていない
+ * ——その名前は `assertNameAvailable` で確かめていないので、消す根拠が無い。判断が既に
+ * 消えていた場合も何もしない（`approve.delete.ts`「判断が無ければ何も変えない」と同じ）。
+ *
+ * **`withStateLock` が排他するのは lock を取る書き手だけである**（`writeInvocation`・
+ * `activate.post.ts`・`invoke.ts`）。U10 は lock を取らないので直列化されない——上の名前の
+ * 照合が要るのはそのためで、lock はそれに加えて `state.json` の read-modify-write をこの
+ * repo の既定の形に揃える。**読み直しと書き込みの間に U10 が挟まる窓は原理上残る**（閉じる
+ * には U10 側にも lock が要る。この change の範囲外）。
+ */
+async function withdrawConflictedDecision(sessionId: string, conflictedName: string): Promise<void> {
+  await withStateLock(sessionId, async () => {
+    const current = await readState(sessionId)
+    if (current.phase !== 'proposed') return
+    if (current.decision?.projectName !== conflictedName) return
+    await writeState(sessionId, withoutDecision(current))
+  })
+}
 
 /**
  * U14: 判断のあるセッションをプロジェクトへ昇格させる（openspec/specs/api/session/promote）。
@@ -23,10 +68,22 @@ import { submissionPath } from '../../../utils/stroke/submission-path'
  *
  * 昇格はセッションディレクトリの改名だけである（openspec/specs/project/generation）。
  * 順序は「衝突確認 → 改名 → `phase` を書く」で、書き込みが失敗したら改名を戻す。
- * どの時点で失敗しても、セッションは元の名前・`proposed`・**判断はそのまま**で残り、
- * 同じ判断のまま昇格だけをやり直せる。逆順（`phase` を書いてから改名）にすると、書いた
- * 直後に落ちたときに **uuid のままで `approved`** のディレクトリが残り、一覧に「生成中」
- * として出てしまう。
+ * どの時点で失敗しても、セッションは元の名前・`proposed` で残る。逆順（`phase` を書いてから
+ * 改名）にすると、書いた直後に落ちたときに **uuid のままで `approved`** のディレクトリが
+ * 残り、一覧に「生成中」として出てしまう。
+ *
+ * ## 失敗の種類で、判断の扱いが分かれる
+ *
+ * **改名・`phase` の書き込みが失敗したときは判断を残す。** 保存先の I/O が転んだだけで、
+ * 同じ判断のまま昇格だけをやり直せる（openspec/specs/api/session/promote「後始末は段ごとに
+ * 閉じる」の「昇格が改名または phase の書き込みで失敗したとき」）。
+ *
+ * **名前が衝突したときは、判断を取り下げてから 409 name-conflict を返す。** 判断が持つ名前は
+ * 既に保存先で使われており、その判断のままでは何度やり直しても昇格できない——やり直しの
+ * 対象は昇格ではなく判断そのものである（openspec/specs/project/generation「昇格の直前に
+ * 既存名との衝突を確認する」）。**取り下げるのはここであって、衝突を伝えられた側では
+ * ない。** 伝えられた側は別の名前を確定して改めて承認するだけでよく、取り下げが済んで
+ * いることを前提にできる。
  *
  * ## 昇格の完了時点で `invocation` を `failed` にする
  *
@@ -89,12 +146,23 @@ export default defineEventHandler(async (event) => {
   const runKey = await beginRun(sessionRunPath(shareRoot, sessionId))
 
   try {
-    // 衝突確認は改名の**前**に通す。既にあれば何も動かさずに 409 で、セッションは
-    // `proposed`・判断つきのまま残る。
-    await assertNameAvailable(shareRoot, projectName)
-
+    // 衝突確認は改名の**前**に通す。既にあれば改名は起こらない。
     // **改名してから phase を書く。** 巻き戻しは対称で、書き込みに失敗したら改名を戻すだけ。
-    await promoteSessionToProject(shareRoot, sessionId, projectName)
+    //
+    // 衝突を投げうる口は**2つある**——ここの `assertNameAvailable` と、
+    // `promoteSessionToProject` が改名の直前に通す同じ確認（`rename` は相手が空ディレクトリ
+    // だと黙って置き換えうるので EEXIST 任せにしない。`utils/stroke/project.ts`）。
+    // **どちらから出た衝突も同じ扱いにする**ので、catch は両方を覆う。
+    try {
+      await assertNameAvailable(shareRoot, projectName)
+      await promoteSessionToProject(shareRoot, sessionId, projectName)
+    } catch (error) {
+      // 扱いの分かれ目は上の doc、取り下げの条件と手順は `withdrawConflictedDecision`。
+      // **取り下げが転んだらその失敗が 409 の代わりに外へ出る**——握り潰すと、応答は
+      // 「取り下げた」と言うのに `state.json` には判断が残る。
+      if (isNameConflict(error)) await withdrawConflictedDecision(sessionId, projectName)
+      throw error
+    }
 
     // 昇格後も steering の実行が起こるので、`invocation` を持たせて引き継ぐ
     // （openspec/specs/agent/invocation）。回数は新しい用途なので 0 から数え直す。
