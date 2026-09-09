@@ -58,8 +58,11 @@ describe('promoteSessionToProject', () => {
   it('同名が既にあれば改名せず衝突を返す', async () => {
     await mkdir(join(root, 'taken'))
 
+    // 理由の印まで固定する。昇格の受け口（U14）はこの印で「判断を取り下げる失敗」と
+    // 「判断を残す失敗」を分けるので、印が落ちると取り下げだけが静かに止まる
     await expect(promoteSessionToProject(root, SESSION_ID, 'taken')).rejects.toMatchObject({
       statusCode: 409,
+      data: { reason: 'name-conflict' },
     })
 
     // セッションは元の名前のまま残り、再度承認できる
@@ -73,6 +76,7 @@ describe('promoteSessionToProject', () => {
 
     await expect(promoteSessionToProject(root, SESSION_ID, 'empty')).rejects.toMatchObject({
       statusCode: 409,
+      data: { reason: 'name-conflict' },
     })
   })
 
