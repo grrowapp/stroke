@@ -19,7 +19,15 @@ import { fakeEvent, stubNitroGlobals, type FakeEvent } from '../../support';
  * ファイル path にしかないため文字クラスにならない。実際
  * `test/server/api/projects/[projectId]/index.delete.test.ts` は収集されて通る
  * （`fix-session-api-layout` で実測）。
+ *
+ * **見るのは準備と後始末だけである**——読み取れない問いの 400、承認以降の 409、通ったときに
+ * handler へ渡すものと 204 の返し方。残すことと配信することの実処理は
+ * `test/server/handler/question.test.ts`。
  */
+
+const { submitQuestion } = vi.hoisted(() => ({ submitQuestion: vi.fn(async () => undefined) }));
+
+vi.mock('../../../../../server/handler/question', () => ({ submitQuestion }));
 
 // ステータスの観測点。理由は `../../support.ts` の `stubNitroGlobals` に書いてある
 vi.mock('#app/composables/ssr', () => ({
@@ -31,17 +39,15 @@ vi.mock('#app/composables/ssr', () => ({
 vi.mock('../../../../../server/utils/stroke/session-store', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../server/utils/stroke/session-store')>()),
   sessionExists: vi.fn(async () => true),
-  readState: vi.fn(async () => ({ phase: 'stroking', currentQuestion: null, invocation: 'idle' })),
-  writeState: vi.fn(async () => undefined),
+  readState: vi.fn(async () => STROKING),
 }));
 
 stubNitroGlobals();
 
 const { default: questionHandler } = await import('../../../../../server/api/strokes/[id]/question/index.post');
-const { readState, writeState } = await import('../../../../../server/utils/stroke/session-store');
+const { readState } = await import('../../../../../server/utils/stroke/session-store');
 
 const readStateMock = vi.mocked(readState);
-const writeStateMock = vi.mocked(writeState);
 
 const QUESTION = {
   header: '保存方式',
@@ -49,11 +55,12 @@ const QUESTION = {
   question: '保存方式をどうするか',
   options: [{ label: 'JSON', description: '1ファイルに丸ごと持つ' }],
 };
+const STROKING = { phase: 'stroking', currentQuestion: null, invocation: 'idle' } as const;
 
 describe('A5 POST /api/strokes/:id/question', () => {
   beforeEach(() => {
-    readStateMock.mockClear();
-    writeStateMock.mockClear();
+    readStateMock.mockReset().mockResolvedValue(STROKING);
+    submitQuestion.mockClear();
   });
 
   /**
@@ -66,11 +73,15 @@ describe('A5 POST /api/strokes/:id/question', () => {
    * 出ないぶん、読んだ側が揃って 200 だと思い込む——代行する MCP ツールの注釈も、その
    * テストの期待値も、長く 200 を書いていた。ここで留めるのはソースが述べるステータスである。
    */
-  it('受理したら本文なしの 204 を返す', async () => {
+  it('受理したら handler へ渡し、本文なしの 204 を返す', async () => {
     const event = fakeEvent('session-1', QUESTION);
 
     const body = await questionHandler(event as never);
 
+    // 断った後の状態をそのまま渡す——問い以外を動かさないのは handler の役目である
+    expect(submitQuestion).toHaveBeenCalledWith('session-1', STROKING, expect.objectContaining({
+      question: '保存方式をどうするか',
+    }));
     // ハンドラは status を自分で持った Response を返す（`setResponseStatus` + 裸の null は
     // h3 に捨てられる）。観測点は event ではなく返り値である
     expect(body).toBeInstanceOf(Response);
@@ -78,39 +89,32 @@ describe('A5 POST /api/strokes/:id/question', () => {
     expect(await (body as Response).text()).toBe('');
   });
 
-  it('受理した問いを state へ残す', async () => {
-    const event = fakeEvent('session-1', QUESTION);
-
-    await questionHandler(event as never);
-
-    expect(writeStateMock).toHaveBeenCalledWith(
-      'session-1',
-      expect.objectContaining({ currentQuestion: expect.objectContaining({ question: '保存方式をどうするか' }) }),
-    );
-  });
-
-  it('読み取れない問いは 400 で弾き、state を書かない', async () => {
+  it('読み取れない問いは 400 で弾き、handler を呼ばない', async () => {
     const event = fakeEvent('session-1', { ...QUESTION, options: [] });
 
     await expect(questionHandler(event as never)).rejects.toThrow('問いの構造として読み取れない。');
-    expect(writeStateMock).not.toHaveBeenCalled();
+    expect(submitQuestion).not.toHaveBeenCalled();
     expect(event.status).toBeUndefined();
   });
 
-  it('承認済みのセッションには 409 を返し、state を書かない', async () => {
+  it('承認済みのセッションには 409 を返し、handler を呼ばない', async () => {
     readStateMock.mockResolvedValueOnce({ phase: 'approved', projectName: 'example', invocation: 'idle' });
     const event = fakeEvent('session-1', QUESTION);
 
-    await expect(questionHandler(event as never)).rejects.toThrow('承認済みのセッションには提出できない。');
-    expect(writeStateMock).not.toHaveBeenCalled();
+    await expect(questionHandler(event as never)).rejects.toMatchObject({
+      statusCode: 409,
+      data: { reason: 'phase' },
+      message: expect.stringContaining('承認済みのセッションには提出できない。'),
+    });
+    expect(submitQuestion).not.toHaveBeenCalled();
     expect(event.status).toBeUndefined();
   });
 
-  it('完成した（activated）プロジェクトにも 409 を返し、state を書かない', async () => {
+  it('完成した（activated）プロジェクトにも 409 を返し、handler を呼ばない', async () => {
     readStateMock.mockResolvedValueOnce({ phase: 'activated', projectName: 'example', invocation: 'idle' });
     const event = fakeEvent('session-1', QUESTION);
 
     await expect(questionHandler(event as never)).rejects.toThrow('承認済みのセッションには提出できない。');
-    expect(writeStateMock).not.toHaveBeenCalled();
+    expect(submitQuestion).not.toHaveBeenCalled();
   });
 });

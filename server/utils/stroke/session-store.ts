@@ -106,6 +106,15 @@ export type SessionState =
   | ProposedState
   | PromotedState
 
+/**
+ * 昇格前（`stroking` / `proposed`）の局面の状態。`isPromotedState` で弾いた残りである。
+ *
+ * 承認以降を断ってから実処理を行う endpoint（A5・A7）が、断った後の形を handler の引数の
+ * 型として書くために使う。ここに置くのは `SessionState` と `isPromotedState` が同じこの
+ * ファイルに在るからで、handler の片方に置いてもう片方が import する形は採らない。
+ */
+export type ActiveSessionState = Exclude<SessionState, PromotedState>
+
 const projectNameSchema = z.string().trim().min(1)
 const invocationSchema = z.enum(['running', 'idle', 'failed', 'error'])
 const retriesSchema = z.number().int().min(0).optional()
