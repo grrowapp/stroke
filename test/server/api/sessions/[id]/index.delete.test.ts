@@ -3,10 +3,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { fakeEvent, stubNitroGlobals } from '../support';
+import { fakeEvent, stubNitroGlobals } from '../../support';
 
 /**
- * 対象は `server/api/sessions/[id]/index.delete.ts`（U11）。
+ * 対象は `server/api/sessions/[id]/index.delete.ts`（U11）。**`[id]` の段を挟む**——
+ * `test/server/api/sessions/` の直下は U1（`sessions/index.post.ts`）と U12
+ * （`sessions/index.get.ts`）を写す位置なので、そこへ置くと対象を偽って指す。
+ * `projects/[projectId]/index.delete.test.ts` と同型で、そちらと同じ形に畳んだ
+ * （fix-session-api-namespace design「`test/server/api/sessions/index.delete.test.ts` の階層合わせ」）。
  *
  * 見るのは2つ。busy 判定が U13（起動）・P1（プロジェクト削除）・U10（承認）と同じ事実
  * （作業場所ディレクトリの実体）を見ていること（fix-rename-during-running-session）。
@@ -21,7 +25,7 @@ import { fakeEvent, stubNitroGlobals } from '../support';
 
 const config = vi.hoisted(() => ({ root: '' }));
 
-vi.mock('../../../../server/utils/stroke/config', () => ({
+vi.mock('../../../../../server/utils/stroke/config', () => ({
   readStrokeConfig: () => ({ projectShareRoot: config.root }),
 }));
 
@@ -30,14 +34,14 @@ vi.mock('#app/nuxt', async (importOriginal) => ({
   useRuntimeConfig: () => ({ projectShareRoot: config.root }),
 }));
 
-vi.mock('../../../../server/utils/stroke/submission-signal', () => ({
+vi.mock('../../../../../server/utils/stroke/submission-signal', () => ({
   forgetSubmissions: vi.fn(),
 }));
 
 stubNitroGlobals();
 
-const { default: deleteHandler } = await import('../../../../server/api/sessions/[id]/index.delete');
-const { beginRun, endRun } = await import('../../../../server/utils/stroke/running');
+const { default: deleteHandler } = await import('../../../../../server/api/sessions/[id]/index.delete');
+const { beginRun, endRun } = await import('../../../../../server/utils/stroke/running');
 
 const SESSION_ID = 'session-uuid';
 

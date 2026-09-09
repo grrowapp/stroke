@@ -47,7 +47,7 @@ export function kindOf(phase: Phase): RunKind {
  * 前提チェック（503）を通すためである。
  */
 export function invokePath(sessionId: string, cwd: string): string {
-  return `/api/strokes/${encodeURIComponent(sessionId)}/invoke-agent?cwd=${encodeURIComponent(cwd)}`
+  return `/api/sessions/${encodeURIComponent(sessionId)}/invoke-agent?cwd=${encodeURIComponent(cwd)}`
 }
 
 /**
@@ -353,7 +353,7 @@ export function buildRun(options: {
     // 一覧に載っていれば、初回の起動を済ませている = 続き先が在る。
     // **参照は API の応答から得る**（openspec/specs/agent/invocation）。
     hasConversation: async () =>
-      (await $fetch<SessionSummary[]>('/api/strokes')).some(s => s.id === sessionId),
+      (await $fetch<SessionSummary[]>('/api/sessions')).some(s => s.id === sessionId),
     setInvocation: invocationWriter(sessionId),
     // ストロークの1回の実行は必ず提出（A5・A7）で終わる。プロセスが正常終了しても
     // 提出が1つも無ければ、作業をせずに終わったということなので起こし直す。

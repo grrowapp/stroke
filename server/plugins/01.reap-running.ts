@@ -30,7 +30,7 @@ export default defineNitroPlugin(() => {
 async function reap(): Promise<void> {
   let sessions: SessionSummary[]
   try {
-    sessions = await $fetch<SessionSummary[]>('/api/strokes')
+    sessions = await $fetch<SessionSummary[]>('/api/sessions')
   } catch (error) {
     console.warn(`${LOG_PREFIX} 起動時の後始末: 一覧を取れない。今回は何もしない`, error)
     return

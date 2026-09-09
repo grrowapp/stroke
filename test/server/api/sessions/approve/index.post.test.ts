@@ -3,8 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeEvent, stubNitroGlobals, type FakeEvent } from '../../support';
 
 /**
+<<<<<<<< HEAD:test/server/api/strokes/approve/index.post.test.ts
  * 対象は `server/api/strokes/[id]/approve/index.post.ts`（U10）。位置の付け方は
  * `question/index.post.test.ts` と同じ（`[id]` の段を挟まない理由もそちらに書いてある）。
+========
+ * 対象は `server/api/sessions/[id]/approve/index.post.ts`（U10）。位置の付け方は
+ * `test/server/api/strokes/question/index.post.test.ts` と同じ（`[id]` の段を挟まない理由もそちらに書いてある）。
+>>>>>>>> 426ccf1a895dcf35c52c947dee547f82f0357425:test/server/api/sessions/approve/index.post.test.ts
  *
  * U10 は承認の判断を記録するだけである（openspec/specs/api/session/approve）。ここで
  * 固定するのは「承認を受けても**ディレクトリの名前が変わらない**・`phase` が `proposed` の
@@ -51,7 +56,11 @@ stubNitroGlobals();
 // 起動の要求（U13）が出ていないことの観測点。U10 は $fetch を一切呼ばない
 vi.stubGlobal('$fetch', fetchMock);
 
+<<<<<<<< HEAD:test/server/api/strokes/approve/index.post.test.ts
 const { default: approveHandler } = await import('../../../../../server/api/strokes/[id]/approve/index.post');
+========
+const { default: approveHandler } = await import('../../../../../server/api/sessions/[id]/approve/index.post');
+>>>>>>>> 426ccf1a895dcf35c52c947dee547f82f0357425:test/server/api/sessions/approve/index.post.test.ts
 const { readState, sessionExists, writeState } = await import(
   '../../../../../server/utils/stroke/session-store'
 );
@@ -64,7 +73,7 @@ const SESSION = '0d0c8a1e-1111-4222-8333-444444444444';
 const PROPOSED = { phase: 'proposed', currentQuestion: null, invocation: 'idle', retries: 0 } as const;
 const BODY = { projectName: 'decided-app' };
 
-describe('U10 POST /api/strokes/:id/approve', () => {
+describe('U10 POST /api/sessions/:id/approve', () => {
   beforeEach(() => {
     read.mockReset().mockResolvedValue('# proposal');
     promoteSessionToProject.mockClear();

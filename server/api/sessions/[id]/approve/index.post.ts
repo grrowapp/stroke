@@ -10,11 +10,11 @@ import { isPromotedState, readState, sessionProposal, withDecision, writeState }
  *
  * **承認は昇格の唯一の引き金である。** ただし引き金であることと、同じ呼び出しの中で全部を
  * 走らせることは別で、ここは判断を記録するだけである——**改名しない・`phase` を動かさない・
- * 起動しない**。昇格は判断が記録されているときにだけ U14（`promote.post.ts`）が行い、
+ * 起動しない**。昇格は判断が記録されているときにだけ U14（`promote/index.post.ts`）が行い、
  * steering の起動は昇格の成功を見た側が U13 に要求する。
  *
  * 判断が記録されている間もセッションはセッションのままで（`phase: 'proposed'`）、
- * プロジェクト一覧には生成中としても現れない。取り下げは `DELETE`（`approve.delete.ts`）。
+ * プロジェクト一覧には生成中としても現れない。取り下げは `DELETE`（`approve/index.delete.ts`）。
  *
  * proposal はセッションの時点から `docs/proposal.md` に在り（受理の時点で A7 が残す）、
  * **承認は proposal を書かず、既にあるものに触れない。**

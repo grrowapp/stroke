@@ -3,8 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeEvent, stubNitroGlobals } from '../../support';
 
 /**
+<<<<<<<< HEAD:test/server/api/strokes/answer/index.post.test.ts
  * 対象は `server/api/strokes/[id]/answer/index.post.ts`（U7）。位置の付け方は
  * `question/index.post.test.ts` と同じ。
+========
+ * 対象は `server/api/sessions/[id]/answer/index.post.ts`（U7）。位置の付け方は
+ * `test/server/api/strokes/question/index.post.test.ts` と同じ。
+>>>>>>>> 426ccf1a895dcf35c52c947dee547f82f0357425:test/server/api/sessions/answer/index.post.test.ts
  *
  * 見るのは承認以降の門（openspec/specs/api/session/answer・add-activated-phase design D10）。
  * `approved` も `activated` も「承認済み」の理由で断り、「答えるべき問いが無い」に落ちない。
@@ -20,7 +25,11 @@ vi.mock('../../../../../server/utils/stroke/session-store', async (importOrigina
 
 stubNitroGlobals();
 
+<<<<<<<< HEAD:test/server/api/strokes/answer/index.post.test.ts
 const { default: answerHandler } = await import('../../../../../server/api/strokes/[id]/answer/index.post');
+========
+const { default: answerHandler } = await import('../../../../../server/api/sessions/[id]/answer/index.post');
+>>>>>>>> 426ccf1a895dcf35c52c947dee547f82f0357425:test/server/api/sessions/answer/index.post.test.ts
 const { appendAnswerStroke, readState } = await import('../../../../../server/utils/stroke/session-store');
 
 const readStateMock = vi.mocked(readState);
@@ -35,7 +44,7 @@ const QUESTION = {
 const ANSWER = { kind: 'option', value: 'JSON' };
 const STROKING = { phase: 'stroking', currentQuestion: QUESTION, invocation: 'idle', retries: 0 } as const;
 
-describe('U7 POST /api/strokes/:id/answer — 承認以降の門', () => {
+describe('U7 POST /api/sessions/:id/answer — 承認以降の門', () => {
   beforeEach(() => {
     readStateMock.mockReset().mockResolvedValue(STROKING);
     appendMock.mockClear();

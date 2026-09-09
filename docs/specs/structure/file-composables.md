@@ -287,7 +287,7 @@ Toaster / 通知一覧                   本家 REST
 | ファイル | 何をするか | 何に触るか | 誰が使うか |
 |---|---|---|---|
 | `useSessionChannel.ts` | セッションの WS チャンネルを1つ購読し、最後の1件を持つ | WebSocket（`useWebSocket`） | 画面1、`useAgentQuestion`（W1）、`useProposalReview`（W2） |
-| `useWaitingRetry.ts` | 送信後の待機と失敗の判定 | HTTP（`GET /api/strokes/<id>` を `useIntervalFn` でポーリング） | 画面1、`useAgentQuestion`、`useProposalReview` |
+| `useWaitingRetry.ts` | 送信後の待機と失敗の判定 | HTTP（`GET /api/sessions/<id>` を `useIntervalFn` でポーリング） | 画面1、`useAgentQuestion`、`useProposalReview` |
 | `useAnnotations.ts` | 差し戻しコメントを積み、4層のペイロードに組む | なし（純粋な状態と変換） | `useProposalReview`、`CommentModal` |
 | `useAgentQuestion.ts` | 問いの往復（W1 購読・回答送信・AI 起動要求・待機）を1つにまとめる | `useSessionChannel`・`useWaitingRetry` + HTTP | `useProposalReview`（※2026-08-24 追記。棚卸しから漏れていた） |
 | `useProposalReview.ts` | 画面2の状態と往復の全部 | 上の各本 + HTTP | 画面2、`Modals.vue` |
@@ -300,7 +300,7 @@ Toaster / 通知一覧                   本家 REST
 useSessionChannel<T>(sessionId, channel) → Ref<T | null>
 ```
 
-`ws://<host>/api/strokes/<id>/ws/<channel>` に `useWebSocket`（vueuse、`autoReconnect: true`）で繋ぎ、届いた1件で上書きする。**最後の1件しか持たない。** 接続時にもサーバー側から現在分が1件届く。
+`ws://<host>/api/sessions/<id>/ws/<channel>` に `useWebSocket`（vueuse、`autoReconnect: true`）で繋ぎ、届いた1件で上書きする。**最後の1件しか持たない。** 接続時にもサーバー側から現在分が1件届く。
 
 URL は `computed` で組み、`typeof window === 'undefined'` なら空文字を返す（`useWebSocket` は空の URL では繋がない）。
 
@@ -324,7 +324,7 @@ W1 と W2 の**唯一の違いは購読先のパスと届く型**だったので
 useWaitingRetry(sessionId) → { waiting, failed, startWaiting, stopWaiting }
 ```
 
-待機中だけ3秒おきに `GET /api/strokes/<id>` を読み、`invocation` が `failed` / `idle` になったら止まる。**通常は W1 / W2 の配信が先に届くので、これは保険。**
+待機中だけ3秒おきに `GET /api/sessions/<id>` を読み、`invocation` が `failed` / `idle` になったら止まる。**通常は W1 / W2 の配信が先に届くので、これは保険。**
 
 timer は vueuse の `useIntervalFn(fn, 3000, { immediate: false })` に委ねている。`resume()` は張り直しのたびに前の timer を捨てるので手で clear する必要がなく、scope が壊れたときの停止も内蔵している。
 
@@ -361,7 +361,7 @@ W1 の購読（`useSessionChannel`）・回答の送信（U7）・AI の起動�
 
 面の名前が `AgentQuestionModal` → `AgentQuestion` に変わったことへの追随でコメント1語だけ変わった。中身は触っていない。
 
-**送信先の `base` が `/api/${sessionId}` になっている**（`useProposalReview` と画面1は `/api/strokes/${sessionId}`）。契約（`docs/specs/api/contract.md`）の形は `/api/strokes/<id>` なので、これは食い違いである。ここでは現状の記録として残す。
+~~**送信先の `base` が `/api/${sessionId}` になっている**~~ → **解消済み**（2026-09-09）。`base` は `/api/sessions/${sessionId}` になり、`useProposalReview`・画面1 と同じ形に揃った。セッションの endpoint の名前空間が `/api/sessions/` である根拠は `docs/specs/api/overview.md`。回答の送信（U7）と、その直後の起動要求（U13）が実在する path に届くことは `test/app/composables/useAgentQuestion.test.ts` が path そのもので検査する。
 
 ### `useProposalReview.ts`（412行）
 
@@ -400,4 +400,4 @@ useProposalReview(sessionId, { phase, strokes }) → 39 個のプロパティ
 - **`useProposalReview` が 547 行で、ストローク側の他の4本の合計（541行）より大きい**（2026-09-04 実測。「個別」の各節に書いた行数と返り値の内訳は 2026-08-24 時点の記録で、その後の変更を追っていない）。状態・モーダル・HTTP エラー解体・送信の決着追跡が1箇所に集まっている
 - **色の定義が composable にある。** `useAnnotations.ts` の `highlightColors` を `CommentModal.vue` が直接 import している。塗りの実値は CSS へ移ったが、色見本と保存形はまだこの定義を使う
 - **画面1の実装が `pages/` にある。** `app/pages/strokes/[sessionId]/index.vue` は `useSessionChannel` と `useWaitingRetry` を直接呼び、送信（`answer()` の中の U7 → U13 の2連発）も自前で書いている。画面2だけが `useProposalReview`（と `useAgentQuestion`）にまとまっている。到達点では `pages/` にページ固有のロジックを置かない（`page-structure.md`）ので、この実装は Page Component の Container.vue へ移す対象になる。移行課題は `docs/specs/plan/structure-migration.md`
-- **`useAgentQuestion` だけ API の base が `/api/<id>` で、他は `/api/strokes/<id>`。** 契約との食い違い（上の「個別」）
+- ~~**`useAgentQuestion` だけ API の base が `/api/<id>` で、他は `/api/strokes/<id>`。** 契約との食い違い~~ → **解消済み**。HTTP を叩く3本（`useWaitingRetry`・`useAgentQuestion`・`useProposalReview`）はどれも `/api/sessions/<id>` を、`useSessionChannel` は `ws://<host>/api/sessions/<id>/ws/<channel>` を組み立てる（上の「個別」）

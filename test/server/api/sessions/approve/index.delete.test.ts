@@ -3,8 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeEvent, stubNitroGlobals, type FakeEvent } from '../../support';
 
 /**
+<<<<<<<< HEAD:test/server/api/strokes/approve/index.delete.test.ts
  * 対象は `server/api/strokes/[id]/approve/index.delete.ts`（U10 の取り消し）。位置の付け方は
  * `question/index.post.test.ts` と同じ。
+========
+ * 対象は `server/api/sessions/[id]/approve/index.delete.ts`（U10 の取り消し）。位置の付け方は
+ * `test/server/api/strokes/question/index.post.test.ts` と同じ。
+>>>>>>>> 426ccf1a895dcf35c52c947dee547f82f0357425:test/server/api/sessions/approve/index.delete.test.ts
  *
  * 取り消すのは判断だけである（openspec/specs/api/session/approve「記録した判断は、昇格の
  * 前なら取り消せる」）。proposal・ストロークの往復の記録・ディレクトリの中身には触れない。
@@ -44,7 +49,11 @@ vi.mock('../../../../../server/utils/stroke/session-store', async (importOrigina
 
 stubNitroGlobals();
 
+<<<<<<<< HEAD:test/server/api/strokes/approve/index.delete.test.ts
 const { default: cancelHandler } = await import('../../../../../server/api/strokes/[id]/approve/index.delete');
+========
+const { default: cancelHandler } = await import('../../../../../server/api/sessions/[id]/approve/index.delete');
+>>>>>>>> 426ccf1a895dcf35c52c947dee547f82f0357425:test/server/api/sessions/approve/index.delete.test.ts
 const { appendStroke, readState, sessionExists, writeState } = await import(
   '../../../../../server/utils/stroke/session-store'
 );
@@ -63,7 +72,7 @@ const DECIDED = {
   decision: { projectName: 'decided-app' },
 } as const;
 
-describe('DELETE /api/strokes/:id/approve', () => {
+describe('DELETE /api/sessions/:id/approve', () => {
   beforeEach(() => {
     readStateMock.mockReset().mockResolvedValue(DECIDED);
     writeStateMock.mockClear();
