@@ -29,13 +29,13 @@ export interface AiRun {
   debugLogDir?: string
   /** 定型の**候補**。どちらを使うかは invokeAi が初回/継続の判定で決める */
   prompts: { first: string, continue: string }
-  /** 失敗を起こし直す回数の上限。到達していたら起動しない */
+  /** 失敗を起動し直す回数の上限。到達していたら起動しない */
   maxRetries: number
-  /** これまでに起こし直した回数。`state.json` 側が持つ */
+  /** これまでに起動し直した回数。`state.json` 側が持つ */
   retries: number
-  /** 起こし直していない起動を打ち切るまでの時間。`runtimeConfig.claude.timeoutMs` */
+  /** 起動し直していない起動を打ち切るまでの時間。`runtimeConfig.claude.timeoutMs` */
   timeoutMs: number
-  /** 起こし直し1回ぶんの刻み。`0` なら伸ばさない。`runtimeConfig.claude.timeoutStepMs` */
+  /** 起動し直し1回ぶんの刻み。`0` なら伸ばさない。`runtimeConfig.claude.timeoutStepMs` */
   timeoutStepMs: number
   /**
    * 会話の続け先。**あるかどうかが初回/継続の判定そのものである。**
@@ -165,7 +165,7 @@ export function invokeAi(
 /**
  * 起動の材料を組み立てられなかった実行を記録する。
  *
- * **この失敗も起こし直しの回数に数える**（`retries + 1`）。上限に達していなければ
+ * **この失敗も起動し直しの回数に数える**（`retries + 1`）。上限に達していなければ
  * `failed`（巡回が拾う）、達しているか上限そのものを読み出せなければ `error`（終端）
  * にする（design.md D3）。
  *
@@ -209,7 +209,7 @@ async function writeInvocation(sessionId: string, invocation: Invocation, retrie
 }
 
 /**
- * 組み立てられた材料で実際に起こす。組み立てが成功した後の処理はここに閉じる
+ * 組み立てられた材料で実際に起動する。組み立てが成功した後の処理はここに閉じる
  * （`fix-idle-stuck-on-run-build-failure` で `invokeAi` の本体から切り出した。切り出しの
  * 時点では振る舞いを変えていない。成功経路はその後 `add-activated-phase` で変えている）。
  */
@@ -219,8 +219,8 @@ async function runBuiltInvocation(sessionId: string, run: AiRun): Promise<void> 
     conversationId, hasConversation, setInvocation, remember, prepare, didWork, recordCompletion,
   } = run
 
-  // 上限判定は起動の前。**`retries` は「これまでに起こし直した回数」** なので、初回の
-  // キック（0回）は起こし直しではない。超えていたら起こさず終端へ倒し、ユーザーに
+  // 上限判定は起動の前。**`retries` は「これまでに起動し直した回数」** なので、初回の
+  // キック（0回）は起動し直しではない。超えていたら起動せず終端へ倒し、ユーザーに
   // 引き渡す。起動の総回数は「上限 + 1」になる（docs/specs/core/settings-reference.md）。
   if (retries > maxRetries) {
     console.warn(`${LOG_PREFIX} リトライ上限に達した: ${sessionId}（${retries}/${maxRetries}）`)
@@ -233,7 +233,7 @@ async function runBuiltInvocation(sessionId: string, run: AiRun): Promise<void> 
   // 伸びてしまうので、上限判定の隣に置いて解釈を1箇所に閉じている
   // （openspec/specs/agent/invocation・design.md Decision 2）。
   //
-  // 伸びるのはひと続きの起こし直しの中だけである。完了とユーザーの再実行が `retries` を
+  // 伸びるのはひと続きの起動し直しの中だけである。完了とユーザーの再実行が `retries` を
   // 0 に戻すので、次の連なりは再び `timeoutMs` から始まる。
   const timeout = timeoutMs + timeoutStepMs * retries
 
@@ -256,7 +256,7 @@ async function runBuiltInvocation(sessionId: string, run: AiRun): Promise<void> 
   const mode: ClaudeMode = continuing ? 'resume' : 'new'
   const prompt = continuing ? prompts.continue : prompts.first
 
-  // **1回の呼び出しで起こすのは1回だけである。** 起こし直しは巡回（`failed` を拾って
+  // **1回の呼び出しで起動するのは1回だけである。** 起動し直しは巡回（`failed` を拾って
   // U13 を叩く）が担い、回数は `state.json` が持つ。ここで内側にもループを持つと、
   // 巡回の回数と掛け算になって総起動回数が上限の意味から外れる。
   const result = await runClaude({ sessionId: conversationId, launch, cwd, prompt, mode, debugLogDir, timeoutMs: timeout })
@@ -268,7 +268,7 @@ async function runBuiltInvocation(sessionId: string, run: AiRun): Promise<void> 
     // output stream の成功エンベロープ = プロセスは完了した。ただし**何もせずに
     // 終わっている**ことがあるので、用途ごとの確認を通す。
     //
-    // 作業をしていなければ失敗として起こし直す——ここを素通しにすると、問いも proposal も
+    // 作業をしていなければ失敗として起動し直す——ここを素通しにすると、問いも proposal も
     // 出ないまま `idle` になり、巡回（`failed` しか拾わない）も回収できない詰まりが残る。
     // **完成の記録より先に見る。** 完成したかを決めるのは `didWork` の方で、記録先の U15 は
     // 判定を持たない（ADR-0014・add-activated-phase design D4）。作業をしていない実行が
@@ -298,7 +298,7 @@ async function runBuiltInvocation(sessionId: string, run: AiRun): Promise<void> 
     failures.push('継続先の会話が失われた（初回ではないので作り直さない）')
   }
 
-  // `failed` は巡回（openspec/specs/portal/batch）が拾って起こし直す。回数が上限を
+  // `failed` は巡回（openspec/specs/portal/batch）が拾って起動し直す。回数が上限を
   // 超えていれば、次のキックが `error` へ倒してユーザーに引き渡す。
   console.warn(`${LOG_PREFIX} AI 呼び出しが失敗: ${sessionId}`, failures)
   await setInvocation('failed')

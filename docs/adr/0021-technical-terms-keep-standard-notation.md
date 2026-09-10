@@ -47,6 +47,10 @@
 | 器 | component / UI part | 部品 |
 | 締めの出力 | finalization output | 終了処理 |
 | 待機を立てる | enter waiting state | 待機に入る |
+| 窓 | time window | 「その間」「稀である」など、起こりやすさをそのまま書く |
+| 印 | flag / record | 記録・flag |
+| 写し | copy / cache | コピー・キャッシュ |
+| 段 | step | ステップ |
 
 ## 参照
 

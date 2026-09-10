@@ -22,7 +22,7 @@ import { currentApiBaseUrl } from './listen-address'
  * 表す（openspec/specs/agent/invocation「起動処理は呼び出し元を区別しない」）。
  */
 
-/** どの用途で起こすか。渡す値の決め方だけが違う。 */
+/** どの用途で起動するか。渡す値の決め方だけが違う。 */
 export type RunKind = 'stroke' | 'steering'
 
 /**
@@ -204,7 +204,7 @@ function conversationWriter(sessionId: string) {
  * true のとき。`ai.ts` の `runBuiltInvocation`）。
  *
  * 2xx 以外は「記録できていない」であり、記録できていないものを完成と扱わない。false を
- * 受けた invokeAi は `failed` に倒し、巡回の起こし直しが続きの実行の完了時にもう一度
+ * 受けた invokeAi は `failed` に倒し、巡回の起動し直しが続きの実行の完了時にもう一度
  * ここを通る（add-activated-phase design D4・Risks「U15 の不達」）。
  *
  * **例外は、既に完成が記録されている場合だけ。** この実行の起動後に別の書き手（起動時の
@@ -245,7 +245,7 @@ async function isAlreadyActivated(sessionId: string): Promise<boolean> {
  * @param cwd        実行する場所。キックする側が渡す（design.md D5）
  * @param phase      対象の局面。用途（ストロークの往復か steering か）と、完成の記録を
  *                   試みるか（生成中の steering だけ）はここから導く（design D4）
- * @param retries    これまでに起こし直した回数
+ * @param retries    これまでに起動し直した回数
  * @param runId      steering の会話 id。まだ無ければ undefined
  * @param token      この起動の接続表 token（provide-operations-via-mcp design.md「接続の担保」）
  */
@@ -312,7 +312,7 @@ export function buildRun(options: {
       // 生成が終わったかを決めるのはここで渡す `didWork` である（ADR-0014・design D4）。
       didWork: steeringCompletedUpstream(cwd, phase),
       // 生成中（`approved`）の steering だけが完成を記録する。完成済み（`activated`）の
-      // 起こし直しは記録を試みない——完成は一度だけ起こる出来事で、U15 も受理しない
+      // 起動し直しは記録を試みない——完成は一度だけ起こる出来事で、U15 も受理しない
       // （openspec/specs/api/session/activate「既に完成した対象には記録しない」）。
       recordCompletion: phase === 'approved' ? completionRecorder(sessionId) : undefined,
       remember: conversationWriter(sessionId),
@@ -356,7 +356,7 @@ export function buildRun(options: {
       (await $fetch<SessionSummary[]>('/api/strokes')).some(s => s.id === sessionId),
     setInvocation: invocationWriter(sessionId),
     // ストロークの1回の実行は必ず提出（A5・A7）で終わる。プロセスが正常終了しても
-    // 提出が1つも無ければ、作業をせずに終わったということなので起こし直す。
+    // 提出が1つも無ければ、作業をせずに終わったということなので起動し直す。
     didWork: submittedSince(sessionId),
     prepare: () => initSessionOpenspec({
       cwd,
@@ -370,7 +370,7 @@ export function buildRun(options: {
 }
 
 /**
- * 自前 MCP サーバー（provide-operations-via-mcp）を起こす `--mcp-config` の1エントリ。
+ * 自前 MCP サーバー（provide-operations-via-mcp）を起動する `--mcp-config` の1エントリ。
  *
  * url は `buildRun` が実際の待ち受けから組み立てた `apiBaseUrl`（`listen-address.ts`）を
  * 渡り受けて組み立てる。設定の固定値は使わない（provide-operations-via-mcp 続き）。
@@ -467,7 +467,7 @@ async function generateProject(cwd: string): Promise<void> {
 }
 
 /**
- * 材料を組み立てて起こす。結果は待たない。
+ * 材料を組み立てて起動する。結果は待たない。
  *
  * **接続表 token の発行・登録・失効は invoke-agent（ここ）の責務である**
  * （openspec/specs/server/session-management・`docs/specs/architecture/invoke-agent.md`）。

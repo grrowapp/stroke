@@ -63,7 +63,7 @@ export default defineEventHandler(async (event): Promise<Response> => {
       throw conflict('phase', 'まだ昇格していない。完成を記録できるのはプロジェクトだけ。')
     }
 
-    // 一方向の遷移。phase 以外は触らない（`runId` は完成後の起こし直しの続き先になる）
+    // 一方向の遷移。phase 以外は触らない（`runId` は完成後の起動し直しの続き先になる）
     await writeState(name, { ...state, phase: 'activated' })
   })
 
