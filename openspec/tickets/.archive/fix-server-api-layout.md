@@ -1,5 +1,5 @@
 ---
-status: Doing
+status: Wait-for-archive
 origin: user
 triage:
   - bug

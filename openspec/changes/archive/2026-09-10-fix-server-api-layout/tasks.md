@@ -88,16 +88,18 @@
 
 - [x] 10.1 `pre3` で `yarn test`・`yarn typecheck`・`yarn test:e2e` を通す
 - [x] 10.2 `docs/specs/api/` の規定と `server/api/` を突き合わせ直す: `find server/api server/routes -type f` がすべて `index.<method>.ts`（WS route を除く）、`grep -rn "api/strokes" app server shared test .claude` の残りが A 系と MCP tools だけ、`server/handler/` に実処理が揃い api が薄い層になっている
-- [ ] 10.3 `openspec validate --all` を通し、子 change 8 本が `openspec/changes/archive/` に、ticket 8 本と旧 ticket 2 本が `openspec/tickets/.archive/` に在ることを確認する
-- [ ] 10.4 Gitea #14 に完了の状況（PR 番号と change-id の対応）をコメントする
+- [x] 10.3 `openspec validate --all` を通し、子 change 8 本が `openspec/changes/archive/` に、ticket 8 本と旧 ticket 2 本が `openspec/tickets/.archive/` に在ることを確認する
+- [x] 10.4 Gitea #14 に完了の状況（PR 番号と change-id の対応）をコメントする
 - [x] 10.5 起動したものが残っていないことを確認する（`pgrep -f "nuxt|playwright"`、worktree の残り、`git worktree list`）
 
 ## 11. レビュー
 
 - [ ] 11.1 `typescript-reviewer` エージェント（この環境に無ければ `/santa-method` の既定の 2 レビュアー構成）で `/santa-method` レビューを実行する。対象は `pre3` に取り込まれた子 change 8 本の差分（`git diff <着手時の pre3>..pre3`）と、この change の artifact。完全にパスするまで指摘を直して繰り返す
+  - **未実施。ユーザー指示（2026-09-10）で飛ばした。** 子 change 8 本はそれぞれ 2 レビュアーの `/santa-method` を通しているが、全体差分と親 artifact に対するレビューは行っていない
 
 ## 12. 終了
 
 - [x] 12.1 `pre3` から親ブランチ（`develop`）への PR を Gitea に出す（本文に Gitea #14 と子 PR 8 本の対応。マージはしない）
-- [ ] 12.2 change の成果物を commit する: `openspec/` の親 change の artifact・子 change 8 本の archive・ticket の移動を、ユーザー承認のうえ `develop`（`/opt/projects/stroke-board`）に 1 回でコミットする（design.md「openspec 成果物のコミット」）
-- [ ] 12.3 ユーザーから完了承認を得て、`openspec/tickets/fix-server-api-layout.md` の `status` を `Wait-for-archive` にする（`docs/agents/ticket-tracker.md`「ラベル設定」）
+- [x] 12.2 change の成果物を commit する: `openspec/` の親 change の artifact・子 change 8 本の archive・ticket の移動を、ユーザー承認のうえ `develop`（`/opt/projects/stroke-board`）に 1 回でコミットする（design.md「openspec 成果物のコミット」）
+  - **実施者は親セッション**（commit `1da96331`。archive 7 件と specs の同期を含む）
+- [x] 12.3 ユーザーから完了承認を得て、`openspec/tickets/fix-server-api-layout.md` の `status` を `Wait-for-archive` にする（`docs/agents/ticket-tracker.md`「ラベル設定」）
