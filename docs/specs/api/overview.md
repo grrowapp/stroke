@@ -11,7 +11,7 @@
 | `projects/` | `/api/projects/` の endpoint。1本につき1ファイル |
 | `ws/` | WS 配信 |
 
-## `sessions/` — 11本
+## `sessions/` — 12本
 
 | # | メソッド / パス | 内容 |
 |---|---|---|
@@ -26,6 +26,7 @@
 | U13 | `GET /api/sessions/:id/invoke-agent` | AI を起動する |
 | U14 | `POST /api/sessions/:id/promote` | セッションをプロジェクトへ昇格させる |
 | U15 | `POST /api/sessions/:id/activate` | プロジェクトの完成を記録する |
+| U16 | `GET /api/sessions/unfinished` | 中断したストローク（昇格前のセッション）を一覧する |
 
 ## `projects/` — 2本
 

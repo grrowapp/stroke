@@ -543,8 +543,14 @@ test.describe('完全な失敗の後', () => {
     await page.getByTestId('invocation-leave').click();
     await expect(page).toHaveURL(/\/projects$/);
 
+    // **戻り道が一覧に在る。** 無ければ「時間を置いて再開する」は成り立たない
+    const row = page.getByTestId('stroke-row').filter({ hasText: sessionId });
+    await expect(row).toBeVisible();
+    await expect(row).toHaveAttribute('data-invocation', 'error');
+
     // 消えていない。開き直せば同じ状態から選べる
-    await page.goto(`/strokes/${sessionId}`);
+    await row.getByTestId('stroke-resume').click();
+    await expect(page).toHaveURL(new RegExp(`/strokes/${sessionId}$`));
     await expect(page.getByTestId('invocation-error')).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId('invocation-restart')).toBeVisible();
   });

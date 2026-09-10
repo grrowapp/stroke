@@ -23,6 +23,7 @@ import {
   restartSteering,
 } from '~/composables/useProjectApi';
 import { useRelativeTime } from '~/composables/useRelativeTime';
+import type { SessionSummary } from '#shared/stroke';
 import type { ProjectDirectoryResponse, ProjectSummary } from '#shared/types';
 
 /** 決着の中身。`in-progress` は行が出るだけで決着ではないので、ここには来ない */
@@ -45,6 +46,43 @@ const directory = computed(() => data.value?.directory);
 const projects = computed<ProjectSummary[]>(() =>
   directory.value?.status === 'ok' ? directory.value.projects : [],
 );
+
+/**
+ * 中断したストローク。
+ *
+ * **プロジェクトの一覧とは別の母集合である。** 昇格していないセッションはプロジェクトではなく、
+ * 走査の母集合にも入らない（specs/project/directory「`.spec-workflow` を持たないディレクトリは
+ * 拾わない」）。それでも上層に出すのは、**離れた先から戻れないと「時間を置いて再開する」が
+ * 成り立たない**ためである（`docs/specs/architecture/failure.md`「対処の選択肢」）。完全な失敗に
+ * 達したセッションは、ここが唯一の戻り道になる。
+ */
+const STROKES_KEY = 'unfinished-strokes';
+
+const { data: sessionList } = await useFetch<SessionSummary[]>('/api/strokes/unfinished', {
+  key: STROKES_KEY,
+  default: () => [],
+});
+
+/**
+ * 昇格前のセッション。昇格した対象はプロジェクトの表に出ているので、ここには来ない
+ * （絞るのは endpoint 側。U16）。
+ */
+const unfinishedStrokes = computed<SessionSummary[]>(() => sessionList.value ?? []);
+
+/** 中断したストロークを開く。行き先は phase が決める（`proposed` 以降は画面2） */
+function resumeStroke(session: SessionSummary): void {
+  void navigateTo(
+    session.phase === 'stroking' ? `/strokes/${session.id}` : `/strokes/${session.id}/proposal`,
+  );
+}
+
+/** 行に出す状態。`error` は自動では動かないので、そうと分かるように出す */
+function strokeStateLabel(session: SessionSummary): string {
+  if (session.invocation === 'error') return '失敗（開いて選ぶ）';
+  if (session.invocation === 'running') return 'AI が応答中';
+  if (session.invocation === 'failed') return 'やり直しています';
+  return session.phase === 'proposed' ? 'proposal の確認待ち' : '問いの往復';
+}
 
 // 最終更新の相対時刻。mount の後にだけ描く（specs/portal/relative-time）
 const relativeTime = useRelativeTime();
@@ -293,6 +331,55 @@ function unread(project: ProjectSummary): number | null {
         </button>
       </div>
     </div>
+
+    <!--
+      中断したストローク。プロジェクトの表とは別の母集合で、昇格前のセッションだけが並ぶ。
+      **離れた先から戻れないと「時間を置いて再開する」が成り立たない**ので、上層に置く
+      （`docs/specs/architecture/failure.md`「対処の選択肢」）。完全な失敗に達したセッションは
+      ここが唯一の戻り道になる。
+    -->
+    <template v-if="unfinishedStrokes.length > 0">
+      <h2 class="sb-page-title mb-3 text-base">中断したストローク</h2>
+
+      <table class="sb-table mb-8" data-testid="strokes-table">
+        <thead>
+          <tr>
+            <th scope="col">概要</th>
+            <th scope="col" class="w-56">状態</th>
+            <th scope="col" class="w-28">最終更新</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="session in unfinishedStrokes"
+            :key="session.id"
+            class="sb-row-hit"
+            data-testid="stroke-row"
+            :data-session="session.id"
+            :data-invocation="session.invocation"
+            @click="resumeStroke(session)"
+          >
+            <td>
+              <button
+                type="button"
+                class="inline-flex items-center gap-1.5 text-left hover:text-[var(--interactive-primary)] focus-visible:outline focus-visible:outline-2"
+                data-testid="stroke-resume"
+                @click.stop="resumeStroke(session)"
+              >
+                <UIcon name="sb:folder" class="size-3.5 shrink-0" />
+                {{ session.id }}
+              </button>
+            </td>
+            <td>
+              <span class="sb-chip" :class="session.invocation === 'error' ? 'text-error' : ''">
+                {{ strokeStateLabel(session) }}
+              </span>
+            </td>
+            <td class="text-[12px]">{{ relativeTime(session.updatedAt) }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </template>
 
     <p v-if="status === 'pending'" class="sb-placeholder">読み込み中…</p>
 

@@ -83,7 +83,10 @@ async function retry() {
   }
 }
 
-/** 時間を置いて再開する。対象は `error` のまま残り、一覧から開き直せる。 */
+/**
+ * 時間を置いて再開する。対象は `error` のまま残り、一覧の「中断したストローク」から
+ * 開き直せる（`app/pages/projects/index.vue`）。戻り道が無ければこの選択肢は成り立たない。
+ */
 async function leave() {
   await navigateTo('/projects')
 }
