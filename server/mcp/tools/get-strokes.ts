@@ -55,7 +55,7 @@ export default defineStrokeTool({
 
     try {
       const response = await $fetch.raw<{ strokes: Stroke[] }>(
-        `/api/strokes/${encodeURIComponent(connected.sessionId)}/strokes`,
+        `/api/sessions/${encodeURIComponent(connected.sessionId)}/strokes`,
       )
       return { status: response.status, strokes: response._data?.strokes }
     } catch (error) {

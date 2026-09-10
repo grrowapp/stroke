@@ -1,7 +1,8 @@
 import { basename, isAbsolute, join, resolve } from 'node:path'
 import { z } from 'zod'
 
-import { toHttpError, upstreamClient } from '../../utils/control/upstream-proxy'
+import { registerProject } from '../../handler/project-directory'
+import { toHttpError } from '../../utils/control/upstream-proxy'
 import { readStrokeConfig } from '../../utils/stroke/config'
 import { parseBody } from '../../utils/stroke/request-schemas'
 
@@ -9,7 +10,8 @@ import { parseBody } from '../../utils/stroke/request-schemas'
  * P2: プロジェクトの生成（openspec/specs/api/project/generate）。
  *
  * 昇格したプロジェクトを本家 spec-workflow に存在させる——本家の登録の REST
- * （`POST /api/projects/add`）へ依頼するだけの口である。プロジェクトはリソースとして
+ * （`POST /api/projects/add`）へ依頼するだけである。依頼そのものは
+ * `server/handler/project-directory.ts` の `registerProject` が持つ。プロジェクトはリソースとして
  * `projects/` を既に持つ（P1 の削除）ので、その作成として同じ path に POST で置く。
  *
  * **ユーザーは叩かない。** 承認の後の実行（steering）の起動の材料を組み立てるとき、
@@ -55,7 +57,7 @@ export default defineEventHandler(async (event): Promise<Response> => {
     })
   }
 
-  const result = await upstreamClient().registerProject(projectPath)
+  const result = await registerProject(projectPath)
   if (!result.ok) {
     // 本家が 404 を返すのは登録の口そのものが無いとき（`/api/projects/add` を持たない版）で、
     // 作成の要求に「対象が見つからない」を返すと読み違える。本家がエラーで返したものは

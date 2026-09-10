@@ -16,8 +16,9 @@ export function submissionPath(sessionId: string): string {
  * （`server/plugins/01.activate-approved.ts`）。A8 と同じ理由でここに並べる
  * （openspec/changes/add-activated-phase design D4）。
  *
- * path は docs（`docs/specs/api/overview.md`）の定義どおり `/api/sessions/` に置く。他の
- * U 系が実装では `/api/strokes/` に在るのは実装側の誤りで、別 ticket（fix-session-api-path）が直す。
+ * path は docs（`docs/specs/api/overview.md`）の定義どおり `/api/sessions/` に置く。セッションの
+ * endpoint は `/api/sessions/`、エージェントが叩く endpoint は `/api/strokes/` で、名前空間が
+ * 分かれている——同じファイルの `submissionPath`（A8）が `/api/strokes/` を返すのはそのためである。
  */
 export function activatePath(sessionId: string): string {
   return `/api/sessions/${encodeURIComponent(sessionId)}/activate`

@@ -3,14 +3,15 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 
-import { DeleteError, isSafeSegment, removeTarget, targetExists } from '../../../server/handler/delete'
+import { DeleteError, removeTarget, targetExists } from '../../../server/handler/delete'
+import { isSafeSegment } from '../../../server/utils/stroke/paths'
 
 /**
  * 削除の実行（design.md D12）。
  *
  * **判定は endpoint が持ち、実行は判定を持たない。** 実行に「どちらから呼ばれたか」を渡して
  * いないことは、引数に現れる。局面の判定は各 endpoint のテスト
- * （`test/server/api/sessions/index.delete.test.ts`・`test/server/api/projects/index.delete.test.ts`）
+ * （`test/server/api/sessions/[id]/index.delete.test.ts`・`test/server/api/projects/[projectId]/index.delete.test.ts`）
  * が見る——かつて `handler/phase.ts` に在った判定は endpoint へ戻した（add-activated-phase design D5）。
  */
 

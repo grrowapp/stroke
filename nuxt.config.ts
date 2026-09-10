@@ -119,6 +119,6 @@ export default defineNuxtConfig({
 
     // WS の URL からセッション id を抜くパターン。`{channel}` はチャネル名に置き換わる。
     // サブパスで配信する構成にするときはここを合わせる
-    wsPathPattern: '/api/strokes/([^/]+)/ws/{channel}(?:$|[/?#])',
+    wsPathPattern: '/api/sessions/([^/]+)/ws/{channel}(?:$|[/?#])',
   },
 });

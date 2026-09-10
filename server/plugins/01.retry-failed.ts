@@ -43,7 +43,7 @@ export default defineNitroPlugin((nitro) => {
   const sweep = async (): Promise<void> => {
     let sessions: SessionSummary[]
     try {
-      sessions = await $fetch<SessionSummary[]>('/api/strokes')
+      sessions = await $fetch<SessionSummary[]>('/api/sessions')
     } catch (error) {
       // 取れなければ次の巡回で拾う。
       console.warn(`${LOG_PREFIX} 一覧を取れなかった。次の巡回で拾う`, error)

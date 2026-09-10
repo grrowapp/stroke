@@ -157,13 +157,13 @@ describe('requestRun', () => {
     const w = useWaitingRetry(SESSION)
     await w.requestRun('/opt/projects/session-1')
     expect(fetchMock).toHaveBeenLastCalledWith(
-      `/api/strokes/${SESSION}/invoke-agent`,
+      `/api/sessions/${SESSION}/invoke-agent`,
       { query: { cwd: '/opt/projects/session-1' } },
     )
     w.stopWaiting()
 
     await w.requestRun()
-    expect(fetchMock).toHaveBeenLastCalledWith(`/api/strokes/${SESSION}/invoke-agent`, {})
+    expect(fetchMock).toHaveBeenLastCalledWith(`/api/sessions/${SESSION}/invoke-agent`, {})
     w.stopWaiting()
   })
 })

@@ -8,13 +8,14 @@ import { createKeyedPeerRegistry } from '../ws/registry'
  * （`openspec/specs/ws/delivery`）。
  *
  * 「現在分」はここに複製しない。正は session-store（`state.json` / `proposal.md`）にあるため、
- * 接続時配信は route ハンドラがそちらを読んで送る（design.md: 書き手は1つ）。
+ * 接続時配信は `server/handler/{question,proposal}.ts` がそちらを読み、route はその結果を
+ * 送るだけである（design.md: 書き手は1つ）。
  */
 /**
  * WS の URL からセッション id を読む。W1・W2 が同じこの1本を使う
  * （同じ規定を2箇所に書かない）。
  *
- * パターンは `runtimeConfig.wsPathPattern`（既定値は settings.ts）。リバースプロキシで
+ * パターンは `runtimeConfig.wsPathPattern`（既定値は `nuxt.config.ts`）。リバースプロキシで
  * サブパス配信する構成にするときは、そこを配信の形に合わせる。合っていないと接続が
  * 無言で閉じる。
  */
@@ -25,8 +26,8 @@ export function sessionIdFromUrl(url: string, channel: 'question' | 'proposal'):
   return match?.[1] ?? null
 }
 
-/** W1 `/api/:id/ws/question` */
+/** W1 `/api/sessions/:id/ws/question` */
 export const questionChannel = createKeyedPeerRegistry<string>()
 
-/** W2 `/api/:id/ws/proposal` */
+/** W2 `/api/sessions/:id/ws/proposal` */
 export const proposalChannel = createKeyedPeerRegistry<string>()

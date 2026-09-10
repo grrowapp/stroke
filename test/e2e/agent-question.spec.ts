@@ -73,7 +73,7 @@ const EXPECTED_LAYOUT = [
 let created: string[] = [];
 
 async function startSession(request: APIRequestContext): Promise<string> {
-  const response = await request.post('/api/strokes', {
+  const response = await request.post('/api/sessions', {
     data: { overview: 'E2E: 問いの往復を確かめる' },
   });
   expect(response.ok(), await response.text()).toBeTruthy();
@@ -106,21 +106,6 @@ async function submitProposal(request: APIRequestContext, sessionId: string): Pr
  */
 async function stubInvokeAgent(page: Page): Promise<void> {
   await page.route('**/invoke-agent', (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: 'null' }),
-  );
-}
-
-/**
- * 画面2（問い返し）の受理も差し替える。
- *
- * 画面2 の送信は `useAgentQuestion` を通り、その送り先が今は `/api/<uuid>/answer` に
- * なっている（本来は `/api/strokes/<uuid>/answer`）。この誤りは別 change
- * `fix-agent-question-api-path` の範囲で、ここでは直さない。パスの誤りに引きずられずに
- * 「送ったあと面がどう動くか」を確かめるため、末端の受理だけを差し替える。
- * 画面1 は正しいパスを通るので、そちらでは差し替えない。
- */
-async function stubFollowupAnswer(page: Page): Promise<void> {
-  await page.route('**/answer', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: 'null' }),
   );
 }
@@ -239,7 +224,6 @@ test.describe('問いの往復', () => {
   });
 
   test('AI が問いを打ち止めると面は閉じ、元の画面に戻る', async ({ page, request }) => {
-    await stubFollowupAnswer(page);
     const sessionId = await startSession(request);
     await submitProposal(request, sessionId);
     await submitQuestion(request, sessionId);
@@ -257,7 +241,6 @@ test.describe('問いの往復', () => {
   });
 
   test('問いが置き換わると、画面2 を開き直しても書きかけは残っていない', async ({ page, request }) => {
-    await stubFollowupAnswer(page);
     const sessionId = await startSession(request);
     await submitProposal(request, sessionId);
     await submitQuestion(request, sessionId);
@@ -286,7 +269,6 @@ test.describe('問いの往復', () => {
   //     問いが長いときに押せなくならないことをここで固定する
 
   test('問いが長くても、画面2 の送信ボタンは面の中に残って押せる', async ({ page, request }) => {
-    await stubFollowupAnswer(page);
     const sessionId = await startSession(request);
     await submitProposal(request, sessionId);
     await submitQuestion(request, sessionId, LONG_QUESTION);
@@ -366,7 +348,7 @@ test.describe('問いの往復', () => {
     await expect(page.getByTestId('agent-question-submit')).toBeVisible();
 
     let sent = 0;
-    await page.route('**/api/strokes/*/answer', (route) => {
+    await page.route('**/api/sessions/*/answer', (route) => {
       sent += 1;
       return route.continue();
     });
@@ -386,7 +368,7 @@ test.describe('問いの往復', () => {
     await page.goto(`/strokes/${sessionId}`);
 
     const bodies: string[] = [];
-    await page.route('**/api/strokes/*/answer', async (route) => {
+    await page.route('**/api/sessions/*/answer', async (route) => {
       bodies.push(route.request().postData() ?? '');
       return route.continue();
     });
@@ -436,7 +418,7 @@ test.describe('問いの往復', () => {
     await page.goto(`/strokes/${sessionId}`);
 
     // 1度目は受理そのものを落とす
-    await page.route('**/api/strokes/*/answer', (route) =>
+    await page.route('**/api/sessions/*/answer', (route) =>
       route.fulfill({ status: 500, contentType: 'application/json', body: '{}' }),
     );
 
@@ -448,7 +430,7 @@ test.describe('問いの往復', () => {
     await expect(page.getByTestId('agent-question-text')).toHaveText(QUESTION.question);
 
     // 2度目は通す
-    await page.unroute('**/api/strokes/*/answer');
+    await page.unroute('**/api/sessions/*/answer');
     await page.getByTestId('agent-question-option').first().click();
     await page.getByTestId('agent-question-submit').click();
 
@@ -466,7 +448,7 @@ test.describe('問いの往復', () => {
 
     // 待機中のポーリング（U2）が failed を拾う局面を作る。
     // 実物で failed になるのは `claude` が応答を返さなかったときで、ここでは起こせない
-    await page.route(new RegExp(`/api/strokes/${sessionId}$`), (route) =>
+    await page.route(new RegExp(`/api/sessions/${sessionId}$`), (route) =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',

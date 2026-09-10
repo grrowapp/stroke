@@ -15,7 +15,7 @@
 
 **値の実体をこの2つ以外のソースファイルに置かない。** 既定値を並べた別モジュール（かつて存在した `server/utils/stroke/settings.ts`）は作らない。同じ値が2箇所に現れ、どちらが正かを資料と突き合わせられなくなるためである。
 
-**設定を引くのは端だけである。** endpoint と CLI が値を解決し、共有のモジュール（`session-core.ts`・`paths.ts`・`claude.ts` など）は**引数で受け取る**。共有モジュールが自分で設定を引くと、endpoint と CLI で引く経路が割れる。
+**設定を引くのは端だけである。** endpoint と CLI が値を解決し、共有のモジュール（`paths.ts`・`claude.ts` など）は**引数で受け取る**。共有モジュールが自分で設定を引くと、endpoint と CLI で引く経路が割れる。
 
 CLI（`yarn session`、Nitro の外）が `useRuntimeConfig()` を使えないことは、値の置き場を分ける理由にならない。`nuxt.config.ts` は `tsx` から普通に import できる（実測確認済み）。環境変数を読まないので、endpoint と CLI は同じ値になる。
 
@@ -42,7 +42,7 @@ const { projectShareRoot, claude } = config.runtimeConfig
 | `claude.debugLogDir` | （空 = 無効） |
 | `openspec.bin` | `openspec` |
 | `openspec.initArgs` | `init --tools none` |
-| `wsPathPattern` | `/api/strokes/([^/]+)/ws/{channel}(?:$\|[/?#])` |
+| `wsPathPattern` | `/api/sessions/([^/]+)/ws/{channel}(?:$\|[/?#])` |
 
 ### `projectShareRoot`
 
@@ -195,13 +195,13 @@ AI へ渡す定型。**手順の本文をここに書かない。** 手順は MC
 
 | 値 | 置き場 |
 |---|---|
-| セッションディレクトリ内のファイル名（`state.json` ほか） | `server/utils/stroke/session-core.ts` |
+| セッションディレクトリ内のファイル名（`state.json` ほか） | `server/utils/stroke/paths.ts` |
 | openspec ルートの名前（`openspec` / `config.yaml`） | `server/utils/stroke/openspec.ts` |
 | 子プロセスを打ち切るシグナル（`SIGKILL`） | `server/utils/stroke/claude.ts` |
 | 継続先が無いときに `claude` が出す文言 | `server/utils/stroke/claude.ts` |
 | 子プロセスへ接続先を渡す環境変数の名前（`STROKE_BASEURL`） | `server/utils/stroke/claude.ts` |
 | プロジェクト名として許す文字 | `server/utils/stroke/project.ts` |
-| 対象の id として受け付ける形 | `server/utils/stroke/session-core.ts` |
+| 対象の id として受け付ける形 | `server/utils/stroke/paths.ts` |
 | 失敗した実行を起こし直す巡回の間隔 | `server/plugins/01.retry-failed.ts` |
 | ログの接頭辞 | `server/utils/stroke/log.ts` |
 

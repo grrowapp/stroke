@@ -10,7 +10,7 @@
  * どうかではなく phase で決まる（specs/project/generation「生成中か完了かはファイルシステムの
  * 事実だけで判定する」・add-activated-phase design D8）。
  *
- * **`listSessionsCore` に相乗りしない。** あれは巡回のための一覧で、`openspec/` の存在と
+ * **`listSessions`（`server/handler/session.ts`）に相乗りしない。** あれは巡回のための一覧で、`openspec/` の存在と
  * `config.yaml` の中身まで検査する。母集合の判定にその検査を持ち込むと、openspec が壊れた
  * プロジェクトが一覧から丸ごと消える。ここが要るのは `state.json` の `phase` だけである。
  *
