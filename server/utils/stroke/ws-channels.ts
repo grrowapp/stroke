@@ -8,7 +8,8 @@ import { createKeyedPeerRegistry } from '../ws/registry'
  * （`openspec/specs/ws/delivery`）。
  *
  * 「現在分」はここに複製しない。正は session-store（`state.json` / `proposal.md`）にあるため、
- * 接続時配信は route ハンドラがそちらを読んで送る（design.md: 書き手は1つ）。
+ * 接続時配信は `server/handler/{question,proposal}.ts` がそちらを読み、route はその結果を
+ * 送るだけである（design.md: 書き手は1つ）。
  */
 /**
  * WS の URL からセッション id を読む。W1・W2 が同じこの1本を使う
