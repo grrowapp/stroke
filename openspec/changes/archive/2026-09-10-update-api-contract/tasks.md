@@ -35,6 +35,6 @@
 
 - [x] 6.1 `openspec validate update-api-contract --strict` を通す
 - [x] 6.2 切り出しの完了を、並走する `fix-server-api-layout`・`fix-session-api-layout` の ticket へ書き添える（参照先の資料が増えたこと）
-- [ ] 6.3 'typescript-reviewer' エージェントに '/santa-method' でレビューを実行させる。レビューが完全にパスするまで続ける
+- [x] 6.3 'typescript-reviewer' エージェントに '/santa-method' でレビューを実行させる。**飛ばした**——`fix-server-api-layout` の子 change（pre3）と同じ扱いで、ユーザー指示（2026-09-10）による
 - [x] 6.4 change の成果物を commit する
-- [ ] 6.5 ユーザーから完了承認を得て、`openspec/tickets/update-api-contract.md` の `status` を `Wait-for-archive` にする
+- [x] 6.5 ユーザーから完了承認を得て、`openspec/tickets/update-api-contract.md` の `status` を `Wait-for-archive` にする

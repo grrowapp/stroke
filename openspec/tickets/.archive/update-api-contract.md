@@ -1,5 +1,5 @@
 ---
-status: Doing
+status: Wait-for-archive
 origin: user
 date: 2026-09-09
 change: update-api-contract

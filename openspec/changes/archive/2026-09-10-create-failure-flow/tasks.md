@@ -36,6 +36,6 @@
 ## 5. 仕上げ
 
 - [x] 5.1 `openspec validate create-failure-flow --strict` を通す
-- [ ] 5.2 'typescript-reviewer' エージェントに '/santa-method' でレビューを実行させる。レビューが完全にパスするまで続ける
+- [x] 5.2 'typescript-reviewer' エージェントに '/santa-method' でレビューを実行させる。**飛ばした**——`fix-server-api-layout` の子 change（pre3）と同じ扱いで、ユーザー指示（2026-09-10）による
 - [x] 5.3 change の成果物を commit する
-- [ ] 5.4 ユーザーから完了承認を得て、`openspec/tickets/create-failure-flow.md` の `status` を `Wait-for-archive` にする
+- [x] 5.4 ユーザーから完了承認を得て、`openspec/tickets/create-failure-flow.md` の `status` を `Wait-for-archive` にする
