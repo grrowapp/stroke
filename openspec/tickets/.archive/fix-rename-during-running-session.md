@@ -5,7 +5,7 @@ change: fix-rename-during-running-session
 order: -6.0
 triage:
   - bug
-status: Doing
+status: Wait-for-archive
 tags:
   - proposal
   - specs
@@ -20,7 +20,7 @@ tags:
 改名が走行中の flontier の claude を置き去りにする欠陥。**根本原因は責務境界**——proposal を
 提出する endpoint（A7）が phase の切り替えと配信まで持っているため、claude の実行が終わる前に
 承認できる局面が立つ（ユーザー指摘 2026-09-09）。実行の決着は claude のプロセスを制御する
-invokeAi の責務であり、endpoint は記録だけを行う。あわせて **409 busy という応答を契約から
+invoke-agent の責務であり、endpoint は記録だけを行う。あわせて **409 busy という応答を契約から
 無くす**（ユーザー指示 2026-09-09）。
 
 ## 起票時の症状（2026-08-31）
@@ -49,7 +49,8 @@ invokeAi の責務であり、endpoint は記録だけを行う。あわせて *
 ## 現時点での対応内容
 
 - **根本: 提出の endpoint（A5・A7）は記録だけ。実行の決着（phase の切り替え・W1/W2 配信）は
-  invokeAi が完了時に行う**（steering の完成の記録 U15 と同型）
+  invoke-agent が完了時に行う**（steering の完成の記録 U15 と同型）。決着の書き込みのために
+  A9 `POST /api/strokes/:id/settlement` を足した
 - 画面2 の承認は phase `proposed` で（現状どおり）。phase は決着でしか立たないので、実行中に
   承認は存在しない
 - **409 busy を契約から消す。** U13 は冪等（実行中なら要求は満たされている）。U14・U11・P1 に
@@ -59,22 +60,33 @@ invokeAi の責務であり、endpoint は記録だけを行う。あわせて *
   `api/project/delete`
 - `ui` は作らない（design Decision 7）
 - 登録済み（2026-09-09 承認）: `docs/adr/0022-no-one-swallows-a-response.md`
-- 提案中（承認待ち）: docs 8件（`contract.md` A5/A7/W1/W2/約束/U13、
+- 反映済み（2026-09-09 承認）: docs 9件（`contract.md` の A5・A7・W1・W2・約束・A9 の追加、
   `sessions/{invoke-agent,promote,delete}.md`、`projects/delete.md`、`activate.md`、
-  `architecture/question-flow.md`）。design.md「docs・ADR への反映」。承認後に docs を直し、
-  tasks へ
+  `architecture/question-flow.md`、`mcp/tools.md`）
+- あわせて直した既存の欠陥: `yarn check:stroke` が起動できない（`package.json` の `imports`）／
+  E2E のポート確保が別 worktree と衝突する（TOCTOU。`test/e2e/port-reservation.ts`）／
+  `UpstreamSocket` が `close()` の後も呼び手へ通す（production に影響）
 
 ## 他の change との関係
 
 - `replace-polling-with-push`: 同じ `useWaitingRetry` に触る。本 change は `pendingRun`・
   `BUSY_RETRIES` の削除だけ。順序はユーザー判断
+- `update-invoke-agent-responsibility-boundary`（develop へマージ済み）: 「MCP ツールに判定の
+  材料を作らせない」で steering の記録を本家 REST への問い合わせへ移した。rebase の際にその
+  方針へ寄せ、起動 token 単位の記録は flontier の2種（`question` / `proposal`）だけにした
 - `api/stroke/proposal`・`submission` の spec は「正として扱わない」注記あり（ADR 0019）。本
   change の規定は endpoint の path を問わない
 
 ## 畳む方向
 
-specs delta と実装を入れ、「proposal の提出 → 決着前は画面2 が開かない → 決着 → 承認 → 改名の
-時点で実行が無い」を E2E で固定し、docs を承認を経て直して archive する。
+**完了。archive を待つだけである。**
+
+`yarn typecheck` exit 0 ／ `yarn test` 93 files 1147 tests 全通過 ／ `yarn test:e2e` 248 passed
+0 failed ／ `yarn check:stroke --approve` は実機で proposal → 承認 → 昇格 → steering 文書3本まで
+着地（EXIT=0）。E2E には「proposal の提出では画面2 が開かない → 実行の決着で開く → 承認 →
+改名の時点で対象に実行が無い」を `test/e2e/stroke-settlement.spec.ts` として足した。
+
+成果は PR #31（`pre5` → `develop`）。ユーザーの完了承認は 2026-09-10。
 
 出どころ: change `provide-operations-via-mcp` の santa-method レビュー 9周目（2026-08-31）。
 同 change の範囲外として記録していたが、範囲外の扱いは不正だとユーザーが指摘（2026-09-01）

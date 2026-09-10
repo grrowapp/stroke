@@ -81,5 +81,5 @@
 
 ## 10. 完了
 
-- [ ] 10.1 実装が specs delta のすべての Requirement を満たすことを確かめ、ユーザーへ完了の承認を求める
-- [ ] 10.2 承認を得たら ticket の `status` を `Wait-for-archive` に書き換える
+- [x] 10.1 実装が specs delta のすべての Requirement を満たすことを確かめ、ユーザーへ完了の承認を求める — **13 の Requirement をすべて確認した。** `agent/invocation`「完了は output stream で検知して idle に変える」（`ai.ts` が `didWork` の後・`setInvocation('idle')` の前に `settle` を呼ぶ）／`api/stroke/question`・`api/stroke/proposal`（`handler/{question,proposal}.ts` の `submit*` は記録のみで `publish` を持たず、`proposal` は phase を動かさない）／`api/session/ws` の W1・W2（配信は `settleQuestion` / `settleProposal`。接続時配信は `currentQuestion` / `currentProposal`）／`api/session/invoke-agent`（`handler/invoke-agent.ts` が `started: false` で何も起こさずに戻る＝冪等）／`api/session/promote`（枠を取れなければ 500。busy を持たない）／`api/session/delete`・`api/project/delete`（`isRunning` の参照が無い）／`stroke/frontier`（承認は phase `proposed` でのみ。phase は決着でしか立たない）。`grep -rn "'busy'" server/ app/ shared/` は0件で、`ConflictReason` から消えている。実機の `yarn check:stroke --approve` も EXIT=0 で着地。ユーザーの承認は 2026-09-10 に得た
+- [x] 10.2 承認を得たら ticket の `status` を `Wait-for-archive` に書き換える

@@ -90,4 +90,11 @@ docs だけを動かすため、実装・データの移行は無い。巻き戻
 
 ## Open Questions
 
-- **`docs/specs/plan/structure-migration.md` へ「パス表記の差」を書くか。** あの資料は構造（ファイルの置き場）の規範と現状の差を持つもので、API のパスの差を載せる資料かどうかは判断が要る。tasks の中でユーザーへ諮る（「切り出し先のパス表記は docs の正へ揃える」）
+- **`docs/specs/plan/structure-migration.md` へ「パス表記の差」を書くか**（2026-09-10 に決めた。**書かない**）。
+  あの資料が持つのは構造の規範（`docs/specs/structure/system-structure.md`）と現状の差であり、載っているのはいずれも
+  「別 change で寄せる」ものである。API のパスの差は、既に `fix-server-api-layout`（親。Gitea #17）と
+  `fix-session-api-layout`（子）が追っており、**同じ差を2箇所で管理することになる**。追う先は ticket と
+  change に一本化し、docs には書かない。
+
+  差そのものは消えていない。切り出した資料（`docs/specs/api/sessions/*.md`）が docs の正のパスで書かれており、
+  実装との食い違いはそこを読めば分かる。

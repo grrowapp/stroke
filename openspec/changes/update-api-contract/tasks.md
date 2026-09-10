@@ -29,7 +29,7 @@
 - [x] 5.1 個別 endpoint の記述を指している参照を洗い出す（`core/schema.md`・`architecture/question-flow.md`・`api/sessions/*.md`・`api/ws/delivery.md`）
 - [x] 5.2 洗い出した参照を新しい置き場へ向け直す。共通の約束を指している参照は触らない
 - [x] 5.3 `docs/specs/api/overview.md` の目録が切り出し後の実体と合っているか確かめる。**足りなければユーザーへ諮る**（並走の基準であり、勝手に触らない）
-- [ ] 5.4 パス表記の差を `docs/specs/plan/structure-migration.md` に書くかどうかをユーザーへ諮る（design.md「Open Questions」）
+- [x] 5.4 パス表記の差を `docs/specs/plan/structure-migration.md` に書くかどうかをユーザーへ諮る（design.md「Open Questions」）
 
 ## 6. 仕上げ
 
