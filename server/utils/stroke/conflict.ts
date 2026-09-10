@@ -38,10 +38,8 @@ export function conflict(reason: ConflictReason, message: string) {
  * 対象が無いのは 404、それ以外（I/O）は 500。同じ実行の同じ失敗なので、口ごとに写しを
  * 持たない。局面の判定（消してよい局面か）はここへ来る前に endpoint が済ませている。
  *
- * **今の呼び手はセッションの削除（U11）だけである。** プロジェクトの削除（P1・
- * `server/api/projects/[projectId]/index.delete.ts`）は同じ写しを自分の中に持ったままで、
- * ここへ寄せるのは Gitea #19（`update-project-api-handler`）である——プロジェクトの
- * endpoint はそちらの範囲なので、この change では触らない。
+ * **呼び手はセッションの削除（U11）とプロジェクトの削除（P1）の2つである。**
+ * P1 が持っていた同じ写しは `update-project-api-handler` で消し、両方がここを呼ぶ形に揃えた。
  */
 export function deleteErrorToHttp(error: unknown) {
   if (error instanceof DeleteError && error.kind === 'not-found') {

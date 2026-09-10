@@ -1,7 +1,8 @@
 import { createError, defineEventHandler, getRouterParam } from 'h3';
 
+import { getSteeringDocument } from '../../../../../handler/project-document';
 import { isSteeringDocument } from '../../../../../utils/upstream/rest';
-import { toHttpError, upstreamClient } from '../../../../../utils/control/upstream-proxy';
+import { toHttpError } from '../../../../../utils/control/upstream-proxy';
 
 export default defineEventHandler(async (event) => {
   const projectId = getRouterParam(event, 'projectId') ?? '';
@@ -12,7 +13,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'unknown-steering-document' });
   }
 
-  const result = await upstreamClient().getSteeringDocument(projectId, name);
+  const result = await getSteeringDocument(projectId, name);
 
   if (!result.ok) throw toHttpError(result.failure);
   return result.value;

@@ -12,8 +12,9 @@
 import { createError, defineEventHandler, getRouterParam, readBody } from 'h3';
 import { z } from 'zod';
 
+import { respondToApproval } from '../../../../../../handler/project-approval';
 import { APPROVAL_ACTIONS, type ApprovalAction } from '../../../../../../utils/upstream/rest';
-import { toHttpError, upstreamClient } from '../../../../../../utils/control/upstream-proxy';
+import { toHttpError } from '../../../../../../utils/control/upstream-proxy';
 
 /**
  * 注釈1件。`#shared/stroke` の `Annotation` と同じ形を、境界で検証できるように zod で持つ。
@@ -62,12 +63,6 @@ const bodySchema = z.object({
   comments: z.array(annotationSchema).max(100).optional(),
 });
 
-const DEFAULT_RESPONSE: Record<ApprovalAction, string> = {
-  approve: 'stroke-board から承認',
-  reject: 'stroke-board から却下',
-  'needs-revision': 'stroke-board から差し戻し',
-};
-
 export default defineEventHandler(async (event) => {
   const projectId = getRouterParam(event, 'projectId') ?? '';
   const approvalId = getRouterParam(event, 'approvalId') ?? '';
@@ -108,13 +103,8 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'revision-needs-comments' });
   }
 
-  const result = await upstreamClient().respondToApproval(
-    projectId,
-    approvalId,
-    action,
-    response === undefined || response.length === 0 ? DEFAULT_RESPONSE[action] : response,
-    comments === undefined ? undefined : { annotations: annotations ?? '', comments },
-  );
+  // 本家へ送る値の組み立て（応答本文が空のときの既定文・注釈のまとめ方）は handler が持つ
+  const result = await respondToApproval(projectId, approvalId, action, { response, annotations, comments });
 
   if (!result.ok) throw toHttpError(result.failure);
 
