@@ -13,25 +13,28 @@ import { stubNitroGlobals } from '../api/support';
  * openspec/specs/project/generation）。起動は要求せず、`invocation` を A8 経由で `failed` に
  * して巡回へ引き渡す。
  *
- * **busy ガードは U10 からここへ移した**（fix-rename-during-running-session）。改名する
+ * **実行の枠は U10 からここへ移した**（fix-rename-during-running-session）。改名する
  * のはこの段なので、対象になるのもここである。`running.ts` の実物は
  * `test/server/utils/stroke/running.test.ts` が見ているので、ここでは `beginRun` /
- * `endRun` をモックし、呼ばれ方（どのパスで占有するか・断られたら何も変えないか・解放が
+ * `endRun` をモックし、呼ばれ方（どのパスで占有するか・取れなければ何も変えないか・解放が
  * どこで起きるか）だけを見る。
+ *
+ * **枠が取れないときは 500 である。** 「実行中だから受け付けない」（409 busy）は契約から
+ * 消えた——承認できる局面は実行の決着でしか立たないので、昇格が実行中に届くのは前提が
+ * 崩れているということであり、理由を握りつぶさずに失敗として返す（ADR-0022）。
  *
  * 受理してよい局面か（昇格済みでないか・判断が記録されているか）は endpoint が持つので
  * ここには来ない（`test/server/api/sessions/promote/index.post.test.ts`）。
  */
 
-const { assertNameAvailable, promoteSessionToProject, revertPromotion, broadcastProjectCreation, forgetSubmissions, fetchMock, beginRun, endRun } =
+const { assertNameAvailable, promoteSessionToProject, revertPromotion, broadcastProjectCreation, fetchMock, beginRun, endRun } =
   vi.hoisted(() => ({
     assertNameAvailable: vi.fn(async (_root: string, name: string) => `/share/${name}`),
     promoteSessionToProject: vi.fn(async (_root: string, _id: string, name: string) => `/share/${name}`),
     revertPromotion: vi.fn(async () => undefined),
     broadcastProjectCreation: vi.fn(() => undefined),
-    forgetSubmissions: vi.fn(() => undefined),
     fetchMock: vi.fn(async (..._args: unknown[]) => undefined),
-    beginRun: vi.fn(async (path: string) => `key:${path}`),
+    beginRun: vi.fn(async (path: string) => ({ started: true, key: `key:${path}` })),
     endRun: vi.fn(),
   }));
 
@@ -45,12 +48,6 @@ vi.mock('../../../server/utils/stroke/project', async (importOriginal) => ({
 
 vi.mock('../../../server/utils/control/board', () => ({
   broadcastProjectCreation,
-}));
-
-vi.mock('../../../server/utils/stroke/submission-signal', () => ({
-  forgetSubmissions,
-  notifySubmission: vi.fn(),
-  submissionCount: vi.fn(() => 0),
 }));
 
 // `sessionRunPath` / `projectRunPath` は fs を引かない純粋関数なので本物を残し、
@@ -119,11 +116,10 @@ function resetMocks(): void {
   promoteSessionToProject.mockReset().mockImplementation(async (_root, _id, name) => `/share/${name}`);
   revertPromotion.mockClear();
   broadcastProjectCreation.mockClear();
-  forgetSubmissions.mockClear();
   fetchMock.mockReset().mockResolvedValue(undefined);
   readStateMock.mockReset().mockResolvedValue(DECIDED);
   writeStateMock.mockReset().mockResolvedValue(undefined);
-  beginRun.mockReset().mockImplementation(async (path: string) => `key:${path}`);
+  beginRun.mockReset().mockImplementation(async (path: string) => ({ started: true, key: `key:${path}` }));
   endRun.mockReset();
 }
 
@@ -134,7 +130,7 @@ describe('promote', () => {
     const order: string[] = [];
     beginRun.mockImplementation(async (path: string) => {
       order.push('begin');
-      return `key:${path}`;
+      return { started: true, key: `key:${path}` };
     });
     assertNameAvailable.mockImplementation(async (_root, name) => {
       order.push('assert');
@@ -166,11 +162,15 @@ describe('promote', () => {
     expect(revertPromotion).not.toHaveBeenCalled();
   });
 
-  it('昇格した瞬間に生成中を配信し、旧 id の提出の記録を落とす', async () => {
+  /**
+   * 提出の記録は起動（接続 token）単位になったので、昇格が旧 id の分を落とす必要は無くなった
+   * ——捨てるのは起動の終わり（`kick` の `.finally`）である
+   * （change fix-rename-during-running-session・`submission-signal.ts`）。
+   */
+  it('昇格した瞬間に生成中を配信する', async () => {
     await run();
 
     expect(broadcastProjectCreation).toHaveBeenCalledWith(NAME, 'in-progress');
-    expect(forgetSubmissions).toHaveBeenCalledWith(SESSION);
   });
 
   it('起動は要求しない。invoke-agent を叩かない', async () => {
@@ -278,7 +278,6 @@ describe('promote', () => {
     expect(promoteSessionToProject).not.toHaveBeenCalled();
     expect(revertPromotion).not.toHaveBeenCalled();
     expect(broadcastProjectCreation).not.toHaveBeenCalled();
-    expect(forgetSubmissions).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -345,11 +344,11 @@ describe('promote', () => {
   });
 
   it('理由の印が name-conflict でない 409 では取り下げない。status だけで判定していない', async () => {
-    assertNameAvailable.mockRejectedValueOnce(conflict('busy', 'この作業場所は AI の応答を待っている。'));
+    assertNameAvailable.mockRejectedValueOnce(conflict('phase', 'この操作は今の phase に当てはまらない。'));
 
     await expect(run()).rejects.toMatchObject({
       statusCode: 409,
-      data: { reason: 'busy' },
+      data: { reason: 'phase' },
     });
 
     expect(writeStateMock).not.toHaveBeenCalled();
@@ -370,7 +369,7 @@ describe('promote', () => {
 
   it('取り下げは読み直してから書く。読み直した時点で判断が無ければ何も書かない', async () => {
     // 取り下げの直前の読み直し。冒頭の読み（endpoint が持つ）との間に承認（U10）の
-    // 取り下げが入った並び——U10 は busy ガードの対象外なので、占有の中でも判断は
+    // 取り下げが入った並び——U10 は実行の枠を取らないので、占有の中でも判断は
     // 入れ替わりうる
     readStateMock.mockResolvedValueOnce({ phase: 'proposed', currentQuestion: null, invocation: 'idle' });
     assertNameAvailable.mockRejectedValueOnce(nameConflict());
@@ -386,7 +385,7 @@ describe('promote', () => {
   });
 
   it('読み直した判断が別の名前なら取り下げない。衝突していない判断を消さない', async () => {
-    // 間に承認（U10）が別の名前で判断を下し直した並び——U10 は busy ガードの対象外で
+    // 間に承認（U10）が別の名前で判断を下し直した並び——U10 は実行の枠を取らず
     // `withStateLock` も取らないので、この占有では止まらない。新しい判断の名前は衝突して
     // いないので、消す根拠が無い
     readStateMock.mockResolvedValueOnce({ ...DECIDED, decision: { projectName: 'decided-app-2' } });
@@ -409,7 +408,7 @@ describe('promote', () => {
   });
 });
 
-describe('promote — busy ガード（U10 から移した。fix-rename-during-running-session）', () => {
+describe('promote — 実行の枠（U10 から移した。fix-rename-during-running-session）', () => {
   beforeEach(resetMocks);
 
   it('対象の作業場所（セッション id・改名前の実体）を beginRun で占有する', async () => {
@@ -418,33 +417,32 @@ describe('promote — busy ガード（U10 から移した。fix-rename-during-r
     expect(beginRun).toHaveBeenCalledWith(sessionRunPath('/share', SESSION));
   });
 
-  it('実行中は 409 busy を返し、何も変わらない（改名・phase 書き込み・配信・A8 のいずれも起きない）', async () => {
-    beginRun.mockRejectedValueOnce(
-      Object.assign(new Error('この作業場所は AI の応答を待っている。'), {
-        statusCode: 409,
-        data: { reason: 'busy' },
-      }),
-    );
+  /**
+   * **`busy` は返さない。** 承認できる局面（`proposed`）は proposal を提出した実行の決着でしか
+   * 立たないので、昇格が実行中に届くこと自体が前提の崩れである。「待てば通る」理由を持たせずに
+   * 500 で返す（ADR-0022・`server/utils/stroke/conflict.ts`「`busy` は無い」）。
+   */
+  it('枠が取れなければ 500 を投げ、何も変わらない（改名・phase 書き込み・配信・A8 のいずれも起きない）', async () => {
+    beginRun.mockResolvedValueOnce({ started: false } as never);
 
     await expect(run()).rejects.toMatchObject({
-      statusCode: 409,
-      data: { reason: 'busy' },
+      statusCode: 500,
+      message: expect.stringContaining('対象で実行が走っている。'),
     });
 
     expect(assertNameAvailable).not.toHaveBeenCalled();
     expect(promoteSessionToProject).not.toHaveBeenCalled();
     expect(writeStateMock).not.toHaveBeenCalled();
     expect(broadcastProjectCreation).not.toHaveBeenCalled();
-    expect(forgetSubmissions).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('busy で断ったときは占有を残さない。beginRun が失敗しているので endRun は呼ばれない', async () => {
-    beginRun.mockRejectedValueOnce(Object.assign(new Error('busy'), { statusCode: 409, data: { reason: 'busy' } }));
+  it('枠を取れずに断ったときは解放もしない。他人の実行の枠を外さない', async () => {
+    beginRun.mockResolvedValueOnce({ started: false } as never);
 
-    await expect(run()).rejects.toMatchObject({ statusCode: 409 });
+    await expect(run()).rejects.toMatchObject({ statusCode: 500 });
 
-    // 占有を取れていない（beginRun が一度も返っていない）ので、解放も起きようがない
+    // 枠を取れていないので、解放も起きようがない
     expect(endRun).not.toHaveBeenCalled();
   });
 

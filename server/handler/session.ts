@@ -5,7 +5,6 @@ import fse from 'fs-extra'
 import { isPhase, type Invocation, type SessionSummary } from '#shared/stroke'
 import { OPENSPEC_CONFIG_FILE, OPENSPEC_DIR } from '../utils/stroke/openspec'
 import { SESSION_FILES, sessionDir, sessionFile } from '../utils/stroke/paths'
-import { forgetSubmissions } from '../utils/stroke/submission-signal'
 import { removeTarget } from './delete'
 
 /**
@@ -78,11 +77,13 @@ export async function createSession(
  * それぞれ決める——セッションの削除は承認より前、プロジェクトの削除は承認以降。判定を
  * ここに置くと、実行が「誰から呼ばれたか」を知ることになる。CLI（`yarn session delete`）に
  * その守りは無く、名前を直に渡せば昇格済みのプロジェクトも消える。手元の道具として、
- * そう決めてある。提出の記録はプロセスごとに持つので、CLI から落としても何も起きない。
+ * そう決めてある。
+ *
+ * 提出の記録は落とさない。記録は起動（接続 token）に属し、`kick` の `.finally` が捨てる
+ * （`submission-signal.ts`）。セッションの id では引けないので、ここで落とすものは無い。
  */
 export async function deleteSession(root: string, sessionId: string): Promise<void> {
   await removeTarget(root, sessionId)
-  forgetSubmissions(sessionId)
 }
 
 /**

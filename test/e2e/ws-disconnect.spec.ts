@@ -1,8 +1,9 @@
 import { WebSocket } from 'ws';
 
-import { expect, test, type APIRequestContext } from '@playwright/test';
+import type { APIRequestContext } from '@playwright/test';
 
 import { APP_PORT } from '../../playwright.config';
+import { expect, settleRun, test } from './support';
 
 /**
  * 配信先が切れてもシステムは動き続ける
@@ -49,12 +50,21 @@ async function submitQuestion(request: APIRequestContext, sessionId: string): Pr
   expect(response.ok(), await response.text()).toBeTruthy();
 }
 
-/** A7: proposal を提出する。これが無いと W2 の接続時配信そのものが発火しない */
+/**
+ * A7 で proposal を提出し、その実行を決着させる（A9）。
+ *
+ * **決着まで進めないと W2 の接続時配信そのものが発火しない。** 接続時配信は phase が
+ * `stroking` のときは何も送らず（`server/routes/api/strokes/[id]/ws/proposal.ts`）、
+ * `proposed` を立てるのは提出ではなく決着になったためである
+ * （change fix-rename-during-running-session）。送る経路を通さないと、この spec は
+ * 「切断に耐えるか」を何も試さないまま緑になる。
+ */
 async function submitProposal(request: APIRequestContext, sessionId: string): Promise<void> {
   const response = await request.post(`/api/strokes/${sessionId}/proposal`, {
     data: { proposal: '# 提案\n\nE2E の proposal 本文。', projectName: 'e2e-ws-disconnect' },
   });
   expect(response.ok(), await response.text()).toBeTruthy();
+  await settleRun(request, sessionId, 'proposal');
 }
 
 /**

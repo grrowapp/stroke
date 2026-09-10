@@ -23,3 +23,16 @@ export function submissionPath(sessionId: string): string {
 export function activatePath(sessionId: string): string {
   return `/api/sessions/${encodeURIComponent(sessionId)}/activate`
 }
+
+/**
+ * A9 の path。実行の決着（提出されたものに応じた phase の切り替えと画面への配信）の
+ * 唯一の書き込み口。
+ *
+ * 叩くのは invokeAi の呼び出し側（`invoke.ts` の `settle`）だけである。提出を受ける口
+ * （A5・A7）は記録だけを行い、局面は動かさない——局面が変わってよいのは実行が終わった
+ * 時点だけで、それを知るのは子プロセスを制御する invokeAi だけである
+ * （openspec/specs/agent/invocation・api/stroke/proposal・api/stroke/question）。
+ */
+export function settlementPath(sessionId: string): string {
+  return `/api/strokes/${encodeURIComponent(sessionId)}/settlement`
+}

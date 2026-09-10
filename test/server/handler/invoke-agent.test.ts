@@ -3,17 +3,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 /**
  * 対象は `server/handler/invoke-agent.ts`（U13 の実処理）。
  *
- * 見るのは fix-idle-stuck-on-run-build-failure の3点。
+ * 見るのは fix-idle-stuck-on-run-build-failure の3点と、起動が冪等であること。
  *
  * - 組み立てに失敗すると（`kick` の `built` が reject すると）`InvokeError` を投げる
  * - 待つのは `built` までである。`settled`（AI の応答の完了）は待たない
- * - 受理しなかったときも busy ガード（`endRun`）が解ける
+ * - 受理しなかったときも実行の枠（`endRun`）が解ける
+ * - **既に走っていれば何も起こさずに戻る**（`beginRun` が `started: false`）。「実行中だから
+ *   受け付けない」（409 busy）は契約から消えた（change fix-rename-during-running-session）
  *
  * 503 への写しは endpoint が持つ（`test/server/api/sessions/invoke-agent/index.get.test.ts`）。
  */
 
 const running = vi.hoisted(() => ({
-  beginRun: vi.fn(async (path: string) => `key:${path}`),
+  beginRun: vi.fn(async (path: string) => ({ started: true, key: `key:${path}` })),
   endRun: vi.fn(),
 }));
 vi.mock('../../../server/utils/stroke/running', () => running);
@@ -32,7 +34,7 @@ function kickResult(built: Promise<void>, settled: Promise<void>): { built: Prom
 
 describe('invokeAgent', () => {
   beforeEach(() => {
-    running.beginRun.mockClear();
+    running.beginRun.mockReset().mockImplementation(async (path: string) => ({ started: true, key: `key:${path}` }));
     running.endRun.mockClear();
     invoke.kick.mockClear();
   });
@@ -46,7 +48,7 @@ describe('invokeAgent', () => {
 
     await invokeAgent({ sessionId: 'session-1', cwd: CWD, phase: 'stroking', retries: 0 });
 
-    // busy ガードはまだ解けていない（settled が終わっていない）
+    // 実行の枠はまだ解けていない（settled が終わっていない）
     expect(running.endRun).not.toHaveBeenCalled();
 
     finishSettled();
@@ -71,7 +73,23 @@ describe('invokeAgent', () => {
     });
   });
 
-  it('組み立てに失敗しても busy ガード（endRun）は解ける', async () => {
+  /**
+   * 起動の要求は冪等である（openspec/specs/api/session/invoke-agent）。既に走っていれば
+   * その要求は満たされているので、投げも起こしもせずに戻る。**枠は取っていないので解放も
+   * しない**——他人の実行の枠を外してしまう。
+   */
+  it('既に走っていれば何も起こさずに戻る。投げず、kick も endRun も呼ばない', async () => {
+    running.beginRun.mockResolvedValueOnce({ started: false } as never);
+
+    await expect(
+      invokeAgent({ sessionId: 'session-1', cwd: CWD, phase: 'stroking', retries: 0 }),
+    ).resolves.toBeUndefined();
+
+    expect(invoke.kick).not.toHaveBeenCalled();
+    expect(running.endRun).not.toHaveBeenCalled();
+  });
+
+  it('組み立てに失敗しても実行の枠（endRun）は解ける', async () => {
     invoke.kick.mockReturnValueOnce(kickResult(
       Promise.reject(new Error('組み立てに失敗')),
       Promise.resolve(),

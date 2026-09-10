@@ -10,7 +10,7 @@
 - phase を `approved` から `activated` に変える。`stroking → proposed → approved → activated` の一方向で、戻す操作は無い
 - **判定を持たない（ADR-0014）。** 完成したかを決めるのは呼び手で、ここは `approved` → `activated` の遷移を記録するだけ。**成果物・ファイルシステム（`.spec-workflow/` 配下）・本家の REST・`invocation` を受理の可否の材料にしない。** 受理を断るのは責務の不成立——対象が無い・`state.json` を読めない・phase が `approved` でない——の3つだけである
 - 起動も判断も昇格も受け持たない。`invocation` にも触れない——実行の記録は invoke-agent がこの応答を見てから書く
-- **busy を見ない。** 叩くのは invoke-agent が `invocation` を `idle` に変える前で、その時点で対象の実行はまだ占有中。busy を見ると自分の実行に弾かれる
+- **実行中かどうかを見ない。** 叩くのは invoke-agent が `invocation` を `idle` に変える前で、その時点で対象の実行はまだ占有中である。実行中を理由に断ると、自分の実行に弾かれる（「実行中だから受理しない」という応答は契約に無い。[contract.md](../contract.md) の「約束」）
 - **読んで書くはセッション単位で直列化する。** `state.json` は1ファイルで、書き込みは丸ごとである。起動時の後始末（A8 で `invocation`）と同じ対象に同時に触れても、古い写しで互いを上書きしない（`session-store.ts` の `withStateLock`。A8・会話 id の記録も同じ待ち行列を通る）
 - 受理したら上層へ `project-creation` の `done` を配信する（[ws/delivery.md](../ws/delivery.md)）。**成功の決着を出すのはここだけ**で、A8 で `idle` を書いても決着にはならない
 

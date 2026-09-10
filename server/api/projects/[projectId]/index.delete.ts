@@ -3,7 +3,6 @@ import { removeTarget } from '../../../handler/delete'
 import { resolveProjectName } from '../../../handler/project-directory'
 import { readStrokeConfig } from '../../../utils/stroke/config'
 import { conflict, deleteErrorToHttp } from '../../../utils/stroke/conflict'
-import { isRunning, projectRunPath } from '../../../utils/stroke/running'
 import { readState, type SessionState } from '../../../utils/stroke/session-store'
 
 /**
@@ -52,12 +51,9 @@ export default defineEventHandler(async (event): Promise<Response> => {
     })
   }
 
-  // busy 判定の単位は起動（U13）・セッションの削除（U11）・承認（U10）と同じ1つの事実
-  // （作業場所ディレクトリの実体）——単位の定義は `running.ts` に集約してあり、
-  // endpoint ごとに数え直さない（fix-rename-during-running-session）。
-  if (await isRunning(projectRunPath(root, name))) {
-    throw conflict('busy', 'このプロジェクトは AI の応答を待っている。完了するまで削除は受け付けない。')
-  }
+  // **実行中かどうかを見ない。** 画面が削除の操作を出す局面（生成の失敗の決着）は実行が
+  // 終わった後である。「実行中だから受理しない」（busy）という応答は持たない
+  // （openspec/specs/api/project/delete。change fix-rename-during-running-session）。
 
   let state: SessionState
   try {

@@ -4,7 +4,6 @@ import { assertNameAvailable, promoteSessionToProject, revertPromotion } from '.
 import { beginRun, endRun, sessionRunPath } from '../utils/stroke/running'
 import { writeState } from '../utils/stroke/session-store'
 import { submissionPath } from '../utils/stroke/submission-path'
-import { forgetSubmissions } from '../utils/stroke/submission-signal'
 import { withdrawConflictedDecision } from './approve'
 
 /**
@@ -77,30 +76,40 @@ function isNameConflict(error: unknown): boolean {
  * A8 が失敗しても昇格は巻き戻さない（後始末は段ごとに閉じる）。`idle` のまま残ると巡回が
  * 拾わないので、そのときは要求する側のキックだけが起動の道になる。
  *
- * ## busy ガードはここにある（fix-rename-during-running-session）
+ * ## 改名は走っている呼び出しを置き去りにしない（fix-rename-during-running-session）
  *
  * **改名するのはこの段である。** 改名は inode を保つため、対象で claude が走っている最中に
  * 改名すると、その呼び出しは改名先で生き続ける一方、自分を名乗る id は改名前のままになる。
  * 以後その呼び出しの操作（問いの送信・文書の提出・実行の記録）はすべて対象を見つけられずに
- * 落ち、成果はどこにも残らない。承認（U10）は判断を記録するだけで改名しないので対象では
- * ない——対象になるのは改名するここだけである。
+ * 落ち、成果はどこにも残らない。
  *
- * 対象の作業場所を `beginRun` で占有してから「衝突確認 → 改名 → `phase` を書く」へ進み、
- * `finally` で必ず解放する。**占有できなければ 409 busy を返し、何も変えずに終わる。**
+ * **その状況は、昇格の要求が実行中に届かないことで防ぐ。** 承認（U10）と昇格（U14）は
+ * phase `proposed` でしか行えず、phase `proposed` は proposal を提出した実行の決着でしか
+ * 立たない（openspec/specs/agent/invocation・stroke/frontier）。だから「実行中だから受理
+ * しない」（409 busy）という応答は持たない——それは承認できる局面が実行中に立つことを
+ * 前提にした設計であり、その前提を無くすのが本旨である
+ * （openspec/specs/api/session/promote）。
  *
- * **解放は steering の起動（U13）を叩く前に置く。** U13 は呼び手（画面・巡回）がこの
- * endpoint の成功応答を見た直後に叩き、同じキー（作業場所の実体）を取りに来る。解放を
- * 後（配信や A8 への引き渡しの後）に回すと、自分がまだ持っている占有で U13 が 409 に
- * なる。占有の区間は「衝突確認 → 改名 → `phase` 書き込み」だけに絞り、配信
- * （`broadcastProjectCreation`）・提出記録の破棄（`forgetSubmissions`）・A8 への引き渡しは
- * 解放の外側で行う。
+ * 改名の間だけ実行の枠を取っておくのは、昇格の直後に始まる steering の実行と重ならない
+ * ようにするためである。取れなければ前提が崩れている（欠陥）なので、握りつぶさずに失敗を
+ * 返す（ADR-0022）。解放は `finally` で必ず行い、steering の起動（U13）を叩く前に置く。
  */
 export async function promote(root: string, sessionId: string, projectName: string): Promise<void> {
-  // busy ガード。対象に実行中の呼び出しがあれば 409 busy で断り、**ここまでは何も
-  // 変えていない**。占有はここから、改名・phase 書き込みが終わった直後（steering の
-  // 起動を叩く前）まで——確認から改名の完了までを、起動が割り込めない1区間にする
-  // （fix-rename-during-running-session）。
-  const runKey = await beginRun(sessionRunPath(root, sessionId))
+  // 改名の間、実行の枠を取っておく。確認から改名の完了までを、起動が割り込めない1区間に
+  // する（fix-rename-during-running-session）。**ここまでは何も変えていない。**
+  //
+  // 取れないのは、届かないはずの実行中に昇格が届いたということで、前提が崩れている。
+  // 理由を握りつぶさずに失敗として返す（ADR-0022）——`busy` のような「待てば通る」理由は
+  // 持たない。
+  const start = await beginRun(sessionRunPath(root, sessionId))
+  if (!start.started) {
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'Internal Server Error',
+      message: '対象で実行が走っている。承認できる局面では起こらないはずの状態である。',
+    })
+  }
+  const runKey = start.key
 
   try {
     // 衝突確認は改名の**前**に通す。既にあれば改名は起こらない。
@@ -150,9 +159,6 @@ export async function promote(root: string, sessionId: string, projectName: stri
   // 一覧へ届く」）。判断の記録（U10）では配信しない——その時点でプロジェクトはまだ無い。
   // 配信は接続中のブラウザへ送るだけで、失敗しても昇格の成否に関わらない。
   broadcastProjectCreation(projectName, 'in-progress')
-
-  // 昇格した時点で旧 id の提出の記録は用済み。以後この id は二度と来ない。
-  forgetSubmissions(sessionId)
 
   // 起動の段を巡回へ引き渡す（上の doc「昇格の完了時点で `invocation` を `failed` にする」）。
   // path は相対。自分自身を叩くのに外向けの設定値で URL を組むと、待ち受けを変えた瞬間に

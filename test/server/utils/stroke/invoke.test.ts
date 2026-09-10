@@ -137,7 +137,10 @@ const { buildRun, kick, kindOf } = await import('../../../../server/utils/stroke
 
 /** 用途を phase で渡す（add-activated-phase design D4）。テストの語彙は kind のまま残す */
 const PHASE_OF = { stroke: 'stroking', steering: 'approved' } as const;
-const { notifySubmission, forgetSubmissions } = await import('../../../../server/utils/stroke/submission-signal');
+const {
+  recordLaunchSubmission,
+  forgetLaunchSubmission,
+} = await import('../../../../server/utils/stroke/submission-signal');
 
 type McpConfig = {
   mcpServers: Record<string, {
@@ -309,8 +312,10 @@ describe('buildRun の --mcp-config', () => {
  * steering は実行の終わりに本家 REST へ問い合わせ、**終了時点の本家の状態**で答える——
  * 3本の文書（`info` の `steering.documents`）と、生成中なら加えて3件の承認依頼
  * （pending の一覧の `filePath`）。起動ごとの記録は無く、MCP ツールも記録しない
- * （`docs/specs/mcp/contract.md`）。flontier は既存どおり対象の `sessionId` で数える
- * （`notifySubmission` / `submissionCount`）——ここが変わっていないことも合わせて見る。
+ * （`docs/specs/mcp/contract.md`）。flontier は**その起動（接続 token）単位**の記録を読む
+ * （`recordLaunchSubmission` / `hasLaunchSubmission`）——「何が」提出されたかを実行の決着
+ * （`settle`）が要るので、対象の `sessionId` で数える形から改めた
+ * （change fix-rename-during-running-session）。
  */
 describe('buildRun の didWork', () => {
   const PROJECT = { projectId: 'PID-A', projectName: 'project-a', projectPath: '/opt/projects/project-a' };
@@ -375,7 +380,8 @@ describe('buildRun の didWork', () => {
   });
 
   afterEach(() => {
-    forgetSubmissions('session-1');
+    forgetLaunchSubmission('token-1');
+    forgetLaunchSubmission('token-2');
     warn.mockRestore();
   });
 
@@ -515,7 +521,7 @@ describe('buildRun の didWork', () => {
     expectWarnedWith('本家への問い合わせで例外: fetch failed');
   });
 
-  it('flontier の起動は対象の sessionId で数える（変わっていない）', async () => {
+  it('flontier の起動はその起動（token）単位の記録を読む', async () => {
     const run = buildRun({
       sessionId: 'session-1',
       cwd: '/tmp/share/session-1',
@@ -527,11 +533,39 @@ describe('buildRun の didWork', () => {
     expect(run.didWork).toBeDefined();
     expect(await run.didWork!()).toBe(false);
 
-    notifySubmission('session-1');
+    // A5・A7 が受理したときと同じ記録
+    recordLaunchSubmission('token-1', 'proposal');
     expect(await run.didWork!()).toBe(true);
 
     // flontier は本家に問い合わせない
     expect(upstream.listProjects).not.toHaveBeenCalled();
+  });
+
+  it('別の起動の提出は flontier でも自分の作業にならない', async () => {
+    const run = buildRun({
+      sessionId: 'session-1',
+      cwd: '/tmp/share/session-1',
+      phase: 'stroking',
+      retries: 0,
+      token: 'token-1',
+    });
+
+    recordLaunchSubmission('token-2', 'question');
+    expect(await run.didWork!()).toBe(false);
+  });
+
+  it('ストロークの起動だけが決着（settle）を持つ', () => {
+    // 局面を動かすのはストロークの決着だけ。steering の決着に当たるのは完成の記録（U15）
+    const stroke = buildRun({
+      sessionId: 'session-1',
+      cwd: '/tmp/share/session-1',
+      phase: 'stroking',
+      retries: 0,
+      token: 'token-1',
+    });
+
+    expect(stroke.settle).toBeDefined();
+    expect(steeringRun('approved').settle).toBeUndefined();
   });
 });
 

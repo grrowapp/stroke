@@ -43,13 +43,17 @@ export interface InvokeAgentInput {
 /**
  * 起動を1回起こす。
  *
- * busy ガード。多重起動はここで止める（specs/api/invoke-agent）。**cwd からキーを引く。**
- * キーは cwd の実体（`stat` の `dev`/`ino`）なので、承認による改名の前後で同じ物理
- * ディレクトリを指す呼び出しは同じキーになり、id 違いでの二重起動が通らない
- * （fix-rename-during-running-session）。占有できなければ `beginRun` の 409 busy が
- * そのまま外へ出る。
+ * 多重起動はここで止める（specs/api/invoke-agent）。**cwd からキーを引く。** キーは cwd の
+ * 実体（`stat` の `dev`/`ino`）なので、承認による改名の前後で同じ物理ディレクトリを指す
+ * 呼び出しは同じキーになり、id 違いでの二重起動が通らない
+ * （fix-rename-during-running-session）。
  *
- * busy ガード解除・接続表 token の削除は実行全体の完了（`settled`）に紐づける。
+ * **起動の要求は冪等である。** 既に走っていればその要求は満たされているので、何も起こさずに
+ * 戻る。「実行中だから受け付けない」（409 busy）は返さない——画面が次の起動を要求できる局面は
+ * いずれも前の実行の決着の後にしか立たないので、ここへ届く重なりは同じ意図の要求（画面と
+ * 巡回が同じ対象を起動する等）だけである。
+ *
+ * 枠の解放・接続表 token の削除は実行全体の完了（`settled`）に紐づける。
  * 組み立てに失敗した実行も、その失敗を記録し終えるまでは「実行中」として扱う
  * （design.md D4）。`settled` は組み立て失敗時も reject しないので、この `.catch`
  * は他の予期しない失敗に対する保険である。
@@ -59,7 +63,9 @@ export interface InvokeAgentInput {
  * （fix-idle-stuck-on-run-build-failure・openspec/specs/api/session/invoke-agent）。
  */
 export async function invokeAgent(input: InvokeAgentInput): Promise<void> {
-  const runKey = await beginRun(input.cwd)
+  const start = await beginRun(input.cwd)
+  if (!start.started) return
+  const runKey = start.key
 
   const { built, settled } = kick({
     sessionId: input.sessionId,

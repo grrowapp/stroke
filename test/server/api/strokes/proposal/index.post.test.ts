@@ -6,9 +6,9 @@ import { fakeEvent, stubNitroGlobals, type FakeEvent } from '../../support';
  * 対象は `server/api/strokes/[id]/proposal/index.post.ts`（A7）。位置の付け方は
  * `question/index.post.test.ts` と同じ（`[id]` の段を挟まない理由もそちらに書いてある）。
  *
- * **見るのは準備と後始末だけである**——承認以降の 409、通ったときに handler へ渡すものと
- * 204 の返し方。受理の順序（残す → phase を進める → 配信する）・出し直しでの判断の失効・
- * 候補名の採り方は `test/server/handler/proposal.test.ts`。
+ * **見るのは準備と後始末だけである**——承認以降の 409、通ったときに handler へ渡すもの
+ * （接続 token を含む）と 204 の返し方。受理が残すだけであること・出し直しでの判断の失効・
+ * 候補名の採り方・決着（`settleProposal`）は `test/server/handler/proposal.test.ts`。
  */
 
 const { submitProposal } = vi.hoisted(() => ({ submitProposal: vi.fn(async () => undefined) }));
@@ -37,6 +37,8 @@ const readStateMock = vi.mocked(readState);
 
 const BODY = { proposal: '# 提案\n\n本文。', projectName: 'example-project' };
 const STROKING = { phase: 'stroking', currentQuestion: null, invocation: 'idle' } as const;
+/** その提出を起こした claude の接続（`x-stroke-token`）。endpoint は素通しするだけ */
+const TOKEN = 'launch-token-1';
 
 describe('A7 POST /api/strokes/:id/proposal', () => {
   beforeEach(() => {
@@ -50,12 +52,13 @@ describe('A7 POST /api/strokes/:id/proposal', () => {
    * この `status` を素通しする。
    */
   it('受理したら handler へ渡し、本文なしの 204 を返す', async () => {
-    const event = fakeEvent('session-1', BODY);
+    const event = fakeEvent('session-1', BODY, { 'x-stroke-token': TOKEN });
 
     const body = await proposalHandler(event as never);
 
-    // 候補名は検証を通さずそのまま渡す——kebab-case かを見て採否を決めるのは handler である
-    expect(submitProposal).toHaveBeenCalledWith('session-1', STROKING, '# 提案\n\n本文。', 'example-project');
+    // 候補名は検証を通さずそのまま渡す——kebab-case かを見て採否を決めるのは handler である。
+    // 接続 token も素通しする——決着が「何が提出されたか」を読む記録に使う
+    expect(submitProposal).toHaveBeenCalledWith('session-1', STROKING, '# 提案\n\n本文。', 'example-project', TOKEN);
     // ハンドラは status を自分で持った Response を返す（`setResponseStatus` + 裸の null は
     // h3 に捨てられる）。観測点は event ではなく返り値である
     expect(body).toBeInstanceOf(Response);
@@ -64,9 +67,19 @@ describe('A7 POST /api/strokes/:id/proposal', () => {
   });
 
   it('候補名が無い本文も受理し、handler へは undefined を渡す', async () => {
-    await proposalHandler(fakeEvent('session-1', { proposal: '# 提案\n\n本文。' }) as never);
+    await proposalHandler(fakeEvent('session-1', { proposal: '# 提案\n\n本文。' }, { 'x-stroke-token': TOKEN }) as never);
 
-    expect(submitProposal).toHaveBeenCalledWith('session-1', STROKING, '# 提案\n\n本文。', undefined);
+    expect(submitProposal).toHaveBeenCalledWith('session-1', STROKING, '# 提案\n\n本文。', undefined, TOKEN);
+  });
+
+  /**
+   * token を持たない要求も受理する。起動の外から直に叩かれたもので、記録の対象にならない
+   * だけである（判定は `submission-signal.ts` が持つ）。endpoint は有無を見ない。
+   */
+  it('接続 token を持たない要求も受理し、handler へは undefined を渡す', async () => {
+    await proposalHandler(fakeEvent('session-1', BODY) as never);
+
+    expect(submitProposal).toHaveBeenCalledWith('session-1', STROKING, '# 提案\n\n本文。', 'example-project', undefined);
   });
 
   it('承認済みのセッションには 409 を返し、handler を呼ばない', async () => {

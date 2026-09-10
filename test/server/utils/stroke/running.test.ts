@@ -6,17 +6,26 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   beginRun,
   endRun,
-  isRunning,
   projectRunPath,
   sessionRunPath,
 } from '../../../../server/utils/stroke/running'
 
 /**
- * busy ガードのキー（fix-rename-during-running-session design.md D2）。
+ * 実行の枠のキー（fix-rename-during-running-session design.md D2）。
  *
  * 見るのは、改名の前後で同じ物理ディレクトリが**同じキー**になること、別のディレクトリは
  * **違うキー**になること、そして `stat` に失敗したら既定値へ落ちずにそのまま投げること。
+ *
+ * **`beginRun` は「実行中だから受け付けない」を投げない**（409 busy を契約から無くした）。
+ * 取れたかどうかを `started` で返すだけで、断る理由は呼び出し側が自分の文脈で決める。
  */
+
+/** 取れた前提でキーを取り出す。取れなければテストを落とす。 */
+async function acquire(path: string): Promise<string> {
+  const start = await beginRun(path)
+  if (!start.started) throw new Error(`枠を取れなかった: ${path}`)
+  return start.key
+}
 
 let root: string
 
@@ -33,14 +42,14 @@ describe('キーの導出', () => {
     const before = join(root, 'session-uuid')
     await mkdir(before)
 
-    const beforeKey = await beginRun(before)
+    const beforeKey = await acquire(before)
     endRun(beforeKey)
 
     const after = join(root, 'project-name')
     await rename(before, after)
 
     // 改名後のパスから引いたキーは、改名前に引いたキーと同じ（inode は保たれる）
-    const afterKey = await beginRun(after)
+    const afterKey = await acquire(after)
     endRun(afterKey)
 
     expect(afterKey).toBe(beforeKey)
@@ -52,8 +61,8 @@ describe('キーの導出', () => {
     await mkdir(a)
     await mkdir(b)
 
-    const keyA = await beginRun(a)
-    const keyB = await beginRun(b)
+    const keyA = await acquire(a)
+    const keyB = await acquire(b)
 
     expect(keyA).not.toBe(keyB)
 
@@ -65,28 +74,26 @@ describe('キーの導出', () => {
     const missing = join(root, 'does-not-exist')
 
     await expect(beginRun(missing)).rejects.toThrow()
-    await expect(isRunning(missing)).rejects.toThrow()
 
     // 失敗しても他のディレクトリの枠には影響しない
     const other = join(root, 'other')
     await mkdir(other)
-    const key = await beginRun(other)
-    expect(await isRunning(other)).toBe(true)
+    const key = await acquire(other)
     endRun(key)
   })
 })
 
-describe('beginRun / endRun / isRunning', () => {
-  it('既に実行中なら 409 busy で断る', async () => {
-    const dir = join(root, 'busy')
+describe('beginRun / endRun', () => {
+  it('既に実行中なら started: false を返す。投げない', async () => {
+    const dir = join(root, 'running')
     await mkdir(dir)
 
-    const key = await beginRun(dir)
-    await expect(beginRun(dir)).rejects.toMatchObject({ statusCode: 409, data: { reason: 'busy' } })
+    const key = await acquire(dir)
+    expect(await beginRun(dir)).toEqual({ started: false })
 
     endRun(key)
     // 解放後は再び取れる
-    const reacquired = await beginRun(dir)
+    const reacquired = await acquire(dir)
     expect(reacquired).toBe(key)
     endRun(reacquired)
   })
@@ -95,8 +102,7 @@ describe('beginRun / endRun / isRunning', () => {
     const dir = join(root, 'vanishing')
     await mkdir(dir)
 
-    const key = await beginRun(dir)
-    expect(await isRunning(dir)).toBe(true)
+    const key = await acquire(dir)
 
     // 実行中にディレクトリそのものが消える（例: 改名で別名になる）
     await rm(dir, { recursive: true, force: true })
@@ -111,10 +117,10 @@ describe('beginRun / endRun / isRunning', () => {
     await mkdir(a)
     await mkdir(b)
 
-    const keyA = await beginRun(a)
-    const keyB = await beginRun(b)
-    expect(await isRunning(a)).toBe(true)
-    expect(await isRunning(b)).toBe(true)
+    const keyA = await acquire(a)
+    const keyB = await acquire(b)
+
+    expect(keyA).not.toBe(keyB)
 
     endRun(keyA)
     endRun(keyB)
@@ -135,13 +141,13 @@ describe('id → パス', () => {
     const sessionPath = sessionRunPath(root, 'uuid-1')
     await mkdir(sessionPath)
 
-    const key = await beginRun(sessionPath)
+    const key = await acquire(sessionPath)
     endRun(key)
 
     const projectPath = projectRunPath(root, 'renamed-project')
     await rename(sessionPath, projectPath)
 
-    const afterKey = await beginRun(projectPath)
+    const afterKey = await acquire(projectPath)
     endRun(afterKey)
 
     expect(afterKey).toBe(key)

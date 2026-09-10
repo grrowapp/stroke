@@ -12,19 +12,18 @@ import { fakeEvent, stubNitroGlobals } from '../../support';
  * `projects/[projectId]/index.delete.test.ts` と同型で、そちらと同じ形に畳んだ
  * （fix-session-api-namespace design「`test/server/api/sessions/index.delete.test.ts` の階層合わせ」）。
  *
- * 見るのは2つ。busy 判定が U13（起動）・P1（プロジェクト削除）・U10（承認）と同じ事実
- * （作業場所ディレクトリの実体）を見ていること（fix-rename-during-running-session）。
- * そして受理範囲——承認より前（`stroking` / `proposed`）だけを消し、昇格済み
- * （`approved` / `activated`）と壊れた `state.json` は消さないこと（add-activated-phase
- * design D5）。
+ * 見るのは2つ。**実行中かどうかを見ないこと**——「実行中だから受理しない」（409 busy）は
+ * 契約から無くなった。削除の操作は実行の決着の後にしか出ないので、実行中に届かない
+ * （fix-rename-during-running-session）。そして受理範囲——承認より前（`stroking` /
+ * `proposed`）だけを消し、昇格済み（`approved` / `activated`）と壊れた `state.json` は
+ * 消さないこと（add-activated-phase design D5）。
  *
  * `running.ts` と `session-store.ts` は実物のまま使う。`readState` は `useRuntimeConfig` を
  * 通るので、差し込み先を差し替えて保存先を一時ディレクトリへ向ける
  * （`session-decision.test.ts` と同じ）。
  *
- * **消す実行（`handler/session.ts` → `handler/delete.ts`）も実物のまま通す。** ここが見たい
- * のは「断ったときに**何も消えていない**」ことで、それは保存先の実物でしか観測できない。
- * 実行そのものの検査（存在しない対象を消したことにしない・保存先の外へ出る名前を通さない）は
+ * **消す実行（`handler/session.ts` → `handler/delete.ts`）も実物のまま通す。** 実行そのものの
+ * 検査（存在しない対象を消したことにしない・保存先の外へ出る名前を通さない）は
  * `test/server/handler/delete.test.ts`・`session.test.ts` が持ち、ここでは重ねない。
  */
 
@@ -37,10 +36,6 @@ vi.mock('../../../../../server/utils/stroke/config', () => ({
 vi.mock('#app/nuxt', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useRuntimeConfig: () => ({ projectShareRoot: config.root }),
-}));
-
-vi.mock('../../../../../server/utils/stroke/submission-signal', () => ({
-  forgetSubmissions: vi.fn(),
 }));
 
 stubNitroGlobals();
@@ -77,36 +72,31 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true });
 });
 
-describe('U11 DELETE /api/sessions/:id — busy', () => {
-  it('実行中（起動と同じキー）は 409 busy で断り、何も消さない', async () => {
-    const key = await beginRun(join(root, SESSION_ID));
+describe('U11 DELETE /api/sessions/:id — 実行中を見ない', () => {
+  it('実行の枠が取られていても断らない。「実行中だから受理しない」は無い', async () => {
+    // 削除の操作は実行の決着の後にしか出ないので実行中には届かないが、届いても busy では
+    // 断らない（fix-rename-during-running-session）
+    const start = await beginRun(join(root, SESSION_ID));
+    if (!start.started) throw new Error('枠を取れなかった');
     try {
-      const event = fakeEvent(SESSION_ID, undefined);
+      const response = await deleteHandler(fakeEvent(SESSION_ID, undefined) as never);
 
-      await expect(deleteHandler(event as never)).rejects.toMatchObject({
-        statusCode: 409,
-        data: { reason: 'busy' },
-      });
-
-      expect(await exists(join(root, SESSION_ID))).toBe(true);
+      expect((response as Response).status).toBe(204);
+      expect(await exists(join(root, SESSION_ID))).toBe(false);
     } finally {
-      endRun(key);
+      endRun(start.key);
     }
   });
 
-  it('実行が終わった後は削除できる', async () => {
-    const event = fakeEvent(SESSION_ID, undefined);
-
-    const response = await deleteHandler(event as never);
+  it('普通に削除できる', async () => {
+    const response = await deleteHandler(fakeEvent(SESSION_ID, undefined) as never);
 
     expect((response as Response).status).toBe(204);
     expect(await exists(join(root, SESSION_ID))).toBe(false);
   });
 
-  it('存在しないセッションは busy より先に 404 になる', async () => {
-    const event = fakeEvent('does-not-exist', undefined);
-
-    await expect(deleteHandler(event as never)).rejects.toMatchObject({ statusCode: 404 });
+  it('存在しないセッションは 404 になる', async () => {
+    await expect(deleteHandler(fakeEvent('does-not-exist', undefined) as never)).rejects.toMatchObject({ statusCode: 404 });
   });
 });
 

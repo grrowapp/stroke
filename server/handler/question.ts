@@ -1,5 +1,5 @@
 import type { Phase, Question } from '#shared/stroke'
-import { notifySubmission } from '../utils/stroke/submission-signal'
+import { recordLaunchSubmissionIfActive } from '../utils/stroke/submission-signal'
 import {
   isPromotedState,
   readState,
@@ -21,22 +21,39 @@ import { questionChannel } from '../utils/stroke/ws-channels'
  */
 
 /**
- * 受理した問いを残し、W1 へ流す。
+ * 受理した問いを残す。**流さない。**
  *
- * `invocation` には触れない。実行の記録を書くのは invokeAi だけで、完了は invokeAi が子プロセスの
- * output stream で検知する（openspec/specs/agent/invocation の MUST）。`state` は endpoint が
- * 承認以降を断った後のものを受け取る——問い以外の項目を1つも動かさないため、丸ごと写して
- * `currentQuestion` だけを差し替える。
+ * 配信は、この提出を行った実行の決着（`settleQuestion`）が行う。受理した瞬間に流すと、
+ * claude の実行がまだ終わっていないのに回答できる状態が立ち、その回答が要求する次の起動が
+ * 走っている実行と重なる（change fix-rename-during-running-session）。
+ *
+ * `invocation` には触れない。実行の記録を書くのは invoke-agent だけで、完了は invoke-agent が
+ * 子プロセスの output stream で検知する（openspec/specs/agent/invocation の MUST）。`state` は
+ * endpoint が承認以降を断った後のものを受け取る——問い以外の項目を1つも動かさないため、
+ * 丸ごと写して `currentQuestion` だけを差し替える。
+ *
+ * `token` はこの提出を起こした claude の接続（`x-stroke-token`）。決着が「何が提出されたか」を
+ * 読むための記録に使う。代行するツールはこれを転送するだけで、記録しない
+ * （`docs/specs/mcp/contract.md`）。
  */
 export async function submitQuestion(
   sessionId: string,
   state: ActiveSessionState,
   question: Question,
+  token: string | undefined,
 ): Promise<void> {
   await writeState(sessionId, { ...state, currentQuestion: question })
-  questionChannel.publish(sessionId, question)
-  // 完了の合図ではなく「作業が行われた」ことの記録。invokeAi が起動の前後で比べる。
-  notifySubmission(sessionId)
+  recordLaunchSubmissionIfActive(token, 'question')
+}
+
+/**
+ * 実行の決着で、記録された今の1問を W1 へ流す。
+ *
+ * 叩くのは invoke-agent だけである（A9）。記録が無ければ流さない——提出が受理されていれば
+ * `currentQuestion` は在る。
+ */
+export async function settleQuestion(sessionId: string, state: ActiveSessionState): Promise<void> {
+  if (state.currentQuestion) questionChannel.publish(sessionId, state.currentQuestion)
 }
 
 /**

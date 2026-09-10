@@ -1,6 +1,4 @@
-import { expect, test } from '@playwright/test';
-
-import { ALPHA, resetBoard, stub } from './support';
+import { ALPHA, expect, resetBoard, stub, test } from './support';
 
 /**
  * 文書の編集と保存（specs/document-editing）。

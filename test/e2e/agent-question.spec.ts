@@ -1,4 +1,6 @@
-import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import type { APIRequestContext, Page } from '@playwright/test';
+
+import { expect, settleRun, test } from './support';
 
 /**
  * 問いの往復（openspec/specs/agent-question）。
@@ -9,8 +11,8 @@ import { expect, test, type APIRequestContext, type Page } from '@playwright/tes
  * 「オーバーレイで開く」「並びが画面で変わらない」「排他」「答えるまで閉じない」
  * 「待機は面の中」「書きかけを持ち越さない」「送り直せる」。
  *
- * 段取りはエージェント側の口（A5 の問い提出・A7 の proposal 提出）を直接叩いて作る。
- * 画面のためのテスト専用の抜け道はアプリに足していない。
+ * 段取りはエージェント側の口（A5 の問い提出・A7 の proposal 提出）と、その実行の決着
+ * （A9）を直接叩いて作る。画面のためのテスト専用の抜け道はアプリに足していない。
  *
  * AI の起動（`invoke-agent`）だけはブラウザ側で差し替える。実物は `claude` を子プロセス
  * として起こすもので、テストが確かめたいのは起動の先ではなく「送ったあと面がどう動くか」
@@ -82,7 +84,13 @@ async function startSession(request: APIRequestContext): Promise<string> {
   return sessionId;
 }
 
-/** A5: 今の1問を提出する。受理した瞬間に W1 へ配信される */
+/**
+ * A5 で今の1問を提出し、その実行を決着させる（A9）。**2段で1つの段取りである。**
+ *
+ * 受理した瞬間には配信されない。W1 が流れるのは実行の決着の時点だけになったので
+ * （change fix-rename-during-running-session）、開いている面へ次の問いを届けるには
+ * 決着まで進める必要がある。
+ */
 async function submitQuestion(
   request: APIRequestContext,
   sessionId: string,
@@ -90,14 +98,19 @@ async function submitQuestion(
 ): Promise<void> {
   const response = await request.post(`/api/strokes/${sessionId}/question`, { data: question });
   expect(response.ok(), await response.text()).toBeTruthy();
+  await settleRun(request, sessionId, 'question');
 }
 
-/** A7: proposal を提出する。phase が proposed になり、今の1問は落ちる */
+/**
+ * A7 で proposal を提出し、その実行を決着させる（A9）。決着で phase が `proposed` になり、
+ * 今の1問は落ちる。提出だけでは phase は動かないので、画面2 の段取りにならない。
+ */
 async function submitProposal(request: APIRequestContext, sessionId: string): Promise<void> {
   const response = await request.post(`/api/strokes/${sessionId}/proposal`, {
     data: { proposal: '# 提案\n\nE2E の proposal 本文。', projectName: 'e2e-agent-question' },
   });
   expect(response.ok(), await response.text()).toBeTruthy();
+  await settleRun(request, sessionId, 'proposal');
 }
 
 /**

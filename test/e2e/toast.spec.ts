@@ -1,6 +1,6 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 
-import { ALPHA, BETA, resetBoard, stub } from './support';
+import { ALPHA, BETA, expect, resetBoard, stub, test } from './support';
 
 /**
  * トースト（specs/notification-toast）。本家と同じ形にする。

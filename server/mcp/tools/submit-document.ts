@@ -145,6 +145,12 @@ export default defineStrokeTool({
       try {
         const response = await $fetch.raw(`/api/strokes/${encodeURIComponent(connected.sessionId)}/proposal`, {
           method: 'POST',
+          // **接続 token をそのまま転送する。** A7 はこれで「どの起動の提出か」を記録し、
+          // invokeAi が実行の決着でそれを読む（openspec/specs/agent/invocation）。ここで
+          // 記録そのものを行わないのは ADR-0014——ツールは代行に徹する。下の steering が
+          // ツール側で記録するのは、受理するのが代行先（本家）で stroke-board の endpoint を
+          // 1つも通らないためである。
+          headers: { 'x-stroke-token': connection.token },
           // 候補が無いときは項目そのものを載せない。A7 の `proposalSubmitBody` は
           // `projectName` を optional として受けるので、送らなければ既存の
           // `state.projectName` がそのまま残る（`server/handler/proposal.ts` の候補名の決定）。

@@ -12,8 +12,11 @@ import { stubNitroGlobals } from '../api/support';
  * （openspec/specs/api/session/invoke-agent「昇格の前後で同じディレクトリに起動が
  * 要求される」）を見る。
  *
- * `./invoke-agent.test.ts` は `running` を丸ごとモックしているので、busy の
- * 判定そのものは見ない（見るのは endRun/beginRun の呼ばれ方）。
+ * **起動の要求は冪等である。** 既に走っていれば何も起こさずに戻るだけで、「実行中だから
+ * 受け付けない」（409 busy）は返さない。
+ *
+ * `./invoke-agent.test.ts` は `running` を丸ごとモックしているので、枠の判定そのものは
+ * 見ない（見るのは endRun/beginRun の呼ばれ方）。
  */
 
 const invoke = vi.hoisted(() => ({ kick: vi.fn() }));
@@ -41,7 +44,7 @@ afterEach(async () => {
 });
 
 describe('U13: 同じ実体のディレクトリへの多重起動', () => {
-  it('異なる id でも同じ物理ディレクトリを cwd に持つ起動は busy で断られる', async () => {
+  it('異なる id でも同じ物理ディレクトリを cwd に持つ起動は、受理されるが二重に起こさない', async () => {
     // 1つ目: まだ AI の応答の完了を待っている状態にする（settled を保留する）
     let finishFirstSettled = (): void => {};
     invoke.kick.mockReturnValueOnce({
@@ -52,15 +55,13 @@ describe('U13: 同じ実体のディレクトリへの多重起動', () => {
     await run('session-uuid', dir);
 
     // 2つ目: 別の id（承認後のプロジェクト名を想定）だが、同じ物理ディレクトリを cwd に持つ
-    await expect(run('renamed-project', dir)).rejects.toMatchObject({
-      statusCode: 409,
-      data: { reason: 'busy' },
-    });
+    // 断らない。要求は満たされている（既にそのディレクトリで走っている）
+    await expect(run('renamed-project', dir)).resolves.toBeUndefined();
 
-    // 2つ目は busy で断られたので kick は1回しか呼ばれていない
+    // それでも kick は1回しか呼ばれていない——AI は二重に起動されない
     expect(invoke.kick).toHaveBeenCalledTimes(1);
 
-    // 後片付け: 1つ目の実行を終わらせて busy ガードを解放する
+    // 後片付け: 1つ目の実行を終わらせて枠を解放する
     finishFirstSettled();
     await Promise.resolve();
     await Promise.resolve();

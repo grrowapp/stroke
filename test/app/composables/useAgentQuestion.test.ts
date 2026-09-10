@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, nextTick, ref, toValue, watch } from 'vue'
 
 /**
- * 呼び出し側が 409 をどう扱うか、そして**どの path へ送っているか**。
+ * 呼び出し側が起動の失敗をどう扱うか、そして**どの path へ送っているか**。
  *
  * **helper の戻り値だけを見ても足りない。** 409 の扱いの不具合の発生源は「同じ扱いが3箇所に
  * 散り、1箇所だけ直されて残りが取り残された」ことである。`error` に文言を入れないことは
@@ -59,15 +59,12 @@ afterEach(() => {
 })
 
 describe('useAgentQuestion.send', () => {
-  it('409 では失敗を示さず、待機に入る', async () => {
+  it('起動が受理されたら失敗を示さず、待機に入る', async () => {
     const { useWaitingRetry } = await import('../../../app/composables/useWaitingRetry')
     vi.stubGlobal('useWaitingRetry', useWaitingRetry)
     const { useAgentQuestion } = await import('../../../app/composables/useAgentQuestion')
 
-    fetchMock.mockImplementation(async (url: string) => {
-      if (url.includes('/invoke-agent')) throw httpError(409)
-      return null
-    })
+    fetchMock.mockResolvedValue(null)
 
     const q = useAgentQuestion('session-1')
     await q.send({ kind: 'option', value: '同期で書く' })
@@ -87,10 +84,7 @@ describe('useAgentQuestion.send', () => {
     vi.stubGlobal('useWaitingRetry', useWaitingRetry)
     const { useAgentQuestion } = await import('../../../app/composables/useAgentQuestion')
 
-    fetchMock.mockImplementation(async (url: string) => {
-      if (url.includes('/invoke-agent')) throw httpError(409)
-      return null
-    })
+    fetchMock.mockResolvedValue(null)
 
     const q = useAgentQuestion('session-1')
     const first = q.question.value
@@ -108,7 +102,7 @@ describe('useAgentQuestion.send', () => {
     expect(q.error.value).toBeNull()
   })
 
-  it('409 以外の起動失敗は、これまでどおり失敗として示す', async () => {
+  it('起動の失敗は、これまでどおり失敗として示す', async () => {
     const { useWaitingRetry } = await import('../../../app/composables/useWaitingRetry')
     vi.stubGlobal('useWaitingRetry', useWaitingRetry)
     const { useAgentQuestion } = await import('../../../app/composables/useAgentQuestion')

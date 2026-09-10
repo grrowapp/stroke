@@ -1,13 +1,100 @@
 /**
  * E2E の下ごしらえ。本家スタブの状態を動かす口と、テスト間で状態を戻す手順、
  * それに注釈の面（`app/components/review/AnnotateSource.vue`）を操作する口。
+ *
+ * **`test` はここから import する。** 素の `@playwright/test` のものではなく、画面の
+ * 読み込みに1つ手当てを入れたもの（下の `test`）を配る。
  */
 
 import { writeFileSync } from 'node:fs';
 
-import { expect, type Page } from '@playwright/test';
+import { expect, test as base, type APIRequestContext, type Page } from '@playwright/test';
 
 import { REGISTRY_PATH, STUB_PORT, registryContent } from '../../playwright.config';
+
+/**
+ * 画面の読み込みを見張る `test`。**ブラウザが読み込み途中の script を捨てたら、開き直す。**
+ *
+ * Chromium は OS が「ネットワークが変わった」と言うと、宛先に関わらず**その時点で飛んで
+ * いるリクエストを全部落とす**（`net::ERR_NETWORK_CHANGED`）。相手が 127.0.0.1 でも落ちる。
+ * 落ちたのが Nuxt の script だと Vue の app が mount されず、画面はサーバーが描いた markup の
+ * まま固まる——`data-connected` は `false` から動かないし、teleport される面
+ * （`app/layouts/stroke.vue` の `UModal`）に至っては DOM に現れない。**待ちを伸ばしても
+ * 直らない**ので、開き直すしかない。
+ *
+ * 実測（2026-09-10）:
+ *
+ * - `resetBoard` の周期を 229 回繰り返したうち2回、`_nuxt/*.js` が 13 本まとめて
+ *   `net::ERR_NETWORK_CHANGED` で落ち、`#__nuxt` に Vue の app が付かなかった。落ちたのは
+ *   その2回だけで、どちらも 15 秒の接続待ちを使い切っている。残りの 227 回は 99〜457ms で
+ *   繋がった
+ * - **サーバー側は無関係だった。** 登録簿を書き戻してから 220ms で本家へ繋ぎ直し、そのまま
+ *   15 秒間ずっと繋がったままだった（`server/utils/control/monitor.ts` に印を入れて計測）
+ * - 元は**このマシンの USB Ethernet（`enxacde48001122`）が上下していること**である。落ちた
+ *   1秒前に `ip monitor` が同じ口の IPv6 link-local アドレスの削除と再付与を記録している。
+ *   口そのものを落とせば起きなくなるが、それは機械の設定であってこのリポジトリの話ではない
+ *
+ * 「遅いから待つ」ではない。**動かないものを、もう一度読み込ませる**手当てである。捨てられた
+ * 画面の上では以後の判定が全部無意味になるので、そのまま進ませない。
+ *
+ * 拾うのは document と script の `net::ERR_NETWORK_CHANGED` **だけ**である。画像やアイコンが
+ * 1つ落ちても画面は動くし、理由で絞らないと**別の画面へ移ったときの取り消し**
+ * （`net::ERR_ABORTED`）まで拾ってしまう。あれは前の画面の読み込みが打ち切られただけで、
+ * 開き直す理由が無い。
+ */
+const LOAD_ATTEMPTS = 3;
+
+/** ブラウザが「ネットワークが変わった」として投げ捨てた印 */
+const DISCARDED = 'net::ERR_NETWORK_CHANGED';
+
+function watchDiscardedLoads(page: Page): void {
+  const discarded: string[] = [];
+
+  page.on('requestfailed', (request) => {
+    const kind = request.resourceType();
+    if (kind !== 'document' && kind !== 'script') return;
+    if (request.failure()?.errorText !== DISCARDED) return;
+    discarded.push(request.url());
+  });
+
+  /**
+   * 読み込みを1つ包む。`load` は module script の取得が終わる（失敗も含む）まで来ないので、
+   * `goto` / `reload` が返る時点では落ちたぶんの `requestfailed` は届いている。
+   */
+  const retry = async <T>(load: () => Promise<T>): Promise<T> => {
+    for (let attempt = 1; ; attempt += 1) {
+      discarded.length = 0;
+      const result = await load();
+      if (discarded.length === 0) return result;
+
+      // 黙って開き直さない。落ちたときに「あの時これが起きていた」と辿れる印を残す
+      console.warn(
+        `[e2e] 画面の script をブラウザが捨てたので開き直す（${attempt}回目）: ${discarded.join(' / ')}`,
+      );
+
+      if (attempt === LOAD_ATTEMPTS) {
+        throw new Error(
+          `画面の script をブラウザが ${LOAD_ATTEMPTS} 回とも捨てた: ${discarded.join(' / ')}`,
+        );
+      }
+    }
+  };
+
+  const goto = page.goto.bind(page);
+  page.goto = (url, options) => retry(() => goto(url, options));
+
+  const reload = page.reload.bind(page);
+  page.reload = (options) => retry(() => reload(options));
+}
+
+export const test = base.extend({
+  page: async ({ page }, use) => {
+    watchDiscardedLoads(page);
+    await use(page);
+  },
+});
+
+export { expect };
 
 export const STUB_URL = `http://127.0.0.1:${STUB_PORT}`;
 
@@ -94,8 +181,35 @@ export const stub = {
   steeringUpdate: (projectId: string) => control('steering-update', { projectId }),
 };
 
+/**
+ * A9: 実行の決着。その実行で提出されたものに応じて局面を切り替え、画面へ届ける。
+ *
+ * **本来これを叩くのは invokeAi だけである**（openspec/specs/agent/invocation）。E2E で
+ * 実物の claude を起こすのは `stroke-settlement.spec.ts` の1本だけで、それ以外の spec は
+ * 段取りをエージェント側の口（A5・A7）から直接作る。段取りには実行が無く決着も走らないので、
+ * 呼び手の代わりにここから叩く——A8（`invocation` の書き込み）や U15（完成の記録）を
+ * `stroke-exit.spec.ts` が直接叩いているのと同じ扱いである。
+ *
+ * これを通さないと画面2 は開かない。A5・A7 は提出を記録するだけで phase を動かさず、配信も
+ * しなくなったためで（change fix-rename-during-running-session）、`proposed` が立つのも
+ * W1・W2 が流れるのも決着の時点だけである。
+ */
+export async function settleRun(
+  request: APIRequestContext,
+  sessionId: string,
+  submitted: 'question' | 'proposal',
+): Promise<void> {
+  const response = await request.post(`/api/strokes/${sessionId}/settlement`, {
+    data: { submitted },
+  });
+  expect(response.ok(), await response.text()).toBeTruthy();
+}
+
 /** tasks を持つ spec の数 × アクティブなプロジェクト数。基準が揃った判定に使う */
 const EXPECTED_PROGRESS_REQUESTS = 2;
+
+/** 接続の切り替わりを待つ上限。下の基準待ちと揃える（`resetBoard` の docblock） */
+const CONNECTION_TIMEOUT_MS = 15_000;
 
 /**
  * 通知の一覧を空に戻し、基準を作り直させる。
@@ -107,6 +221,24 @@ const EXPECTED_PROGRESS_REQUESTS = 2;
  * 「接続済み」表示だけでは足りない。あれは1つでも基準が整えば立つので、もう一方の
  * プロジェクトの基準がまだのうちに通知を起こすと取りこぼす。スタブが受けた
  * `tasks/progress` の回数で、両方の基準が揃ったことを確定的に待つ。
+ *
+ * **接続の切り替わりの上限は 15 秒。** 下の基準待ちと揃えてある。ここが長いのは遅いからでは
+ * ない——実測（2026-09-10、この周期を 229 回繰り返した）では registry を書き戻してから表示が
+ * `true` になるまで 99〜457ms（中央 286ms）で、余白は元から十分にある。伸ばす方向で直そうと
+ * していたのは、**待っても動かない画面**（上の `test` の docblock。ブラウザが script を
+ * 捨てた場合）を待ちの問題と取り違えていたためで、あれは開き直しで受けるようになった。
+ *
+ * **ここに backoff は効いていない。** かつてこの docblock には「再接続の待ちが spec を
+ * またいで積み上がる」と書いてあったが、そうはならない。registry を空にすると監視対象から
+ * 外れて socket は閉じられ、書き戻すと**別の socket が作り直される**
+ * （`server/utils/control/monitor.ts` の `sync` → `watch`）。作り直された socket の待ちは
+ * 初期値から始まる。実測（2026-09-09、`scheduleReconnect` に印を入れて全体の 77 件まで
+ * 計測）でも再接続の予約は一度も通らず、close から接続が戻るまでは毎回 3〜5 秒——その大半は
+ * registry を書き戻すまでの間——だった。
+ *
+ * backoff の上限そのものは 5 秒へ下げてある（`server/utils/upstream/socket.ts` の
+ * `MAX_BACKOFF_MS`）。効くのは本家が落ちたまま監視対象に残り続けた場合で、この関数の
+ * 切っては繋ぐ経路ではない。
  */
 export async function resetBoard(
   page: Page,
@@ -122,13 +254,17 @@ export async function resetBoard(
 
   writeFileSync(REGISTRY_PATH, '{}');
   await page.goto('/');
-  await expect(page.getByTestId('upstream-connection')).toHaveAttribute('data-connected', 'false');
+  await expect(page.getByTestId('upstream-connection')).toHaveAttribute('data-connected', 'false', {
+    timeout: CONNECTION_TIMEOUT_MS,
+  });
   await expect(page.getByTestId('notification-row')).toHaveCount(0);
 
   await options.whileDisconnected?.();
 
   writeFileSync(REGISTRY_PATH, registryContent());
-  await expect(page.getByTestId('upstream-connection')).toHaveAttribute('data-connected', 'true');
+  await expect(page.getByTestId('upstream-connection')).toHaveAttribute('data-connected', 'true', {
+    timeout: CONNECTION_TIMEOUT_MS,
+  });
 
   await expect
     .poll(async () => (await stub.stats()).progressRequests, { timeout: 15_000 })
