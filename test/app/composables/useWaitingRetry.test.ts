@@ -97,6 +97,45 @@ describe('requestRun', () => {
     expect(w.waiting.value).toBe(false)
   })
 
+  it('error に達しただけでは何も消えない', async () => {
+    // 完全な失敗（`docs/specs/architecture/failure.md`）はユーザーへ引き渡す状態であり、
+    // 引き渡した対象を消すのはユーザーが承諾したときだけである。承諾を出すのは呼び出し側で、
+    // ここは呼ばれるまで DELETE を出さない
+    fetchMock.mockResolvedValue(null)
+
+    const w = useWaitingRetry(SESSION)
+    w.errored.value = true
+
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      `/api/sessions/${SESSION}`,
+      expect.objectContaining({ method: 'DELETE' }),
+    )
+  })
+
+  it('discard は承諾の後の1本だけを出す', async () => {
+    fetchMock.mockResolvedValue(null)
+
+    const w = useWaitingRetry(SESSION)
+    await w.discard()
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenLastCalledWith(`/api/sessions/${SESSION}`, { method: 'DELETE' })
+  })
+
+  it('再実行はリトライ回数のリセットを付ける', async () => {
+    // 回数を戻すのは U13 側（`reset`）。画面は A8 を叩かない（specs/agent/invocation）
+    fetchMock.mockResolvedValue(null)
+
+    const w = useWaitingRetry(SESSION)
+    await w.retryFromError()
+
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      `/api/sessions/${SESSION}/invoke-agent`,
+      { query: { reset: 1 } },
+    )
+    w.stopWaiting()
+  })
+
   it('cwd を渡したときだけ query に載せる', async () => {
     fetchMock.mockResolvedValue(null)
 

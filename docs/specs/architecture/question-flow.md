@@ -5,8 +5,21 @@
 状態の正はサーバのファイル（`state.json` / `strokes.json`）にある。WS はバッファを持たず、
 繋がっている接続へその場で流すだけ。図と実装が食い違ったら実装が正しい。
 
-矢印に付けた番号（U1・U7・U9・U13・A5・A7・A9・W1・W2）は `docs/specs/api/contract.md` の一覧と同じもの。
-入れ物の形と検証の規定は `docs/specs/core/schema.md` を参照。
+矢印に付けた番号（U1・U7・U9・U13・A5・A7・A9・W1・W2）は `docs/specs/api/overview.md` の目録と同じもの。
+各 endpoint の入出力は `docs/specs/api/sessions/` と `docs/specs/api/strokes/` の1本1ファイル、
+全 endpoint に共通する約束は `docs/specs/api/contract.md`、入れ物の形と検証の規定は
+`docs/specs/core/schema.md` を参照。
+
+## 画面とルート
+
+| 画面 | ルート |
+|---|---|
+| 概要入力（セッション開始前） | `/strokes` |
+| 画面1（ストローク） | `/strokes/<uuid>` |
+| 画面2（proposal 確認） | `/strokes/<uuid>/proposal` |
+
+概要を投稿するとセッションが作られ、`/strokes/<uuid>` へ移る。セッション uuid を URL に載せる
+約束そのものは `docs/specs/api/contract.md`「セッションの参照方法」が持つ。
 
 ## 並び
 
@@ -179,6 +192,7 @@ W1 が流すのは問いだけで、**問いの取り下げは流れない**。p
 
 ## 関連
 
-- `docs/specs/api/contract.md` — endpoint の一覧と契約
+- `docs/specs/api/overview.md` — endpoint の一覧
+- `docs/specs/api/contract.md` — 全 endpoint に共通する約束
 - `docs/specs/core/schema.md` — 入れ物の形と検証の規定
 - `docs/specs/reference/stroke-modules.md` — 画面側の使い方

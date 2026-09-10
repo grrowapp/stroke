@@ -109,9 +109,19 @@ export function useWaitingRetry(sessionId: MaybeRefOrGetter<string>) {
     if (!result.ok) throw result.error
   }
 
-  /** `error` からの削除。回復手段のもう一方（U11）。 */
+  /**
+   * `error` からの削除（U11）。**破壊を伴う選択肢なので、承諾を得た後にだけ呼ぶ**
+   * （`docs/specs/architecture/failure.md`「破壊を伴う選択肢の承諾」）。承諾の一手を
+   * 出すのは呼び出し側で、ここは消えるものを示す責務を持たない。
+   *
+   * 消した後の行き先は概要の入力である。やり直しの起点はそこであって、消した対象の
+   * 一覧ではない。
+   */
   async function discard(): Promise<void> {
-    await $fetch(`/api/sessions/${toValue(sessionId)}`, { method: 'DELETE' })
+    // **URL を `string` として渡す。** `/api/sessions/unfinished`（U16）が静的な兄弟として
+  // 増えたことで、`/api/sessions/${…}` の型が GET だけに狭まり、DELETE が通らなくなる
+  // （Nitro の typed routes の性質）。実体の route は `sessions/[id]/index.delete.ts` に在る
+    await $fetch(`/api/sessions/${toValue(sessionId)}` as string, { method: 'DELETE' })
   }
 
   return {

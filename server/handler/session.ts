@@ -152,6 +152,56 @@ export async function listSessions(root: string): Promise<SessionSummary[]> {
 }
 
 /**
+ * 中断したストローク——昇格前（`stroking` / `proposed`）のセッションの一覧（U16）。
+ *
+ * **`listSessions` と母集合が違う。** あれは巡回と初回判定のための一覧で、openspec ルートと
+ * `config.yaml` のスキーマ設定まで検査する。実行環境は初回の起動で整えられるので、**その起動が
+ * 失敗し続けたセッションはあの一覧に載らない**。完全な失敗に達して自動では動かない対象こそ
+ * 戻り道が要る（`docs/specs/architecture/failure.md`「時間を置いて再開する」）以上、検査を
+ * 持ち込むと、いちばん拾いたいものが落ちる。ここが見るのは `state.json` があることだけである。
+ *
+ * 昇格した対象（`approved` / `activated`）は載せない。あれはプロジェクトであり、上層の
+ * プロジェクト一覧に出ている。新しいものから並べる。
+ */
+export async function listUnfinishedStrokes(root: string): Promise<SessionSummary[]> {
+  let entries
+  try {
+    entries = await readdir(root, { withFileTypes: true })
+  } catch {
+    return []
+  }
+
+  const sessions: SessionSummary[] = []
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue
+
+    let mtime: Date
+    try {
+      const s = await stat(sessionFile(root, entry.name, SESSION_FILES.state))
+      if (!s.isFile()) continue
+      mtime = s.mtime
+    } catch {
+      continue
+    }
+
+    const phase = await readPhase(root, entry.name)
+    if (phase !== 'stroking' && phase !== 'proposed') continue
+
+    sessions.push({
+      id: entry.name,
+      phase,
+      updatedAt: mtime.toISOString(),
+      // キックする側がこれを cwd として U13 に渡す。endpoint に導出させない
+      path: sessionDir(root, entry.name),
+      invocation: await listedInvocation(root, entry.name),
+    })
+  }
+
+  return sessions.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+}
+
+/**
  * `state.json` の `invocation` をそのまま読む。script の削除受理判定に使う（design.md 決定5:
  * サーバ無しの経路では保存された状態を実行中判定の材料にする）。読めなければ null。
  */

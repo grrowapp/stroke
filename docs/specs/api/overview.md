@@ -4,14 +4,14 @@
 
 | 置き場 | 何が入るか |
 |---|---|
-| [contract.md](./contract.md) | 全ての endpoint に共通する約束 |
+| [contract.md](./contract.md) | 全ての endpoint に共通する約束（全体設計・責務範囲・status の意味・対称性） |
 | [server.md](./server.md) | `server/api/` のファイルの置き方（Endpoint はディレクトリ、Method は `index.<method>.ts`） |
 | `sessions/` | `/api/sessions/` の endpoint。1本につき1ファイル |
 | `strokes/` | `/api/strokes/` の endpoint。1本につき1ファイル |
 | `projects/` | `/api/projects/` の endpoint。1本につき1ファイル |
 | `ws/` | WS 配信 |
 
-## `sessions/` — 11本
+## `sessions/` — 12本
 
 | # | メソッド / パス | 内容 |
 |---|---|---|
@@ -26,6 +26,7 @@
 | U13 | `GET /api/sessions/:id/invoke-agent` | AI を起動する |
 | U14 | `POST /api/sessions/:id/promote` | セッションをプロジェクトへ昇格させる |
 | U15 | `POST /api/sessions/:id/activate` | プロジェクトの完成を記録する |
+| U16 | `GET /api/sessions/unfinished` | 中断したストローク（昇格前のセッション）を一覧する |
 
 ## `projects/` — 2本
 
@@ -34,7 +35,7 @@
 | P1 | `DELETE /api/projects/:projectId` | 作りきれなかったプロジェクトを消す |
 | P2 | `POST /api/projects` | 昇格したプロジェクトの生成を本家へ依頼する |
 
-## `strokes/` — 5本
+## `strokes/` — 6本
 
 | # | メソッド / パス | 内容 |
 |---|---|---|
@@ -43,6 +44,7 @@
 | A5 | `POST /api/strokes/:id/question` | 問いを提出する |
 | A7 | `POST /api/strokes/:id/proposal` | proposal を提出する |
 | A8 | `POST /api/strokes/:id/submission` | 実行の記録を変える |
+| A9 | `POST /api/strokes/:id/settlement` | 実行の決着。局面を切り替えて画面へ届ける |
 
 ## `ws/` — 3本
 
