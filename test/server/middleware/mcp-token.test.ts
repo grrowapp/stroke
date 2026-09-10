@@ -77,7 +77,7 @@ describe('MCP の受け口の token 検査', () => {
   it('/mcp 以外のパスは素通しする（token を持たなくても影響を受けない）', () => {
     for (const url of [
       '/',
-      '/api/strokes',
+      '/api/sessions',
       '/api/strokes/session-1/overview',
       '/mcp/deeplink',
       '/mcp/badge.svg',

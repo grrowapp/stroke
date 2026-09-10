@@ -1,6 +1,6 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 
-import { ALPHA, resetBoard, stub } from './support';
+import { ALPHA, expect, resetBoard, stub, test } from './support';
 
 /**
  * `RecordList` の行。

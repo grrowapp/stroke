@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto'
 /**
  * 接続表。
  *
- * MCP ツール呼び出しを、それを起こした claude の接続文脈に結びつける層
+ * MCP ツール呼び出しを、それを起動した claude の接続文脈に結びつける層
  * （specs `server/session-management`、design.md「接続の担保」）。
  *
  * flontier 工程の呼び出しは `sessionId`、steering 工程の呼び出しは `projectPath` を持つ。
@@ -28,7 +28,13 @@ export type ConnectionHeaders = Record<string, string | string[] | undefined>
 
 const connections = new Map<string, ConnectionContext>()
 
-/** 推測困難な一時 token を発行する。登録はしない（呼び出し側が `registerConnection` する）。 */
+/**
+ * 推測困難な一時 token を発行する。登録はしない（呼び出し側が `registerConnection` する）。
+ *
+ * 発行・登録・失効を行うのは invoke-agent（`server/utils/stroke/invoke.ts` の `kick`）だけで
+ * ある（specs `server/session-management`）。MCP ツールは `resolveConnection` で解決する
+ * だけで、この表に書き込まない（`docs/specs/mcp/contract.md`）。
+ */
 export function issueConnectionToken(): string {
   return randomBytes(32).toString('hex')
 }
@@ -38,7 +44,7 @@ export function registerConnection(token: string, context: ConnectionContext): v
   connections.set(token, context)
 }
 
-/** 登録を消す。invokeAi の実行終了時（正常・異常とも）に呼ぶ。 */
+/** 登録を消す。invoke-agent の実行終了時（正常・異常とも）に呼ぶ。 */
 export function removeConnection(token: string): void {
   connections.delete(token)
 }
@@ -46,18 +52,16 @@ export function removeConnection(token: string): void {
 /**
  * その token の起動がまだ実行中か（＝接続表に載ったままか）。
  *
- * ツールの中で、**代行先を待っている間に実行が畳まれていないか**を確かめるために要る。
- * ハンドラの先頭で `resolveConnection` を通っていても、`await` の向こう側では実行が
- * 終わっていることがある——打ち切り（タイムアウト）で claude を殺しても、サーバー側の
- * ツールハンドラは中断されないためである。
+ * 提出を受ける endpoint（A5・A7）が、**代行先を待っている間に実行が畳まれていないか**を
+ * 確かめるために要る。ハンドラの先頭で token を解決できていても、`await` の向こう側では
+ * 実行が終わっていることがある——打ち切り（タイムアウト）で claude を殺しても、サーバー側の
+ * ハンドラは中断されないためである。
  *
  * これを見ずに起動単位の記録を足すと、`kick` の `.finally`（`removeConnection` →
- * `forgetLaunchSubmission`）が済んだ後に記録が作り直され、誰も捨てないまま残る
- * （specs `mcp/tools/submit`「起動が終わった後まで残してはならない」。santa-method
- * レビュー指摘 2026-09-04）。
+ * `forgetLaunchSubmission`）が済んだ後に記録が作り直され、誰も捨てないまま残る。
  *
- * **判定と記録の間に `await` を置かないこと。** 片付けは1つの同期ブロックなので、
- * 間に `await` が無ければ「片付けの前」か「片付けの後」のどちらかにしかならない。
+ * **判定と記録の間に `await` を置かないこと。** 片付けは1つの同期ブロックなので、間に
+ * `await` が無ければ「片付けの前」か「片付けの後」のどちらかにしかならない。
  */
 export function isConnectionActive(token: string): boolean {
   return connections.has(token)

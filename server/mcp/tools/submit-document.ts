@@ -1,12 +1,11 @@
 import { z } from 'zod'
 import { defineStrokeTool } from '../../utils/mcp/define-tool'
 
-import { isConnectionActive, resolveConnection } from '../../utils/mcp/connection-table'
+import { resolveConnection } from '../../utils/mcp/connection-table'
 import { readFetchFailure } from '../../utils/mcp/fetch-failure'
 import { resolveConnectionProjectPath, resolveConnectionSessionId } from '../../utils/mcp/require-connection'
 import { resolveProjectId } from '../../utils/mcp/resolve-project-id'
 import { classifySteeringFailure, upstreamFetch } from '../../utils/mcp/upstream-fetch'
-import { recordLaunchSubmission } from '../../utils/stroke/submission-signal'
 
 /** 数値キーの写像なので `Object.prototype` のメンバとは衝突しない（下の 404 の写像を参照）。 */
 const FLONTIER_ERROR_CODE_BY_STATUS: Record<number, string> = {
@@ -43,6 +42,11 @@ const FLONTIER_ERROR_CODE_BY_404_MESSAGE: Record<string, string> = Object.assign
  * 持ち帰った本家の status を載せる。以前ここに置いていた `status: 200` の定数は、本家の
  * PUT がたまたまそう返すのと一致していただけで導出ではなかった（santa-method レビュー
  * 指摘 2026-08-30）。
+ *
+ * **このツールの責務は、文書を代行先へ登録することだけである**（`docs/specs/mcp/contract.md`
+ * 「代行以外の固定の処理を受け持たない」）。その提出で作業が行われたかの判定・記録は
+ * invoke-agent の責務で、ここには置かない——steering の判定は invoke-agent が実行の終わりに
+ * 本家 REST へ問い合わせる（`server/utils/stroke/invoke.ts` の `steeringCompletedUpstream`）。
  */
 
 /**
@@ -141,9 +145,15 @@ export default defineStrokeTool({
       try {
         const response = await $fetch.raw(`/api/strokes/${encodeURIComponent(connected.sessionId)}/proposal`, {
           method: 'POST',
+          // **接続 token をそのまま転送する。** A7 はこれで「どの起動の提出か」を記録し、
+          // invokeAi が実行の決着でそれを読む（openspec/specs/agent/invocation）。ここで
+          // 記録そのものを行わないのは ADR-0014——ツールは代行に徹する。下の steering が
+          // ツール側で記録するのは、受理するのが代行先（本家）で stroke-board の endpoint を
+          // 1つも通らないためである。
+          headers: { 'x-stroke-token': connection.token },
           // 候補が無いときは項目そのものを載せない。A7 の `proposalSubmitBody` は
           // `projectName` を optional として受けるので、送らなければ既存の
-          // `state.projectName` がそのまま残る（`server/api/strokes/[id]/proposal.post.ts`）。
+          // `state.projectName` がそのまま残る（`server/handler/proposal.ts` の候補名の決定）。
           body: {
             proposal: args.document,
             ...(args.projectName === undefined ? {} : { projectName: args.projectName }),
@@ -194,19 +204,9 @@ export default defineStrokeTool({
         z.unknown(),
         { method: 'PUT', body: { content: args.document } },
       )
-      // 本家が応答を返して受理した経路だけで記録する（design.md D2）。ここまで来た時点で
-      // `upstreamFetch` は例外を投げていない＝本家 PUT は 2xx で応答している。steering の
-      // 提出は stroke-board の endpoint を通らないので、この起動（token）を単位に、ここで
-      // しか記録できない（specs `mcp/tools/submit`「受理された steering の提出を、その
-      // 起動の作業として記録する」）。結果には項目を足さない（D5）。
-      //
-      // **記録するのは、その起動がまだ実行中のときだけである。** 打ち切りで実行が先に
-      // 畳まれると、`kick` の `.finally`（`removeConnection` → `forgetLaunchSubmission`）が
-      // 済んだ後に、この飛行中の提出が戻ってくる。無条件に記録すると誰も捨てない記録が
-      // 残り、同 spec の「起動が終わった後まで残してはならない」に反する（santa-method
-      // レビュー指摘 2026-09-04）。判定と記録の間に `await` を置かないこと——理由は
-      // `isConnectionActive` の docblock。
-      if (isConnectionActive(connection.token)) recordLaunchSubmission(connection.token)
+      // ここまで来た時点で `upstreamFetch` は例外を投げていない＝本家 PUT は 2xx で応答
+      // している。返すのは本家の実応答の `status` だけで、受理を記録しない——文書が本家に
+      // 在るかは invoke-agent が実行の終わりに本家へ問い合わせる（上の docblock）。
       return { status: response.status }
     } catch (error) {
       const failure = classifySteeringFailure(error)

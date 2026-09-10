@@ -49,7 +49,7 @@ export interface ActivateCounts {
  * 拾う）、`running` は起動時の後始末（`01.reap-running.ts`）が `failed` へ倒す途中なので、
  * どれも生成中のまま残す。
  *
- * **`idle` は一覧が返した値である。** 一覧（`session-core.ts` の `readInvocation`）は
+ * **`idle` は一覧が返した値である。** 一覧（`server/handler/session.ts` の `listSessions`）は
  * 読めない値・知らない値も `idle` として載せるので、`invocation` を持たない古い
  * `state.json` もここを通る。導入前のものを畳むのがこの処理の目的なので、それでよい
  * （design Risks「成果物ゼロの legacy を畳む」が同じ性質のものとして許容している）。

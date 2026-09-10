@@ -2,9 +2,10 @@ import { createHash } from 'node:crypto';
 import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { expect, test, type APIRequestContext } from '@playwright/test';
+import type { APIRequestContext } from '@playwright/test';
 
 import { PROJECTS_PARENT } from '../../playwright.config';
+import { expect, settleRun, test } from './support';
 
 /**
  * 受理した proposal は残る（openspec/specs/api/stroke/proposal）。
@@ -19,43 +20,23 @@ import { PROJECTS_PARENT } from '../../playwright.config';
 
 const PROPOSAL_BODY = '# 提案\n\nE2E: 受理した proposal が残ることを確かめる本文。';
 
-/**
- * 後始末の削除が busy で断られる間、出し直しを続ける上限。
- *
- * E2E の steering は `/bin/true`（`playwright.config.ts`）で、起動から終了まで 200ms に満たない。
- * 巡回（60秒ごと）が起こし直した直後に重なっても、この上限の中で終わる。
- */
-const STEERING_SETTLE_TIMEOUT_MS = 5_000;
-const STEERING_POLL_INTERVAL_MS = 100;
-
 /** 済んだ（消した・もともと無い）か、断られたか。断られた理由は本文ごと持つ */
 type ProjectCleanup = { kind: 'done' } | { kind: 'refused'; detail: string };
 
-/** 削除口が「AI の応答を待っている」で断った応答か（`server/utils/stroke/conflict.ts` の形） */
-function isBusyRefusal(status: number, body: string): boolean {
-  if (status !== 409) return false;
-  try {
-    return (JSON.parse(body) as { data?: { reason?: string } }).data?.reason === 'busy';
-  } catch {
-    return false;
-  }
-}
-
 /**
- * 昇格したプロジェクトを消す。busy の間だけ待つ。
+ * 昇格したプロジェクトを消す。
  *
- * 承認の画面は昇格の直後に steering を起こす（ADR 0011）。その実行中の削除は busy（409）で
- * 断られる（実測 2026-09-06）。**観測点はサーバ自身の busy 判定にする**——`state.json` の
- * `invocation` は起動より遅れて書かれ（`running` の集合に入ってから A8 で書くまでの間は昇格時の
- * `failed` のまま）、しかも afterEach の時点では画面がまだ起動を要求していないこともあるので、
- * それを見て「終わった」と読むと直後の DELETE が busy で断られる。
+ * **待たない。** かつては承認の直後に起こる steering の実行中の削除が busy（409）で断られ、
+ * その間だけ出し直していた。削除は実行中かどうかを見なくなったので
+ * （openspec/specs/api/project/delete。change fix-rename-during-running-session）、
+ * 断られたらそれは busy ではない別の理由であり、待っても通らない。
  *
  * 消す前に名前で在ることを確かめる。無ければ消すものが無い。**在ると確かめた後の 404 は
  * 失敗である**——名前で在るのに `projectId` で見つからないのは、ここで導出した id とサーバの
  * 導出がずれたということで、それを緑で隠さない。
  */
-async function deleteProjectWhenSettled(request: APIRequestContext, name: string): Promise<ProjectCleanup> {
-  const existing = await request.get(`/api/strokes/${encodeURIComponent(name)}`);
+async function deleteProject(request: APIRequestContext, name: string): Promise<ProjectCleanup> {
+  const existing = await request.get(`/api/sessions/${encodeURIComponent(name)}`);
   if (existing.status() === 404) return { kind: 'done' };
   if (!existing.ok()) {
     return { kind: 'refused', detail: `状態を読めない: ${existing.status()} ${await existing.text()}` };
@@ -65,26 +46,14 @@ async function deleteProjectWhenSettled(request: APIRequestContext, name: string
     .update(join(PROJECTS_PARENT, name))
     .digest('base64url')
     .substring(0, 16);
-  const deadline = Date.now() + STEERING_SETTLE_TIMEOUT_MS;
-  for (;;) {
-    const response = await request.delete(`/api/projects/${encodeURIComponent(projectId)}`);
-    if (response.ok()) return { kind: 'done' };
+  const response = await request.delete(`/api/projects/${encodeURIComponent(projectId)}`);
+  if (response.ok()) return { kind: 'done' };
 
-    const body = await response.text();
-    const refusal = `${response.status()} ${body}`;
-    if (!isBusyRefusal(response.status(), body)) return { kind: 'refused', detail: `${projectId}: ${refusal}` };
-    if (Date.now() >= deadline) {
-      return {
-        kind: 'refused',
-        detail: `${projectId}: steering の実行が ${STEERING_SETTLE_TIMEOUT_MS}ms 以内に終わらない。最後の応答: ${refusal}`,
-      };
-    }
-    await new Promise((resolve) => setTimeout(resolve, STEERING_POLL_INTERVAL_MS));
-  }
+  return { kind: 'refused', detail: `${projectId}: ${response.status()} ${await response.text()}` };
 }
 
 async function startSession(request: APIRequestContext): Promise<string> {
-  const response = await request.post('/api/strokes', {
+  const response = await request.post('/api/sessions', {
     data: { overview: 'E2E: 受理した proposal が残ることを確かめる' },
   });
   expect(response.ok(), await response.text()).toBeTruthy();
@@ -92,7 +61,13 @@ async function startSession(request: APIRequestContext): Promise<string> {
   return sessionId;
 }
 
-/** A7: proposal の全文を提出する */
+/**
+ * A7 で proposal の全文を提出し、その実行を決着させる（A9）。
+ *
+ * 提出だけでは画面2 は開かない（phase は `stroking` のままで、画面1 へ戻される）。承認できる
+ * 局面が立つのは実行の決着の時点だけになった（change fix-rename-during-running-session）。
+ * ここで見たいのは残った本文が画面へ届くことなので、決着まで進めた状態を段取りとして作る。
+ */
 async function submitProposal(
   request: APIRequestContext,
   sessionId: string,
@@ -102,6 +77,7 @@ async function submitProposal(
     data: { proposal: PROPOSAL_BODY, projectName },
   });
   expect(response.ok(), await response.text()).toBeTruthy();
+  await settleRun(request, sessionId, 'proposal');
 }
 
 test.describe('受理した proposal は残る', () => {
@@ -124,7 +100,7 @@ test.describe('受理した proposal は残る', () => {
    * 409 や 404 は誰も見ていなかった）。消せなかったものは次の run の無関係なテスト
    * （`projects.spec.ts` の行数）を落とす形でしか現れず、口が弾いたのか届かなかったのかも
    * 読めない（fix-e2e-project-residue）。受理されなかったら、何を消そうとしてどう断られたかを
-   * 載せて**このテストを落とす**。昇格したプロジェクトの扱いは `deleteProjectWhenSettled`。
+   * 載せて**このテストを落とす**。昇格したプロジェクトの扱いは `deleteProject`。
    */
   test.afterEach(async ({ request }) => {
     const refused: string[] = [];
@@ -138,7 +114,7 @@ test.describe('受理した proposal は残る', () => {
       }
 
       for (const name of promoted) {
-        const outcome = await deleteProjectWhenSettled(request, name);
+        const outcome = await deleteProject(request, name);
         if (outcome.kind === 'refused') refused.push(`プロジェクト ${name}（${outcome.detail}）`);
       }
     } finally {
@@ -199,8 +175,16 @@ test.describe('受理した proposal は残る', () => {
     });
     expect(response.ok(), '残せないのに受理された').toBeFalsy();
 
+    // 受理されていないので、この実行を決着させても画面2 は立たない。断られる理由は `phase`
+    // （残っている proposal が無い）で、busy ではない——busy は契約から無くなった
+    const settlement = await request.post(`/api/strokes/${sessionId}/settlement`, {
+      data: { submitted: 'proposal' },
+    });
+    expect(settlement.status(), '本文が無いのに決着した').toBe(409);
+    expect(((await settlement.json()) as { data?: { reason?: string } }).data?.reason).toBe('phase');
+
     // phase は進まない。進むと画面2 へ移ってしまい、本文の無いまま承認へ進める
-    const state = (await (await request.get(`/api/strokes/${sessionId}`)).json()) as {
+    const state = (await (await request.get(`/api/sessions/${sessionId}`)).json()) as {
       phase: string;
     };
     expect(state.phase).toBe('stroking');

@@ -29,13 +29,13 @@ export interface AiRun {
   debugLogDir?: string
   /** 定型の**候補**。どちらを使うかは invokeAi が初回/継続の判定で決める */
   prompts: { first: string, continue: string }
-  /** 失敗を起こし直す回数の上限。到達していたら起動しない */
+  /** 失敗を起動し直す回数の上限。到達していたら起動しない */
   maxRetries: number
-  /** これまでに起こし直した回数。`state.json` 側が持つ */
+  /** これまでに起動し直した回数。`state.json` 側が持つ */
   retries: number
-  /** 起こし直していない起動を打ち切るまでの時間。`runtimeConfig.claude.timeoutMs` */
+  /** 起動し直していない起動を打ち切るまでの時間。`runtimeConfig.claude.timeoutMs` */
   timeoutMs: number
-  /** 起こし直し1回ぶんの刻み。`0` なら伸ばさない。`runtimeConfig.claude.timeoutStepMs` */
+  /** 起動し直し1回ぶんの刻み。`0` なら伸ばさない。`runtimeConfig.claude.timeoutStepMs` */
   timeoutStepMs: number
   /**
    * 会話の続け先。**あるかどうかが初回/継続の判定そのものである。**
@@ -64,18 +64,39 @@ export interface AiRun {
    *
    * プロセスが正常終了しても、何もせずに終わっていることがある。ストロークは1回の
    * 実行が必ず提出（A5・A7）で終わるので、提出が無ければ作業をしていない。steering は
-   * 提出（steering 文書）が代行先（本家）に受理されたかを、起動単位の記録で見る
-   * （`invoke.ts` の `submittedByLaunch`。fix-steering-empty-completion）。渡さなければ
-   * 常に「行われた」とみなす——今はどの用途も渡すので、この既定は工程を問わない安全弁
-   * として残る。
+   * 実行の終わりに invoke-agent が本家 REST へ問い合わせ、3本の文書と承認依頼が本家に
+   * 在るかで答える（`invoke.ts` の `steeringCompletedUpstream`。判定は終了時点の本家の
+   * 状態で行い、起動ごとの記録は持たない——`docs/specs/architecture/invoke-agent.md`）。
+   * 本家への問い合わせを含むので非同期である。渡さなければ常に「行われた」とみなす——
+   * 今はどの用途も渡すので、この既定は工程を問わない安全弁として残る。
    */
-  didWork?: () => boolean
+  didWork?: () => Promise<boolean>
+  /**
+   * **実行を決着させる**。`didWork` と同じ置き方で、渡されているときだけ呼ぶ。
+   *
+   * 決着とは、その実行で提出されたものに応じて局面を切り替え、画面へ届けることである
+   * （openspec/specs/agent/invocation「完了は output stream で検知して idle に変える」）。
+   * 提出を受ける口（A5・A7）は記録だけを行うので、局面が動くのはここだけになる——局面が
+   * 変わってよいのは実行が終わった時点だけで、それを知るのは子プロセスを制御するこの層
+   * だけである。
+   *
+   * ストロークの実行だけが渡す（`invoke.ts`）。steering は決着を持たない（完成の記録は
+   * `recordCompletion`）。**`didWork` が true のときだけ呼ぶ**——何も提出していない実行に
+   * 決着させるものは無い。
+   *
+   * 決着できなければ `false` を返し、invokeAi は `failed` に倒す。局面が動かないまま
+   * `idle` にすると、proposal が在るのに画面へ出ない対象がそこで止まる。巡回が起こし直し、
+   * 続きの実行の完了時にもう一度決着を試みる。
+   *
+   * invokeAi はいつ叩くかを判定しない。関数が渡されているかどうかが判定の結果である。
+   */
+  settle?: () => Promise<boolean>
   /**
    * **完成を記録する**。`didWork` と同じ置き方で、渡されているときだけ呼ぶ。
    *
    * 生成中のプロジェクト（phase が `approved`）の steering だけが渡す（`invoke.ts`）。
-   * **`didWork` が true のときだけ呼ぶ**——完成したかを決めるのは `didWork`（その起動で
-   * steering 文書の提出が本家に受理されたか）で、記録先の U15 は判定を持たない
+   * **`didWork` が true のときだけ呼ぶ**——完成したかを決めるのは `didWork`（3本の文書と
+   * その承認依頼が本家に在るか）で、記録先の U15 は判定を持たない
    * （ADR-0014・add-activated-phase design D3・D4）。記録が受理されなければ `failed` に
    * 倒す——404・409・不達はどれも「記録できていない」であり、`idle` にすると完成の記録が
    * 無いまま完了になる。
@@ -164,7 +185,7 @@ export function invokeAi(
 /**
  * 起動の材料を組み立てられなかった実行を記録する。
  *
- * **この失敗も起こし直しの回数に数える**（`retries + 1`）。上限に達していなければ
+ * **この失敗も起動し直しの回数に数える**（`retries + 1`）。上限に達していなければ
  * `failed`（巡回が拾う）、達しているか上限そのものを読み出せなければ `error`（終端）
  * にする（design.md D3）。
  *
@@ -208,18 +229,19 @@ async function writeInvocation(sessionId: string, invocation: Invocation, retrie
 }
 
 /**
- * 組み立てられた材料で実際に起こす。組み立てが成功した後の処理はここに閉じる
+ * 組み立てられた材料で実際に起動する。組み立てが成功した後の処理はここに閉じる
  * （`fix-idle-stuck-on-run-build-failure` で `invokeAi` の本体から切り出した。切り出しの
  * 時点では振る舞いを変えていない。成功経路はその後 `add-activated-phase` で変えている）。
  */
 async function runBuiltInvocation(sessionId: string, run: AiRun): Promise<void> {
   const {
     launch, cwd, debugLogDir, prompts, maxRetries, retries, timeoutMs, timeoutStepMs,
-    conversationId, hasConversation, setInvocation, remember, prepare, didWork, recordCompletion,
+    conversationId, hasConversation, setInvocation, remember, prepare, didWork, settle,
+    recordCompletion,
   } = run
 
-  // 上限判定は起動の前。**`retries` は「これまでに起こし直した回数」** なので、初回の
-  // キック（0回）は起こし直しではない。超えていたら起こさず終端へ倒し、ユーザーに
+  // 上限判定は起動の前。**`retries` は「これまでに起動し直した回数」** なので、初回の
+  // キック（0回）は起動し直しではない。超えていたら起動せず終端へ倒し、ユーザーに
   // 引き渡す。起動の総回数は「上限 + 1」になる（docs/specs/core/settings-reference.md）。
   if (retries > maxRetries) {
     console.warn(`${LOG_PREFIX} リトライ上限に達した: ${sessionId}（${retries}/${maxRetries}）`)
@@ -232,7 +254,7 @@ async function runBuiltInvocation(sessionId: string, run: AiRun): Promise<void> 
   // 伸びてしまうので、上限判定の隣に置いて解釈を1箇所に閉じている
   // （openspec/specs/agent/invocation・design.md Decision 2）。
   //
-  // 伸びるのはひと続きの起こし直しの中だけである。完了とユーザーの再実行が `retries` を
+  // 伸びるのはひと続きの起動し直しの中だけである。完了とユーザーの再実行が `retries` を
   // 0 に戻すので、次の連なりは再び `timeoutMs` から始まる。
   const timeout = timeoutMs + timeoutStepMs * retries
 
@@ -255,7 +277,7 @@ async function runBuiltInvocation(sessionId: string, run: AiRun): Promise<void> 
   const mode: ClaudeMode = continuing ? 'resume' : 'new'
   const prompt = continuing ? prompts.continue : prompts.first
 
-  // **1回の呼び出しで起こすのは1回だけである。** 起こし直しは巡回（`failed` を拾って
+  // **1回の呼び出しで起動するのは1回だけである。** 起動し直しは巡回（`failed` を拾って
   // U13 を叩く）が担い、回数は `state.json` が持つ。ここで内側にもループを持つと、
   // 巡回の回数と掛け算になって総起動回数が上限の意味から外れる。
   const result = await runClaude({ sessionId: conversationId, launch, cwd, prompt, mode, debugLogDir, timeoutMs: timeout })
@@ -267,13 +289,27 @@ async function runBuiltInvocation(sessionId: string, run: AiRun): Promise<void> 
     // output stream の成功エンベロープ = プロセスは完了した。ただし**何もせずに
     // 終わっている**ことがあるので、用途ごとの確認を通す。
     //
-    // 作業をしていなければ失敗として起こし直す——ここを素通しにすると、問いも proposal も
+    // 作業をしていなければ失敗として起動し直す——ここを素通しにすると、問いも proposal も
     // 出ないまま `idle` になり、巡回（`failed` しか拾わない）も回収できない詰まりが残る。
     // **完成の記録より先に見る。** 完成したかを決めるのは `didWork` の方で、記録先の U15 は
     // 判定を持たない（ADR-0014・add-activated-phase design D4）。作業をしていない実行が
     // 完成を記録しに行くと、何も出していない対象が完成として畳まれる。
-    if (didWork !== undefined && !didWork()) {
-      console.warn(`${LOG_PREFIX} AI 呼び出しが失敗: ${sessionId}`, ['プロセスは成功したが提出が届かない'])
+    if (didWork !== undefined && !(await didWork())) {
+      console.warn(`${LOG_PREFIX} AI 呼び出しが失敗: ${sessionId}`, ['プロセスは成功したが作業が確認できない'])
+      await setInvocation('failed')
+      return
+    }
+
+    // 作業があった実行のうち、決着を渡されたもの（ストローク）だけが決着する。**局面が
+    // 動くのはここだけである**——提出を受ける口（A5・A7）は記録だけを行う
+    // （openspec/specs/api/stroke/question・api/stroke/proposal）。`idle` にする前に置くのは、
+    // 承認できる局面が立つ時点を実行の終わりに揃えるためである
+    // （change fix-rename-during-running-session）。
+    //
+    // 決着できなければ `failed` に倒す。局面が動かないまま `idle` にすると、proposal が
+    // 在るのに画面へ出ない対象がそこで止まり、巡回（`failed` しか拾わない）も回収できない。
+    if (settle !== undefined && !(await settle())) {
+      console.warn(`${LOG_PREFIX} AI 呼び出しが失敗: ${sessionId}`, ['プロセスは成功したが決着できない'])
       await setInvocation('failed')
       return
     }
@@ -297,7 +333,7 @@ async function runBuiltInvocation(sessionId: string, run: AiRun): Promise<void> 
     failures.push('継続先の会話が失われた（初回ではないので作り直さない）')
   }
 
-  // `failed` は巡回（openspec/specs/portal/batch）が拾って起こし直す。回数が上限を
+  // `failed` は巡回（openspec/specs/portal/batch）が拾って起動し直す。回数が上限を
   // 超えていれば、次のキックが `error` へ倒してユーザーに引き渡す。
   console.warn(`${LOG_PREFIX} AI 呼び出しが失敗: ${sessionId}`, failures)
   await setInvocation('failed')

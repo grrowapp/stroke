@@ -74,8 +74,8 @@ export function useProposalReview(
 ) {
   const a = useAnnotations()
 
-  /** このセッションの API。`/api/<uuid>` */
-  const base = computed(() => `/api/strokes/${toValue(sessionId)}`)
+  /** このセッションの API。`/api/sessions/<uuid>` */
+  const base = computed(() => `/api/sessions/${toValue(sessionId)}`)
 
   const phase = ref<Phase>(initial.phase)
   const strokes = ref<Stroke[]>(initial.strokes)
@@ -384,7 +384,10 @@ export function useProposalReview(
   async function discardSession(): Promise<void> {
     promotionFailed.value = null
     try {
-      await $fetch(`/api/sessions/${sessionId}`, { method: 'DELETE' })
+      // **URL を `string` として渡す。** `/api/sessions/unfinished`（U16）が静的な兄弟として
+  // 増えたことで、`/api/sessions/${…}` の型が GET だけに狭まり、DELETE が通らなくなる
+  // （Nitro の typed routes の性質）。実体の route は `sessions/[id]/index.delete.ts` に在る
+      await $fetch(`/api/sessions/${sessionId}` as string, { method: 'DELETE' })
     } catch (error) {
       warn('破棄できませんでした', messageOf(error))
       return
@@ -415,10 +418,10 @@ export function useProposalReview(
         await $fetch(`${base.value}/approve`, { method: 'DELETE' })
         await $fetch(`${base.value}/approve`, { method: 'POST', body: { projectName: name } })
       } catch (error) {
-        // サーバは 409 を3つの意味で返す(名前の衝突 / AI が実行中 / phase 不整合)。
-        // 名前を変えるまで承認を止めるのは、衝突と分かったときだけにする。
-        // 400（名前に使えない文字）と 409 の残り（phase 不整合・実行中）は判断そのものが
-        // 成立しないので、器に載せず「別の名前で再度承認できる」状態に留める
+        // サーバは 409 を2つの意味で返す(名前の衝突 / phase 不整合)。名前を変えるまで
+        // 承認を止めるのは、衝突と分かったときだけにする。400（名前に使えない文字）と
+        // 409 の残り（phase 不整合）は判断そのものが成立しないので、器に載せず
+        // 「別の名前で再度承認できる」状態に留める
         if (statusOf(error) === 409 && reasonOf(error) === 'name-conflict') {
           conflictName.value = name
         } else {
@@ -447,18 +450,27 @@ export function useProposalReview(
       const status = statusOf(error)
 
       if (status === 409 && reasonOf(error) === 'name-conflict') {
-        // 判断の後に同じ名前が保存先に現れた。同じ判断のままでは昇格できないので、判断を
-        // 取り下げて別の名前を確定させる（specs/project/generation「判断を取り下げて別の
-        // 名前で改めて承認できる」）
-        await $fetch(`${base.value}/approve`, { method: 'DELETE' }).catch(() => undefined)
+        // 判断の後に同じ名前が保存先に現れた。同じ判断のままでは昇格できない。**衝突した
+        // 名前の判断はサーバが取り下げている**ので（specs/api/session/promote「判断の名前が
+        // 昇格の直前に衝突している」・specs/project/generation「昇格の直前に既存名との衝突を
+        // 確認する」）、ここは衝突した名前を出して、別の名前を確定させる面へ戻すだけでよい。
+        // 次の承認は今までどおり `DELETE` → `POST` で下す——取り下げ済みなら `DELETE` は
+        // 何も変えず、取り下げの対象外だった判断（間に別の名前で下し直していた場合。同 spec）
+        // はその `DELETE` が拾う
         conflictName.value = name
       } else if (status === 500) {
-        // **昇格の実行が失敗した**（改名の I/O・`phase` の書き込み）。判断は記録されたまま
-        // 残っているので、決着と同じ器で次を選ばせる（specs/project/generation）。この時点では
+        // **昇格の実行が失敗した**（改名の I/O・`phase` の書き込み・衝突時の取り下げの
+        // 書き込み）。判断は記録されたまま残っているので、決着と同じ器で次を選ばせる
+        // （specs/project/generation）。この時点では
         // プロジェクトが無く phase は `proposed` なので、破棄はセッション側、やり直すは昇格だけの
         // 再要求になる
         promotionNotice.value = name
       } else {
+        // **理由を捨てない。** サーバが返した文言をそのまま出す（ADR-0022「応答の
+        // 握りつぶしは、いかなる者にも許されない」）。ここに落ちるのは 409 phase
+        // （画面が持っている局面が古い）と、契約に無い応答である。「実行中だから受理
+        // しない」（busy）は無い——承認の操作は実行の決着の後にしか存在しない
+        // （specs/stroke/frontier・api/session/promote）。
         warn('プロジェクトを作れませんでした', messageOf(error))
       }
       return
@@ -483,7 +495,7 @@ export function useProposalReview(
 
   /** 段3の実体。失敗は起動の段に留め、昇格の結果にも画面の流れにも影響させない。 */
   async function kickSteering(name: string): Promise<void> {
-    const target = `/api/strokes/${encodeURIComponent(name)}`
+    const target = `/api/sessions/${encodeURIComponent(name)}`
     try {
       const status = await $fetch<SessionStatus>(target)
       await $fetch(`${target}/invoke-agent`, { query: { cwd: status.path } })

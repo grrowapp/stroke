@@ -142,7 +142,7 @@ export function isPromotedPhase(phase: Phase): phase is 'approved' | 'activated'
  */
 export type Invocation = 'running' | 'idle' | 'failed' | 'error'
 
-/** U2 `GET /api/:id` の出力。 */
+/** U2 `GET /api/sessions/:id` の出力。 */
 export interface SessionStatus {
   phase: Phase
   invocation: Invocation
@@ -153,7 +153,7 @@ export interface SessionStatus {
   path: string
 }
 
-/** W2 `/api/:id/ws/proposal` の配信1件分。A7 の入力と対になる。 */
+/** W2 `/api/sessions/:id/ws/proposal` の配信1件分。A7 の入力と対になる。 */
 export interface ProposalMessage {
   proposal: string
   projectName: string | null

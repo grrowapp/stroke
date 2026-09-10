@@ -3,26 +3,25 @@ import { dirname, join } from 'node:path'
 import { z } from 'zod'
 import { isPromotedPhase, type Answer, type Invocation, type Phase, type Question, type SendBackPayload, type Stroke } from '#shared/stroke'
 import type { ProjectCreationOutcome } from '#shared/types'
+import { targetExists } from '../../handler/delete'
+import {
+  SessionError,
+  createSession as createSessionHandler,
+  writeAtomic as writeAtomicHandler,
+} from '../../handler/session'
 import { broadcastProjectCreation } from '../control/board'
-import { conflict } from './conflict'
-import { sessionFile } from './paths'
+import { SESSION_FILES, sessionFile } from './paths'
 import { PROJECT_DOCS_DIR, PROJECT_PROPOSAL_FILE } from './project'
 import { questionSchema } from './question'
 import { sendBackBody } from './request-schemas'
-import {
-  SESSION_FILES,
-  SessionCoreError,
-  createSessionCore,
-  sessionExistsCore,
-  writeAtomic as writeAtomicCore,
-} from './session-core'
 
 /**
  * 保存先を解決する端。
  *
- * core（`session-core.ts` / `paths.ts`）は設定を引かず `root` を引数で受け取る。
- * このモジュールは `createError` を使う Nitro 専用なので、ここが endpoint 側の端になる
- * （CLI 側の端は `scripts/session.ts`）。docs/specs/core/settings-reference.md 参照。
+ * handler（`server/handler/session.ts` / `delete.ts`）と `paths.ts` は設定を引かず `root` を
+ * 引数で受け取る。このモジュールは `createError` を使う Nitro 専用なので、ここが endpoint
+ * 側の端になる（CLI 側の端は `scripts/session.ts`）。
+ * docs/specs/core/settings-reference.md 参照。
  */
 function shareRoot(): string {
   return useRuntimeConfig().projectShareRoot
@@ -106,6 +105,15 @@ export type SessionState =
   | (ActiveFields & { phase: 'stroking' })
   | ProposedState
   | PromotedState
+
+/**
+ * 昇格前（`stroking` / `proposed`）の局面の状態。`isPromotedState` で弾いた残りである。
+ *
+ * 承認以降を断ってから実処理を行う endpoint（A5・A7）が、断った後の形を handler の引数の
+ * 型として書くために使う。ここに置くのは `SessionState` と `isPromotedState` が同じこの
+ * ファイルに在るからで、handler の片方に置いてもう片方が import する形は採らない。
+ */
+export type ActiveSessionState = Exclude<SessionState, PromotedState>
 
 const projectNameSchema = z.string().trim().min(1)
 const invocationSchema = z.enum(['running', 'idle', 'failed', 'error'])
@@ -197,33 +205,36 @@ const strokesSchema = z.array(strokeSchema)
  * `state.json` は最初からここで書き、セッションはこの時点で「在る」ものとして扱う。
  */
 export async function createSession(overview: string): Promise<string> {
-  // 実体は core（design.md 決定3: endpoint と script で同じ実装を呼ぶ）。
+  // 実体は handler（design.md 決定3: endpoint と script で同じ実装を呼ぶ）。
   try {
-    return await createSessionCore(shareRoot(), overview, 'idle')
+    return await createSessionHandler(shareRoot(), overview, 'idle')
   } catch (error) {
     throw sessionErrorToHttp(error)
   }
 }
 
-/** セッションとして成立しているか。`state.json` が在ることをもって在るとする。 */
+/**
+ * セッションとして成立しているか。`state.json` が在ることをもって在るとする。
+ *
+ * 「在る」の判定は `handler/delete.ts` の1つを共有する——消す前の確認と同じものを見る。
+ */
 export async function sessionExists(sessionId: string): Promise<boolean> {
-  return sessionExistsCore(shareRoot(), sessionId)
+  return targetExists(shareRoot(), sessionId)
 }
 
-/** core の失敗を HTTP へ写す。endpoint 側の共通の出口。 */
+/**
+ * handler の失敗を HTTP へ写す。endpoint 側の共通の出口。
+ *
+ * ここへ来るのは保存先の I/O が転んだときだけである（`SessionError` の種別は `io` の
+ * 1つ。`server/handler/session.ts`）。種別が増えたときに写し先を足す場所として、
+ * `SessionError` かどうかは見たまま残す。
+ */
 export function sessionErrorToHttp(error: unknown) {
-  const kind = error instanceof SessionCoreError ? error.kind : 'io'
   const message = error instanceof Error ? error.message : String(error)
 
-  if (kind === 'phase') {
-    // 今の phase に当てはまらない操作。画面は 409 を「待てば通る」と読むが、
-    // これは待っても通らない——それでも既存の 409 の語彙に揃える（utils/conflict）。
-    return conflict('phase', message)
-  }
-  const notFound = kind === 'not-found'
   return createError({
-    statusCode: notFound ? 404 : 500,
-    statusMessage: notFound ? 'Not Found' : 'Internal Server Error',
+    statusCode: 500,
+    statusMessage: 'Internal Server Error',
     message,
   })
 }
@@ -239,7 +250,7 @@ export async function readState(sessionId: string): Promise<SessionState> {
 /**
  * 実行の記録（`invocation`）を書く。
  *
- * **この1本が書き込みの規則である。** A8 の endpoint（`submission.post.ts`）も、invokeAi
+ * **この1本が書き込みの規則である。** A8 の endpoint（`submission/index.post.ts`）も、invokeAi
  * へ渡す書き込み口（`invoke.ts`）も、ここを呼ぶ。規則を2箇所に写さないため。
  *
  * 値はそのまま書く。回数は渡されたときだけ上書きする（`error` からの再実行で 0 に戻す）。
@@ -268,7 +279,7 @@ export async function writeInvocation(
   //
   // **成功の決着はここから流さない。** `invocation` は実行の記録であって完成の記録ではなく、
   // `idle` は「終わった」であって「できた」ではない。成功の決着（`done`）を出すのは完成の
-  // 記録（U15 `activate.post.ts`）だけである（openspec/specs/api/session/activate・
+  // 記録（U15 `activate/index.post.ts`）だけである（openspec/specs/api/session/activate・
   // add-activated-phase design D7）。行の判定も `invocation` を見ず、`state.json` の phase
   // だけで決まる（`control/directory.ts`）。
   const outcome = creationOutcomeOf(state.phase, invocation)
@@ -453,7 +464,7 @@ export function sessionProposal(sessionId: string) {
         await mkdir(dirname(path()), { recursive: true })
       } catch (error) {
         throw sessionErrorToHttp(
-          new SessionCoreError(
+          new SessionError(
             'io',
             `proposal の置き場を作れなかった: ${error instanceof Error ? error.message : String(error)}`,
           ),
@@ -466,10 +477,10 @@ export function sessionProposal(sessionId: string) {
   }
 }
 
-/** 原子的な書き込みの実体は core。失敗はここで HTTP へ写す。 */
+/** 原子的な書き込みの実体は handler。失敗はここで HTTP へ写す。 */
 async function writeAtomic(sessionId: string, name: string, contents: string): Promise<void> {
   try {
-    await writeAtomicCore(shareRoot(), sessionId, name, contents)
+    await writeAtomicHandler(shareRoot(), sessionId, name, contents)
   } catch (error) {
     throw sessionErrorToHttp(error)
   }

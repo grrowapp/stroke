@@ -1,7 +1,8 @@
 import { basename, isAbsolute, join, resolve } from 'node:path'
 import { z } from 'zod'
 
-import { toHttpError, upstreamClient } from '../../utils/control/upstream-proxy'
+import { registerProject } from '../../handler/project-directory'
+import { toHttpError } from '../../utils/control/upstream-proxy'
 import { readStrokeConfig } from '../../utils/stroke/config'
 import { parseBody } from '../../utils/stroke/request-schemas'
 
@@ -9,14 +10,18 @@ import { parseBody } from '../../utils/stroke/request-schemas'
  * P2: プロジェクトの生成（openspec/specs/api/project/generate）。
  *
  * 昇格したプロジェクトを本家 spec-workflow に存在させる——本家の登録の REST
- * （`POST /api/projects/add`）へ依頼するだけの口である。プロジェクトはリソースとして
+ * （`POST /api/projects/add`）へ依頼するだけである。依頼そのものは
+ * `server/handler/project-directory.ts` の `registerProject` が持つ。プロジェクトはリソースとして
  * `projects/` を既に持つ（P1 の削除）ので、その作成として同じ path に POST で置く。
  *
  * **ユーザーは叩かない。** 承認の後の実行（steering）の起動の材料を組み立てるとき、
  * サーバーが AI を起動する前に叩く（`server/utils/stroke/invoke.ts` の `kick`）。かつては
  * steering 用 claude の `--mcp-config` に並べた本家 MCP の自己登録でプロジェクトが本家に
  * 現れていた——生成が AI のプロセスに乗っていた。その配線は外し、生成はここだけになった
- * （update-project-generation-via-upstream-rest）。
+ * （update-project-generation-via-upstream-rest）。本家 MCP は承認依頼のためにだけ steering の
+ * 起動定義へ並べ直したが、並べるのはここが受理された後に限る——登録済みのパスへの自己登録は
+ * 同じ projectId を返すだけで、生成にはならない
+ * （update-invoke-agent-responsibility-boundary design D4）。
  *
  * **id を取らない。** 作成に id は無く、本家が要るのはパスであり、呼び手は cwd としてパスを
  * 既に持っている。id を受けてパスを導出し直すのは、呼び手が持つ事実を別の規則で決め直す
@@ -52,7 +57,7 @@ export default defineEventHandler(async (event): Promise<Response> => {
     })
   }
 
-  const result = await upstreamClient().registerProject(projectPath)
+  const result = await registerProject(projectPath)
   if (!result.ok) {
     // 本家が 404 を返すのは登録の口そのものが無いとき（`/api/projects/add` を持たない版）で、
     // 作成の要求に「対象が見つからない」を返すと読み違える。本家がエラーで返したものは

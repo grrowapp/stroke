@@ -180,7 +180,7 @@ export async function deleteProject(projectId: string): Promise<string | null> {
  */
 export async function restartSteering(name: string, cwd: string): Promise<string | null> {
   try {
-    await $fetch(`/api/strokes/${encodeURIComponent(name)}/invoke-agent`, {
+    await $fetch(`/api/sessions/${encodeURIComponent(name)}/invoke-agent`, {
       query: { reset: 1, cwd },
     });
     return null;

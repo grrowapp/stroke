@@ -17,7 +17,7 @@ export function useSessionChannel<T>(sessionId: MaybeRefOrGetter<string>, channe
   const url = computed(() => {
     if (typeof window === 'undefined') return ''
     const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws'
-    return `${scheme}://${window.location.host}/api/strokes/${toValue(sessionId)}/ws/${channel}`
+    return `${scheme}://${window.location.host}/api/sessions/${toValue(sessionId)}/ws/${channel}`
   })
 
   useWebSocket(url, {

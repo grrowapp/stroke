@@ -17,7 +17,7 @@ const rawId = route.params.sessionId
 const sessionId = Array.isArray(rawId) ? (rawId[0] ?? '') : (rawId ?? '')
 
 const { data: status, error } = await useFetch<SessionStatus>(
-  `/api/strokes/${sessionId}`,
+  `/api/sessions/${sessionId}`,
   { key: `status:${sessionId}` },
 )
 
@@ -35,7 +35,7 @@ if (status.value && status.value.phase === 'stroking') {
   await navigateTo(`/strokes/${sessionId}`)
 }
 
-const { data: strokesData } = await useFetch<{ strokes: Stroke[] }>(`/api/strokes/${sessionId}/strokes`, {
+const { data: strokesData } = await useFetch<{ strokes: Stroke[] }>(`/api/sessions/${sessionId}/strokes`, {
   key: `strokes:${sessionId}`,
 })
 

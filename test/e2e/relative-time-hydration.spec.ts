@@ -1,4 +1,6 @@
-import { expect, test, type Browser } from '@playwright/test';
+import type { Browser } from '@playwright/test';
+
+import { expect, test } from './support';
 
 /**
  * プロジェクト一覧の「最終更新」が、**ハイドレーションでずれない**ことを見る。

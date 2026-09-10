@@ -68,7 +68,7 @@ export async function resolveProjectId(projectPath: string): Promise<ProjectIdRe
   if (!result.ok) return { ok: false, ...describeUpstreamFailure(result.failure) }
 
   // 素の `===` では末尾スラッシュや `..` を含む形が一致しない。projectPath は
-  // `GET /api/strokes/:id/invoke-agent` のクエリ `cwd` 由来で外から任意の書き方が
+  // `GET /api/sessions/:id/invoke-agent` のクエリ `cwd` 由来で外から任意の書き方が
   // 渡るので、両側を正規化してから比べる。
   const wanted = normalizePath(projectPath)
   const entries = result.value

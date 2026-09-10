@@ -91,8 +91,14 @@ export default defineStrokeTool({
     try {
       // `args` は手を入れずそのまま渡す。項目が欠けていても A5 へ届け、A5 の 400 と
       // 違反箇所を `error` に載せる（検証の正は送信先。ADR-0014）。
+      // **接続 token をそのまま転送する。** A5 はこれで「どの起動の提出か」を記録し、
+      // invokeAi が実行の決着でそれを読む（openspec/specs/agent/invocation）。ここで
+      // 記録そのものを行わないのは ADR-0014——ツールは代行に徹し、判断も記録も送信先が
+      // 持つ。steering の提出だけがツール側で記録するのは、受理するのが代行先（本家）で
+      // stroke-board の endpoint を1つも通らないためである。
       const response = await $fetch.raw(`/api/strokes/${encodeURIComponent(connected.sessionId)}/question`, {
         method: 'POST',
+        headers: { 'x-stroke-token': resolved.token },
         body: args,
       })
       return { status: response.status }

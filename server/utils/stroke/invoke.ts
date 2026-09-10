@@ -4,11 +4,15 @@ import { readStrokeConfig } from './config'
 import { LOG_PREFIX } from './log'
 import { initSessionOpenspec } from './openspec'
 import { isPromotedState, readState, sessionExists, withStateLock, writeState } from './session-store'
-import { forgetLaunchSubmission, hasLaunchSubmission, submissionCount } from './submission-signal'
-import { activatePath, submissionPath } from './submission-path'
-import { MCP_SERVER_NAME, withMcpToolsAllowed } from '../mcp/allowed-tools'
+import { forgetLaunchSubmission, hasLaunchSubmission, launchSubmissionKinds } from './submission-signal'
+import { activatePath, settlementPath, submissionPath } from './submission-path'
+import { MCP_SERVER_NAME, STEERING_ALLOWED_TOOLS, UPSTREAM_MCP_SERVER_NAME, withMcpToolsAllowed } from '../mcp/allowed-tools'
+import { readServerConfig } from '../config'
 import { issueConnectionToken, registerConnection, removeConnection } from '../mcp/connection-table'
 import { exposedToolsHeaderValue, MCP_TOOLS_HEADER, type McpToolPhase } from '../mcp/exposed-tools'
+import { resolveProjectId } from '../mcp/resolve-project-id'
+import { upstreamClient } from '../control/upstream-proxy'
+import { STEERING_DOCUMENTS, type SteeringDocument, type UpstreamFailure } from '../upstream/rest'
 import { currentApiBaseUrl } from './listen-address'
 
 /**
@@ -18,7 +22,7 @@ import { currentApiBaseUrl } from './listen-address'
  * 表す（openspec/specs/agent/invocation「起動処理は呼び出し元を区別しない」）。
  */
 
-/** どの用途で起こすか。渡す値の決め方だけが違う。 */
+/** どの用途で起動するか。渡す値の決め方だけが違う。 */
 export type RunKind = 'stroke' | 'steering'
 
 /**
@@ -43,7 +47,7 @@ export function kindOf(phase: Phase): RunKind {
  * 前提チェック（503）を通すためである。
  */
 export function invokePath(sessionId: string, cwd: string): string {
-  return `/api/strokes/${encodeURIComponent(sessionId)}/invoke-agent?cwd=${encodeURIComponent(cwd)}`
+  return `/api/sessions/${encodeURIComponent(sessionId)}/invoke-agent?cwd=${encodeURIComponent(cwd)}`
 }
 
 /**
@@ -66,26 +70,155 @@ function invocationWriter(sessionId: string) {
 }
 
 /**
- * 「この時点より後に提出があったか」を答える関数を作る。
+ * flontier の「その起動で作業が行われたか」を答える関数を作る。
  *
- * 起動の前に今の数を控え、呼ばれた時点の数と比べる。完了の検知（output stream）とは
- * 別で、作業が行われたかだけを見る。
+ * 単位は起動（接続 token）である。完了の検知（output stream）とは別で、作業が行われたか
+ * だけを見る。かつては対象の `sessionId` で提出数を持ち、起動の前後で比べていたが、その形
+ * では「何が」提出されたかを持てず、実行の決着（`settlement`）の材料にならない
+ * （change fix-rename-during-running-session）。
+ *
+ * 記録者は受理した endpoint（A5・A7）自身である。MCP ツールは記録しない
+ * （`docs/specs/mcp/contract.md`「代行以外の固定の処理を受け持たない」）——ツールがするのは
+ * 接続 token をそのまま転送することだけで、steering の判定を本家 REST へ移したのと同じ
+ * 線引きである（`steeringCompletedUpstream`）。
  */
-function submittedSince(sessionId: string): () => boolean {
-  const before = submissionCount(sessionId)
-  return () => submissionCount(sessionId) > before
+function submittedByLaunch(token: string): () => Promise<boolean> {
+  return async () => hasLaunchSubmission(token)
 }
 
 /**
- * steering 用の「作業が行われたか」。flontier の `submittedSince` と対だが、比べる前後の
- * 数ではなく起動単位（接続 token）の記録を読む——steering の提出は stroke-board の
- * endpoint を通らず、対象の `sessionId` に結びつける経路が無いため
- * （design.md D1「steering の作業の signal は起動（接続 token）を単位にする」）。
- *
- * 記録者は `submit-document.ts` の steering 分岐（受理された提出だけを記録する）。
+ * 承認依頼の `filePath`。本家はプロジェクトルートからの相対パスで返す（ADR-0007）。
+ * 3本の名前は `rest.ts` の `STEERING_DOCUMENTS` が1つ持つ（本家の `info` の
+ * `steering.documents` のキーと同じ）。
  */
-function submittedByLaunch(token: string): () => boolean {
-  return () => hasLaunchSubmission(token)
+function steeringApprovalPath(name: SteeringDocument): string {
+  return `.spec-workflow/steering/${name}.md`
+}
+
+/**
+ * 本家の失敗をログ1行に写す。種別と、本家が返した理由・status を残す。
+ *
+ * MCP ツールの結果の形（`server/utils/mcp/upstream-failure.ts`）はここでは要らない——
+ * 読むのは人（ログ）だけで、`errorCode` に写す相手が居ない。
+ */
+function describeFailureForLog(failure: UpstreamFailure): string {
+  switch (failure.kind) {
+    case 'not-configured':
+      return 'not-configured（本家ダッシュボードの URL が設定されていない）'
+    case 'not-found':
+      return `not-found（${failure.path}）`
+    case 'error-response':
+      return `error-response（${failure.status} ${failure.reason}）`
+    case 'unreachable':
+      return `unreachable（${failure.reason}）`
+    case 'malformed':
+      return `malformed（${failure.reason}）`
+  }
+}
+
+/**
+ * steering 用の「作業が行われたか」。flontier の `submittedSince` と対だが、実行の間の
+ * 記録ではなく、**実行の終わりに本家 REST へ問い合わせて、終了時点の本家の状態**で答える
+ * （openspec/specs/agent/invocation「作業が行われたかの判定を工程ごとに持ち、完成の記録より
+ * 先に問う」・`docs/specs/architecture/invoke-agent.md`）。
+ *
+ * かつては `submit-document` が本家 PUT の受理を起動 token の記録に残し、ここがそれを
+ * 読んでいた。MCP ツールは代行以外の固定の処理を受け持たない（`docs/specs/mcp/contract.md`）
+ * ので、判定の材料を作る側から外し、正が在る本家に直接聞く形にした
+ * （update-invoke-agent-responsibility-boundary design D2）。
+ *
+ * 条件は phase で分ける（同 design D3）。
+ *
+ * - `approved`（生成中）: 3本の文書が本家に在り、**かつ**その3本それぞれに承認依頼が
+ *   出ている。これが完成の判定そのものになる——true なら呼び出し元が U15 を叩く
+ * - `activated`（完成済みの起動し直し）: 3本の文書が在ればよい。承認依頼は既に承認されて
+ *   pending の一覧から消えていてよい
+ *
+ * phase は `buildRun` が材料を組み立てた時点の値である。実行中に起動時の書き上げが同じ
+ * 対象を `activated` にしても、この判定は `approved` の条件のままで、U15 側が「既に完成
+ * している」と断る（`completionRecorder`）。
+ *
+ * 本家の承認依頼の一覧は **pending だけ**を返す。プロセス終了より前にユーザーが承認を
+ * 済ませていると生成中の判定は false になる。確認は終了直後の1回なので、承認がその前に
+ * 済んでいることは稀で、起動し直された実行が承認依頼を出し直せば次で true になる。
+ *
+ * 到達済みの状態で何もしなかった実行も true になる。これは意図した変化で、起動し直しが
+ * 空振りして `failed` に倒れ続ける経路が無くなる。
+ *
+ * projectId を解決できない・本家に届かない・未設定・形違いはすべて false——本家の状態を確かめ
+ * られないものを完成と扱わない。**throw しない。** ここが投げると `runBuiltInvocation` の
+ * 成功経路が途中で落ち、`invocation` が `running` のまま残る。
+ */
+function steeringCompletedUpstream(cwd: string, phase: Phase): () => Promise<boolean> {
+  const requireApprovals = phase === 'approved'
+  const warn = (reason: string): false => {
+    console.warn(`${LOG_PREFIX} steering の完成を確認できない: ${cwd}`, [reason])
+    return false
+  }
+
+  return async () => {
+    try {
+      const resolved = await resolveProjectId(cwd)
+      if (!resolved.ok) return warn(`projectId を解決できない: ${resolved.error}`)
+
+      const client = upstreamClient()
+      const info = await client.getProjectInfo(resolved.projectId)
+      if (!info.ok) return warn(`本家の info を取れない: ${describeFailureForLog(info.failure)}`)
+
+      const missing = STEERING_DOCUMENTS.filter(name => !info.value.steering.documents[name])
+      if (missing.length > 0) return warn(`本家に無い steering 文書: ${missing.join(', ')}`)
+
+      if (!requireApprovals) return true
+
+      const approvals = await client.listPendingApprovals(resolved.projectId)
+      if (!approvals.ok) return warn(`本家の承認依頼の一覧を取れない: ${describeFailureForLog(approvals.failure)}`)
+
+      // 数えるのは steering の承認依頼だけ。spec の承認依頼が同じ `filePath` を持つことは
+      // 無いが、category を見ておけば照合が `filePath` の形だけに依存しない
+      const requested = new Set(
+        approvals.value.filter(approval => approval.category === 'steering').map(approval => approval.filePath),
+      )
+      const unrequested = STEERING_DOCUMENTS.filter(name => !requested.has(steeringApprovalPath(name)))
+      if (unrequested.length > 0) return warn(`承認依頼が出ていない steering 文書: ${unrequested.join(', ')}`)
+
+      return true
+    } catch (error) {
+      return warn(`本家への問い合わせで例外: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+}
+
+/**
+ * ストロークの実行の**決着**を作る。その起動で提出されたものを A9 へ渡す。
+ *
+ * 局面（phase）を動かし画面へ配信するのはここから叩く A9 だけである。提出を受ける口
+ * （A5・A7）は記録だけを行う（openspec/specs/api/stroke/question・api/stroke/proposal）。
+ *
+ * **proposal を先に見る。** 1回の実行が問いと proposal の両方を出すことは無いが、出たなら
+ * proposal の方が後の局面である。
+ *
+ * path は相対。自分自身を叩くのに外向けの設定値で URL を組むと、待ち受けを変えた瞬間に
+ * 届かなくなる（`invokePath` の docblock と同じ理由）。
+ */
+function settlement(sessionId: string, token: string): () => Promise<boolean> {
+  return async () => {
+    const kinds = launchSubmissionKinds(token)
+    const submitted = kinds.has('proposal') ? 'proposal' : kinds.has('question') ? 'question' : null
+    // 提出が無い実行は `didWork` が先に弾くので、ここへは届かない。届いたなら決着させる
+    // ものが無いということで、失敗にはしない（`failed` に倒すと巡回が回し続ける）。
+    if (submitted === null) return true
+
+    try {
+      await $fetch(settlementPath(sessionId), { method: 'POST', body: { submitted } })
+      return true
+    } catch (error) {
+      console.warn(
+        `${LOG_PREFIX} 実行を決着できない: ${sessionId}`,
+        error instanceof Error ? error.message : error,
+      )
+      return false
+    }
+  }
 }
 
 /**
@@ -110,7 +243,7 @@ function conversationWriter(sessionId: string) {
  * true のとき。`ai.ts` の `runBuiltInvocation`）。
  *
  * 2xx 以外は「記録できていない」であり、記録できていないものを完成と扱わない。false を
- * 受けた invokeAi は `failed` に倒し、巡回の起こし直しが続きの実行の完了時にもう一度
+ * 受けた invokeAi は `failed` に倒し、巡回の起動し直しが続きの実行の完了時にもう一度
  * ここを通る（add-activated-phase design D4・Risks「U15 の不達」）。
  *
  * **例外は、既に完成が記録されている場合だけ。** この実行の起動後に別の書き手（起動時の
@@ -118,9 +251,9 @@ function conversationWriter(sessionId: string) {
  * （完成の記録）は果たされているので受理と同じに扱う——断られたら phase を読み直して決める。
  * 判定を U15 の応答の文言に頼らない。
  *
- * 書き上げが `running` を対象から外した（design D9）ので、この窓は狭い——一覧を取ってから
+ * 書き上げが `running` を対象から外した（design D9）ので、これが起こるのは一覧を取ってから
  * U15 を POST するまでの間に起動が挟まったときだけである。それでも残すのは、`failed` に
- * 倒すと完成済みの対象を巡回が起こし直し続けるためで、窓の広さとは別の理由による。
+ * 倒すと完成済みの対象を巡回が起動し直し続けるためで、起こりやすさとは別の理由による。
  */
 function completionRecorder(sessionId: string) {
   return async (): Promise<boolean> => {
@@ -151,7 +284,7 @@ async function isAlreadyActivated(sessionId: string): Promise<boolean> {
  * @param cwd        実行する場所。キックする側が渡す（design.md D5）
  * @param phase      対象の局面。用途（ストロークの往復か steering か）と、完成の記録を
  *                   試みるか（生成中の steering だけ）はここから導く（design D4）
- * @param retries    これまでに起こし直した回数
+ * @param retries    これまでに起動し直した回数
  * @param runId      steering の会話 id。まだ無ければ undefined
  * @param token      この起動の接続表 token（provide-operations-via-mcp design.md「接続の担保」）
  */
@@ -181,17 +314,17 @@ export function buildRun(options: {
     return {
       launch: {
         command: claude.command,
-        // 自前 MCP サーバー（provide-operations-via-mcp）を --mcp-config で与えて起こす。
-        // MCP ツールは --allowedTools に載っていないと呼べないため、呼び出しごとにここで
-        // 足す（tasks 4.5）。
+        // 自前 MCP サーバー（provide-operations-via-mcp）と、承認依頼のための本家 MCP を
+        // --mcp-config で与えて起動する。MCP ツールは --allowedTools に載っていないと呼べない
+        // ため、呼び出しごとにここで足す。本家のツールで許可するのは `approvals` だけ
+        // （`STEERING_ALLOWED_TOOLS`。docs/specs/core/settings-reference.md「`--allowedTools`」）。
         //
-        // **本家 spec-workflow の MCP は並べない。** かつて並べていた（ADR 0011）が、その
-        // 目的は起動時の登録簿への自己登録——AI の起動に乗せたプロジェクトの生成——だけで、
-        // ツール呼び出しは1つも要らなかった。生成は P2（`POST /api/projects`）が本家 REST へ
-        // 依頼するものになり、`kick` が AI を起動する前に済ませる。claude はプロジェクトを
-        // 本家に登録する手段を持たない（update-project-generation-via-upstream-rest design D3）。
+        // 本家 MCP を並べるのは `kick` が生成（P2）を済ませた後である。登録済みのパスへの
+        // 自己登録は同じ projectId を返すだけで、生成にはならない
+        // （openspec/specs/agent/invocation「承認の後の実行は、起動の材料を組み立てるたびに
+        // 生成を依頼する」・update-invoke-agent-responsibility-boundary design D4）。
         args: [
-          ...withMcpToolsAllowed(claude.args),
+          ...withMcpToolsAllowed(claude.args, STEERING_ALLOWED_TOOLS),
           '--mcp-config',
           mcpConfigFor(cwd, token, apiBaseUrl),
         ],
@@ -210,16 +343,15 @@ export function buildRun(options: {
       conversationId: runId,
       hasConversation: async () => runId !== undefined,
       setInvocation: invocationWriter(sessionId),
-      // steering の1回の実行は steering 文書の提出（本家が受理したもの）で終わる。
-      // プロセスが正常終了しても提出が1つも無ければ、作業をせずに終わったということ
-      // なので起こし直す（fix-steering-empty-completion）。この起動の token で読む——
-      // steering の提出は stroke-board の endpoint を通らないため、対象の id ではなく
-      // 起動そのものを単位に数える（design.md D1）。
+      // steering の1回の実行は、3本の文書と承認依頼が本家に揃って終わる。プロセスが
+      // 正常終了しても揃っていなければ、作業を終えずに終わったということなので起動し直す。
+      // 判定は実行の終わりに本家 REST へ問い合わせて行う——起動ごとの記録は持たず、MCP
+      // ツールにも作らせない（`docs/specs/mcp/contract.md`・`steeringCompletedUpstream`）。
       // **この判定が完成の判定そのものである。** 記録先の U15 は判定を持たないので、
       // 生成が終わったかを決めるのはここで渡す `didWork` である（ADR-0014・design D4）。
-      didWork: submittedByLaunch(token),
+      didWork: steeringCompletedUpstream(cwd, phase),
       // 生成中（`approved`）の steering だけが完成を記録する。完成済み（`activated`）の
-      // 起こし直しは記録を試みない——完成は一度だけ起こる出来事で、U15 も受理しない
+      // 起動し直しは記録を試みない——完成は一度だけ起こる出来事で、U15 も受理しない
       // （openspec/specs/api/session/activate「既に完成した対象には記録しない」）。
       recordCompletion: phase === 'approved' ? completionRecorder(sessionId) : undefined,
       remember: conversationWriter(sessionId),
@@ -260,11 +392,15 @@ export function buildRun(options: {
     // 一覧に載っていれば、初回の起動を済ませている = 続き先が在る。
     // **参照は API の応答から得る**（openspec/specs/agent/invocation）。
     hasConversation: async () =>
-      (await $fetch<SessionSummary[]>('/api/strokes')).some(s => s.id === sessionId),
+      (await $fetch<SessionSummary[]>('/api/sessions')).some(s => s.id === sessionId),
     setInvocation: invocationWriter(sessionId),
     // ストロークの1回の実行は必ず提出（A5・A7）で終わる。プロセスが正常終了しても
-    // 提出が1つも無ければ、作業をせずに終わったということなので起こし直す。
-    didWork: submittedSince(sessionId),
+    // 提出が1つも無ければ、作業をせずに終わったということなので起動し直す。単位は起動
+    // （接続 token）——決着（下の `settle`）が「何が提出されたか」を要るので揃えてある。
+    didWork: submittedByLaunch(token),
+    // 実行の決着。提出されたものに応じて phase を切り替え、画面へ配信する（A9）。
+    // **ストロークだけが持つ。** steering の決着に当たるのは完成の記録（U15）である。
+    settle: settlement(sessionId, token),
     prepare: () => initSessionOpenspec({
       cwd,
       bin: openspec.bin,
@@ -277,7 +413,7 @@ export function buildRun(options: {
 }
 
 /**
- * 自前 MCP サーバー（provide-operations-via-mcp）を起こす `--mcp-config` の1エントリ。
+ * 自前 MCP サーバー（provide-operations-via-mcp）を起動する `--mcp-config` の1エントリ。
  *
  * url は `buildRun` が実際の待ち受けから組み立てた `apiBaseUrl`（`listen-address.ts`）を
  * 渡り受けて組み立てる。設定の固定値は使わない（provide-operations-via-mcp 続き）。
@@ -289,9 +425,9 @@ export function buildRun(options: {
  *
  * **`x-stroke-cwd` はサーバーが読まないヘッダである。** 起動時の後始末（`reap-match.ts`）が
  * 走っている claude を argv で照合するとき、steering の手がかりは cwd の JSON 文字列が
- * argv に含まれるかどうかである。かつては本家 MCP エントリの `npx` 引数に cwd が載って
- * いたが、その配線を外した（`mcpConfigFor`）ので、代わりにここで argv へ残す
- * （update-project-generation-via-upstream-rest design D4）。
+ * argv に含まれるかどうかである。本家 MCP エントリ（`mcpConfigFor`）の `npx` 引数にも
+ * 同じ cwd が載るが、照合はこのヘッダに拠る——本家の配線が変わっても照合が壊れないように
+ * するため（update-invoke-agent-responsibility-boundary design D4）。
  *
  * ヘッダの値は HTTP の制約で ASCII に限る。cwd は `projectShareRoot`（既定 `/opt/projects`）の
  * 直下で、名前は uuid かプロジェクト名（`project.ts` の `PROJECT_NAME_PATTERN`、ASCII のみ）
@@ -326,22 +462,35 @@ function mcpToolConfigFor(token: string, apiBaseUrl: string, cwd: string): strin
 }
 
 /**
- * steering 工程の `--mcp-config`。自前 MCP サーバーのみを持つ。
+ * steering 工程の `--mcp-config`。自前 MCP サーバーと、本家 `spec-workflow-mcp` を持つ。
  *
- * `--mcp-config` は JSON 文字列を直接受け取れる（実機確認済み・design.md D7）。
+ * `--mcp-config` は JSON 文字列を直接受け取れる（実機確認済み・provide-operations-via-mcp
+ * design D7）。
  *
- * **本家 `spec-workflow-mcp` は並べない。** かつては `npx -y @pimzino/spec-workflow-mcp@latest
- * <cwd>` を `SPEC_WORKFLOW_HOME` 付きで並べ、その起動時の自己登録でプロジェクトが本家に
- * 現れていた——プロジェクトの生成が AI のプロセスに乗っていた。生成は P2
- * （`POST /api/projects`）が本家 REST へ依頼するものになり、`kick` が AI を起動する前に
- * 済ませる。配線を外した後、claude はプロジェクトを本家に登録する手段を持たない
- * （openspec/specs/project/generation「AI のプロセスにプロジェクトを生成させてはならない」・
- * update-project-generation-via-upstream-rest design D3）。
+ * **本家 MCP を並べる目的は承認依頼を出すことである。** 本家 REST に承認依頼を作る
+ * route は無く、作れるのは本家 MCP の `approvals` ツールなので、steering 工程に並べて
+ * そのツールを許可する（`STEERING_ALLOWED_TOOLS`。docs/specs/mcp/contract.md
+ * 「本家 spec-workflow の MCP との関係」）。
+ *
+ * 本家 MCP は起動時に登録簿へ自己登録するが、`kick` が P2（`POST /api/projects`）で生成を
+ * 済ませてから AI を起動するので、登録済みのパスへの自己登録は同じ projectId を返すだけで
+ * 生成にはならない（openspec/specs/project/generation「昇格したプロジェクトを本家に
+ * 存在させるのは生成の依頼だけであり、AI のプロセスではない」）。
+ *
+ * `SPEC_WORKFLOW_HOME` はポータルが登録簿を読むのと同じ値（`readServerConfig`）を渡す。
+ * ずらすと承認依頼が別の登録簿のプロジェクトに立つ（docs/specs/core/settings-reference.md
+ * 「ポータル側」）。
  */
 function mcpConfigFor(cwd: string, token: string, apiBaseUrl: string): string {
   return JSON.stringify({
     mcpServers: {
       [MCP_SERVER_NAME]: mcpToolServerEntry(token, apiBaseUrl, 'steering', cwd),
+      [UPSTREAM_MCP_SERVER_NAME]: {
+        type: 'stdio',
+        command: 'npx',
+        args: ['-y', '@pimzino/spec-workflow-mcp@latest', cwd],
+        env: { SPEC_WORKFLOW_HOME: readServerConfig().specWorkflowHome },
+      },
     },
   })
 }
@@ -361,11 +510,14 @@ async function generateProject(cwd: string): Promise<void> {
 }
 
 /**
- * 材料を組み立てて起こす。結果は待たない。
+ * 材料を組み立てて起動する。結果は待たない。
  *
- * spawn 直前に接続表 token を発行・登録し（provide-operations-via-mcp design.md「接続の
- * 担保」）、実行終了時（正常・異常とも——`buildRun` が同期的に throw する経路も含む）に
- * 削除する。**削除は `settled` の1本に集約する**
+ * **接続表 token の発行・登録・失効は invoke-agent（ここ）の責務である**
+ * （openspec/specs/server/session-management・`docs/specs/architecture/invoke-agent.md`）。
+ * spawn 直前に発行・登録し（provide-operations-via-mcp design.md「接続の担保」）、実行
+ * 終了時（正常・異常とも——`buildRun` が同期的に throw する経路も含む）に削除する。MCP
+ * ツールは `x-stroke-token` を接続表で解決するだけで、発行にも失効にも関与しない。
+ * **削除は `settled` の1本に集約する**
  * （fix-idle-stuck-on-run-build-failure design.md「接続の担保」・Risks）。
  *
  * `buildRun` の呼び出しは `invokeAi` の内側へ移した。ここで渡すのは組み立て済みの
@@ -374,9 +526,11 @@ async function generateProject(cwd: string): Promise<void> {
  * であって `kick` ではない（design.md D1「書き込むのは invokeAi だけ」）。
  *
  * **steering の組み立て方は、材料を返す前に生成（P2）を依頼する。** 初回か継続かを問わず
- * 起動のたびに依頼する——本家の登録は dashboard の再起動で消え、本家 MCP の自己登録を
- * 外した今、戻す道はこれだけである。受理されなければ材料を返さず reject し、AI は起動
- * しない（update-project-generation-via-upstream-rest design D2）。
+ * 起動のたびに依頼する——本家の登録は dashboard の再起動で消え、それを戻す道はここだけで
+ * ある。本家 MCP は承認依頼のためにだけ並べ（`mcpConfigFor`）、生成が受理される前に本家
+ * MCP を含めた起動定義で AI を起動しない。受理されなければ材料を返さず reject し、AI は
+ * 起動しない（update-project-generation-via-upstream-rest design D2・
+ * update-invoke-agent-responsibility-boundary design D4）。
  *
  * **戻り値は2つの完結点を持つ。**
  *
@@ -410,15 +564,11 @@ export function kick(options: {
   const { built, settled } = invokeAi(options.sessionId, options.retries, build)
 
   // 削除は settled の1本に集約する（fix-idle-stuck-on-run-build-failure design.md
-  // 「接続の担保」）。起動単位の提出記録（steering）も同じ寿命で捨てる——次の起動が
-  // 前の起動の提出を自分の作業として数えないようにするため（fix-steering-empty-completion
-  // design.md D1「記録は removeConnection(token) と同じ `.finally` で捨てる」）。
-  // flontier の起動でも forgetLaunchSubmission は無害（何も記録されていないので no-op）。
+  // 「接続の担保」）。token の寿命はこの起動と1対1で、ここで失効させる以外に消す者は居ない。
   return {
     built,
     settled: settled.finally(() => {
       removeConnection(token)
-      forgetLaunchSubmission(token)
     }),
   }
 }

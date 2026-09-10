@@ -1,6 +1,4 @@
-import { expect, test } from '@playwright/test';
-
-import { ALPHA, BETA, resetBoard, stub } from './support';
+import { ALPHA, BETA, expect, resetBoard, stub, test } from './support';
 
 /**
  * 通知の発生から一覧・トースト・飛び先まで（specs/notification-feed, notification-toast）。

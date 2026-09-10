@@ -3,9 +3,8 @@ import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { expect, test } from '@playwright/test';
-
 import { PROJECTS_PARENT, SEEDED_PROJECT_NAME, SEEDED_SESSION_ID } from '../../playwright.config';
+import { expect, test } from './support';
 
 /** 本家と同じ式で導く（design.md D13）。承認で作ったものは workspace のパスが生成先に等しい */
 const SEEDED_PROJECT_ID = createHash('sha1')
@@ -28,6 +27,21 @@ test.describe.configure({ mode: 'serial' });
 
 test.describe('承認して一覧へ戻る', () => {
   /**
+   * この spec が始まるまでにスタブへ届いていた登録の件数。
+   *
+   * **他の spec が残した登録を数えない。** `proposal-persistence.spec.ts` も昇格まで進むので、
+   * その steering の起動が依頼した登録がスタブに残ったまま、こちらの番になる（実測 2026-09-09:
+   * 「届いた依頼がすべて昇格先のパス」が他の spec の依頼で落ちた）。スタブの計数を戻して
+   * しまうと他の spec の前提を壊すので、**引き算で自分の分だけを見る。**
+   */
+  let registeredBeforeSpec = 0;
+
+  test.beforeAll(async () => {
+    const { stub } = await import('./support');
+    registeredBeforeSpec = (await stub.stats()).registrations.length;
+  });
+
+  /**
    * 昇格したものを残さない。
    *
    * 昇格したディレクトリが保存先に居座ると、**次の実行から一覧に出る**
@@ -44,14 +58,14 @@ test.describe('承認して一覧へ戻る', () => {
    * 昇格の前なら取り下げられる。画面の承認（次のテスト）はこの3段を順に踏む。
    */
   test('承認の判断だけではプロジェクトにならず、昇格の前なら取り下げられる', async ({ request }) => {
-    const approve = `/api/strokes/${SEEDED_SESSION_ID}/approve`;
+    const approve = `/api/sessions/${SEEDED_SESSION_ID}/approve`;
 
     // 段1: 判断を記録する。ディレクトリは改名されず、phase も動かない
     const decided = await request.post(approve, { data: { projectName: SEEDED_PROJECT_NAME } });
     expect(decided.status()).toBe(204);
     expect(existsSync(join(PROJECTS_PARENT, SEEDED_SESSION_ID))).toBe(true);
     expect(existsSync(join(PROJECTS_PARENT, SEEDED_PROJECT_NAME))).toBe(false);
-    const status = (await (await request.get(`/api/strokes/${SEEDED_SESSION_ID}`)).json()) as { phase: string };
+    const status = (await (await request.get(`/api/sessions/${SEEDED_SESSION_ID}`)).json()) as { phase: string };
     expect(status.phase).toBe('proposed');
 
     // プロジェクト一覧には生成中としても現れない
@@ -72,7 +86,7 @@ test.describe('承認して一覧へ戻る', () => {
     expect(existsSync(join(PROJECTS_PARENT, SEEDED_SESSION_ID, 'strokes.json'))).toBe(true);
 
     // 判断が無ければ昇格は受理されない。承認が唯一の引き金
-    const refused = await request.post(`/api/strokes/${SEEDED_SESSION_ID}/promote`);
+    const refused = await request.post(`/api/sessions/${SEEDED_SESSION_ID}/promote`);
     expect(refused.status()).toBe(409);
     expect(existsSync(join(PROJECTS_PARENT, SEEDED_PROJECT_NAME))).toBe(false);
 
@@ -114,6 +128,8 @@ test.describe('承認して一覧へ戻る', () => {
     const response = await request.delete(`/api/sessions/${SEEDED_PROJECT_NAME}`);
 
     expect(response.status()).toBe(409);
+    // 断る理由は phase（承認済みはこの口の対象ではない）。実行中を理由に断ることは無い
+    expect(((await response.json()) as { data?: { reason?: string } }).data?.reason).toBe('phase');
     expect(existsSync(join(PROJECTS_PARENT, SEEDED_PROJECT_NAME))).toBe(true);
   });
 
@@ -134,8 +150,8 @@ test.describe('承認して一覧へ戻る', () => {
    * specs/agent/invocation。change `update-project-generation-via-upstream-rest`）。
    *
    * 昇格の成功を見た画面が U13 を叩き、その起動の材料の組み立てが AI を起動する前に P2
-   * （`POST /api/projects`）で本家へ登録を依頼する。claude は `/bin/true` に差し替えてあるので、
-   * 登録がスタブに届いたなら、それは P2 から来たものである。
+   * （`POST /api/projects`）で本家へ登録を依頼する。claude はスタブに差し替えてあり、台本を
+   * 置いていないこの対象では何もせずに終わるので、登録がスタブに届いたなら P2 から来たものである。
    */
   test('承認して起動が要求されると、本家に昇格先のパスで登録が依頼される', async () => {
     const { stub } = await import('./support');
@@ -144,23 +160,27 @@ test.describe('承認して一覧へ戻る', () => {
     // 依頼がスタブへ届くまで待って見る。件数を固定しないのは、巡回（60秒ごと）が `failed` の
     // 対象を起こし直すたびに依頼が1件増えるためで、届いた依頼がすべて昇格先のパスであることを見る
     await expect
-      .poll(async () => (await stub.stats()).registrations.length, { timeout: 10_000 })
+      .poll(async () => (await stub.stats()).registrations.length - registeredBeforeSpec, { timeout: 10_000 })
       .toBeGreaterThanOrEqual(1);
     const { registrations } = await stub.stats();
-    expect(registrations.every((entry) => entry.projectPath === join(PROJECTS_PARENT, SEEDED_PROJECT_NAME))).toBe(true);
+    expect(
+      registrations
+        .slice(registeredBeforeSpec)
+        .every((entry) => entry.projectPath === join(PROJECTS_PARENT, SEEDED_PROJECT_NAME)),
+    ).toBe(true);
   });
 
   /**
    * **AI の起動はプロジェクトを生成しない**（削除の検証。design D6）。
    *
    * 本家が登録を受け付けない間に起動を要求すると、起動の材料を組み立てられず（503）、AI は
-   * 起動されず `invocation` は `failed` になる。登録は増えない。起動定義に本家 MCP は無いので、
-   * 起動しても本家に登録される道は無い——受け付けるようになった後の起動で、P2 からの登録が
-   * 1件増えるだけである。
+   * 起動されず `invocation` は `failed` になる。登録は増えない。生成が受理されなければ AI は
+   * 起動されないので、起動定義に並ぶ本家 MCP が自己登録する機会は無い——受け付けるように
+   * なった後の起動で、P2 からの登録が1件増えるだけである。
    */
   test('本家が登録を受け付けなければ起動は 503 で止まり、登録は増えない', async ({ request }) => {
     const { stub } = await import('./support');
-    const target = `/api/strokes/${SEEDED_PROJECT_NAME}`;
+    const target = `/api/sessions/${SEEDED_PROJECT_NAME}`;
     const cwd = join(PROJECTS_PARENT, SEEDED_PROJECT_NAME);
 
     type Status = { invocation: string };
@@ -174,19 +194,23 @@ test.describe('承認して一覧へ戻る', () => {
     // 断っている間はどの起動要求も登録を増やさない（スタブは断った依頼を数えない）ので、基準が安定する
     await stub.refuseRegistration(true);
     try {
-      // 前の起動（画面が要求したもの。claude は `/bin/true` なので提出が無く `failed`）が畳まれるのを待つ
+      // 前の起動（画面が要求したもの。claude のスタブは台本が無ければ何もしないので、提出が無く
+      // `failed`）が畳まれるのを待つ
       await expect.poll(async () => (await readStatus()).invocation, { timeout: 10_000 }).not.toBe('running');
       const retriesBefore = readRetries();
       const registeredBefore = (await stub.stats()).registrations.length;
 
-      // 巡回の起こし直しが走っている瞬間は busy（409）で断られるので、503 が返るまで要求する
+      // **起動の要求は冪等なので、断られることは無い**（openspec/specs/api/session/invoke-agent。
+      // change fix-rename-during-running-session）。巡回の起こし直しが走っている瞬間に当たると、
+      // その要求は既に満たされているものとして 200 が返り、新しい呼び出しは始まらない。組み立ての
+      // 失敗（503）を見たいので、自分の要求が起動になるまで出し直す
       await expect
         .poll(async () => (await request.get(`${target}/invoke-agent`, { params: { cwd } })).status(), { timeout: 10_000 })
         .toBe(503);
 
       // 「起動の材料を組み立てられない」は起こし直しの回数を進めて `failed`（上限に達していれば
       // `error`）を書く（`ai.ts` の `recordBuildFailure`）。U13 の 503 は記録の書き込みより先に返るので、
-      // 待って見る。巡回が同じ窓で起こし直すこともあるので、回数は「増えた」ことだけを見る
+      // 待って見る。巡回が同じ間に起動し直すこともあるので、回数は「増えた」ことだけを見る
       // 上限に達した記録（`error`）は回数を進めないので、回数の増加か `error` への到達のどちらかを待つ
       await expect
         .poll(async () => readRetries() > retriesBefore || (await readStatus()).invocation === 'error', { timeout: 10_000 })
@@ -197,16 +221,27 @@ test.describe('承認して一覧へ戻る', () => {
       await stub.refuseRegistration(false);
     }
 
-    // 受け付けるようになれば、起動のたびに依頼し直す（続きの起動でも）。断られた実行の
-    // 後始末（busy ガードの解放）が済むまで 409 が返りうるので、200 になるまで要求する。
-    // 上限に達して `error` になっていれば `reset` で回数を戻して起こす（ユーザーの再実行と同じ口）
+    // 受け付けるようになれば、起動のたびに依頼し直す（続きの起動でも）。上限に達して `error` に
+    // なっていれば `reset` で回数を戻して起こす（ユーザーの再実行と同じ口）。
+    //
+    // **要求は冪等なので、登録が増えるまで出し直す。** 直前の実行の後始末がまだ済んでいない間の
+    // 要求は 200 のまま新しい呼び出しを始めないので、1回で登録が増えるとは限らない。かつては
+    // その窓で 409（busy）が返っていたが、その応答は契約から無くなった
+    // （change fix-rename-during-running-session）
     const registeredWhileRefused = (await stub.stats()).registrations.length;
+    const runStatuses = new Set<number>();
     await expect
-      .poll(async () => (await request.get(`${target}/invoke-agent`, { params: { cwd, reset: '1' } })).status(), { timeout: 10_000 })
-      .toBe(200);
-    await expect
-      .poll(async () => (await stub.stats()).registrations.length, { timeout: 10_000 })
+      .poll(
+        async () => {
+          const response = await request.get(`${target}/invoke-agent`, { params: { cwd, reset: '1' } });
+          runStatuses.add(response.status());
+          return (await stub.stats()).registrations.length;
+        },
+        { timeout: 10_000 },
+      )
       .toBeGreaterThanOrEqual(registeredWhileRefused + 1);
+    // 出し直した要求はどれも受理されている。実行中を理由に断られた回は1つも無い
+    expect([...runStatuses]).toEqual([200]);
     expect((await stub.stats()).registrations.at(-1)).toEqual({ projectPath: cwd });
   });
 
@@ -383,6 +418,8 @@ test.describe('承認して一覧へ戻る', () => {
     // あって `.spec-workflow/` の有無ではない（specs/api/project/delete）
     const refused = await request.delete(path);
     expect(refused.status()).toBe(409);
+    // ここも理由は phase。削除は実行中かどうかを見ない（specs/api/project/delete）
+    expect(((await refused.json()) as { data?: { reason?: string } }).data?.reason).toBe('phase');
     expect(existsSync(join(PROJECTS_PARENT, SEEDED_PROJECT_NAME))).toBe(true);
   });
 });

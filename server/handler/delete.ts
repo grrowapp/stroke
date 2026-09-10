@@ -1,6 +1,7 @@
 import fse from 'fs-extra'
 import { stat } from 'node:fs/promises'
 import { join } from 'node:path'
+import { SESSION_FILES, isSafeSegment } from '../utils/stroke/paths'
 
 /**
  * 保存先直下の1つを消す実行。
@@ -12,8 +13,10 @@ import { join } from 'node:path'
  * **呼び出し元を知らせて分岐させない。** ここに「セッションから来たのか」を渡して条件を
  * 変えると、実行が呼び出し元を知ることになり、局面が増えるたびにここが太る。
  *
- * CLI（`yarn session delete`）はここを通らず `deleteSessionCore` を直に呼ぶ。判定を持たない
- * 素通しの口として残してある。
+ * **消す実行はこの1本だけである。** endpoint（U11・P1）も CLI（`yarn session delete`）も
+ * 検証の道具（`yarn check:stroke`）もここを通る。かつて `session-core.ts` に
+ * `deleteSessionCore` / `removeSessionDir` という同じ実装が並んでいたが、
+ * `update-session-api-handler` で畳んだ。
  */
 
 export type DeleteErrorKind = 'not-found' | 'io'
@@ -29,19 +32,16 @@ export class DeleteError extends Error {
 }
 
 /**
- * 保存先の直下の1つとして、ディレクトリ名にそのまま使える形か。
+ * `state.json` が在ることをもって、対象として在るとする。
  *
- * **保存先の外へ出られる形を通さない**ことだけを見る。緩めれば保存先の外を消せてしまう。
+ * **「在る」の定義はこの1つである。** 消す前の確認（U11・P1・CLI）も、セッションとして
+ * 成立しているかの確認（`session-store.ts` の `sessionExists`）も同じものを見る。
+ * 名前の形（保存先の外へ出られないこと）は `isSafeSegment` が見る（`utils/stroke/paths.ts`）。
  */
-export function isSafeSegment(value: string): boolean {
-  return /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value) && !value.includes('..')
-}
-
-/** `state.json` が在ることをもって、消せる対象として在るとする */
 export async function targetExists(root: string, name: string): Promise<boolean> {
   if (!isSafeSegment(name)) return false
   try {
-    return (await stat(join(root, name, 'state.json'))).isFile()
+    return (await stat(join(root, name, SESSION_FILES.state))).isFile()
   } catch {
     return false
   }

@@ -69,7 +69,7 @@ function makeRun(overrides: Partial<AiRun> = {}): {
     setInvocation: async (invocation, retries) => {
       calls.push({ invocation, retries })
     },
-    didWork: () => true,
+    didWork: async () => true,
     remember: async (id) => {
       remembered.push(id)
     },
@@ -186,16 +186,117 @@ describe('invokeAi', () => {
   it('プロセスは成功したが作業をしていなければ failed にする', async () => {
     // ai.ts は kind を知らず、渡された `didWork` の真偽値しか見ない。ストロークは
     // 必ず提出（A5・A7）で終わるので提出が無ければ作業をしていない（invoke.ts の
-    // submittedSince）。steering は steering 文書の提出が代行先に受理されたかを
-    // 起動単位の記録で見る（invoke.ts の submittedByLaunch。
-    // fix-steering-empty-completion）。どちらも呼び出し側が渡す関数が false を返せば
-    // ここは同じく failed になる——この既存のケースは工程を問わず成立する（tasks 4.6）
+    // submittedSince）。steering は実行の終わりに本家 REST へ問い合わせ、3本の文書と
+    // 承認依頼が本家に在るかで見る（invoke.ts の steeringCompletedUpstream。
+    // update-invoke-agent-responsibility-boundary）。どちらも呼び出し側が渡す関数が
+    // false を返せばここは同じく failed になる——このケースは工程を問わず成立する
     runClaude.mockResolvedValue({ ok: true, sessionId: 'x' })
 
-    const { run, calls } = makeRun({ didWork: () => false })
+    const { run, calls } = makeRun({ didWork: async () => false })
     await runInvoke(run)
 
     expect(calls.at(-1)).toEqual({ invocation: 'failed', retries: undefined })
+  })
+
+  /**
+   * 実行の決着（change fix-rename-during-running-session）。`didWork` と同じ置き方で、
+   * 渡されていて**かつ作業があったとき**だけ呼ぶ。ai.ts は何が提出されたかを知らず、
+   * 渡された関数の真偽値しか見ない。
+   *
+   * **局面が動くのはここだけである。** 提出を受ける口（A5・A7）は記録だけを行い、phase の
+   * 切り替えと画面への配信は決着が持つ。`idle` にする前に置くのは、承認できる局面が立つ
+   * 時点を実行の終わりに揃えるためである。
+   */
+  describe('実行の決着（settle）', () => {
+    it('作業ありで決着できれば idle（回数は戻す）', async () => {
+      runClaude.mockResolvedValue({ ok: true, sessionId: 'x' })
+      const settle = vi.fn(async () => true)
+
+      const { run, calls } = makeRun({ didWork: () => true, settle })
+      await runInvoke(run)
+
+      expect(settle).toHaveBeenCalledTimes(1)
+      expect(calls.at(-1)).toEqual({ invocation: 'idle', retries: 0 })
+    })
+
+    it('決着は `idle` を書く前に起こる', async () => {
+      // 局面が動いてから実行が終わる。逆だと、承認できる局面が立つ前に `idle` になる
+      runClaude.mockResolvedValue({ ok: true, sessionId: 'x' })
+      const order: string[] = []
+      const settle = vi.fn(async () => {
+        order.push('settle')
+        return true
+      })
+
+      const { run } = makeRun({
+        didWork: () => true,
+        settle,
+        setInvocation: async (invocation) => {
+          order.push(invocation)
+        },
+      })
+      await runInvoke(run)
+
+      expect(order).toEqual(['running', 'settle', 'idle'])
+    })
+
+    it('作業ありでも決着できなければ failed（巡回が起こし直す）', async () => {
+      runClaude.mockResolvedValue({ ok: true, sessionId: 'x' })
+
+      const { run, calls } = makeRun({ didWork: () => true, settle: async () => false })
+      await runInvoke(run)
+
+      expect(calls.at(-1)).toEqual({ invocation: 'failed', retries: undefined })
+    })
+
+    it('渡されていなければ決着を試みず idle（steering）', async () => {
+      runClaude.mockResolvedValue({ ok: true, sessionId: 'x' })
+
+      const { run, calls } = makeRun({ didWork: () => true, settle: undefined })
+      await runInvoke(run)
+
+      expect(calls.at(-1)).toEqual({ invocation: 'idle', retries: 0 })
+    })
+
+    it('作業が無ければ決着を試みず failed', async () => {
+      runClaude.mockResolvedValue({ ok: true, sessionId: 'x' })
+      const settle = vi.fn(async () => true)
+
+      const { run, calls } = makeRun({ didWork: () => false, settle })
+      await runInvoke(run)
+
+      expect(settle).not.toHaveBeenCalled()
+      expect(calls.at(-1)).toEqual({ invocation: 'failed', retries: undefined })
+    })
+
+    it('プロセスが失敗したら決着を試みない（提出は記録として残るが局面は動かない）', async () => {
+      runClaude.mockResolvedValue({ ok: false, detail: 'timeout', sessionMissing: false })
+      const settle = vi.fn(async () => true)
+
+      const { run, calls } = makeRun({ settle })
+      await runInvoke(run)
+
+      expect(settle).not.toHaveBeenCalled()
+      expect(calls.at(-1)).toEqual({ invocation: 'failed', retries: undefined })
+    })
+
+    it('決着は完成の記録より先に起こる', async () => {
+      runClaude.mockResolvedValue({ ok: true, sessionId: 'x' })
+      const order: string[] = []
+      const settle = vi.fn(async () => {
+        order.push('settle')
+        return true
+      })
+      const recordCompletion = vi.fn(async () => {
+        order.push('record')
+        return true
+      })
+
+      const { run } = makeRun({ didWork: () => true, settle, recordCompletion })
+      await runInvoke(run)
+
+      expect(order).toEqual(['settle', 'record'])
+    })
   })
 
   /**
@@ -203,8 +304,8 @@ describe('invokeAi', () => {
    * **かつ作業があったとき**だけ呼ぶ。ai.ts は phase を知らず、渡された関数の真偽値しか
    * 見ない。
    *
-   * **`didWork` を先に見る。** 完成したかを決めるのは `didWork`（その起動で steering 文書の
-   * 提出が本家に受理されたか）で、記録先の U15 は判定を持たない（ADR-0014）。記録の受理を
+   * **`didWork` を先に見る。** 完成したかを決めるのは `didWork`（3本の文書と承認依頼が
+   * 本家に在るか）で、記録先の U15 は判定を持たない（ADR-0014）。記録の受理を
    * 完成の判定に代える形は 2026-09-04 に退けた——U15 が承認依頼を数えていた時の理屈である。
    */
   describe('完成の記録（recordCompletion）', () => {
@@ -212,7 +313,7 @@ describe('invokeAi', () => {
       runClaude.mockResolvedValue({ ok: true, sessionId: 'x' })
       const recordCompletion = vi.fn(async () => true)
 
-      const { run, calls } = makeRun({ didWork: () => true, recordCompletion })
+      const { run, calls } = makeRun({ didWork: async () => true, recordCompletion })
       await runInvoke(run)
 
       expect(recordCompletion).toHaveBeenCalledTimes(1)
@@ -222,7 +323,7 @@ describe('invokeAi', () => {
     it('作業ありでも記録が受理されなければ failed（巡回が起こし直す）', async () => {
       runClaude.mockResolvedValue({ ok: true, sessionId: 'x' })
 
-      const { run, calls } = makeRun({ didWork: () => true, recordCompletion: async () => false })
+      const { run, calls } = makeRun({ didWork: async () => true, recordCompletion: async () => false })
       await runInvoke(run)
 
       expect(calls.at(-1)).toEqual({ invocation: 'failed', retries: undefined })
@@ -231,7 +332,7 @@ describe('invokeAi', () => {
     it('渡されていなければ記録を試みず idle（ストローク・完成済みの steering）', async () => {
       runClaude.mockResolvedValue({ ok: true, sessionId: 'x' })
 
-      const { run, calls } = makeRun({ didWork: () => true, recordCompletion: undefined })
+      const { run, calls } = makeRun({ didWork: async () => true, recordCompletion: undefined })
       await runInvoke(run)
 
       expect(calls.at(-1)).toEqual({ invocation: 'idle', retries: 0 })
@@ -243,7 +344,7 @@ describe('invokeAi', () => {
       runClaude.mockResolvedValue({ ok: true, sessionId: 'x' })
       const recordCompletion = vi.fn(async () => true)
 
-      const { run, calls } = makeRun({ didWork: () => false, recordCompletion })
+      const { run, calls } = makeRun({ didWork: async () => false, recordCompletion })
       await runInvoke(run)
 
       expect(recordCompletion).not.toHaveBeenCalled()
@@ -458,7 +559,7 @@ describe('invokeAi の組み立て失敗', () => {
       timeoutStepMs: 0,
       hasConversation: async () => false,
       setInvocation: async (invocation, retries) => { calls.push({ invocation, retries }) },
-      didWork: () => true,
+      didWork: async () => true,
     }
     const { built, settled } = invokeAi(SESSION_ID, 0, async () => run)
 

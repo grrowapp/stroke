@@ -1,0 +1,4 @@
+schema: specs-with-grill
+created: 2026-09-09
+skip_specs: true
+note: 置き方の物差しは既存 capability server/api-layout（fix-project-api-layout が新設）。要件は変わらないので delta を持たない

@@ -27,6 +27,8 @@ MCP サーバーは stroke-board の route `/mcp`（Streamable HTTP）で提供�
 
 絞りは起動側が接続ごとに指定する SHALL——ツールの側で工程を判定して拒否する形にしてはならない（MUST NOT）。呼べないものを見せてから失敗させると、呼び手は失敗するまで判別できない。
 
+この絞りが掛かるのは stroke-board 自身の MCP サーバーの一覧である SHALL。steering 工程に併せて配線される本家 spec-workflow の MCP（`agent/invocation` が定める。承認依頼のツール `approvals` を許可する）は別のサーバーであり、そのツールは上の一覧に数えず、`mcp/server` の結果の形にも従わない SHALL。
+
 #### Scenario: flontier 工程に steering のツールが見えない
 
 - **GIVEN** flontier 工程の claude が起動している
@@ -50,6 +52,12 @@ MCP サーバーは stroke-board の route `/mcp`（Streamable HTTP）で提供�
 - **GIVEN** steering 工程の接続で `/mcp` に繋いでいる
 - **WHEN** ツールの一覧を取る
 - **THEN** `get-steering-guide` が現れ、`get-guide` は現れない
+
+#### Scenario: 本家のツールは stroke-board の一覧に数えない
+
+- **GIVEN** steering 工程の claude が起動している
+- **WHEN** stroke-board の MCP サーバーの接続でツールの一覧を取る
+- **THEN** 一覧は `get-steering-guide` / `get-steering` / `submit-document` の3本で、本家の `approvals` はこの一覧に無い（本家の MCP は別のサーバーとして配線されている）
 
 ### Requirement: 結果は status と errorCode のフラットな形で返す
 
