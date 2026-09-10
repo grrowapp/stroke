@@ -11,8 +11,9 @@
 import { createError, defineEventHandler, getRouterParam, readBody } from 'h3';
 import { z } from 'zod';
 
+import { saveSteeringDocument } from '../../../../../handler/project-document';
 import { isSteeringDocument } from '../../../../../utils/upstream/rest';
-import { toHttpError, upstreamClient } from '../../../../../utils/control/upstream-proxy';
+import { toHttpError } from '../../../../../utils/control/upstream-proxy';
 
 const bodySchema = z.object({
   content: z.string(),
@@ -33,7 +34,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'invalid-body' });
   }
 
-  const result = await upstreamClient().saveSteeringDocument(projectId, name, parsed.data.content);
+  const result = await saveSteeringDocument(projectId, name, parsed.data.content);
 
   if (!result.ok) throw toHttpError(result.failure);
 

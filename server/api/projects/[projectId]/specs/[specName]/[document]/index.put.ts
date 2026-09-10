@@ -12,8 +12,9 @@
 import { createError, defineEventHandler, getRouterParam, readBody } from 'h3';
 import { z } from 'zod';
 
+import { saveSpecDocument } from '../../../../../../handler/project-document';
 import { isSpecDocumentName } from '../../../../../../utils/upstream/schema';
-import { toHttpError, upstreamClient } from '../../../../../../utils/control/upstream-proxy';
+import { toHttpError } from '../../../../../../utils/control/upstream-proxy';
 
 /**
  * 本家は body の `content` をファイルの中身として丸ごと書く。
@@ -40,12 +41,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'invalid-body' });
   }
 
-  const result = await upstreamClient().saveSpecDocument(
-    projectId,
-    specName,
-    document,
-    parsed.data.content,
-  );
+  const result = await saveSpecDocument(projectId, specName, document, parsed.data.content);
 
   if (!result.ok) throw toHttpError(result.failure);
 

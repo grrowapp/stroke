@@ -1,14 +1,10 @@
-import { readdir } from 'node:fs/promises'
-import { join } from 'node:path'
-
 import type { Phase } from '#shared/stroke'
-import { DeleteError, removeTarget } from '../../../handler/delete'
+import { removeTarget } from '../../../handler/delete'
+import { resolveProjectName } from '../../../handler/project-directory'
 import { readStrokeConfig } from '../../../utils/stroke/config'
-import { conflict } from '../../../utils/stroke/conflict'
-import { isSafeSegment } from '../../../utils/stroke/paths'
+import { conflict, deleteErrorToHttp } from '../../../utils/stroke/conflict'
 import { isRunning, projectRunPath } from '../../../utils/stroke/running'
 import { readState, type SessionState } from '../../../utils/stroke/session-store'
-import { deriveProjectId } from '../../../utils/upstream/project-id'
 
 /**
  * プロジェクトを消す（`openspec/specs/api/project/delete`）。
@@ -21,14 +17,15 @@ import { deriveProjectId } from '../../../utils/upstream/project-id'
  * ここでは受理しない——セッションの削除が扱う。
  *
  * **完成したプロジェクト（`activated`）は消さない。** それは steering が文書を出し終え、
- * レビューできる状態に達した実体で、この口が扱う対象ではない。この口は「作りきれずに
- * 終わったもの」を片付けるためにある。**根拠は phase であって `.spec-workflow/` の有無では
- * ない**——そのディレクトリは生成（P2）の依頼を本家が受理したときにでき、AI が起動する前から
- * 在るので、作りきれなかったプロジェクトも持っている。有無で断ると、失敗の決着で「破棄する」を選んだものが消せず一覧に居座る
- * （add-activated-phase design D5）。
+ * レビューできる状態に達した実体で、この endpoint が扱う対象ではない。ここが扱うのは
+ * 「作りきれずに終わったもの」の片付けである。**根拠は phase であって `.spec-workflow/` の
+ * 有無ではない**——そのディレクトリは生成（P2）の依頼を本家が受理したときにでき、AI が
+ * 起動する前から在るので、作りきれなかったプロジェクトも持っている。有無で断ると、失敗の
+ * 決着で「破棄する」を選んだものが消せず一覧に居座る（add-activated-phase design D5）。
  *
- * つまりこの口が消すのは `approved` だけである（下の `DELETABLE`）。判定は endpoint が持ち、
- * 消す動作（`handler/delete`）は判定を持たない。phase は `readState`（zod）で読み、
+ * つまりこの endpoint が消すのは `approved` だけである（下の `DELETABLE`）。**どの局面を
+ * 許すかはここが自分の literal で持ち**、消す動作（`handler/delete`）も名前を引く走査
+ * （`handler/project-directory`）も判定を持たない。phase は `readState`（zod）で読み、
  * **壊れた `state.json` は消さない**。
  *
  * 対象は `projectId` で指す。本家の id は workspace のパスから作られ、生成中の行は
@@ -36,7 +33,7 @@ import { deriveProjectId } from '../../../utils/upstream/project-id'
  * ハッシュの性質上、**保存先を走査して導出値と突き合わせる**しかない。
  */
 
-/** この口が消してよい局面。作りきれなかったもの（生成中）だけ */
+/** この endpoint が消してよい局面。作りきれなかったもの（生成中）だけ */
 const DELETABLE: readonly Phase[] = ['approved']
 
 export default defineEventHandler(async (event): Promise<Response> => {
@@ -46,7 +43,7 @@ export default defineEventHandler(async (event): Promise<Response> => {
   }
 
   const root = readStrokeConfig().projectShareRoot
-  const name = await resolveName(root, projectId)
+  const name = await resolveProjectName(root, projectId)
   if (name === null) {
     throw createError({
       statusCode: 404,
@@ -57,7 +54,7 @@ export default defineEventHandler(async (event): Promise<Response> => {
 
   // busy 判定の単位は起動（U13）・セッションの削除（U11）・承認（U10）と同じ1つの事実
   // （作業場所ディレクトリの実体）——単位の定義は `running.ts` に集約してあり、
-  // 口ごとに数え直さない（fix-rename-during-running-session）。
+  // endpoint ごとに数え直さない（fix-rename-during-running-session）。
   if (await isRunning(projectRunPath(root, name))) {
     throw conflict('busy', 'このプロジェクトは AI の応答を待っている。完了するまで削除は受け付けない。')
   }
@@ -78,43 +75,8 @@ export default defineEventHandler(async (event): Promise<Response> => {
   try {
     await removeTarget(root, name)
   } catch (error) {
-    throw toHttp(error)
+    throw deleteErrorToHttp(error)
   }
 
   return new Response(null, { status: 204 })
 })
-
-/**
- * `projectId` から保存先直下の名前を引く。
- *
- * ハッシュは戻せないので、直下を走査して**導出値が一致するもの**を探す。件数は保存先の
- * 直下の数だけで、走査そのものは一覧の組み立てでも毎回行っている規模である。
- */
-async function resolveName(root: string | null, projectId: string): Promise<string | null> {
-  if (root === null) return null
-
-  let entries
-  try {
-    entries = await readdir(root, { withFileTypes: true })
-  } catch {
-    return null
-  }
-
-  for (const entry of entries) {
-    if (!entry.isDirectory() || !isSafeSegment(entry.name)) continue
-    if (deriveProjectId(join(root, entry.name)) === projectId) return entry.name
-  }
-
-  return null
-}
-
-function toHttp(error: unknown) {
-  if (error instanceof DeleteError && error.kind === 'not-found') {
-    return createError({ statusCode: 404, statusMessage: 'Not Found', message: error.message })
-  }
-  return createError({
-    statusCode: 500,
-    statusMessage: 'Internal Server Error',
-    message: error instanceof Error ? error.message : String(error),
-  })
-}
