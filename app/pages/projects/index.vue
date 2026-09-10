@@ -344,7 +344,8 @@ function unread(project: ProjectSummary): number | null {
       <table class="sb-table mb-8" data-testid="strokes-table">
         <thead>
           <tr>
-            <th scope="col">概要</th>
+            <!-- 出しているのはセッションの id である。概要の本文は持っていない -->
+            <th scope="col">セッション</th>
             <th scope="col" class="w-56">状態</th>
             <th scope="col" class="w-28">最終更新</th>
           </tr>

@@ -95,6 +95,13 @@ async function leave() {
 const confirmingRestart = ref(false)
 
 /**
+ * 人へ引き渡す。行き先は設定（`app/app.config.ts` の `support.contact`）が持ち、
+ * **空のあいだはこの選択肢を出さない**（`docs/specs/core/settings-reference.md`）。
+ * 押しても何も起きない道を増やさないためである。
+ */
+const support = useAppConfig().support
+
+/**
  * 最初からやり直す。**承諾を得た後にだけ呼ぶ**（`failure.md`「破壊を伴う選択肢の承諾」）。
  * 行き先は概要の入力——やり直しの起点はそこであって、消した対象の一覧ではない。
  */
@@ -218,6 +225,17 @@ async function answer(given: Answer) {
         </UButton>
         <UButton color="neutral" variant="ghost" data-testid="invocation-leave" @click="leave">
           一覧へ戻る
+        </UButton>
+        <!-- 行き先が設定されているときだけ出す。無い問い合わせ先を出さない -->
+        <UButton
+          v-if="support.contact !== ''"
+          color="neutral"
+          variant="ghost"
+          :to="support.contact"
+          external
+          data-testid="invocation-support"
+        >
+          {{ support.label }}
         </UButton>
       </template>
     </UAlert>

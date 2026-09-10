@@ -535,6 +535,10 @@ test.describe('完全な失敗の後', () => {
     await expect(page.getByTestId('invocation-leave')).toBeVisible();
     // 壊す1つは頭の位置に、警告色で分けて出る
     await expect(page.getByTestId('invocation-restart')).toBeVisible();
+
+    // 問い合わせ先は既定で空。**無い行き先は出さない**（`support.contact`）。
+    // 残る選択肢だけで「2つ以上・うち1つは壊さない」を満たしている
+    await expect(page.getByTestId('invocation-support')).toBeHidden();
   });
 
   test('一覧へ戻っても対象は残り、開き直すと同じ選択肢が出る', async ({ page, request }) => {
