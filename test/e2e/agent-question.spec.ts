@@ -570,7 +570,7 @@ test.describe('完全な失敗の後', () => {
     await expect(page.getByTestId('invocation-restart-warning')).toBeHidden();
 
     // セッションは残っている（U2 が 404 にならない）
-    const status = await request.get(`/api/strokes/${sessionId}`);
+    const status = await request.get(`/api/sessions/${sessionId}`);
     expect(status.ok(), await status.text()).toBeTruthy();
   });
 
@@ -583,7 +583,7 @@ test.describe('完全な失敗の後', () => {
     await expect(page).toHaveURL(/\/strokes$/);
     await expect(page.getByText('作りたいシステムを書く')).toBeVisible();
 
-    const status = await request.get(`/api/strokes/${sessionId}`);
+    const status = await request.get(`/api/sessions/${sessionId}`);
     expect(status.status()).toBe(404);
   });
 });

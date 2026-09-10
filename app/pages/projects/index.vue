@@ -58,7 +58,7 @@ const projects = computed<ProjectSummary[]>(() =>
  */
 const STROKES_KEY = 'unfinished-strokes';
 
-const { data: sessionList } = await useFetch<SessionSummary[]>('/api/strokes/unfinished', {
+const { data: sessionList } = await useFetch<SessionSummary[]>('/api/sessions/unfinished', {
   key: STROKES_KEY,
   default: () => [],
 });

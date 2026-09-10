@@ -130,7 +130,7 @@ describe('requestRun', () => {
     await w.retryFromError()
 
     expect(fetchMock).toHaveBeenLastCalledWith(
-      `/api/strokes/${SESSION}/invoke-agent`,
+      `/api/sessions/${SESSION}/invoke-agent`,
       { query: { reset: 1 } },
     )
     w.stopWaiting()

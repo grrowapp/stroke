@@ -118,7 +118,10 @@ export function useWaitingRetry(sessionId: MaybeRefOrGetter<string>) {
    * 一覧ではない。
    */
   async function discard(): Promise<void> {
-    await $fetch(`/api/sessions/${toValue(sessionId)}`, { method: 'DELETE' })
+    // **URL を `string` として渡す。** `/api/sessions/unfinished`（U16）が静的な兄弟として
+  // 増えたことで、`/api/sessions/${…}` の型が GET だけに狭まり、DELETE が通らなくなる
+  // （Nitro の typed routes の性質）。実体の route は `sessions/[id]/index.delete.ts` に在る
+    await $fetch(`/api/sessions/${toValue(sessionId)}` as string, { method: 'DELETE' })
   }
 
   return {

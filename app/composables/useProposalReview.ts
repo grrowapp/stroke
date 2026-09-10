@@ -384,7 +384,10 @@ export function useProposalReview(
   async function discardSession(): Promise<void> {
     promotionFailed.value = null
     try {
-      await $fetch(`/api/sessions/${sessionId}`, { method: 'DELETE' })
+      // **URL を `string` として渡す。** `/api/sessions/unfinished`（U16）が静的な兄弟として
+  // 増えたことで、`/api/sessions/${…}` の型が GET だけに狭まり、DELETE が通らなくなる
+  // （Nitro の typed routes の性質）。実体の route は `sessions/[id]/index.delete.ts` に在る
+      await $fetch(`/api/sessions/${sessionId}` as string, { method: 'DELETE' })
     } catch (error) {
       warn('破棄できませんでした', messageOf(error))
       return

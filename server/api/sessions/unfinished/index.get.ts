@@ -1,6 +1,6 @@
 import type { SessionSummary } from '#shared/stroke'
-import { readStrokeConfig } from '../../utils/stroke/config'
-import { listUnfinishedStrokes } from '../../utils/stroke/unfinished'
+import { listUnfinishedStrokes } from '../../../handler/session'
+import { readStrokeConfig } from '../../../utils/stroke/config'
 
 /**
  * U16: 中断したストローク——昇格前（`stroking` / `proposed`）のセッションを一覧する。

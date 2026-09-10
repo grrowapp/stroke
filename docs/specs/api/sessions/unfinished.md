@@ -17,8 +17,3 @@
   ディレクトリも並びうる
 - **プロジェクトの母集合は変えない。** 走査（`.spec-workflow` を持つディレクトリ）にセッションを
   混ぜない
-
-## 実装のパス
-
-実装は現状 `/api/strokes/unfinished` に在る。U 系の名前空間の移設は `fix-server-api-layout` の範囲で、
-docs の正はこの資料のパスである（[overview.md](../overview.md)）。
