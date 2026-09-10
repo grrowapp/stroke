@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { expect, test } from '@playwright/test';
+import { expect, test } from './support';
 
 /**
  * 本家の design token が実際に描画へ効いているかを、稼働中の画面から読む。

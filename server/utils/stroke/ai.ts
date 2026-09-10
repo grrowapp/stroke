@@ -72,6 +72,26 @@ export interface AiRun {
    */
   didWork?: () => Promise<boolean>
   /**
+   * **実行を決着させる**。`didWork` と同じ置き方で、渡されているときだけ呼ぶ。
+   *
+   * 決着とは、その実行で提出されたものに応じて局面を切り替え、画面へ届けることである
+   * （openspec/specs/agent/invocation「完了は output stream で検知して idle に変える」）。
+   * 提出を受ける口（A5・A7）は記録だけを行うので、局面が動くのはここだけになる——局面が
+   * 変わってよいのは実行が終わった時点だけで、それを知るのは子プロセスを制御するこの層
+   * だけである。
+   *
+   * ストロークの実行だけが渡す（`invoke.ts`）。steering は決着を持たない（完成の記録は
+   * `recordCompletion`）。**`didWork` が true のときだけ呼ぶ**——何も提出していない実行に
+   * 決着させるものは無い。
+   *
+   * 決着できなければ `false` を返し、invokeAi は `failed` に倒す。局面が動かないまま
+   * `idle` にすると、proposal が在るのに画面へ出ない対象がそこで止まる。巡回が起こし直し、
+   * 続きの実行の完了時にもう一度決着を試みる。
+   *
+   * invokeAi はいつ叩くかを判定しない。関数が渡されているかどうかが判定の結果である。
+   */
+  settle?: () => Promise<boolean>
+  /**
    * **完成を記録する**。`didWork` と同じ置き方で、渡されているときだけ呼ぶ。
    *
    * 生成中のプロジェクト（phase が `approved`）の steering だけが渡す（`invoke.ts`）。
@@ -216,7 +236,8 @@ async function writeInvocation(sessionId: string, invocation: Invocation, retrie
 async function runBuiltInvocation(sessionId: string, run: AiRun): Promise<void> {
   const {
     launch, cwd, debugLogDir, prompts, maxRetries, retries, timeoutMs, timeoutStepMs,
-    conversationId, hasConversation, setInvocation, remember, prepare, didWork, recordCompletion,
+    conversationId, hasConversation, setInvocation, remember, prepare, didWork, settle,
+    recordCompletion,
   } = run
 
   // 上限判定は起動の前。**`retries` は「これまでに起動し直した回数」** なので、初回の
@@ -275,6 +296,20 @@ async function runBuiltInvocation(sessionId: string, run: AiRun): Promise<void> 
     // 完成を記録しに行くと、何も出していない対象が完成として畳まれる。
     if (didWork !== undefined && !(await didWork())) {
       console.warn(`${LOG_PREFIX} AI 呼び出しが失敗: ${sessionId}`, ['プロセスは成功したが作業が確認できない'])
+      await setInvocation('failed')
+      return
+    }
+
+    // 作業があった実行のうち、決着を渡されたもの（ストローク）だけが決着する。**局面が
+    // 動くのはここだけである**——提出を受ける口（A5・A7）は記録だけを行う
+    // （openspec/specs/api/stroke/question・api/stroke/proposal）。`idle` にする前に置くのは、
+    // 承認できる局面が立つ時点を実行の終わりに揃えるためである
+    // （change fix-rename-during-running-session）。
+    //
+    // 決着できなければ `failed` に倒す。局面が動かないまま `idle` にすると、proposal が
+    // 在るのに画面へ出ない対象がそこで止まり、巡回（`failed` しか拾わない）も回収できない。
+    if (settle !== undefined && !(await settle())) {
+      console.warn(`${LOG_PREFIX} AI 呼び出しが失敗: ${sessionId}`, ['プロセスは成功したが決着できない'])
       await setInvocation('failed')
       return
     }

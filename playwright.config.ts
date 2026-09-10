@@ -1,9 +1,10 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { createServer } from 'node:net';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { defineConfig } from '@playwright/test';
+
+import { PORT_SEARCH_START, reservePort } from './test/e2e/port-reservation';
 
 /**
  * E2E は本物の spec-workflow-mcp を使わない。
@@ -15,7 +16,7 @@ import { defineConfig } from '@playwright/test';
  */
 
 /**
- * 待ち受けは**実行のたびに空きを OS から取る**。
+ * 待ち受けは**実行のたびに空きを取る**（固定値を持たない）。
  *
  * 同じマシンで作業ツリーを並べて動かすため、共通のポートにすると「既に使われている」で
  * 起動できないだけでなく、先に立っている別ツリーのアプリへテストが当たってしまう
@@ -30,51 +31,23 @@ import { defineConfig } from '@playwright/test';
  *
  * スタブもアプリも実行のたびに立てて捨てるもので、**人がブラウザで繋ぎに行かない**。
  * 固定である必要はなく、空きを取れば衝突は原理的に起きない。人が繋ぐ dev サーバー
- * （3399 固定・`CLAUDE.md`）とは要件が違う。
+ * （番号を決めるのは `package.json` の `dev` と `nuxt.config.ts` の `devServer.port`。
+ * `CLAUDE.md`）とは要件が違う。
  */
 /**
- * 探し始める番号。**50000 から上だけを使う。**
+ * 空きの探し方そのものは `test/e2e/port-reservation.ts` にある。
  *
- * OS に任せる（`listen(0)`）と ephemeral の範囲から選ばれ、そこは他のプロセスが
- * 一時的な発信元として使う帯でもある。ここを避けて、E2E は 50000 以上に固定で寄せる。
- * どのポートを使ったかはログに出るので、人が見つけたいときも範囲が分かっていればよい。
- */
-const PORT_SEARCH_START = 50000;
-
-/** 上限。ここまで空きが無ければ、待ち受けではなく環境の問題として落とす */
-const PORT_SEARCH_END = 60000;
-
-/** その番号で待ち受けられるか。使用中なら false を返し、それ以外の失敗は投げる */
-async function isFree(port: number): Promise<boolean> {
-  return new Promise((resolve, reject) => {
-    const probe = createServer();
-    probe.unref();
-    probe.on('error', (error: NodeJS.ErrnoException) => {
-      if (error.code === 'EADDRINUSE' || error.code === 'EACCES') {
-        resolve(false);
-        return;
-      }
-      reject(error);
-    });
-    probe.listen(port, '127.0.0.1', () => {
-      probe.close(() => resolve(true));
-    });
-  });
-}
-
-/**
- * `from` から上へ順に空きを探す。
+ * **かつてはここに「空きか probe して、閉じてから番号を返す」だけの関数を置いていた。**
+ * 確保になっていない（TOCTOU）ことを旧コメントは認めたうえで「順に上がる作りなので、
+ * 同時に走る2本が同じ番号で止まり続けることはない」と正当化していたが、それは後から
+ * 始まった実行にしか当てはまらない。ほぼ同時に始まった2本は、どちらもまだ誰も listen して
+ * いない 50000 を見て揃って同じ番号を選ぶ。実測 2026-09-09: 別ツリー
+ * （`update-session-api-handler`）の実行と 50000 番が重なり、
+ * `connect ECONNREFUSED 127.0.0.1:50000` で 39 件が落ちた。
  *
- * 控えてから閉じて渡すので、取ってから本番が待ち受けるまでの間に別のプロセスが
- * 割り込む隙は残る。順に上がる作りなので、同時に走る2本が同じ番号で止まり続けることは
- * ない——先に取った側が使い始めれば、次の実行はその上を見る。
+ * いまは番号ごとの予約ファイルを排他作成して確保する。切り出したのは、その当たり外れを
+ * 素の vitest で固定するためである（`test/e2e/port-reservation.test.ts`）。
  */
-async function takeFreePort(from: number): Promise<number> {
-  for (let port = from; port < PORT_SEARCH_END; port += 1) {
-    if (await isFree(port)) return port;
-  }
-  throw new Error(`${from}〜${PORT_SEARCH_END} に空きポートが無い`);
-}
 
 /**
  * 決めた番号を環境変数へ控えて持ち回る。
@@ -86,12 +59,16 @@ async function takeFreePort(from: number): Promise<number> {
  *
  * 環境変数は本体プロセスで先に決まり、ワーカーは fork 時にそれを引き継ぐ。固定表の頃は
  * 何度評価しても同じ値だったので、この持ち回りが要らなかった。
+ *
+ * **控えがあるワーカーは予約を取らない。** 予約を持つのは本体プロセスだけで、解放も
+ * そこの終了時に走る（`port-reservation.ts` の exit hook）。ワーカーが取り直すと番号が
+ * ずれるうえ、予約もワーカーの数だけ残ることになる。
  */
 async function resolvePort(key: string, from: number): Promise<number> {
   const controlled = process.env[key];
   if (controlled !== undefined && controlled !== '') return Number(controlled);
 
-  const port = await takeFreePort(from);
+  const { port } = await reservePort(from);
   process.env[key] = String(port);
   return port;
 }
@@ -265,7 +242,46 @@ export default defineConfig({
   testMatch: '**/*.spec.ts',
   fullyParallel: false,
   workers: 1,
-  timeout: 30_000,
+  /**
+   * テスト1件の上限。
+   *
+   * **45秒。** 30秒だった頃、`approval-annotation.spec.ts` の長い1件が混雑時に 28.8 秒まで
+   * 伸びて時間切れになった（単独で走らせれば通る。実測 2026-09-09）。この spec は本文を
+   * 描画してから範囲を選び、指摘を付けて確かめるまでを1件でやるので、他の実行と機械を
+   * 分け合っているときは素で30秒に迫る。上限が実測とほぼ同じだと、遅い日にだけ落ちる。
+   *
+   * 個々の待ちには別に上限が置いてある（`support.ts` の接続待ちなど）ので、ここを伸ばしても
+   * 固まったテストが放置されるわけではない。
+   */
+  timeout: 45_000,
+  /**
+   * 判定1つあたりの待ちの上限。
+   *
+   * **15秒。** playwright の既定は5秒で、混雑した機械ではそれが持たない。teleport される面
+   * （`app/layouts/stroke.vue` の `UModal`）は SSR の HTML に出ないので
+   * （実測: `/strokes/<id>` の応答に `agent-question-text` も `stroke-modal` も無い）、
+   * その面を見る判定はどれも「ページを読み込んでハイドレーションが済むまで」を待つことになる。
+   *
+   * 実測（2026-09-10、`/strokes/<id>` を 30 回開いて、`goto` が返ってから
+   * `agent-question-text` が出るまでを測った）:
+   *
+   * | 機械の混み具合（load average / 8 core） | p50 | 最大 |
+   * | --- | --- | --- |
+   * | 8 前後（他の作業ツリーの E2E と並走。n=100） | 1.4 秒 | 1.7 秒 |
+   * | 15 前後（さらに負荷を掛けた。n=30） | 3.3 秒 | 4.0 秒 |
+   *
+   * 混んだ側の最大は 4.0 秒で、既定の5秒に**余白がほとんど無い**。ここが実測とほぼ同じだと、
+   * 遅い日にだけ落ちる——テストごとの上限を 30 秒から 45 秒へ上げたのと同じ理由である（上）。
+   *
+   * 15 秒にしたのは、いちばん混んだときの実測（4.0 秒）に対して3倍以上の余白を取りつつ、
+   * テスト1件の上限（45 秒）の中に収まる値だからである。`support.ts` の接続待ち
+   * （`CONNECTION_TIMEOUT_MS`）とも揃う。
+   *
+   * **待ちを伸ばしても直らないものが別にある。** ブラウザが読み込み途中の script を捨てると
+   * 画面は永久に動かない。それは待ちの問題ではないので、`support.ts` の `test` が
+   * 読み込み直しで受けている（あちらの docblock）。
+   */
+  expect: { timeout: 15_000 },
   use: {
     baseURL: `http://127.0.0.1:${APP_PORT}`,
     trace: 'retain-on-failure',
@@ -293,8 +309,13 @@ export default defineConfig({
         // 本物の `/opt/projects` に書かないための、テスト限定の差し替えである。
         NUXT_PROJECT_SHARE_ROOT: PROJECTS_PARENT,
         // 承認は昇格の直後に steering の claude を起こす（ADR 0011）。E2E で本物を
-        // 走らせないよう、起動する実行ファイルだけ何もしないものに差し替える。
-        NUXT_CLAUDE_COMMAND: '/bin/true',
+        // 走らせないよう、起動する実行ファイルだけスタブに差し替える。
+        //
+        // **既定は何もしない。** 台本（`.claude-stub.json`）を置かれていない対象では、
+        // 何も出さずに終了コード 0 で終わる——かつてここに書いていた `/bin/true` と
+        // まったく同じで、成功エンベロープが出ないので実行は `failed` になる。台本を
+        // 置いた対象だけが提出して終わる（`test/e2e/fixtures/claude-stub.mjs`）。
+        NUXT_CLAUDE_COMMAND: join(dirname(fileURLToPath(import.meta.url)), 'test/e2e/fixtures/claude-stub.mjs'),
         NUXT_SPEC_WORKFLOW_HOME: SPEC_WORKFLOW_HOME,
         NUXT_SYNC_INTERVAL_MS: String(SYNC_INTERVAL_MS),
       },

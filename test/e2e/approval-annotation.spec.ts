@@ -1,6 +1,6 @@
-import { expect, test, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
-import { ALPHA, addSelectionComment, painted, resetBoard, selectIn, stub } from './support';
+import { ALPHA, addSelectionComment, expect, painted, resetBoard, selectIn, stub, test } from './support';
 
 /**
  * 承認画面の2つの面（プレビュー / 生テキスト）と、そこで付けた指摘の行き先。

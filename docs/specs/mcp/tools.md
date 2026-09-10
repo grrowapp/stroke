@@ -30,7 +30,7 @@ stroke-board 自身が提供する MCP サーバー（route `/mcp`、Streamable 
 | `get-steering-guide` | steering 工程の手順 | （無し。本文はツールの定数） |
 | `get-steering` | steering 文書の取得 | 本家 `GET /api/projects/:projectId/steering/:name` ＋ `GET /api/projects/:projectId/info` |
 
-**代行するツールは、対応する endpoint の応答だけから結果を作る。** 検証も状態遷移も endpoint 側にあり、ツール側に第2の実装を置かない（[ADR 0014](../../adr/0014-api-has-no-implicit-state-branching.md)）。同一プロセスでも endpoint を経由するのは、busy ガードと前提チェックを通すためである。
+**代行するツールは、対応する endpoint の応答だけから結果を作る。** 検証も状態遷移も endpoint 側にあり、ツール側に第2の実装を置かない（[ADR 0014](../../adr/0014-api-has-no-implicit-state-branching.md)）。同一プロセスでも endpoint を経由するのは、多重起動の直列化と前提チェックを通すためである。
 
 案内の2本だけが代行先を持たない。手順の本文はどの endpoint も持っていないためで、ADR 0014 に反しない——どこにも第1の実装が無い。
 

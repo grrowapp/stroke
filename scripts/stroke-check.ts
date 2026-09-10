@@ -88,23 +88,6 @@ const APPROVE_NAME_ATTEMPTS = 5
 /** steering 文書の本数（product / tech / structure）。3本揃ったら着地とみなす */
 const STEERING_DOCUMENTS = 3
 
-/**
- * 直前の待ちに入った時点の生出力の本数。`settle` が「もう終わっているか」を見るのに使う。
- *
- * **待ちに入るものは必ず `beginRoundWait()` を通すこと。** 待ちの中で実行が終わったか
- * どうかは、この基準からの増分でしか分からない——`settle` の呼び出し時点で数え直すと、
- * 既に終わっている実行を「まだ動いている」と読み違える。逆に**基準が古いままだと、
- * 前の実行が終わったことを次の実行の終わりと取り違えて素通りする**（`--send-back` を
- * 併用したとき、差し戻しの待ちが基準を更新しないと `approve` の `settle` が確定的に
- * 素通りしていた。santa-method レビュー指摘 9周目 2026-08-31）。
- */
-let roundStartLogs = 0
-
-/** 待ちに入る。`settle` が見る基準を取り直す */
-function beginRoundWait(): void {
-  roundStartLogs = logEntryCount()
-}
-
 /** 画面1 を開き直す上限。dev がモジュールを取り落とすと数回に1回は開けない（`openStrokes`） */
 const OPEN_ATTEMPTS = 5
 
@@ -317,13 +300,10 @@ async function main(): Promise<void> {
     fail(`回答ポリシー ${policyName} は無い（${Object.keys(policies).join(' / ')}）`)
   }
 
-  // **デバッグログが無いと、承認まで進める判定が2つとも鈍る。** 黙って弱い判定に落ちると、
+  // **デバッグログが無いと、steering の着地の判定が鈍る。** 黙って弱い判定に落ちると、
   // 通ったのか見られていないだけなのかが報告から分からない。使う前に言う
   if (approveRequested && DEBUG_LOG_DIR === '') {
-    console.log('  注意: claude.debugLogDir が空なので、次の2つが効かない')
-    console.log('    - 実行の終了を数えられないので、承認の手前の待ちが5秒固定になる')
-    console.log('      （まだ動いている claude の作業場所を承認が改名しうる）')
-    console.log('    - steering の着地を文書の有無だけで判定する')
+    console.log('  注意: claude.debugLogDir が空なので、steering の着地を文書の有無だけで判定する')
     console.log('      （ツールを通さず直接書かれたものと区別できない）')
   }
 
@@ -459,8 +439,6 @@ async function run(browser: Browser, policy: Policy): Promise<{
       const steered = approved === null ? null : await waitForSteering(page, approved)
       return { rounds, landed: true, sessionId, revised, approved, steered }
     }
-    // 待ちに入った時点（`waitForNext`）を基準に、問いを出した実行の終わりを待つ
-    await settle(page, roundStartLogs)
     const answered = await answer(page, policy, round)
     rounds.push(answered)
     // ここでは基準を取り直さない。次の反復の `waitForNext` が待ちに入るときに取る
@@ -493,8 +471,7 @@ async function waitForNext(page: Page, previous: string | undefined): Promise<'q
   // 待っている間は無言にしない。AI の応答は数分かかることがあり、進んでいるのか
   // 止まっているのかが外から分からないと、待つ判断も切る判断もできない
   const started = Date.now()
-  beginRoundWait()
-  const logs = roundStartLogs
+  const logs = logEntryCount()
   let notified = 0
 
   while (Date.now() < deadline) {
@@ -652,18 +629,11 @@ function fallbackProjectName(): string {
  * @returns 承認で確定したプロジェクト名
  */
 async function approve(page: Page): Promise<string> {
-  // **承認そのものは busy ガードの対象である**（`approve/index.post.ts`。fix-rename-during-running-session
-  // で対象になった。実行中に承認すると 409 busy で断られる）。それでも実行の終わりを
-  // ここで待つのは、断られてやり直すのではなく**一度で通したい**からである——待たずに
-  // 投げて 409 を踏むと、この巡回スクリプトはそこで止まってしまう。承認がセッション
-  // ディレクトリを**改名する**性質そのもの（まだ動いている claude の cwd を足元から
-  // 動かす）は変わっていない。
-  //
-  // 基準は**この待ちに入った時点**（`waitForNext` が控えた本数）にする。`settle` の中で
-  // 数え直すと、proposal を出した実行が既に終わっていても「増えていない」と見えて、
-  // 4分を丸ごと捨てる（実測 2026-08-31）
-  await settle(page, roundStartLogs)
-
+  // **実行の終わりをここで待たない。** 画面に「承認して作る」が出ている時点で、その
+  // proposal を出した実行は既に終わっている——提出（A7）は記録だけを行い、phase を
+  // `proposed` にして画面へ配信するのは実行の決着（A9）だからである
+  // （change fix-rename-during-running-session）。走っている claude の足元でディレクトリを
+  // 改名する状況そのものが起こらないので、待つ理由が無い。
   await page.getByRole('button', { name: '承認して作る' }).click()
 
   const dialog = page.getByRole('dialog')
@@ -964,13 +934,8 @@ async function sendBack(
   sessionId: string,
 ): Promise<boolean> {
   // 着地の検知は「承認して作る」ボタンでも通る（URL を見ていない経路がある）。
-  // 指摘を付ける口が出るまで待ってから触る
-  // **proposal を出した実行の終了を待ってから触る。** 受理（`server/handler/proposal.ts` の publish）は
-  // 実行の途中で飛ぶので、画面に proposal が出た時点ではまだ動いている。ここで待たないと、
-  // 続く `beginRoundWait()` の基準がその実行の終了行を含まず、`approve` の `settle` が
-  // 「終わっている」と誤読して素通りする（santa-method レビュー指摘 11周目 2026-08-31）
-  await settle(page, roundStartLogs)
-
+  // 指摘を付ける口が出るまで待ってから触る。**実行の終わりは待たない**——画面に proposal が
+  // 出ている時点でその実行は決着している（`approve` の理由書きと同じ）
   const addComment = page.getByRole('button', { name: '＋ 全体へのコメント' })
   await addComment.waitFor({ state: 'visible', timeout: 30_000 })
 
@@ -986,10 +951,6 @@ async function sendBack(
   const followup = page.getByRole('button', { name: 'AI から質問があります' })
   const revised = page.getByText('差し戻しを受けて proposal が出し直されました')
 
-  // 出し直しの実行はここから始まる。基準を取り直さないと、`approve` の `settle` が
-  // 「差し戻しの前の実行が終わっている」を根拠に素通りする
-  beginRoundWait()
-
   let deadline = Date.now() + ROUND_TIMEOUT_MS
   let started = Date.now()
   let notified = 0
@@ -1000,18 +961,11 @@ async function sendBack(
 
     if (await followup.count() > 0) {
       endProgress()
-      // 問い返しも AI の実行の途中で出る。答える前に終了を待たないと 409 を踏む（`settle`）
-      await settle(page, roundStartLogs)
       await followup.click()
       const round = rounds.length + 1
       const answered = await answer(page, policy, round)
       rounds.push(answered)
       console.log(`  Q${round}（差し戻し後） ${answered.header}: ${answered.question} → ${answered.answer}`)
-      // **答えたら新しい実行が始まる。ここで基準を取り直す。**
-      // 取り直さないと、`approve` の `settle` は「問い返しを出した実行が終わっている」を
-      // 根拠に素通りし、出し直しの実行が動いている足元でディレクトリを改名する
-      // （santa-method レビュー指摘 10周目 2026-08-31。9周目の修正はこの経路を外していた）
-      beginRoundWait()
       deadline = Date.now() + ROUND_TIMEOUT_MS
       started = Date.now()
       notified = 0
@@ -1043,50 +997,6 @@ async function sendBack(
 
   endProgress()
   return false
-}
-
-/**
- * 問いを出した実行が終わるのを待ってから答える。
- *
- * **これをしないと必ず 409 を踏む。** 問いは AI プロセスの実行の**途中**で提出されるので、
- * 画面に出た時点ではまだそのプロセスが動いている。そこへ答えると `invoke-agent` が
- * busy ガードに弾かれる。人は問いを読んで選ぶ間に終わるので踏まない。
- *
- * しかもこの画面（`pages/strokes/[sessionId]/index.vue`）は 409 のとき
- * 「AI を起動できませんでした。」を出すだけで再試行の口を持たない。踏んでからの回復が
- * 画面上に無いので、踏まないようにするのが唯一の道である（実測 2026-08-28）。
- *
- * 終了は claude の生出力が1本増えたことで分かる（`debugLogDir`）。設定が空で数えられない
- * ときは、一定時間だけ置いて進む。
- */
-async function settle(page: Page, baseline: number): Promise<void> {
-  if (DEBUG_LOG_DIR === '') {
-    await page.waitForTimeout(5000)
-    return
-  }
-
-  // **もう終わっているなら待たない。** 基準を渡されたときは、その時点から生出力が
-  // 増えているかを見る。増えていれば実行は終わっており、ここで待つと何も起きないまま
-  // `ROUND_TIMEOUT_MS`（4分）を丸ごと捨てる（実測 2026-08-31: `approve` の手前で毎回）
-  const before = baseline
-  if (logEntryCount() > before) return
-  const deadline = Date.now() + ROUND_TIMEOUT_MS
-  const started = Date.now()
-  let notified = 0
-
-  while (Date.now() < deadline) {
-    if (logEntryCount() > before) { endProgress(); return }
-
-    const elapsed = Math.floor((Date.now() - started) / 1000)
-    if (elapsed > notified) {
-      notified = elapsed
-      progress(`${elapsed}秒 — 問いを出した実行の終了を待っている`)
-    }
-    await page.waitForTimeout(1000)
-  }
-
-  endProgress()
-  console.log('    実行の終了を確認できないまま答える')
 }
 
 /**

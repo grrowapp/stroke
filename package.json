@@ -6,6 +6,9 @@
   "engines": {
     "node": "^22.19.0 || ^24.11.0 || >=26.0.0"
   },
+  "imports": {
+    "#shared/*": "./shared/*.ts"
+  },
   "scripts": {
     "dev": "nuxt dev --port 3100",
     "build": "nuxt build",

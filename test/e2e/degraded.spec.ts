@@ -1,9 +1,7 @@
 import { writeFileSync } from 'node:fs';
 
-import { expect, test } from '@playwright/test';
-
 import { PROJECTS_PARENT, REGISTRY_PATH, registryContent } from '../../playwright.config';
-import { resetBoard } from './support';
+import { expect, resetBoard, test } from './support';
 
 /**
  * 本家が動いていない状態・プロジェクトが0件の状態でも画面が壊れないこと（tasks.md 8.4）。

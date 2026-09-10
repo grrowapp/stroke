@@ -1,6 +1,6 @@
 import type { Phase, ProposalMessage } from '#shared/stroke'
 import { isKebabCase } from '../utils/stroke/project'
-import { notifySubmission } from '../utils/stroke/submission-signal'
+import { recordLaunchSubmissionIfActive } from '../utils/stroke/submission-signal'
 import {
   markProposalStrokeIfFirst,
   readState,
@@ -28,24 +28,28 @@ function message(proposal: string, projectName: string | undefined): ProposalMes
 }
 
 /**
- * proposal を受理する。順序は **残す → phase を進める → 配信する**。
+ * proposal を受理する。**残すだけで、phase を進めず、流さない。**
+ *
+ * 局面の切り替えと配信は、この提出を行った実行の決着（`settleProposal`）が行う。ここで phase を
+ * `proposed` にすると、claude の実行がまだ終わっていないのに承認できる局面が立つ。承認は昇格
+ * （U14）の改名を呼び、改名は走っている claude を置き去りにする
+ * （change fix-rename-during-running-session）。
  *
  * **受理した本文はここで残す。** 配信（`publish`）はメモリ上の接続にしか届かないので、残さないと
  * 「提出の瞬間に繋いでいた画面にしか出ない」ことになる。繋ぎ直した画面にも承認にも同じ proposal が
- * 要る（openspec/specs/api/stroke/proposal）。残せなければそこで失敗し、phase も配信も行わない
- * ——逆順にすると、配信だけ届いて残っていない状態が作れてしまう。**この順序を api と分けて
- * 持たない**ので、端をまたいで崩れることが起きない。
+ * 要る（openspec/specs/api/stroke/proposal）。残せなければそこで失敗する。
  *
  * **出し直しで承認の判断は失効する。** 判断はそれが下された proposal に結びつく
  * （openspec/specs/api/session/approve）。proposal を書く口はここ1つなので、ここで判断を
  * 持ち越さなければ足りる——版の印は持たない（design.md 決定2）。前の状態を丸ごと写さないのは
- * そのためで、`proposed` からの出し直しに乗っている `decision` はここで落ちる。
+ * そのためで、`proposed` からの出し直しに乗っている `decision` はここで落ちる。**phase は
+ * 動かさない**ので、いまの局面をそのまま書き戻す。
  *
  * 候補名は kebab-case のときだけ採る（`docs/specs/api/contract.md` A7）。**これは入力の検証では
  * ない**——kebab-case でなくても 400 にはならず、既に在る候補が残るだけである。受理の可否を
  * 変えないので、書き込む値の決定としてここが持つ。
  *
- * `invocation` には触れない。実行の記録を書くのは invokeAi だけである
+ * `invocation` には触れない。実行の記録を書くのは invoke-agent だけである
  * （openspec/specs/agent/invocation の MUST）。
  */
 export async function submitProposal(
@@ -53,25 +57,50 @@ export async function submitProposal(
   state: ActiveSessionState,
   proposal: string,
   projectName: string | undefined,
+  token: string | undefined,
 ): Promise<void> {
-  // 受理を成立させる前に残す。ここが失敗したら phase も配信も行わない
+  // 受理を成立させる前に残す。ここが失敗したら記録も残さない
   await sessionProposal(sessionId).write(proposal)
 
   await markProposalStrokeIfFirst(sessionId)
 
   const candidate = projectName && isKebabCase(projectName) ? projectName : state.projectName
 
+  const kept = {
+    currentQuestion: state.currentQuestion,
+    invocation: state.invocation,
+    ...(state.retries === undefined ? {} : { retries: state.retries }),
+    ...(candidate ? { projectName: candidate } : {}),
+  }
+  await writeState(
+    sessionId,
+    state.phase === 'proposed' ? { phase: 'proposed', ...kept } : { phase: 'stroking', ...kept },
+  )
+
+  recordLaunchSubmissionIfActive(token, 'proposal')
+}
+
+/**
+ * 実行の決着で phase を `proposed` にし、残っている proposal を W2 へ流す。
+ *
+ * 叩くのは invoke-agent だけである（A9）。**書いてから流す**——逆にすると、配信だけ届いて局面が
+ * 動いていない状態が作れる。本文が残っていなければ決着の前提が成り立たないので、局面を
+ * 動かさずに `false` を返す（呼び手が失敗として扱い、起動し直しの対象になる）。
+ */
+export async function settleProposal(sessionId: string, state: ActiveSessionState): Promise<boolean> {
+  const proposal = await sessionProposal(sessionId).read()
+  if (proposal === undefined) return false
+
   await writeState(sessionId, {
     phase: 'proposed',
     currentQuestion: null,
     invocation: state.invocation,
     ...(state.retries === undefined ? {} : { retries: state.retries }),
-    ...(candidate ? { projectName: candidate } : {}),
+    ...(state.projectName ? { projectName: state.projectName } : {}),
   })
 
-  proposalChannel.publish(sessionId, message(proposal, candidate))
-  // 完了の合図ではなく「作業が行われた」ことの記録。invokeAi が起動の前後で比べる。
-  notifySubmission(sessionId)
+  proposalChannel.publish(sessionId, message(proposal, state.projectName))
+  return true
 }
 
 /**

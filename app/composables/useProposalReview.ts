@@ -415,10 +415,10 @@ export function useProposalReview(
         await $fetch(`${base.value}/approve`, { method: 'DELETE' })
         await $fetch(`${base.value}/approve`, { method: 'POST', body: { projectName: name } })
       } catch (error) {
-        // サーバは 409 を3つの意味で返す(名前の衝突 / AI が実行中 / phase 不整合)。
-        // 名前を変えるまで承認を止めるのは、衝突と分かったときだけにする。
-        // 400（名前に使えない文字）と 409 の残り（phase 不整合・実行中）は判断そのものが
-        // 成立しないので、器に載せず「別の名前で再度承認できる」状態に留める
+        // サーバは 409 を2つの意味で返す(名前の衝突 / phase 不整合)。名前を変えるまで
+        // 承認を止めるのは、衝突と分かったときだけにする。400（名前に使えない文字）と
+        // 409 の残り（phase 不整合）は判断そのものが成立しないので、器に載せず
+        // 「別の名前で再度承認できる」状態に留める
         if (statusOf(error) === 409 && reasonOf(error) === 'name-conflict') {
           conflictName.value = name
         } else {
@@ -463,6 +463,11 @@ export function useProposalReview(
         // 再要求になる
         promotionNotice.value = name
       } else {
+        // **理由を捨てない。** サーバが返した文言をそのまま出す（ADR-0022「応答の
+        // 握りつぶしは、いかなる者にも許されない」）。ここに落ちるのは 409 phase
+        // （画面が持っている局面が古い）と、契約に無い応答である。「実行中だから受理
+        // しない」（busy）は無い——承認の操作は実行の決着の後にしか存在しない
+        // （specs/stroke/frontier・api/session/promote）。
         warn('プロジェクトを作れませんでした', messageOf(error))
       }
       return

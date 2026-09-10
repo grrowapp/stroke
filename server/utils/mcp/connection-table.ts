@@ -44,9 +44,27 @@ export function registerConnection(token: string, context: ConnectionContext): v
   connections.set(token, context)
 }
 
-/** 登録を消す。invokeAi の実行終了時（正常・異常とも）に呼ぶ。 */
+/** 登録を消す。invoke-agent の実行終了時（正常・異常とも）に呼ぶ。 */
 export function removeConnection(token: string): void {
   connections.delete(token)
+}
+
+/**
+ * その token の起動がまだ実行中か（＝接続表に載ったままか）。
+ *
+ * 提出を受ける endpoint（A5・A7）が、**代行先を待っている間に実行が畳まれていないか**を
+ * 確かめるために要る。ハンドラの先頭で token を解決できていても、`await` の向こう側では
+ * 実行が終わっていることがある——打ち切り（タイムアウト）で claude を殺しても、サーバー側の
+ * ハンドラは中断されないためである。
+ *
+ * これを見ずに起動単位の記録を足すと、`kick` の `.finally`（`removeConnection` →
+ * `forgetLaunchSubmission`）が済んだ後に記録が作り直され、誰も捨てないまま残る。
+ *
+ * **判定と記録の間に `await` を置かないこと。** 片付けは1つの同期ブロックなので、間に
+ * `await` が無ければ「片付けの前」か「片付けの後」のどちらかにしかならない。
+ */
+export function isConnectionActive(token: string): boolean {
+  return connections.has(token)
 }
 
 /**

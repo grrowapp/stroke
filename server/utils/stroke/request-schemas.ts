@@ -103,6 +103,19 @@ export const submissionBody = z.object({
 }, { error: '実行の記録は invocation を持つ組で送る。' })
 
 /**
+ * A9 の入力。その実行で何が提出されたかを渡す。
+ *
+ * 叩くのは invokeAi だけである（openspec/specs/agent/invocation）。**決着の中身はこの引数が
+ * 決める。** endpoint が状態を見て分岐を選ぶのではない——引数で制御される分岐は契約に
+ * 現れるので ADR-0014 の対象外である。
+ */
+export const settlementBody = z.object({
+  submitted: z.enum(['question', 'proposal'], {
+    error: '提出されたものは question・proposal のいずれか。',
+  }),
+}, { error: '決着は submitted を持つ組で送る。' })
+
+/**
  * 契約に合わないボディは 400。**反した箇所はすべて返す。**
  *
  * 先頭1件だけを返していた頃は、送り手が1つ直しては送り直すことを繰り返した。往復のたびに

@@ -10,15 +10,16 @@ import { DeleteError } from '../../handler/delete'
 /**
  * 409 の理由。
  *
- * サーバは3つの理由で 409 を返すが、どれも同じ status なので画面から区別できない。
- * 理由の印を `data.reason` に載せ、画面が出すもの（名前を変えさせる／待たせる／
- * 画面を作り直す）を選べるようにする。
+ * サーバは2つの理由で 409 を返すが、どちらも同じ status なので画面から区別できない。
+ * 理由の印を `data.reason` に載せ、画面が出すもの（名前を変えさせる／画面を作り直す）を
+ * 選べるようにする。
+ *
+ * **`busy`（実行中だから受け付けない）は無い。** 起動の要求は冪等で、削除・昇格は実行の
+ * 決着の後にしか要求されない（fix-rename-during-running-session）。
  */
 export type ConflictReason =
   /** `/opt/projects/<name>` が既にある。別の名前なら通る */
   | 'name-conflict'
-  /** そのセッションで `claude -p` が実行中。待てば通る */
-  | 'busy'
   /** その操作が今の phase に当てはまらない。画面が持っている状態が古い */
   | 'phase'
 

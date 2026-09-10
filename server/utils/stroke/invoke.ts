@@ -4,8 +4,8 @@ import { readStrokeConfig } from './config'
 import { LOG_PREFIX } from './log'
 import { initSessionOpenspec } from './openspec'
 import { isPromotedState, readState, sessionExists, withStateLock, writeState } from './session-store'
-import { submissionCount } from './submission-signal'
-import { activatePath, submissionPath } from './submission-path'
+import { forgetLaunchSubmission, hasLaunchSubmission, launchSubmissionKinds } from './submission-signal'
+import { activatePath, settlementPath, submissionPath } from './submission-path'
 import { MCP_SERVER_NAME, STEERING_ALLOWED_TOOLS, UPSTREAM_MCP_SERVER_NAME, withMcpToolsAllowed } from '../mcp/allowed-tools'
 import { readServerConfig } from '../config'
 import { issueConnectionToken, registerConnection, removeConnection } from '../mcp/connection-table'
@@ -70,14 +70,20 @@ function invocationWriter(sessionId: string) {
 }
 
 /**
- * 「この時点より後に提出があったか」を答える関数を作る。
+ * flontier の「その起動で作業が行われたか」を答える関数を作る。
  *
- * 起動の前に今の数を控え、呼ばれた時点の数と比べる。完了の検知（output stream）とは
- * 別で、作業が行われたかだけを見る。
+ * 単位は起動（接続 token）である。完了の検知（output stream）とは別で、作業が行われたか
+ * だけを見る。かつては対象の `sessionId` で提出数を持ち、起動の前後で比べていたが、その形
+ * では「何が」提出されたかを持てず、実行の決着（`settlement`）の材料にならない
+ * （change fix-rename-during-running-session）。
+ *
+ * 記録者は受理した endpoint（A5・A7）自身である。MCP ツールは記録しない
+ * （`docs/specs/mcp/contract.md`「代行以外の固定の処理を受け持たない」）——ツールがするのは
+ * 接続 token をそのまま転送することだけで、steering の判定を本家 REST へ移したのと同じ
+ * 線引きである（`steeringCompletedUpstream`）。
  */
-function submittedSince(sessionId: string): () => Promise<boolean> {
-  const before = submissionCount(sessionId)
-  return async () => submissionCount(sessionId) > before
+function submittedByLaunch(token: string): () => Promise<boolean> {
+  return async () => hasLaunchSubmission(token)
 }
 
 /**
@@ -178,6 +184,39 @@ function steeringCompletedUpstream(cwd: string, phase: Phase): () => Promise<boo
       return true
     } catch (error) {
       return warn(`本家への問い合わせで例外: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+}
+
+/**
+ * ストロークの実行の**決着**を作る。その起動で提出されたものを A9 へ渡す。
+ *
+ * 局面（phase）を動かし画面へ配信するのはここから叩く A9 だけである。提出を受ける口
+ * （A5・A7）は記録だけを行う（openspec/specs/api/stroke/question・api/stroke/proposal）。
+ *
+ * **proposal を先に見る。** 1回の実行が問いと proposal の両方を出すことは無いが、出たなら
+ * proposal の方が後の局面である。
+ *
+ * path は相対。自分自身を叩くのに外向けの設定値で URL を組むと、待ち受けを変えた瞬間に
+ * 届かなくなる（`invokePath` の docblock と同じ理由）。
+ */
+function settlement(sessionId: string, token: string): () => Promise<boolean> {
+  return async () => {
+    const kinds = launchSubmissionKinds(token)
+    const submitted = kinds.has('proposal') ? 'proposal' : kinds.has('question') ? 'question' : null
+    // 提出が無い実行は `didWork` が先に弾くので、ここへは届かない。届いたなら決着させる
+    // ものが無いということで、失敗にはしない（`failed` に倒すと巡回が回し続ける）。
+    if (submitted === null) return true
+
+    try {
+      await $fetch(settlementPath(sessionId), { method: 'POST', body: { submitted } })
+      return true
+    } catch (error) {
+      console.warn(
+        `${LOG_PREFIX} 実行を決着できない: ${sessionId}`,
+        error instanceof Error ? error.message : error,
+      )
+      return false
     }
   }
 }
@@ -356,8 +395,12 @@ export function buildRun(options: {
       (await $fetch<SessionSummary[]>('/api/sessions')).some(s => s.id === sessionId),
     setInvocation: invocationWriter(sessionId),
     // ストロークの1回の実行は必ず提出（A5・A7）で終わる。プロセスが正常終了しても
-    // 提出が1つも無ければ、作業をせずに終わったということなので起動し直す。
-    didWork: submittedSince(sessionId),
+    // 提出が1つも無ければ、作業をせずに終わったということなので起動し直す。単位は起動
+    // （接続 token）——決着（下の `settle`）が「何が提出されたか」を要るので揃えてある。
+    didWork: submittedByLaunch(token),
+    // 実行の決着。提出されたものに応じて phase を切り替え、画面へ配信する（A9）。
+    // **ストロークだけが持つ。** steering の決着に当たるのは完成の記録（U15）である。
+    settle: settlement(sessionId, token),
     prepare: () => initSessionOpenspec({
       cwd,
       bin: openspec.bin,

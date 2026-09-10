@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './support';
 
 /**
  * 上層 — プロジェクト一覧（specs/project-directory）。

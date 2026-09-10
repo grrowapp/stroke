@@ -5,13 +5,16 @@ import { requireSessionId } from '../../../../utils/stroke/session-param'
 import { isPromotedState, readState } from '../../../../utils/stroke/session-store'
 
 /**
- * A7: proposal の全文を提出する。初提出なら strokes へマーカー行を追記し、受理した瞬間に
- * W2 へ配信する。
+ * A7: proposal の全文を提出する。初提出なら strokes へマーカー行を追記する。
+ *
+ * **受理は記録までである。** phase を進めず、画面へも配信しない——どちらも、この提出を
+ * 行った実行の決着（A9）が行う（change fix-rename-during-running-session）。ここで phase を
+ * `proposed` にすると、claude の実行がまだ終わっていないのに承認できる局面が立ち、承認が
+ * 呼ぶ昇格（U14）の改名が走っている claude を置き去りにする。
  *
  * ここが持つのは**受け付けるかどうか**までである——本文が形として読み取れるか（400）と、
- * 提出してよい局面か（409）。受理を成立させる段——残す・phase を進める・配信する——は
- * `handler/proposal.ts` が1続きで持つ。順序（残す → phase を進める → 配信する）とその
- * 理由、出し直しで承認の判断が失効することも、そちらに書いてある。
+ * 提出してよい局面か（409）。残すことと、出し直しで承認の判断が失効することは
+ * `handler/proposal.ts` が持つ。
  */
 export default defineEventHandler(async (event) => {
   const sessionId = await requireSessionId(event)
@@ -23,7 +26,7 @@ export default defineEventHandler(async (event) => {
     throw conflict('phase', '承認済みのセッションには提出できない。')
   }
 
-  await submitProposal(sessionId, state, proposal, projectName)
+  await submitProposal(sessionId, state, proposal, projectName, getHeader(event, 'x-stroke-token'))
 
   return new Response(null, { status: 204 })
 })

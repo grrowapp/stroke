@@ -199,6 +199,107 @@ describe('invokeAi', () => {
   })
 
   /**
+   * 実行の決着（change fix-rename-during-running-session）。`didWork` と同じ置き方で、
+   * 渡されていて**かつ作業があったとき**だけ呼ぶ。ai.ts は何が提出されたかを知らず、
+   * 渡された関数の真偽値しか見ない。
+   *
+   * **局面が動くのはここだけである。** 提出を受ける口（A5・A7）は記録だけを行い、phase の
+   * 切り替えと画面への配信は決着が持つ。`idle` にする前に置くのは、承認できる局面が立つ
+   * 時点を実行の終わりに揃えるためである。
+   */
+  describe('実行の決着（settle）', () => {
+    it('作業ありで決着できれば idle（回数は戻す）', async () => {
+      runClaude.mockResolvedValue({ ok: true, sessionId: 'x' })
+      const settle = vi.fn(async () => true)
+
+      const { run, calls } = makeRun({ didWork: () => true, settle })
+      await runInvoke(run)
+
+      expect(settle).toHaveBeenCalledTimes(1)
+      expect(calls.at(-1)).toEqual({ invocation: 'idle', retries: 0 })
+    })
+
+    it('決着は `idle` を書く前に起こる', async () => {
+      // 局面が動いてから実行が終わる。逆だと、承認できる局面が立つ前に `idle` になる
+      runClaude.mockResolvedValue({ ok: true, sessionId: 'x' })
+      const order: string[] = []
+      const settle = vi.fn(async () => {
+        order.push('settle')
+        return true
+      })
+
+      const { run } = makeRun({
+        didWork: () => true,
+        settle,
+        setInvocation: async (invocation) => {
+          order.push(invocation)
+        },
+      })
+      await runInvoke(run)
+
+      expect(order).toEqual(['running', 'settle', 'idle'])
+    })
+
+    it('作業ありでも決着できなければ failed（巡回が起こし直す）', async () => {
+      runClaude.mockResolvedValue({ ok: true, sessionId: 'x' })
+
+      const { run, calls } = makeRun({ didWork: () => true, settle: async () => false })
+      await runInvoke(run)
+
+      expect(calls.at(-1)).toEqual({ invocation: 'failed', retries: undefined })
+    })
+
+    it('渡されていなければ決着を試みず idle（steering）', async () => {
+      runClaude.mockResolvedValue({ ok: true, sessionId: 'x' })
+
+      const { run, calls } = makeRun({ didWork: () => true, settle: undefined })
+      await runInvoke(run)
+
+      expect(calls.at(-1)).toEqual({ invocation: 'idle', retries: 0 })
+    })
+
+    it('作業が無ければ決着を試みず failed', async () => {
+      runClaude.mockResolvedValue({ ok: true, sessionId: 'x' })
+      const settle = vi.fn(async () => true)
+
+      const { run, calls } = makeRun({ didWork: () => false, settle })
+      await runInvoke(run)
+
+      expect(settle).not.toHaveBeenCalled()
+      expect(calls.at(-1)).toEqual({ invocation: 'failed', retries: undefined })
+    })
+
+    it('プロセスが失敗したら決着を試みない（提出は記録として残るが局面は動かない）', async () => {
+      runClaude.mockResolvedValue({ ok: false, detail: 'timeout', sessionMissing: false })
+      const settle = vi.fn(async () => true)
+
+      const { run, calls } = makeRun({ settle })
+      await runInvoke(run)
+
+      expect(settle).not.toHaveBeenCalled()
+      expect(calls.at(-1)).toEqual({ invocation: 'failed', retries: undefined })
+    })
+
+    it('決着は完成の記録より先に起こる', async () => {
+      runClaude.mockResolvedValue({ ok: true, sessionId: 'x' })
+      const order: string[] = []
+      const settle = vi.fn(async () => {
+        order.push('settle')
+        return true
+      })
+      const recordCompletion = vi.fn(async () => {
+        order.push('record')
+        return true
+      })
+
+      const { run } = makeRun({ didWork: () => true, settle, recordCompletion })
+      await runInvoke(run)
+
+      expect(order).toEqual(['settle', 'record'])
+    })
+  })
+
+  /**
    * 完成の記録（add-activated-phase design D4）。`didWork` と同じ置き方で、渡されていて
    * **かつ作業があったとき**だけ呼ぶ。ai.ts は phase を知らず、渡された関数の真偽値しか
    * 見ない。

@@ -1,6 +1,6 @@
-import { expect, test, type APIRequestContext } from '@playwright/test';
+import type { APIRequestContext } from '@playwright/test';
 
-import { addSelectionComment, painted, selectIn } from './support';
+import { addSelectionComment, expect, painted, selectIn, settleRun, test } from './support';
 
 /**
  * ストローク側の proposal 確認画面の面（プレビュー / 生テキスト）と、そこで付けた指摘。
@@ -31,11 +31,20 @@ async function startSession(request: APIRequestContext): Promise<string> {
   return sessionId;
 }
 
+/**
+ * A7 で提出し、その実行を決着させる（A9）。**2段で1つの段取りである。**
+ *
+ * 提出だけでは phase は `stroking` のままで、画面2 は開かない（画面1 へ戻される）。
+ * 承認できる局面が立つのは実行の決着の時点だけになった
+ * （change fix-rename-during-running-session）。ここが見たいのは面と指摘なので、決着まで
+ * 進めた状態を段取りとして作る。
+ */
 async function submitProposal(request: APIRequestContext, sessionId: string): Promise<void> {
   const response = await request.post(`/api/strokes/${sessionId}/proposal`, {
     data: { proposal: PROPOSAL_BODY, projectName: 'e2e-proposal-annotation' },
   });
   expect(response.ok(), await response.text()).toBeTruthy();
+  await settleRun(request, sessionId, 'proposal');
 }
 
 test.describe('proposal 確認画面の2つの面', () => {

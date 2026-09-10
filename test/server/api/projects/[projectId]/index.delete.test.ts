@@ -9,11 +9,11 @@ import { deriveProjectId } from '../../../../../server/utils/upstream/project-id
 /**
  * 対象は `server/api/projects/[projectId]/index.delete.ts`（P1）。
  *
- * 見るのは2つ。busy 判定が U13（起動）・U11（セッション削除）・U10（承認）と同じ事実
- * （作業場所ディレクトリの実体）を見ていること（fix-rename-during-running-session）。
- * そして受理範囲——作りきれなかった（`approved`）ものだけを消し、完成した（`activated`）
- * ものは `.spec-workflow/` の有無によらず消さないこと（specs/api/project/delete・
- * add-activated-phase design D5）。
+ * 見るのは2つ。**実行中かどうかを見ないこと**——「実行中だから受理しない」（409 busy）は
+ * 契約から無くなった。削除の操作は生成の失敗の決着でしか出ないので、実行中に届かない
+ * （fix-rename-during-running-session）。そして受理範囲——作りきれなかった（`approved`）
+ * ものだけを消し、完成した（`activated`）ものは `.spec-workflow/` の有無によらず消さない
+ * こと（specs/api/project/delete・add-activated-phase design D5）。
  *
  * `running.ts` と `session-store.ts` は実物のまま使う（`useRuntimeConfig` の差し替えは
  * `sessions/[id]/index.delete.test.ts` と同じ）。
@@ -72,36 +72,29 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true });
 });
 
-describe('P1 DELETE /api/projects/:projectId — busy', () => {
-  it('実行中（起動と同じキー）は 409 busy で断り、何も消さない', async () => {
-    const key = await beginRun(join(root, PROJECT_NAME));
+describe('P1 DELETE /api/projects/:projectId — 実行中を見ない', () => {
+  it('実行の枠が取られていても断らない。「実行中だから受理しない」は無い', async () => {
+    const start = await beginRun(join(root, PROJECT_NAME));
+    if (!start.started) throw new Error('枠を取れなかった');
     try {
-      const event = eventFor(projectId);
+      const response = await deleteHandler(eventFor(projectId) as never);
 
-      await expect(deleteHandler(event as never)).rejects.toMatchObject({
-        statusCode: 409,
-        data: { reason: 'busy' },
-      });
-
-      expect(await exists(join(root, PROJECT_NAME))).toBe(true);
+      expect((response as Response).status).toBe(204);
+      expect(await exists(join(root, PROJECT_NAME))).toBe(false);
     } finally {
-      endRun(key);
+      endRun(start.key);
     }
   });
 
-  it('実行が終わった後は削除できる', async () => {
-    const event = eventFor(projectId);
-
-    const response = await deleteHandler(event as never);
+  it('普通に削除できる', async () => {
+    const response = await deleteHandler(eventFor(projectId) as never);
 
     expect((response as Response).status).toBe(204);
     expect(await exists(join(root, PROJECT_NAME))).toBe(false);
   });
 
-  it('存在しないプロジェクトは busy より先に 404 になる', async () => {
-    const event = eventFor('does-not-exist');
-
-    await expect(deleteHandler(event as never)).rejects.toMatchObject({ statusCode: 404 });
+  it('存在しないプロジェクトは 404 になる', async () => {
+    await expect(deleteHandler(eventFor('does-not-exist') as never)).rejects.toMatchObject({ statusCode: 404 });
   });
 });
 

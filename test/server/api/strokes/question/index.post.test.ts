@@ -21,7 +21,7 @@ import { fakeEvent, stubNitroGlobals, type FakeEvent } from '../../support';
  * （`fix-session-api-layout` で実測）。
  *
  * **見るのは準備と後始末だけである**——読み取れない問いの 400、承認以降の 409、通ったときに
- * handler へ渡すものと 204 の返し方。残すことと配信することの実処理は
+ * handler へ渡すもの（接続 token を含む）と 204 の返し方。残すことと、決着で流すことの実処理は
  * `test/server/handler/question.test.ts`。
  */
 
@@ -56,6 +56,8 @@ const QUESTION = {
   options: [{ label: 'JSON', description: '1ファイルに丸ごと持つ' }],
 };
 const STROKING = { phase: 'stroking', currentQuestion: null, invocation: 'idle' } as const;
+/** その提出を起こした claude の接続（`x-stroke-token`）。endpoint は素通しするだけ */
+const TOKEN = 'launch-token-1';
 
 describe('A5 POST /api/strokes/:id/question', () => {
   beforeEach(() => {
@@ -74,19 +76,30 @@ describe('A5 POST /api/strokes/:id/question', () => {
    * テストの期待値も、長く 200 を書いていた。ここで留めるのはソースが述べるステータスである。
    */
   it('受理したら handler へ渡し、本文なしの 204 を返す', async () => {
-    const event = fakeEvent('session-1', QUESTION);
+    const event = fakeEvent('session-1', QUESTION, { 'x-stroke-token': TOKEN });
 
     const body = await questionHandler(event as never);
 
-    // 断った後の状態をそのまま渡す——問い以外を動かさないのは handler の役目である
+    // 断った後の状態をそのまま渡す——問い以外を動かさないのは handler の役目である。
+    // 接続 token も素通しする——決着が「何が提出されたか」を読む記録に使う
     expect(submitQuestion).toHaveBeenCalledWith('session-1', STROKING, expect.objectContaining({
       question: '保存方式をどうするか',
-    }));
+    }), TOKEN);
     // ハンドラは status を自分で持った Response を返す（`setResponseStatus` + 裸の null は
     // h3 に捨てられる）。観測点は event ではなく返り値である
     expect(body).toBeInstanceOf(Response);
     expect((body as Response).status).toBe(204);
     expect(await (body as Response).text()).toBe('');
+  });
+
+  /**
+   * token を持たない要求も受理する。起動の外から直に叩かれたもので、記録の対象にならない
+   * だけである（判定は `submission-signal.ts` が持つ）。endpoint は有無を見ない。
+   */
+  it('接続 token を持たない要求も受理し、handler へは undefined を渡す', async () => {
+    await questionHandler(fakeEvent('session-1', QUESTION) as never);
+
+    expect(submitQuestion).toHaveBeenCalledWith('session-1', STROKING, expect.anything(), undefined);
   });
 
   it('読み取れない問いは 400 で弾き、handler を呼ばない', async () => {

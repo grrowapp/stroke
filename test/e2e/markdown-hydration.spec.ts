@@ -1,6 +1,6 @@
-import { expect, test, type Browser, type Page } from '@playwright/test';
+import type { Browser, Page } from '@playwright/test';
 
-import { ALPHA, resetBoard } from './support';
+import { ALPHA, expect, resetBoard, test } from './support';
 
 /**
  * markdown を描く画面で、**ハイドレーションがずれていない**ことを見る。

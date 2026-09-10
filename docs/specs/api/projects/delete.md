@@ -19,7 +19,6 @@
 | status | 状況 |
 |---|---|
 | 404 | プロジェクトが無い |
-| 409 busy | 対象で AI が走っている |
 | 409 phase | まだプロジェクトになっていない（`stroking` / `proposed`）。セッションの削除を使う |
 | 409 phase | 中身のあるプロジェクト（`activated`） |
 | 409 phase | `state.json` を読めない |

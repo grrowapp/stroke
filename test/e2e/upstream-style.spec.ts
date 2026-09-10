@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 
-import { ALPHA, resetBoard, stub } from './support';
+import { ALPHA, expect, resetBoard, stub, test } from './support';
 
 /**
  * 下層とトーストが本家の様式になっているかを、稼働中の画面から読む。
