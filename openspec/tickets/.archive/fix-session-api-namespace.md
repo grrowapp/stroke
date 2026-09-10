@@ -1,5 +1,5 @@
 ---
-status: Doing
+status: Wait-for-archive
 origin: agent
 triage:
   - bug
@@ -15,7 +15,7 @@ tags:
 
 # fix-session-api-namespace
 
-`docs/specs/api/overview.md` を基準に、セッション系の endpoint（U 系と W1 / W2）を `/api/strokes/` から `/api/sessions/` へ移設する。handler は #13 で `index.<method>.ts` に揃っているので、移動はディレクトリ単位の `git mv` で済む。画面・サーバ内の参照・テスト・E2E・`wsPathPattern`・`useAgentQuestion` の基底・`.claude/settings.json`・spec `server/session-management`・関連 docs 4 ページを追随させる。基準の docs には触れない。
+`docs/specs/api/overview.md` を基準に、セッションの endpoint（`docs/specs/api/contract.md` の `U1`〜`U15`）と WS の `W1` / `W2` を `/api/strokes/` から `/api/sessions/` へ移設する。handler は #13 で `index.<method>.ts` に揃っているので、移動はディレクトリ単位の `git mv` で済む。画面・サーバ内の参照・テスト・E2E・`wsPathPattern`・`useAgentQuestion` の基底・`.claude/settings.json`・spec `server/session-management`・関連 docs 4 ページを追随させる。基準の docs には触れない。
 
 ## 経緯
 
@@ -30,4 +30,4 @@ tags:
 
 ## 畳む方向
 
-`grep -rn "api/strokes" app server shared test .claude` に残るのが A 系と MCP tools だけで、問い返しの回答送信（`useAgentQuestion`）が 404 にならず、`yarn test`・`yarn test:e2e`・`openspec validate --all` が通ること。PR が `pre3` にマージされ、親が archive すること。旧 ticket 2 本が `.archive/` へ移り、README だけの change ディレクトリが消えていること。
+`grep -rn "api/strokes" app server shared test .claude` に残るのがエージェントが叩く endpoint と MCP tools だけで、問い返しの回答送信（`useAgentQuestion`）が 404 にならず、`yarn test`・`yarn test:e2e`・`openspec validate --all` が通ること。PR が `pre3` にマージされ、親が archive すること。旧 ticket 2 本が `.archive/` へ移り、README だけの change ディレクトリが消えていること。

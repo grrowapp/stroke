@@ -1,5 +1,5 @@
 ---
-status: Planning
+status: Doing
 origin: user
 date: 2026-09-09
 change: create-failure-flow
@@ -8,6 +8,7 @@ tags:
   - specs
   - design
   - tasks
+  - pre2/4f092b9f-635f-480b-922e-0f648f0319e0
 ---
 
 # create-failure-flow
@@ -34,5 +35,17 @@ tags:
 ## 書き出し先の決定
 
 ユーザーへ3案（`architecture/` へ新設 / `session-workflow.md` へ節を追加 / `api/contract.md` へ節を追加）を諮り、**新設**を採った（2026-09-09）。名前は指摘を2度受けて決めた——長いとの指摘で `failure-recovery.md` から縮め、続けて「recovery ではなく failure」との指示で `failure.md` にした（指示の綴り `failer` は英語として立たないため、通用する `failure` を採った。`docs/agents/issue-tracker.md`「用語の表記」）。capability も `failure`、change-id も `create-failure-flow` に揃えた。
+
+## 作業で分かったこと（2026-09-09）
+
+- **W1 の接続時配信が終端の表示を消していた。** 答え終わっていない問いが残ったまま `error` に達した
+  セッションを開くと、接続の瞬間に届く1問が `stopWaiting()` を呼び、終端の表示ごと落ちる。ユーザーは
+  選択肢に触れないまま、答えても進まない問いの前に立たされていた。終端は問いの到着で解けない形に直した
+- **初期状態の判定が一度きりで効かない場面があった。** 画面1 はモーダル（`stroke` レイアウト）の中に
+  あり、中身は client 側にだけ描かれる。SSR の payload を持たずに hydration すると、setup の時点で
+  `status` がまだ null で、`error` を拾えないまま問いの面が出る。`watch` で当てる形に直した
+- **一覧から `error` のセッションへ戻れない。** 上層の一覧は昇格したプロジェクトだけを返し、ストローク中の
+  セッションは載らない。「時間を置いて再開する」の戻り側が無い。扱いは design.md「Open Questions」で
+  ユーザーへ諮る
 
 対応する change: `create-failure-flow`

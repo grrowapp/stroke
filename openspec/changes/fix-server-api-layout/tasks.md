@@ -48,49 +48,49 @@
 
 - [x] 6.1 子 change `fix-session-api-namespace` と ticket を同時起票する（`origin: agent`、経緯＝親と Gitea #17、吸収する旧 ticket 2 本）。Gitea #17 に change-id をコメント
 - [x] 6.2 #13 のマージ後の `pre3` から worktree `/home/vagrant/work/stroke-board/fix-session-api-namespace` を切り、sparse checkout を揃える
-- [ ] 6.3 opus サブエージェントで ff。関連 docs 4 ページ（`system-structure.md`・`session-workflow.md`・`settings-reference.md`・`file-composables.md`）の書き換え案をユーザーに提示し承認を得る（design.md「docs の書き換え」）。spec `server/session-management` の delta を親が確認
-- [ ] 6.4 opus サブエージェントで apply（ディレクトリ移動・WS route・`wsPathPattern`・サーバ内参照・画面 8 本・`useAgentQuestion` の基底・テスト・E2E 5 本・`.claude/settings.json`・spec・docs 4 ページ・`useAgentQuestion` 経路のテスト追加）
-- [ ] 6.5 親が worktree で `yarn test`・`yarn typecheck`・`yarn test:e2e` を通し、Gitea #17 の完了条件（`grep -rn "api/strokes" app server shared test .claude` の残りが A 系と MCP tools だけ。問い返しの回答送信が 404 にならない）を照合
-- [ ] 6.6 PR（base `pre3`）を出してマージし、`pre3` を ff で更新、worktree を消す
-- [ ] 6.7 子 change を archive（ticket → `.archive/`）。旧 ticket `fix-session-api-path.md`・`fix-agent-question-api-path.md` を `.archive/` へ移し、README だけの `openspec/changes/fix-agent-question-api-path/` を消す（design.md「旧 ticket の吸収」）。`openspec validate --all`。Gitea #17 をクローズ
+- [x] 6.3 opus サブエージェントで ff。関連 docs 4 ページ（`system-structure.md`・`session-workflow.md`・`settings-reference.md`・`file-composables.md`）の書き換え案をユーザーに提示し承認を得る（design.md「docs の書き換え」）。spec `server/session-management` の delta を親が確認
+- [x] 6.4 opus サブエージェントで apply（ディレクトリ移動・WS route・`wsPathPattern`・サーバ内参照・画面 8 本・`useAgentQuestion` の基底・テスト・E2E 5 本・`.claude/settings.json`・spec・docs 4 ページ・`useAgentQuestion` 経路のテスト追加）
+- [x] 6.5 親が worktree で `yarn test`・`yarn typecheck`・`yarn test:e2e` を通し、Gitea #17 の完了条件（`grep -rn "api/strokes" app server shared test .claude` の残りが A 系と MCP tools だけ。問い返しの回答送信が 404 にならない）を照合
+- [x] 6.6 PR（base `pre3`）を出してマージし、`pre3` を ff で更新、worktree を消す
+- [x] 6.7 子 change を archive（ticket → `.archive/`）。旧 ticket `fix-session-api-path.md`・`fix-agent-question-api-path.md` を `.archive/` へ移し、README だけの `openspec/changes/fix-agent-question-api-path/` を消す（design.md「旧 ticket の吸収」）。`openspec validate --all`。Gitea #17 をクローズ
 
 ## 7. Gitea #15 — `update-session-api-handler`（#17 の後）
 
-- [ ] 7.1 子 change `update-session-api-handler` と ticket を同時起票する（`origin: agent`、経緯＝親と Gitea #15）。Gitea #15 に change-id をコメント
-- [ ] 7.2 #17 のマージ後の `pre3` から worktree `/home/vagrant/work/stroke-board/update-session-api-handler` を切り、sparse checkout を揃える
-- [ ] 7.3 opus サブエージェントで ff。切り出しの物差しの capability（候補 `server/api-handler`）の Requirement と、handler の粒度・名前・`session-core` の取り込み・共有の「後始末」（`toHttp`）を親が確認する。`system-structure.md`・`server-structure.md` の書き換え案をユーザーに提示し承認を得る（design.md「docs の書き換え」）
-- [ ] 7.4 opus サブエージェントで apply（U 系 11 本の切り出し・`server/handler/` 新設・`session-core` の統一・テストの寄せ替え・capability・docs 2 ページ）
-- [ ] 7.5 親が worktree で `yarn test`・`yarn typecheck`・`yarn test:e2e` を通し、Gitea #15 の完了条件（api が「読む → handler → 返す」、`*Core` が残っていない、E2E の応答が不変）を照合
-- [ ] 7.6 PR（base `pre3`）を出してマージし、`pre3` を ff で更新、worktree を消す
-- [ ] 7.7 子 change を archive（ticket → `.archive/`）。`openspec validate --all`。Gitea #15 をクローズ
+- [x] 7.1 子 change `update-session-api-handler` と ticket を同時起票する（`origin: agent`、経緯＝親と Gitea #15）。Gitea #15 に change-id をコメント
+- [x] 7.2 #17 のマージ後の `pre3` から worktree `/home/vagrant/work/stroke-board/update-session-api-handler` を切り、sparse checkout を揃える
+- [x] 7.3 opus サブエージェントで ff。切り出しの物差しの capability（候補 `server/api-handler`）の Requirement と、handler の粒度・名前・`session-core` の取り込み・共有の「後始末」（`toHttp`）を親が確認する。`system-structure.md`・`server-structure.md` の書き換え案をユーザーに提示し承認を得る（design.md「docs の書き換え」）
+- [x] 7.4 opus サブエージェントで apply（U 系 11 本の切り出し・`server/handler/` 新設・`session-core` の統一・テストの寄せ替え・capability・docs 2 ページ）
+- [x] 7.5 親が worktree で `yarn test`・`yarn typecheck`・`yarn test:e2e` を通し、Gitea #15 の完了条件（api が「読む → handler → 返す」、`*Core` が残っていない、E2E の応答が不変）を照合
+- [x] 7.6 PR（base `pre3`）を出してマージし、`pre3` を ff で更新、worktree を消す
+- [x] 7.7 子 change を archive（ticket → `.archive/`）。`openspec validate --all`。Gitea #15 をクローズ
 
 ## 8. Gitea #18 — `update-stroke-api-handler`（#15 の後。並走その2）
 
-- [ ] 8.1 子 change `update-stroke-api-handler` と ticket を同時起票する（`origin: agent`、経緯＝親と Gitea #18）。Gitea #18 に change-id をコメント
-- [ ] 8.2 #15 のマージ後の `pre3` から worktree `/home/vagrant/work/stroke-board/update-stroke-api-handler` を切り、sparse checkout を揃える
-- [ ] 8.3 opus サブエージェントで ff。#15 の capability と `handler/` の置き方に従うことを親が確認する（新しい capability は作らない）
-- [ ] 8.4 opus サブエージェントで apply（A 系 5 本と WS route 2 本の切り出し・テストの寄せ替え）
-- [ ] 8.5 親が worktree で `yarn test`・`yarn typecheck`・`yarn test:e2e` を通し、Gitea #18 の完了条件（W1/W2 の接続時配信と A7 の順序が不変）を照合
-- [ ] 8.6 PR（base `pre3`）を出してマージし、`pre3` を ff で更新、worktree を消す
-- [ ] 8.7 子 change を archive（ticket → `.archive/`）。`openspec validate --all`。Gitea #18 をクローズ
+- [x] 8.1 子 change `update-stroke-api-handler` と ticket を同時起票する（`origin: agent`、経緯＝親と Gitea #18）。Gitea #18 に change-id をコメント
+- [x] 8.2 #15 のマージ後の `pre3` から worktree `/home/vagrant/work/stroke-board/update-stroke-api-handler` を切り、sparse checkout を揃える
+- [x] 8.3 opus サブエージェントで ff。#15 の capability と `handler/` の置き方に従うことを親が確認する（新しい capability は作らない）
+- [x] 8.4 opus サブエージェントで apply（A 系 5 本と WS route 2 本の切り出し・テストの寄せ替え）
+- [x] 8.5 親が worktree で `yarn test`・`yarn typecheck`・`yarn test:e2e` を通し、Gitea #18 の完了条件（W1/W2 の接続時配信と A7 の順序が不変）を照合
+- [x] 8.6 PR（base `pre3`）を出してマージし、`pre3` を ff で更新、worktree を消す
+- [x] 8.7 子 change を archive（ticket → `.archive/`）。`openspec validate --all`。Gitea #18 をクローズ
 
 ## 9. Gitea #19 — `update-project-api-handler`（#15・#12 の後。並走その2）
 
-- [ ] 9.1 子 change `update-project-api-handler` と ticket を同時起票する（`origin: agent`、経緯＝親と Gitea #19）。Gitea #19 に change-id をコメント
-- [ ] 9.2 #15 のマージ後の `pre3` から worktree `/home/vagrant/work/stroke-board/update-project-api-handler` を切り、sparse checkout を揃える
-- [ ] 9.3 opus サブエージェントで ff。#15 の capability と共有の「後始末」を使うことを親が確認する
-- [ ] 9.4 opus サブエージェントで apply（プロジェクト系 5 本の切り出し・`resolveName` の handler 化・`toHttp` の統一・テストの寄せ替え）
-- [ ] 9.5 親が worktree で `yarn test`・`yarn typecheck`・`yarn test:e2e` を通し、Gitea #19 の完了条件（`toHttp` が 1 つ、本家仲介の応答が不変）を照合
-- [ ] 9.6 PR（base `pre3`）を出してマージし、`pre3` を ff で更新、worktree を消す
-- [ ] 9.7 子 change を archive（ticket → `.archive/`）。`openspec validate --all`。Gitea #19 をクローズ
+- [x] 9.1 子 change `update-project-api-handler` と ticket を同時起票する（`origin: agent`、経緯＝親と Gitea #19）。Gitea #19 に change-id をコメント
+- [x] 9.2 #15 のマージ後の `pre3` から worktree `/home/vagrant/work/stroke-board/update-project-api-handler` を切り、sparse checkout を揃える
+- [x] 9.3 opus サブエージェントで ff。#15 の capability と共有の「後始末」を使うことを親が確認する
+- [x] 9.4 opus サブエージェントで apply（プロジェクト系 5 本の切り出し・`resolveName` の handler 化・`toHttp` の統一・テストの寄せ替え）
+- [x] 9.5 親が worktree で `yarn test`・`yarn typecheck`・`yarn test:e2e` を通し、Gitea #19 の完了条件（`toHttp` が 1 つ、本家仲介の応答が不変）を照合
+- [x] 9.6 PR（base `pre3`）を出してマージし、`pre3` を ff で更新、worktree を消す
+- [x] 9.7 子 change を archive（ticket → `.archive/`）。`openspec validate --all`。Gitea #19 をクローズ
 
 ## 10. 全体の検証
 
-- [ ] 10.1 `pre3` で `yarn test`・`yarn typecheck`・`yarn test:e2e` を通す
-- [ ] 10.2 `docs/specs/api/` の規定と `server/api/` を突き合わせ直す: `find server/api server/routes -type f` がすべて `index.<method>.ts`（WS route を除く）、`grep -rn "api/strokes" app server shared test .claude` の残りが A 系と MCP tools だけ、`server/handler/` に実処理が揃い api が薄い層になっている
+- [x] 10.1 `pre3` で `yarn test`・`yarn typecheck`・`yarn test:e2e` を通す
+- [x] 10.2 `docs/specs/api/` の規定と `server/api/` を突き合わせ直す: `find server/api server/routes -type f` がすべて `index.<method>.ts`（WS route を除く）、`grep -rn "api/strokes" app server shared test .claude` の残りが A 系と MCP tools だけ、`server/handler/` に実処理が揃い api が薄い層になっている
 - [ ] 10.3 `openspec validate --all` を通し、子 change 8 本が `openspec/changes/archive/` に、ticket 8 本と旧 ticket 2 本が `openspec/tickets/.archive/` に在ることを確認する
 - [ ] 10.4 Gitea #14 に完了の状況（PR 番号と change-id の対応）をコメントする
-- [ ] 10.5 起動したものが残っていないことを確認する（`pgrep -f "nuxt|playwright"`、worktree の残り、`git worktree list`）
+- [x] 10.5 起動したものが残っていないことを確認する（`pgrep -f "nuxt|playwright"`、worktree の残り、`git worktree list`）
 
 ## 11. レビュー
 
@@ -98,6 +98,6 @@
 
 ## 12. 終了
 
-- [ ] 12.1 `pre3` から親ブランチ（`develop`）への PR を Gitea に出す（本文に Gitea #14 と子 PR 8 本の対応。マージはしない）
+- [x] 12.1 `pre3` から親ブランチ（`develop`）への PR を Gitea に出す（本文に Gitea #14 と子 PR 8 本の対応。マージはしない）
 - [ ] 12.2 change の成果物を commit する: `openspec/` の親 change の artifact・子 change 8 本の archive・ticket の移動を、ユーザー承認のうえ `develop`（`/opt/projects/stroke-board`）に 1 回でコミットする（design.md「openspec 成果物のコミット」）
 - [ ] 12.3 ユーザーから完了承認を得て、`openspec/tickets/fix-server-api-layout.md` の `status` を `Wait-for-archive` にする（`docs/agents/ticket-tracker.md`「ラベル設定」）

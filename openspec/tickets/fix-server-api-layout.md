@@ -70,3 +70,15 @@ tags:
 ## 畳む方向
 
 子 change 8 本がそれぞれ archive され、PR がマージされていること。`docs/specs/api/` の規定と `server/api/` が一致し、`yarn test`・`yarn test:e2e`・`openspec validate --all` が通ること。`pre3` から親ブランチへの PR が出ていること。
+
+## 参照先の資料が増えた（2026-09-09。change `update-api-contract` から）
+
+`docs/specs/api/contract.md` に在った各 endpoint の入出力を、1本1ファイルへ切り出した。**基準の
+`api/overview.md`・`api/server.md` は触っていない**が、実装を突き合わせる先が増えている。
+
+- U1・U2・U3・U7・U9・U12 — `docs/specs/api/sessions/{overview,get,strokes,answer,send-back,list}.md`（新設）
+- A1・A4・A5・A7・A8 — `docs/specs/api/strokes/{overview,send-back,question,proposal,submission}.md`（新設）
+- W1・W2 — `docs/specs/api/ws/delivery.md` へ吸収
+
+切り出し先のパス表記は docs の正（`/api/sessions/`）に揃えてある。実装との差は #17 の範囲のままで、
+`update-api-contract` は実装に触っていない。

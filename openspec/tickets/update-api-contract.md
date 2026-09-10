@@ -1,5 +1,5 @@
 ---
-status: Planning
+status: Doing
 origin: user
 date: 2026-09-09
 change: update-api-contract
@@ -8,6 +8,7 @@ tags:
   - specs
   - design
   - tasks
+  - pre2/4f092b9f-635f-480b-922e-0f648f0319e0
 ---
 
 # update-api-contract
