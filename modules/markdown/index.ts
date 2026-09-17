@@ -1,4 +1,19 @@
 import { addComponent, createResolver, defineNuxtModule, installModule } from '@nuxt/kit';
+import type { ModuleOptions as MdcModuleOptions } from '@nuxtjs/mdc';
+
+/**
+ * markxdown が `@nuxtjs/mdc` へ渡す設定のうち、利用側が選べる口。
+ * ここに挙げた3項目だけを開ける。それ以外の mdc の設定は固定のままとする。
+ */
+export interface ModuleOptions {
+  headings?: {
+    anchorLinks?: NonNullable<MdcModuleOptions['headings']>['anchorLinks'];
+  };
+  rehypePlugins?: {
+    'rehype-raw'?: NonNullable<MdcModuleOptions['rehypePlugins']>['rehype-raw'];
+  };
+  components?: Pick<NonNullable<MdcModuleOptions['components']>, 'prose' | 'map'>;
+}
 
 /**
  * markdown を扱う実体を閉じるモジュール。
@@ -37,15 +52,43 @@ import { addComponent, createResolver, defineNuxtModule, installModule } from '@
  * に勝つ」危険そのものが無くなる。**ただし @nuxt/ui を `modules/` 側へ移すなど順序を
  * 変えると、この前提は崩れる。**
  */
-export default defineNuxtModule({
+export default defineNuxtModule<ModuleOptions>({
   meta: {
-    // `configKey` は置かない。このモジュールは設定を1つも受け取らないので、
-    // 宣言すると使えない設定キーが型に生えるだけになる。値の正は
-    // `docs/specs/core/settings-reference.md`（ADR 0004）で、そこに無いものは設定ではない
-    name: 'stroke-board-markdown',
+    // 切り出し後の利用側設定として `configKey: 'markxdown'` を公開する。
+    // stroke-board からの利用は既定値のみで、`nuxt.config.ts` に `markxdown` キーを
+    // 置くことはしない。stroke-board の設定の正は
+    // `docs/specs/core/settings-reference.md`（ADR 0004）で、この口はその対象外になる。
+    name: 'markxdown',
+    configKey: 'markxdown',
   },
 
-  async setup(_options, nuxt) {
+  defaults: {
+    // 既定では h2〜h4 に自動でアンカーリンクが付き、本家の文書表示と別物になるので切る
+    headings: { anchorLinks: false },
+
+    // **生 HTML は描かない。** MDC の既定サニタイズは属性しか落とさず、`<img>` や
+    // `<script>` はタグとして残る。`rehype-raw` を切ると生 HTML が要素にならず、
+    // 文書側の HTML が描かれる経路そのものが無くなる。
+    // stroke-board は本家のファイルを読んで出すだけで、文書の中身を信用して実行する
+    // 立場にない。
+    rehypePlugins: { 'rehype-raw': false },
+
+    // Prose コンポーネントを使わず素のタグで描く。
+    // `@nuxtjs/mdc` を入れると @nuxt/ui が自前の Prose 一式（ProseTable / ProseTh …）を
+    // 自動登録し（`hasNuxtModule` 判定なので `ui.prose: false` では止まらない）、
+    // Tailwind クラスを直付けする。クラスは `.sb-markdown` の指定に勝つため、
+    // 本家写しの見た目（docs/specs/core）が丸ごと効かなくなる。
+    //
+    // そのうえで `pre` だけ自前の受け口に差し替える。本家は mermaid のフェンスを図（SVG）に
+    // しているが、shiki は生ソースのコードブロックにしてしまう。`MarkdownPre` が
+    // `language` を見て mermaid だけ図へ回し、それ以外の `pre` は属性ごと素通しする。
+    // 値は `resolveComponent()` で引かれるため、受け口は global に登録する必要がある。
+    //
+    // `prose` は上のとおり切ったままにする。Prose を戻すと `.sb-markdown` が効かなくなる。
+    components: { prose: false, map: { pre: 'MarkdownFence' } },
+  },
+
+  async setup(options, nuxt) {
     const { resolve } = createResolver(import.meta.url);
 
     // 外から引く口。`#markdown` の1本だけを公開する。
@@ -56,9 +99,6 @@ export default defineNuxtModule({
 
     // markdown の解釈。ビルド時に畳み込まれるので runtimeConfig には置けない
     await installModule('@nuxtjs/mdc', {
-      // 既定では h2〜h4 に自動でアンカーリンクが付き、本家の文書表示と別物になるので切る
-      headings: { anchorLinks: false },
-
       // **`keepPosition` はここに置けない。** あれは `parseMarkdown` に渡す
       // `MDCParseOptions` のオプションであって、module の `ModuleOptions` ではない
       // （`dist/module.d.mts` の 63行目と 126行目）。
@@ -80,27 +120,9 @@ export default defineNuxtModule({
       // 書き換えると12本落ちる（実測 2026-08-30）。
       //
       // 位置の口の実装は `runtime/position/` が持つ。
-
-      // **生 HTML は描かない。** MDC の既定サニタイズは属性しか落とさず、`<img>` や
-      // `<script>` はタグとして残る。`rehype-raw` を切ると生 HTML が要素にならず、
-      // 文書側の HTML が描かれる経路そのものが無くなる。
-      // stroke-board は本家のファイルを読んで出すだけで、文書の中身を信用して実行する
-      // 立場にない。
-      rehypePlugins: { 'rehype-raw': false },
-
-      // Prose コンポーネントを使わず素のタグで描く。
-      // `@nuxtjs/mdc` を入れると @nuxt/ui が自前の Prose 一式（ProseTable / ProseTh …）を
-      // 自動登録し（`hasNuxtModule` 判定なので `ui.prose: false` では止まらない）、
-      // Tailwind クラスを直付けする。クラスは `.sb-markdown` の指定に勝つため、
-      // 本家写しの見た目（docs/specs/core）が丸ごと効かなくなる。
-      //
-      // そのうえで `pre` だけ自前の受け口に差し替える。本家は mermaid のフェンスを図（SVG）に
-      // しているが、shiki は生ソースのコードブロックにしてしまう。`MarkdownPre` が
-      // `language` を見て mermaid だけ図へ回し、それ以外の `pre` は属性ごと素通しする。
-      // 値は `resolveComponent()` で引かれるため、受け口は global に登録する必要がある。
-      //
-      // `prose` は上のとおり切ったままにする。Prose を戻すと `.sb-markdown` が効かなくなる。
-      components: { prose: false, map: { pre: 'MarkdownFence' } },
+      headings: options.headings,
+      rehypePlugins: options.rehypePlugins,
+      components: options.components,
     });
 
     // フェンスの受け口。**global でなければならない。**
