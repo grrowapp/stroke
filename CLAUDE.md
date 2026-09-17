@@ -56,6 +56,7 @@ worktree = `git worktree` で切った作業ディレクトリ。それぞれが
 - **日本語当て字用法禁止** — 必読: `docs/adr/0021-technical-terms-keep-standard-notation.md`。開発・システム系の用語は一般に通用する表記（英語かカタカナ）で書き、自分で訳語を作らない。禁止例の一覧は ADR にあり、指摘されたら即座にそこへ追記する
 - **規定外短縮表記禁止** — 必読: `docs/adr/0023-no-undefined-abbreviations.md`。instruction・template が定めていない短縮形を作らず、規定の名前は規定の形で書く
 - **根拠薄弱な独断限定制約の設置禁止** — 必読: `docs/adr/0024-no-unfounded-unilateral-restrictions.md`。理由の無い限定（「〜だけ」「〜には置かない」）を独断で規定に入れない。限定にメリットがあると判断したら、先にユーザーへ理由を提示し承認を得てから書く
+- **画面遷移・操作アクションの独断変更禁止** — 必読: `docs/adr/0025-no-unilateral-navigation-changes.md`。URL の入場先・リダイレクト・自動遷移・`navigateTo` / `router.push` / route rule / middleware・ボタンやリンクの飛び先・操作の可否（活性／非活性）・画面の責務範囲を、ユーザーの指示なしに足す・変える・消すことをしない。リファクタリングやバグ修正の「ついで」も同じ。変えたいときは、何をどう変えるかと理由を先にユーザーへ提示し、承認を得て、遷移の設計を `docs/specs/architecture/screen-flow.md` へ書き出してから実装する。既に入っている独断の遷移を見つけたら、黙って直さずユーザーへ報告する
 
 ## Docs
 
