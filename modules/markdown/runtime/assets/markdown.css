@@ -314,31 +314,9 @@
   }
 
   /*
-   * 文書を直すときの入力欄。読みのときの `.sb-markdown` と同じ幅・同じ面に置き、
-   * 編集に入った瞬間に見え方が飛ばないようにする。中身は markdown の生テキストなので
-   * 等幅で出す。
+   * 文書を直すときの入力欄の指定（`.sb-textarea`）はここに無い。`UTextarea` の `ui`
+   * （`MarkdownEditor.vue` の `TEXTAREA_UI`）へ移した。
    */
-  .sb-textarea {
-    display: block;
-    width: 100%;
-    min-height: 60vh;
-    padding: 12px;
-    border-radius: 6px;
-    background: var(--surface-sunken);
-    border: 1px solid var(--border-default);
-    color: var(--text-primary);
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: var(--text-sm);
-    line-height: 1.7;
-    resize: vertical;
-    white-space: pre;
-    tab-size: 2;
-  }
-
-  .sb-textarea:focus {
-    outline: none;
-    border-color: var(--interactive-primary);
-  }
 
   /* 保存できなかった理由。消えると何が起きたか分からなくなるので、色だけで示さない */
   .sb-error {

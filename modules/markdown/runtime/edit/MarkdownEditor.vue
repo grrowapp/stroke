@@ -18,6 +18,8 @@
 import { useEventListener, useMounted, useTimeoutFn } from '@vueuse/core';
 import { computed, ref, watch } from '#imports';
 import { onBeforeRouteLeave } from 'vue-router';
+import UButton from '#ui/components/Button.vue';
+import UTextarea from '#ui/components/Textarea.vue';
 
 import MarkdownView from '../render/MarkdownView.vue';
 
@@ -49,6 +51,37 @@ const props = defineProps<{
   framed?: boolean;
   testid?: string;
 }>();
+
+/**
+ * 操作のボタンの見た目。本家の `.btn`（`main.css` の `.sb-action`）に合わせる。
+ *
+ * `size="lg"` が本家と同じ余白（`px-3 py-2` = 8px 12px）と字（`text-sm` = 12px）を持つので、
+ * 差分だけを `ui` で足す。
+ * - `gap-1`: 本家は 4px（`size="lg"` の既定は 8px）
+ * - `border border-transparent`: 本家の `.btn` は透明な 1px 枠を持ち、それで高さが 35px になる
+ * - `text-white`: 既定の `text-inverted` はダークでは暗い色。本家は塗りのボタンを白抜きにする
+ * - `disabled:opacity-50`: 本家は 0.5（@nuxt/ui の既定は 0.75）
+ */
+const PRIMARY_UI = {
+  base: 'gap-1 border border-transparent text-white hover:bg-[var(--interactive-primary-hover)] disabled:opacity-50 disabled:cursor-not-allowed',
+} as const;
+
+/** 塗らないボタン。本家の `.btn-secondary`（`.sb-action-secondary`）の値 */
+const SECONDARY_UI = {
+  base: 'gap-1 border border-[var(--border-default)] bg-[var(--interactive-secondary)] text-[var(--text-secondary)] hover:bg-[var(--interactive-secondary-hover)] hover:border-[var(--border-strong)] disabled:opacity-50 disabled:cursor-not-allowed',
+} as const;
+
+/**
+ * 生テキストの入力欄。読みのときの本文（`.sb-markdown`）と同じ幅・同じ面に置く。
+ *
+ * `variant="none"` を選ぶのは、既定の `outline` が枠を `ring` で描くのに対し、ここは本家と
+ * 同じ 1px の `border` で描くため。`fixed` を立てるのは、既定（`fixed: false`）が
+ * `md:text-sm` を足して md 以上で字送りを既定値へ戻してしまうからである。
+ */
+const TEXTAREA_UI = {
+  root: 'block w-full',
+  base: 'min-h-[60vh] p-3 rounded-md border border-[var(--border-default)] bg-[var(--surface-sunken)] text-[var(--text-primary)] font-mono text-sm/[1.7] resize-y whitespace-pre [tab-size:2] focus:outline-none focus:border-[var(--interactive-primary)]',
+} as const;
 
 type Mode = 'read' | 'edit';
 
@@ -178,18 +211,19 @@ onBeforeRouteLeave(() => {
     <div class="mb-4 flex items-center gap-2">
       <template v-if="mode === 'read'">
         <!--
-          下層のボタンは `.sb-action`（本家の `.btn`）。prototype 由来の `.sb-btn` は
-          上層のもので、寸法（padding 7px / 600）が本家と違う（main.css の注釈）。
+          ボタンは @nuxt/ui の `UButton`。寸法・色は本家の `.btn` に合わせた `ui`
+          （`PRIMARY_UI` / `SECONDARY_UI`）で当てる。
         -->
-        <button
+        <UButton
           v-if="editable"
           type="button"
-          class="sb-action"
+          size="lg"
+          :ui="PRIMARY_UI"
           data-testid="document-edit"
           @click="startEditing"
         >
           編集
-        </button>
+        </UButton>
       </template>
 
       <template v-else>
@@ -197,33 +231,35 @@ onBeforeRouteLeave(() => {
           直しかけを整形して見る。画面は移らず、この場で下の面が切り替わる。
           本家の承認画面もプレビューと生テキストを同じ場で行き来する
         -->
-        <button
+        <UButton
           type="button"
-          class="sb-action"
-          :class="preview ? '' : 'sb-action-secondary'"
+          size="lg"
+          :ui="preview ? PRIMARY_UI : SECONDARY_UI"
           :aria-pressed="preview"
           data-testid="document-preview"
           @click="preview = !preview"
         >
           プレビュー
-        </button>
-        <button
+        </UButton>
+        <UButton
           type="button"
-          class="sb-action"
+          size="lg"
+          :ui="PRIMARY_UI"
           :disabled="!savable"
           data-testid="document-save"
           @click="submit"
         >
           {{ saving ? '保存中…' : '保存' }}
-        </button>
-        <button
+        </UButton>
+        <UButton
           type="button"
-          class="sb-action sb-action-secondary"
+          size="lg"
+          :ui="SECONDARY_UI"
           data-testid="document-cancel"
           @click="discard"
         >
           やめる
-        </button>
+        </UButton>
       </template>
 
       <span v-if="justSaved" class="sb-chip sb-chip-on" data-testid="document-saved">
@@ -259,10 +295,12 @@ onBeforeRouteLeave(() => {
       <MarkdownView v-if="mode === 'edit' && preview" :value="draft">
         <template #empty><slot name="empty" /></template>
       </MarkdownView>
-      <textarea
+      <UTextarea
         v-else-if="mode === 'edit'"
         v-model="draft"
-        class="sb-textarea"
+        variant="none"
+        fixed
+        :ui="TEXTAREA_UI"
         spellcheck="false"
         data-testid="document-input"
       />
