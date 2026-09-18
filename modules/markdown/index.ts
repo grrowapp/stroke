@@ -1,5 +1,105 @@
 import { addComponent, createResolver, defineNuxtModule, installModule } from '@nuxt/kit';
+import { defu } from 'defu';
 import type { ModuleOptions as MdcModuleOptions } from '@nuxtjs/mdc';
+
+/**
+ * 本文の見た目のうち、**`@nuxt/ui` の Prose の既定から動かす分**。
+ *
+ * 型（見出し・段落・箇条書き・罫線の寸法）は Tailwind Typography（`prose prose-sm
+ * sm:prose-base dark:prose-invert …`＝本家 `MDXEditorWrapper.tsx` の
+ * `contentEditableClassName` の写し）が持つ。ここに置くのは2種類だけ。
+ *
+ * 1. 本家の MDXEditor が prose の上に重ねている差分（表・インラインコード・リンク・引用）。
+ *    もとは `runtime/assets/markdown.css` の `@layer sb-doc` に在った。
+ * 2. `@nuxt/ui` の Prose が持ち込む指定のうち、上の型と食い違う分の打ち消し。
+ *    実測（Prose を有効にする前後で計測）で出たのは次の5件:
+ *      - `ProseH1` の `font-bold` が prose の 800 に勝って 700 になる
+ *      - `ProseTable` が入れ物の `div`（`my-5 overflow-x-auto rounded-md`）を増やし、角丸が付く
+ *      - `ProseTh` / `ProseTd` の `text-sm` が字を 14px から 12px へ落とす
+ *      - `ProseTr` の角丸（`rounded-ss-md` など）が表の四隅に付く
+ *      - `ProseCode` の `border border-muted` で枠が出て、`text-sm` が字送りを詰める
+ *
+ * 同じ slot に競合するユーティリティを書けば、`tv` が `tailwind-merge` で後勝ちに解決する。
+ * CSS の並び順に頼らないので、打ち消しはこの形で書くこと。
+ *
+ * **prose に勝たせたいものには `!` を付ける。** 以前は `@layer sb-doc` が prose より後の
+ * レイヤーに居たので素の指定で勝てたが、theme のユーティリティは prose と同じレイヤーに
+ * 載るため、`:where()` に子の指定を含む規則（表のセル・リンク・引用）には負ける。
+ *
+ * リンクと引用は e2e の文書（steering の product.md）に出てこないので、計測で確かめられて
+ * いない。値は移す前の `@layer sb-doc` と同じで、`!` も同じ「prose に勝つ」ためのもの。
+ */
+const PROSE_THEME = {
+  /* prose は 800。`@nuxt/ui` の `font-bold`（700）を戻す */
+  h1: { slots: { base: 'font-extrabold' } },
+
+  /*
+   * リンク。prose（invert）の既定は白。本家は `MDXEditorWrapper.css` の
+   * `.mdx-editor-wrapper a { color: var(--accentText) }` で青にしている。
+   * 実測 rgb(112,184,255)。太さ 500 と下線は prose のまま。
+   */
+  a: { base: 'text-[rgb(112,184,255)]!' },
+
+  /*
+   * 引用。`MDXEditorWrapper.css` の `blockquote`（border-left 4px var(--accentBase) /
+   * padding-left 1rem / margin 1rem 0 / ダーク時 color #9ca3af）。斜体と 500 は prose のまま。
+   * 枠色の rgb(13,21,32) は @mdxeditor のダークテーマが入れた `--accentBase`。
+   */
+  blockquote: { base: 'my-4! ps-4! border-s-4! border-[rgb(13,21,32)]! text-[#9ca3af]!' },
+
+  /*
+   * インラインコード。本家は Lexical が `code > span._code_` の二重構造で出し、目に入るのは
+   * 内側（実測: 本文 16px の中で 13.16px ＝ 0.875em × 0.94 / 600 / 面 rgb(33,34,37) /
+   * padding 1px 4px / 角丸なし）。MDC は `code` 1枚しか出さないので、その値をここへ持たせる。
+   * バッククォートは prose の `code::before/::after` がそのまま出す。
+   *
+   * `border-0` と `/[1.75]` は `@nuxt/ui` の打ち消し（枠と字送り）。1.75 は prose の字送り。
+   */
+  code: {
+    base: 'px-1! py-px! rounded-none! border-0! bg-[rgb(33,34,37)]! text-[0.8225em]/[1.75]! font-semibold',
+  },
+
+  /*
+   * 表。本家の表は prose ではなく MDXEditor の table editor（`_tableEditor_` /
+   * `_leftAlignedCell_`）が描く。実測: 罫線 1px rgb(46,49,53) / セル padding 4px 8px /
+   * 字 14px（prose の 0.875em）/ th は 600・白・面 #1f2937 / 縦は baseline 揃え。
+   *
+   * 入れ物の `div` は余白・角丸・横スクロールを持たせない。余白は表そのものが持つ（16px）。
+   */
+  table: {
+    slots: {
+      root: 'my-0 overflow-visible rounded-none',
+      base: 'my-4! w-full border-collapse rounded-none',
+    },
+  },
+
+  /*
+   * 字の大きさと字送りは表から継ぐ（`@nuxt/ui` の `text-sm` を打ち消す）。
+   *
+   * **余白は `!` を付けないと prose に負ける。** prose の `:where(th)` 一式には
+   * `thead th:first-child` のような子の指定があり、素のユーティリティより詳細度が高い
+   * （実測: `px-2` だけでは左の余白が 0 になり、`py-1` だけでは `td` の上が 8px になる）。
+   * 以前は `@layer sb-doc` が prose より後のレイヤーだったので、この手当てが要らなかった。
+   */
+  th: {
+    base: 'px-2! py-1! rounded-none border border-[rgb(46,49,53)] bg-[#1f2937] text-left! align-baseline font-semibold text-white [font-size:inherit] [line-height:inherit]',
+  },
+  td: {
+    base: 'px-2! py-1! rounded-none border border-[rgb(46,49,53)] text-left! align-baseline [font-size:inherit] [line-height:inherit]',
+  },
+
+  /* prose は thead と行に区切り線を足す。本家はセルの罫線で格子を引くので重ねない */
+  thead: { base: 'border-0' },
+  tbody: { base: 'border-0' },
+
+  /*
+   * 行。`@nuxt/ui` は表の四隅の角を丸めるので、同じ組み合わせセレクタで打ち消す
+   * （詳細度が同じなので、同じ slot に書いて `tailwind-merge` に後勝ちさせる）。
+   */
+  tr: {
+    base: 'border-0 [&:first-child>th:first-child]:rounded-none [&:first-child>th:last-child]:rounded-none [&:last-child>td:first-child]:rounded-none [&:last-child>td:last-child]:rounded-none',
+  },
+} as const;
 
 /**
  * markxdown が `@nuxtjs/mdc` へ渡す設定のうち、利用側が選べる口。
@@ -42,15 +142,14 @@ export interface ModuleOptions {
  * **markdown の設定はここにだけ在る。** `nuxt.config.ts` に戻さないこと
  * （`openspec/specs/markdown/module` の「markdown を扱う実体はモジュールの内側にだけ在る」）。
  *
- * **読み込み順が変わっている。** Nuxt は `nuxt.config.ts` の modules を先に、`modules/`
- * の分を後に走らせる。そのため `@nuxt/ui` の setup 時点では `@nuxtjs/mdc` がまだ入って
- * おらず、`hasNuxtModule('@nuxtjs/mdc')` が偽になる（`@nuxt/ui/dist/module.mjs:121`）。
- * 結果として @nuxt/ui は Prose 一式を登録しない。
+ * **読み込み順に前提がある。** このモジュールは **`@nuxt/ui` より前**に走らなければ
+ * ならない。`@nuxt/ui` は setup の時点で `hasNuxtModule('@nuxtjs/mdc')` を見て Prose 一式を
+ * 登録するかどうかを決める（`@nuxt/ui/dist/module.mjs:121`）ので、こちらが先に
+ * `@nuxtjs/mdc` を入れていないと Prose が1つも登録されない。
  *
- * これは害にならない。下の `components.prose: false` により MDC は Prose を引かないので、
- * 以前も登録されているだけで使われていなかった。むしろ「Tailwind クラスが `.sb-markdown`
- * に勝つ」危険そのものが無くなる。**ただし @nuxt/ui を `modules/` 側へ移すなど順序を
- * 変えると、この前提は崩れる。**
+ * 利用側は `modules` の並びでこれを満たす（`nuxt.config.ts` の `'./modules/markdown'` が
+ * `'@nuxt/ui'` の前）。`modules/` ディレクトリの自動読み込みに任せると後回しになるので、
+ * 明示して並べること。
  */
 export default defineNuxtModule<ModuleOptions>({
   meta: {
@@ -73,19 +172,14 @@ export default defineNuxtModule<ModuleOptions>({
     // 立場にない。
     rehypePlugins: { 'rehype-raw': false },
 
-    // Prose コンポーネントを使わず素のタグで描く。
-    // `@nuxtjs/mdc` を入れると @nuxt/ui が自前の Prose 一式（ProseTable / ProseTh …）を
-    // 自動登録し（`hasNuxtModule` 判定なので `ui.prose: false` では止まらない）、
-    // Tailwind クラスを直付けする。クラスは `.sb-markdown` の指定に勝つため、
-    // 本家写しの見た目（docs/specs/core）が丸ごと効かなくなる。
+    // Prose コンポーネントで描く。本文の要素は `@nuxt/ui` の Prose 一式が持ち、
+    // 見た目の上書きは `ui.prose.*`（`nuxt.options.appConfig.ui`）へ置く。下の setup を見ること。
     //
     // そのうえで `pre` だけ自前の受け口に差し替える。本家は mermaid のフェンスを図（SVG）に
-    // しているが、shiki は生ソースのコードブロックにしてしまう。`MarkdownPre` が
-    // `language` を見て mermaid だけ図へ回し、それ以外の `pre` は属性ごと素通しする。
+    // しているが、shiki は生ソースのコードブロックにしてしまう。`MarkdownFence` が
+    // `language` を見て mermaid だけ図へ回し、それ以外の `pre` は `ProsePre` へ委ねる。
     // 値は `resolveComponent()` で引かれるため、受け口は global に登録する必要がある。
-    //
-    // `prose` は上のとおり切ったままにする。Prose を戻すと `.sb-markdown` が効かなくなる。
-    components: { prose: false, map: { pre: 'MarkdownFence' } },
+    components: { prose: true, map: { pre: 'MarkdownFence' } },
   },
 
   async setup(options, nuxt) {
@@ -123,6 +217,37 @@ export default defineNuxtModule<ModuleOptions>({
       headings: options.headings,
       rehypePlugins: options.rehypePlugins,
       components: options.components,
+    });
+
+    // 本文の見た目。**`@nuxt/ui` と同じ置き場・同じ入れ方**にする
+    // （`@nuxt/ui/dist/module.mjs:103` が `nuxt.options.appConfig.ui` へ `defu` で入れている）。
+    //
+    // `defu` は先に入っている値を残すので、このモジュールが `@nuxt/ui` より前に走る限り
+    // ここの値が @nuxt/ui の既定に勝ち、利用側の `app.config.ts` は更に上から勝てる。
+    nuxt.options.appConfig.ui = defu(nuxt.options.appConfig.ui ?? {}, { prose: PROSE_THEME });
+
+    // **Prose の名前は `@nuxt/ui` の実体に解かせる。**
+    //
+    // `@nuxtjs/mdc` も `components.prose` が立つと自前の Prose 一式を登録する
+    // （`@nuxtjs/mdc/dist/module.mjs:357`）。その中身は素のタグ（`ProseTable.vue` は
+    // `<table><slot/></table>` だけ）で、`ui.prose.*` の theme を持たない。
+    //
+    // 名前がぶつかったとき Nuxt が採るのは**先に走査したディレクトリ**で、同じ priority
+    // なら後から登録した側は捨てられる（`nuxt/dist/index.mjs:2600-2612`。
+    // `addComponentsDir` の priority の既定は 0 —— `@nuxt/kit/dist/index.mjs:1758`）。
+    // このモジュールは `@nuxt/ui` より前に走るので、何もしないと MDC の素タグが名前を取り、
+    // `@nuxt/ui` の Prose と theme はどちらも効かない（実測: `.nuxt/components.d.ts` の
+    // `ProsePre` / `ProseTable` が `@nuxtjs/mdc` を指す）。
+    //
+    // そこで MDC 側の登録だけ priority を下げる。`components:dirs` は登録順に呼ばれるので、
+    // この時点で MDC の分は配列に入っており、`@nuxt/ui` の分はまだ入っていない。
+    nuxt.hook('components:dirs', (dirs) => {
+      for (const dir of dirs) {
+        if (typeof dir === 'string') continue;
+        if (typeof dir.path !== 'string') continue;
+        if (!dir.path.includes('@nuxtjs/mdc') || !dir.path.endsWith('components/prose')) continue;
+        dir.priority = -1;
+      }
     });
 
     // フェンスの受け口。**global でなければならない。**

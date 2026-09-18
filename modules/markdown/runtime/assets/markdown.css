@@ -198,85 +198,10 @@
   }
 
   /*
-   * インラインコード。
-   *
-   * 本家は Lexical が `code > span._code_` の二重構造で出しており、外の `code` に
-   * prose（`prose-code:` の色 ＋ 前後のバッククォート ＋ 0.875em ＋ 600）が、内の
-   * `span` に MDXEditor の scoped CSS（0.94em / 面 #212225 / padding 1px 4px /
-   * 角丸なし）が当たる。実測（本文 16px の `li` の中）:
-   *   外 code  14px / 600 / 面 gray-800 / padding 0 / radius 0 / ::before ::after = `
-   *   内 span  13.16px / 600 / 面 rgb(33,34,37) / padding 1px 4px / radius 0
-   *
-   * MDC は `code` 1枚しか出さないので、目に入る側（内の span）の値をその `code` に
-   * 持たせる。バッククォートは prose の `code::before/::after` がそのまま出す。
-   * 二重構造でしか出せないのは「バッククォートだけ外の面色になる」ところで、両者の差は
-   * rgb(31,41,55) と rgb(33,34,37) の1段。ここは合わせられないので落としている。
+   * インラインコード・表・リンク・引用の指定はここに無い。**`ui.prose.*` へ移した**
+   * （`modules/markdown/index.ts` の `PROSE_THEME`）。値の出どころと実測はそちらの
+   * コメントが持つ。
    */
-  .sb-markdown :not(pre) > code {
-    padding: 1px 4px;
-    border-radius: 0;
-    background: rgb(33, 34, 37);
-    /* 0.875em（prose）× 0.94（MDXEditor の `_code_`）＝ 本文 16px に対して 13.16px */
-    font-size: 0.8225em;
-    font-weight: 600;
-  }
-
-  /*
-   * 表。本家の表は prose ではなく MDXEditor の table editor（`_tableEditor_` /
-   * `_leftAlignedCell_`）が描いている。`MDXEditorWrapper.css` にも表の指定はあるが
-   * （padding .5rem 1rem / border #374151）、あとから読まれる `@mdxeditor/editor` の
-   * scoped CSS が同じ強さで上書きするので、画面に出ているのは下の値のほう。
-   *
-   * 実測（/#/specs/view の design.md）: 罫線 1px rgb(46,49,53) / セル padding 4px 8px /
-   * 字 14px（prose の 0.875em）/ th は 600・白・面 #1f2937 / 縦は baseline 揃え。
-   */
-  .sb-markdown table {
-    margin: 16px 0;
-    border-collapse: collapse;
-    width: 100%;
-  }
-
-  .sb-markdown th,
-  .sb-markdown td {
-    padding: 4px 8px;
-    border: 1px solid rgb(46, 49, 53);
-    text-align: left;
-    vertical-align: baseline;
-  }
-
-  .sb-markdown th {
-    background: #1f2937;
-    color: #fff;
-    font-weight: 600;
-  }
-
-  /* prose は thead と行に区切り線を足す。本家はセルの罫線で格子を引くので重ねない */
-  .sb-markdown thead,
-  .sb-markdown tbody tr {
-    border: 0;
-  }
-
-  /*
-   * リンク。prose（invert）の既定は白。本家は `MDXEditorWrapper.css` の
-   * `.mdx-editor-wrapper a { color: var(--accentText) }` で青にしている。
-   * 実測 rgb(112,184,255)（`--accentText` は @mdxeditor のダークテーマ側が勝つ）。
-   * 太さ 500 と下線は prose のまま。
-   */
-  .sb-markdown a {
-    color: rgb(112, 184, 255);
-  }
-
-  /*
-   * 引用。`MDXEditorWrapper.css` の `blockquote`（border-left 4px var(--accentBase) /
-   * padding-left 1rem / margin 1rem 0 / ダーク時 color #9ca3af）。斜体と 500 は prose のまま。
-   * 実測の枠色 rgb(13,21,32) は @mdxeditor のダークテーマが入れた `--accentBase`。
-   */
-  .sb-markdown blockquote {
-    margin: 16px 0;
-    padding-left: 16px;
-    border-left: 4px solid rgb(13, 21, 32);
-    color: #9ca3af;
-  }
 }
 
 @layer components {
