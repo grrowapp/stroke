@@ -921,7 +921,8 @@ test.describe('本文が markdown として描かれる', () => {
     await expect(diagram.locator('svg')).toBeVisible();
 
     // 生ソースのコードブロックとしては残らない
-    await expect(body.locator('pre[language="mermaid"]')).toHaveCount(0);
+    // `language` は `ProsePre` の props に吸われるので、`MarkdownFence` が `data-language` で出す
+    await expect(body.locator('pre[data-language="mermaid"]')).toHaveCount(0);
     await expect(body).not.toContainText('flowchart LR');
 
     // 図の中身が絵になっている（節と線が SVG の要素として出ている）
@@ -1002,7 +1003,7 @@ test.describe('本文が markdown として描かれる', () => {
     const body = page.getByTestId('document-content');
 
     // 図の差し替えは mermaid だけ。ts のフェンスは shiki のコードブロックのまま
-    const code = body.locator('pre[language="ts"]');
+    const code = body.locator('pre[data-language="ts"]');
     await expect(code).toHaveCount(1);
     await expect(code.locator('code')).toContainText('コードブロック');
     await expect(code).toHaveClass(/shiki/);

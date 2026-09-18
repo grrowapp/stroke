@@ -108,8 +108,8 @@ function markNode(node: MDCNode): MDCNode {
   //
   // 印が要るのは、**`position` が DOM へ出る経路が他に無い**ためである。
   // `MDCRenderer` は受け側へ `node.props` だけを渡して `node.position` を捨てる
-  // （`MDCRenderer.vue` の `propsToData`）。`code` 属性も `MarkdownCode` が props で
-  // 宣言しているため `v-bind="attrs"` から抜けて `pre` に戻らない（実測）。
+  // （`MDCRenderer.vue` の `propsToData`）。`code` 属性も `ProsePre` が props で
+  // 宣言しているため `v-bind="$attrs"` から抜けて `pre` に戻らない（実測）。
   //
   // 打つのは `pre` だけにする。すべての要素に打つと DOM が属性で膨れるうえ、
   // 位置が要るのは「中の text ノードが位置を持たない領域」だけである。

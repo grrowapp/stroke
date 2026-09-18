@@ -73,36 +73,15 @@
   }
 
   /*
-   * コードブロック。本家（spec-workflow-mcp）は MDXEditor の `codeMirrorPlugin` に渡して
-   * いて `pre` を使わず、`div._codeMirrorWrapper_` > `div._codeMirrorToolbar_` + `.cm-editor`
-   * になる。stroke-board は読み取り表示なので CodeMirror は持ち込まず、本家が画面に出す形
-   * （枠・右上の帯・行番号・折り返し）を素の `pre` で組み立てる（`CodeBlock.vue`）。
+   * コードブロック。枠・行番号・折り返しは `ProsePre` が持つ（`ui.prose.pre`。
+   * `modules/markdown/index.ts` の `PROSE_THEME`）。ここに残すのは `ProsePre` の外に置く
+   * 右上の札と、その位置の基準だけ（`MarkdownFence.vue`）。
    *
-   * 値の出どころは稼働中の本家（`/#/specs/view`）の実測と、その CSS の重ね
-   * （`@mdxeditor` の `_codeMirrorWrapper_` ＋ `MDXEditorWrapper.css` のダーク時）。
-   * `.sb-mermaid` と同じく、ダーク一本なので重ねた後の値だけを持つ。
-   *
-   * 外枠: margin 16px 0 / padding .8rem / border 1px #374151 / radius 8px / overflow hidden
-   *       / background #1f2937
+   * `.sb-code` は `ProsePre` の入れ物（外枠）を包むだけの箱で、自分では寸法を持たない。
+   * 外枠の margin は箱を素通りするので、箱の縁は外枠の縁と重なる。
    */
   .sb-code {
-    /* 行番号の桁数。`CodeBlock.vue` が行数から決めて inline で入れる */
-    --sb-code-digits: 1;
-    /* 番号の欄の幅。本家は1桁で 22px（左右 8px の余白＋数字1文字）。9.6px の等幅1文字は約 5.76px */
-    --sb-code-gutter: calc(16px + var(--sb-code-digits) * 5.76px);
-    /*
-     * 本文の左位置。本家は 番号の欄 ＋ 折り畳みの欄 8px ＋ 区切り線 1px ＋ 行の内側 6px。
-     * 折り畳みは編集の仕掛けなので中身は持たないが、幅は空けて同じ位置に本文を置く
-     */
-    --sb-code-indent: calc(var(--sb-code-gutter) + 15px);
-
     position: relative;
-    margin: 16px 0;
-    padding: 12.8px;
-    border: 1px solid #374151;
-    border-radius: 8px;
-    overflow: hidden;
-    background: #1f2937;
   }
 
   /*
@@ -111,90 +90,24 @@
    *
    * 本家はこの中に言語セレクタと「Delete code block」を置くが、文書表示ではどちらも
    * `disabled` で押せない。操作としては存在しないので、ここは言語名の札だけを出す。
+   *
+   * 本家の帯は外枠の 1px の枠の内側に置かれ、外枠の `overflow:hidden` と角丸 8px で右上の
+   * 角が枠の内側の丸み（7px）に切られる。帯は外枠の外の箱に居るので、同じ位置と同じ丸みを
+   * 自分で持つ。
    */
   .sb-code-toolbar {
     position: absolute;
-    top: 0;
-    right: 0;
+    top: 1px;
+    right: 1px;
     z-index: 1;
     display: flex;
     gap: 4px;
     padding: 8px 16px;
+    border-top-right-radius: 7px;
     border-bottom-left-radius: 4px;
     background: #374151;
     color: #9ca3af;
     font-size: 12px;
-  }
-
-  /*
-   * 本文。本家の `.cm-scroller`（font-family:monospace / line-height:1.4）と
-   * `.cm-content.cm-lineWrapping`（padding 4px 0 / color #e5e7eb / 折り返す）の重ね。
-   * 横スクロールはさせない（本家は折り返す）。
-   *
-   * 左の番号の欄は本家では別の列（`.cm-gutters`）だが、行が折り返しても背景が続くように
-   * ここでは背景の帯として敷く。色は本家の `.cm-gutters`（#374151 と区切り線 #4b5563）。
-   */
-  /*
-   * `.sb-code` を重ねて詳細度を (0,2,0) にしてある。prose の `.prose :where(pre):not(…)`
-   * は (0,1,0) で `pre` の面・余白・角丸・字送りを全部持つため、同じ強さでは
-   * 並び順しだいで負ける。
-   */
-  .sb-code .sb-code-body {
-    margin: 0;
-    padding: 4px 2px 4px var(--sb-code-indent);
-    border: 0;
-    border-radius: 0;
-    overflow: visible;
-    background: linear-gradient(
-      to right,
-      #374151 0 calc(var(--sb-code-gutter) + 8px),
-      #4b5563 calc(var(--sb-code-gutter) + 8px) calc(var(--sb-code-gutter) + 9px),
-      transparent calc(var(--sb-code-gutter) + 9px)
-    );
-    color: #e5e7eb;
-    font-family: monospace;
-    font-size: 16px;
-    line-height: 1.4;
-    white-space: break-spaces;
-    word-break: break-word;
-    counter-reset: sb-code-line;
-  }
-
-  /*
-   * インラインコードの指定（prose の `code` と `.sb-markdown :not(pre) > code`）を
-   * コードブロックの中へ持ち込ませない。本家のコードブロックは 16px・等幅のまま。
-   */
-  .sb-code .sb-code-body code {
-    padding: 0;
-    background: none;
-    color: inherit;
-    font-family: inherit;
-    font-size: inherit;
-    font-weight: inherit;
-  }
-
-  /*
-   * 行番号。本家の `.cm-lineNumbers .cm-gutterElement`（font-size .6rem / padding 0 .5rem
-   * / 右寄せ / color #6b7280）。`span.line` は shiki が行ごとに出すもので、無い言語のときは
-   * `CodeBlock.vue` が同じ形で組み立てる。
-   *
-   * 番号は行の内側に置いて左の余白へずらす。折り返しても番号が付くのは先頭の1行だけで、
-   * 続きは本文の左端に揃う（本家の CodeMirror と同じ）。
-   */
-  .sb-code .sb-code-body .line::before {
-    counter-increment: sb-code-line;
-    content: counter(sb-code-line);
-    display: inline-block;
-    box-sizing: border-box;
-    width: var(--sb-code-gutter);
-    margin-left: calc(-1 * var(--sb-code-indent));
-    margin-right: 15px;
-    padding: 0 8px;
-    color: #6b7280;
-    font-size: 9.6px;
-    line-height: 1.4;
-    text-align: right;
-    vertical-align: top;
   }
 
   /*

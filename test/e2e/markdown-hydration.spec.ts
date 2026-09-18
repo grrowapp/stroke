@@ -74,7 +74,8 @@ interface Shape {
 
 async function shapeOf(page: Page): Promise<Shape> {
   const body = await page.getByTestId('document-content').evaluate((root) => ({
-    code: root.querySelector('[data-testid="code-block-body"]')?.innerHTML ?? '(コードブロックが無い)',
+    // `ProsePre` は `data-testid` を入れ物の `div` にも付けるので、`pre` に絞る
+    code: root.querySelector('pre[data-testid="code-block-body"]')?.innerHTML ?? '(コードブロックが無い)',
     prose: Array.from(root.querySelectorAll('h1, h2, p, li, th, td')).map((node) => node.outerHTML),
   }));
 

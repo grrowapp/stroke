@@ -12,7 +12,7 @@
  * 実行環境（`#components`・global 登録された `MarkdownFence`・図が使う `useColorMode`）が
  * 要り、単体テストに Nuxt のビルドと shiki を引き込むことになる。ここで確かめたいのは
  * 「包みの属性とフェンスの `pre` から位置が引けるか」だけなので、その2つを実物と同じ形で
- * 組み立てられれば足りる。`pre` の組み方は `../render/MarkdownCode.vue` と
+ * 組み立てられれば足りる。`pre` の組み方は `../render/MarkdownFence.vue`（`ProsePre`）と
  * `../render/MarkdownDiagram.vue` の写しで、どちらかが変われば下の `renderFence` も
  * 直すこと。
  *
@@ -49,13 +49,13 @@ interface AstNode {
  */
 let markFencePosition: 'no' | 'real' | 'wrong' = 'no';
 
-/** `../render/MarkdownCode.vue` の `LANGUAGE_NAME` のうち、ここで使うぶん */
+/** `../render/MarkdownFence.vue` の `LANGUAGE_NAME` のうち、ここで使うぶん */
 const LANGUAGE_NAME: Record<string, string> = { ts: 'TypeScript', text: 'Plain Text' };
 
 /**
  * フェンスを描く。`../render/MarkdownFence.vue` の振り分けと、その先の写し。
  *
- * **`code` も `position` も DOM には出ない。** `MarkdownCode` は `code` を props で受けて
+ * **`code` も `position` も DOM には出ない。** `ProsePre` は `code` を props で受けて
  * `pre` へ戻さず、`MDCRenderer` は `node.position` を捨てる。画面に出るのは `code` の
  * 末尾を落とした字だけで、口はそこから対応表を組み直す。
  */
@@ -85,15 +85,19 @@ function renderFence(node: AstNode, document: Document): Node {
   name.append(document.createTextNode(LANGUAGE_NAME[language] ?? language));
   toolbar.append(name);
 
+  // `ProsePre` の root と `pre`。`ProsePre` は `inheritAttrs: false` を持たないので、
+  // 渡した属性は両方に付く（`@nuxt/ui` 4.10.0 で実測）
+  const root = document.createElement('div');
   const pre = document.createElement('pre');
-  pre.setAttribute('class', 'sb-code-body');
-  pre.setAttribute('language', language);
-  pre.setAttribute('data-testid', 'code-block-body');
+  for (const element of [root, pre]) {
+    element.setAttribute('data-language', language);
+    element.setAttribute('data-testid', 'code-block-body');
 
-  if (markFencePosition !== 'no' && node.position) {
-    const shift = markFencePosition === 'wrong' ? 1 : 0;
-    pre.setAttribute('data-src-start', String(node.position.start + shift));
-    pre.setAttribute('data-src-end', String(node.position.end + shift));
+    if (markFencePosition !== 'no' && node.position) {
+      const shift = markFencePosition === 'wrong' ? 1 : 0;
+      element.setAttribute('data-src-start', String(node.position.start + shift));
+      element.setAttribute('data-src-end', String(node.position.end + shift));
+    }
   }
 
   // shiki を通らない場合の枝。`code` を行に割って `span.line` を並べる（末尾は落とす）
@@ -106,8 +110,9 @@ function renderFence(node: AstNode, document: Document): Node {
     body.append(line);
   });
   pre.append(body);
+  root.append(pre);
 
-  box.append(toolbar, pre);
+  box.append(toolbar, root);
   return box;
 }
 

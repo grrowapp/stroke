@@ -7,7 +7,7 @@
  *
  * **この印が要るのは、`position` が DOM へ出る経路が他に無いためである。**
  * `MDCRenderer` は受け側へ `node.props` だけを渡して `node.position` を捨て、
- * `code` 属性も `MarkdownCode` が props で宣言しているため `v-bind="attrs"` から
+ * `code` 属性も `ProsePre` が props で宣言しているため `v-bind="$attrs"` から
  * 抜けて `pre` に戻らない（実測）。印が消えると、位置の口はフェンスの中を
  * 生テキストの走査で当てにいく逃げ道へ落ちる。
  */

@@ -60,6 +60,53 @@ const PROSE_THEME = {
   },
 
   /*
+   * コードブロック。本家（spec-workflow-mcp）は MDXEditor の `codeMirrorPlugin` に渡していて
+   * `pre` を使わず、`div._codeMirrorWrapper_` > `div._codeMirrorToolbar_` + `.cm-editor` になる。
+   * CodeMirror は持ち込まず、本家が画面に出す形（枠・行番号・折り返し）を `ProsePre` に
+   * 持たせる。右上の言語名の札は `ProsePre` の外（`runtime/render/MarkdownFence.vue`）。
+   *
+   * 値の出どころは稼働中の本家（`/#/specs/view`）の実測と、その CSS の重ね
+   * （`@mdxeditor` の `_codeMirrorWrapper_` ＋ `MDXEditorWrapper.css` のダーク時）。
+   *
+   * root（入れ物の `div`）が外枠: margin 16px 0 / padding .8rem / border 1px #374151 /
+   * radius 8px / overflow hidden / background #1f2937。
+   *
+   * 行番号の桁数 `--sb-code-digits` は `MarkdownFence.vue` が行数から決めて inline で入れる。
+   * 番号の欄の幅は本家の1桁で 22px（左右 8px の余白＋数字1文字。9.6px の等幅1文字は約 5.76px）。
+   * 本文の左位置は 番号の欄 ＋ 折り畳みの欄 8px ＋ 区切り線 1px ＋ 行の内側 6px。
+   * 折り畳みは編集の仕掛けなので中身は持たないが、幅は空けて同じ位置に本文を置く。
+   */
+  pre: {
+    slots: {
+      root: 'my-4 p-[12.8px] border border-[#374151] rounded-lg overflow-hidden bg-[#1f2937] [--sb-code-gutter:calc(16px_+_var(--sb-code-digits,1)_*_5.76px)] [--sb-code-indent:calc(var(--sb-code-gutter)_+_15px)]',
+
+      /*
+       * 本文。本家の `.cm-scroller`（font-family:monospace / line-height:1.4）と
+       * `.cm-content.cm-lineWrapping`（padding 4px 0 / color #e5e7eb / 折り返す）の重ね。
+       * 横スクロールはさせない（本家は折り返す）。
+       *
+       * 左の番号の欄は本家では別の列（`.cm-gutters`）だが、行が折り返しても背景が続くように
+       * 背景の帯として敷く。色は本家の `.cm-gutters`（#374151 と区切り線 #4b5563）。
+       *
+       * `!` は prose の `.prose :where(pre)` 一式（面・余白・角丸・字の大きさと字送り）と
+       * `prose-pre:bg-*` に勝つため。
+       *
+       * `**:[.line]:inline` は `@nuxt/ui` の `**:[.line]:block` の打ち消し。block にすると
+       * shiki が行の間に残す改行と重なり、1行おきに空行が出る。
+       *
+       * `[&_code]:*` はインラインコードの指定（prose の `code` と `prose-code:*`）を
+       * コードブロックの中へ持ち込ませない。本家のコードブロックは 16px・等幅のまま。
+       *
+       * `[&_.line]:before:*` が行番号。本家の `.cm-lineNumbers .cm-gutterElement`
+       * （font-size .6rem / padding 0 .5rem / 右寄せ / color #6b7280）。番号は行の内側に置いて
+       * 左の余白へずらす。折り返しても番号が付くのは先頭の1行だけで、続きは本文の左端に
+       * 揃う（本家の CodeMirror と同じ）。
+       */
+      base: 'm-0! pt-1! pb-1! pe-0.5! ps-(--sb-code-indent)! border-0 rounded-none! overflow-visible! bg-transparent! bg-[linear-gradient(to_right,#374151_0_calc(var(--sb-code-gutter)_+_8px),#4b5563_calc(var(--sb-code-gutter)_+_8px)_calc(var(--sb-code-gutter)_+_9px),transparent_calc(var(--sb-code-gutter)_+_9px))]! text-[#e5e7eb]! font-[family-name:monospace]! text-[16px]/[1.4]! whitespace-break-spaces [word-break:break-word] [counter-reset:sb-code-line] **:[.line]:inline [&_code]:p-0! [&_code]:[background:none]! [&_code]:[color:inherit]! [&_code]:[font:inherit]! [&_.line]:before:[counter-increment:sb-code-line] [&_.line]:before:content-[counter(sb-code-line)] [&_.line]:before:inline-block [&_.line]:before:box-border [&_.line]:before:w-(--sb-code-gutter) [&_.line]:before:ml-[calc(-1*var(--sb-code-indent))] [&_.line]:before:mr-[15px] [&_.line]:before:px-2 [&_.line]:before:text-[#6b7280] [&_.line]:before:text-[9.6px]/[1.4] [&_.line]:before:text-right [&_.line]:before:align-top',
+    },
+  },
+
+  /*
    * 表。本家の表は prose ではなく MDXEditor の table editor（`_tableEditor_` /
    * `_leftAlignedCell_`）が描く。実測: 罫線 1px rgb(46,49,53) / セル padding 4px 8px /
    * 字 14px（prose の 0.875em）/ th は 600・白・面 #1f2937 / 縦は baseline 揃え。
