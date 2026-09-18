@@ -21,6 +21,8 @@
 import { computed, onMounted, ref, watch } from 'vue';
 
 import { useColorMode } from '#imports';
+import UAlert from '#ui/components/Alert.vue';
+import USkeleton from '#ui/components/Skeleton.vue';
 
 import { SOURCE_END_ATTR, SOURCE_START_ATTR } from '../position/source-span';
 import type { SourceRange } from '../position/types';
@@ -54,6 +56,27 @@ const sourceMarks = computed<Record<string, string | number>>(() => {
   marks[SOURCE_END_ATTR] = range.end;
   return marks;
 });
+
+/**
+ * エラーの枠（`UAlert`）の見た目。
+ *
+ * 足すのは本文の並びの中での余白（前後 16px）と、畳んだ元ソースの組みだけ。
+ * 子の要素へ当てる指定も `ui` の側に持たせ、template には class を書かない。
+ */
+const ERROR_UI = {
+  root: 'my-4',
+  description:
+    'text-xs [&_pre]:overflow-auto [&_pre]:whitespace-pre-wrap [&_details]:mt-2 [&_summary]:cursor-pointer [&_details_pre]:mt-2 [&_details_pre]:text-muted',
+} as const;
+
+/**
+ * 描く前の枠（`USkeleton`）の見た目。
+ *
+ * 高さは図が入る場所を先に取るためのもので、以前の枠（`p-4` ＋ 中の `h-32`）と同じ 160px。
+ */
+const LOADING_UI = {
+  base: 'my-4 flex h-40 items-center justify-center text-sm text-muted',
+} as const;
 
 /**
  * 本家 `hooks/useMDXEditorTheme.ts` の `mermaidThemeVariables` をそのまま写す。
@@ -122,41 +145,38 @@ watch([(): string => props.code, (): string => colorMode.value], draw);
   <!--
     エラー: 本家と同じく文言と元ソースを畳んで出す。
 
-    **色も本家の className の写しである**（`bg-red-50 dark:bg-red-900/20 border border-red-200
-    dark:border-red-800 rounded-lg p-4 my-4` / `text-red-700 dark:text-red-300` /
-    `text-red-600 dark:text-red-400`。既定がダークなので dark 側だけを残した）。
-    design token へ寄せないこと——寄せると本家のどれを写したのかが読めなくなり、本家が
-    変わったときに追随できない（change `adopt-upstream-design-tokens` の design D5）。
+    **枠は @nuxt/ui の `UAlert`。** 以前はここに本家の className（`bg-red-900/20
+    border-red-800` など）を直書きし、「本家のどれを写したのかが読めなくなる」ことを理由に
+    design token へ寄せないと決めていた（change `adopt-upstream-design-tokens` の design D5）。
+    その決めは「@nuxt/ui が持つ部品と仕組みを自前で再実装しない」という後からの決定に
+    上書きされている。ここは `UAlert` の error 色に委ね、余白だけを `ui` で合わせる。
   -->
-  <div
+  <UAlert
     v-if="failure"
-    class="my-4 rounded-lg border border-red-800 bg-red-900/20 p-4"
+    color="error"
+    variant="subtle"
+    title="Mermaid Diagram Error"
+    :ui="ERROR_UI"
     data-testid="mermaid-error"
   >
-    <p class="mb-2 text-sm font-medium text-red-300">Mermaid Diagram Error</p>
-    <pre class="overflow-auto text-xs whitespace-pre-wrap text-red-400">{{ failure }}</pre>
-    <details class="mt-2">
-      <summary class="cursor-pointer text-xs text-red-400">Show source</summary>
-      <pre class="mt-2 overflow-auto text-xs whitespace-pre-wrap text-gray-400">{{ code }}</pre>
-    </details>
-  </div>
+    <template #description>
+      <pre>{{ failure }}</pre>
+      <details>
+        <summary>Show source</summary>
+        <pre>{{ code }}</pre>
+      </details>
+    </template>
+  </UAlert>
 
   <!--
     描く前。SSR と hydration 直後はここ。図の分の高さを先に取っておく。
 
-    **色も本家の className の写しである**（`bg-gray-100 dark:bg-gray-800 rounded-lg p-4 my-4
-    animate-pulse` / `h-32 bg-gray-200 dark:bg-gray-700 rounded` /
-    `text-gray-500 dark:text-gray-400`）。上のエラーと同じ理由で token へ寄せない。
+    **枠は @nuxt/ui の `USkeleton`。** 明滅と面はそれが持つ（`animate-pulse` /
+    `bg-elevated`）。上のエラーと同じく、本家の className の写しはやめている。
   -->
-  <div
-    v-else-if="!svg"
-    class="my-4 animate-pulse rounded-lg bg-gray-800 p-4"
-    data-testid="mermaid-loading"
-  >
-    <div class="flex h-32 items-center justify-center rounded bg-gray-700">
-      <span class="text-sm text-gray-400">Loading diagram...</span>
-    </div>
-  </div>
+  <USkeleton v-else-if="!svg" :ui="LOADING_UI" data-testid="mermaid-loading">
+    <span>Loading diagram...</span>
+  </USkeleton>
 
   <!--
     成功。`sb-mermaid` は本家の `.mermaid-container` の写し。

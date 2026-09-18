@@ -11,8 +11,13 @@ export default defineNuxtConfig({
   // [agent decision] Nitro が本家への接続を持つので SSR を有効にする
   ssr: true,
 
-  // markdown は `modules/markdown/` が自分で `@nuxtjs/mdc` を登録する
-  modules: ['@nuxt/ui', '@nuxtjs/mcp-toolkit'],
+  // markdown は `modules/markdown/` が自分で `@nuxtjs/mdc` を登録する。
+  //
+  // **`@nuxt/ui` より前に並べること。** `modules/` ディレクトリの自動読み込みに任せると
+  // 後回しになり、`@nuxt/ui` の setup 時点で `hasNuxtModule('@nuxtjs/mdc')` が偽になって
+  // Prose 一式が登録されない（`@nuxt/ui/dist/module.mjs:121`）。切り出し後は package 名
+  // `markxdown` がこの位置に並ぶので、これが最終形と同じ並びになる。
+  modules: ['./modules/markdown', '@nuxt/ui', '@nuxtjs/mcp-toolkit'],
 
   // [agent decision] inline SVG で描く。パスが DOM に出るので prototype / 本家との一致をテストで比較できる
   icon: {

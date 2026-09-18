@@ -42,8 +42,20 @@ const TEXT_NODE = 3;
 /** 要素の `nodeType` */
 const ELEMENT_NODE = 1;
 
-/** フェンスが描かれる要素のタグ。`../render/MarkdownCode.vue` も図の添え書きも `pre` で出す */
+/** フェンスが描かれる要素のタグ。`ProsePre`（`../render/MarkdownFence.vue`）も図の添え書きも `pre` で出す */
 const FENCE_TAG = 'PRE';
+
+/**
+ * 包みのタグ。`./source-span.ts` の `WRAPPER_TAG`（`span`）と同じもの。
+ *
+ * **印を持つ要素がすべて包みとは限らない。** フェンスの印は `pre` の props に載り、
+ * `ProsePre` は `inheritAttrs: false` を持たないので、同じ印が `pre` を包む入れ物の `div`
+ * にも出る（`@nuxt/ui` 4.10.0 で実測）。その `div` を包みとして読むと、フェンスの字が
+ * 包みの対応とフェンスの対応の両方に並び、一続きどうしが重なる。
+ * `./source-span.ts` が印を打つのは `span`（包み）と `pre`（フェンス）だけなので、
+ * それ以外のタグの印は読まない。
+ */
+const WRAPPER_TAG = 'SPAN';
 
 /** 面の材料 */
 export interface PreviewSurface {
@@ -231,8 +243,8 @@ function isClosingFence(line: string, open: FenceMarker): boolean {
  *
  * **フェンスの位置が DOM に出ない `pre` が残っているので、これが要る。**
  *
- * 印は `../position/source-span.ts` が `pre` の props へ載せ、`MarkdownCode` の
- * `v-bind="attrs"` から属性として出る。だから普段はここを通らない。通るのは
+ * 印は `../position/source-span.ts` が `pre` の props へ載せ、`MarkdownFence` から
+ * `ProsePre` の `v-bind="$attrs"` を通って属性として出る。だから普段はここを通らない。通るのは
  * **生テキストの先頭（offset 0）から始まるフェンス**、つまり文書がフェンスで始まる場合
  * だけである。`@nuxtjs/mdc` は position を真偽で拾うので
  * （`dist/runtime/parser/compiler.js` の
@@ -287,7 +299,7 @@ function scanFencedBlocks(source: string): Fenced[] {
  * `pre` の中の字から、対応表の材料になる `code` の候補を出す。
  *
  * **画面に出ている字は `code` そのものではない。** 描く側が末尾を落とすからである
- * （`../render/MarkdownCode.vue` の `code.trimEnd()`。shiki を通る場合も
+ * （`../render/MarkdownFence.vue` の `code.trimEnd()`。shiki を通る場合も
  * `codeToHast(code.trimEnd())` で同じ）。落ちるのは末尾だけなので、行の数から
  * 足し直せる本数が決まる。
  *
@@ -455,7 +467,8 @@ export function createPreviewPositionPort({
       const element = node.nodeType === ELEMENT_NODE ? (node as Element) : null;
       // フェンスの中に包みは無い（位置を持たない text ノードは包まれない。
       // `./source-span.ts`）ので、`pre` の中では包みを探さない
-      const wrapper = element && !insideFence ? readWrapperRange(element, source) : null;
+      const wrapper =
+        element && !insideFence && element.tagName === WRAPPER_TAG ? readWrapperRange(element, source) : null;
       const fence = element !== null && !insideFence && element.tagName === FENCE_TAG;
 
       // コメント（`<!--v-if-->` など）は文字を持たないので、幅0の範囲になる
