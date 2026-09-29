@@ -29,7 +29,7 @@ const { notifications, upstreamConnected } = useBoardSocket();
     </header>
 
     <nav class="sb-bar sb-tabbar" aria-label="ポータル">
-      <NuxtLink to="/" class="sb-tab" active-class="sb-tab-on" data-testid="tab-notifications">
+      <NuxtLink to="/notifications" class="sb-tab" active-class="sb-tab-on" data-testid="tab-notifications">
         <span class="inline-flex items-center gap-1.5">
           <UIcon name="sb:bell" class="size-3.5 shrink-0" />
           通知

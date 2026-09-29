@@ -81,11 +81,11 @@ markdown を描く・直す部品5本が `app/components/` から `modules/markd
 |---|---|
 | `AgentQuestion` | `pages/strokes/[sessionId]/index.vue`（素置き）、`pages/strokes/[sessionId]/proposal.vue`（`UModal` の body slot） |
 | `StrokeBreadcrumb` | `pages/strokes/[sessionId]/index.vue`、`pages/strokes/[sessionId]/proposal.vue` |
-| `WaitingIndicator` | `pages/strokes/index.vue`、`pages/strokes/[sessionId]/proposal.vue`、`AgentQuestion.vue` |
+| `WaitingIndicator` | `page/Stroke/Start/Container.vue`、`pages/strokes/[sessionId]/proposal.vue`、`AgentQuestion.vue` |
 | `review/*` | `pages/strokes/[sessionId]/proposal.vue`（`CommentModal` だけは `review/Modals.vue` 経由） |
 | `review/ApprovalAnnotator` | `pages/projects/[projectId]/approvals/[approvalId].vue`。`AnnotateSource` / `CommentCard` / `CommentModal` / `useAnnotations` をポータル側から使い回す唯一の経路 |
 | `shared/NotificationToaster` | `app.vue` 直下 |
-| `stroke/OverviewForm` | `pages/strokes/index.vue` |
+| `stroke/OverviewForm` | `page/Stroke/Start/Container.vue` |
 | `review/RejectModal` | `workspace/ApprovalCard` と `review/ApprovalAnnotator`（一覧のカードと対象文書を読む画面で同じモーダル） |
 | `workspace/ApprovalCard` | `pages/projects/[projectId]/approvals/` の2画面 |
 | `workspace/WorkspaceShell` | `layouts/workspace.vue` と `layouts/approval.vue`（承認依頼をその場のモーダルとして開く器） |

@@ -89,7 +89,7 @@ function toggleCollapsed(): void {
   -->
   <div class="flex min-h-screen flex-col bg-[var(--surface-base)] text-[var(--text-primary)]">
     <header class="sb-bar">
-      <NuxtLink to="/" class="sb-navitem sb-bar-back pl-0" data-testid="back-to-portal">
+      <NuxtLink to="/projects" class="sb-navitem sb-bar-back pl-0" data-testid="back-to-portal">
         <UIcon name="sb:back" class="size-4 shrink-0" />
         ポータルへ戻る
       </NuxtLink>

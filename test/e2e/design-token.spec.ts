@@ -276,7 +276,7 @@ test.describe('アイコンは prototype のものを使っている', () => {
   });
 
   test('上層のタブは bell と grid', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/notifications');
 
     const expected = prototypeIconPaths();
 
