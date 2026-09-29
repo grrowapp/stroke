@@ -7,6 +7,7 @@
  * 下層は左サイドバーで、形そのものを変えることでどちらの階層にいるかが見て分かる。
  */
 import { useBoardSocket } from '~/composables/useBoardSocket';
+import { manageAccess } from '#shared/access';
 
 const { notifications, upstreamConnected } = useBoardSocket();
 </script>
@@ -47,6 +48,20 @@ const { notifications, upstreamConnected } = useBoardSocket();
           プロジェクト一覧
         </span>
       </NuxtLink>
+      <!--
+        ユーザー管理への入口。右端に離して置き、管理者にだけ出す（access/user-management・
+        docs/specs/architecture/screen-flow.md）。
+      -->
+      <Can :ability="manageAccess">
+        <NuxtLink
+          to="/admin/users"
+          class="sb-tab ml-auto"
+          active-class="sb-tab-on"
+          data-testid="tab-user-management"
+        >
+          ユーザー管理
+        </NuxtLink>
+      </Can>
     </nav>
 
     <main class="min-h-0 flex-1 overflow-auto p-4">
