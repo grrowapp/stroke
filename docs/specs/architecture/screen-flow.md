@@ -26,7 +26,7 @@ URL と画面の対応、各画面の責務、画面と画面をつなぐ遷移�
 - **1つの URL に2つ以上の責務を持たせない。** `/` はストロークの開始だけ、`/projects` はプロジェクトの一覧と入場だけ、`/notifications` は通知の一覧だけを担う
 - **上層のどの画面も URL を持つ。** 直接開いても、ブックマークから開いても、再読み込みしても、その URL の画面が出る
 - `stroke` layout は画面全体を覆うモーダルで、閉じる操作を持たない。どの場面に居るかは URL が持つので、再読み込みすれば同じ場面がモーダルとして開き直る（`docs/specs/plan/portal-stroke-entrance.md`「決定: ページ遷移で開く（design.md D1）」）
-- `portal` layout はヘッダーとタブ bar を持つ。タブは「通知」と「プロジェクト一覧」の2つ
+- `portal` layout はヘッダーとタブ bar を持つ。タブは左に「通知」と「プロジェクト一覧」の2つ、右端に離して「ユーザー管理」を置く。「ユーザー管理」は管理者にだけ出る
 
 ### `/` と `/strokes` が同じ画面を出す理由
 
@@ -60,7 +60,9 @@ flowchart TB
 
   notifications -- "タブ「プロジェクト一覧」" --> projects
   projects -- "タブ「通知」" --> notifications
-  projects -- "ユーザー管理（管理者にだけ出る）" --> admin
+  notifications -- "タブ「ユーザー管理」（管理者にだけ出る）" --> admin
+  projects -- "タブ「ユーザー管理」（管理者にだけ出る）" --> admin
+  admin -- "タブ「通知」「プロジェクト一覧」" --> projects
   projects -- "作成" --> start
   projects -- "中断したストロークの行" --> s1
   projects -- "中断したストロークの行（proposed 以降）" --> s2
@@ -91,8 +93,8 @@ flowchart TB
 | --- | --- | --- |
 | `portal` layout | タブ「通知」 | `/notifications` |
 | `portal` layout | タブ「プロジェクト一覧」 | `/projects` |
+| `portal` layout | タブ bar の右端の「ユーザー管理」（管理者にだけ出る） | `/admin/users` |
 | `/projects` | 作成 | `/strokes` |
-| `/projects` | 上部の「ユーザー管理」（管理者にだけ出る） | `/admin/users` |
 | `/projects` | アクティブな行 | `/projects/<projectId>` |
 | `/projects` | 中断したストロークの行 | phase が `stroking` なら `/strokes/<sessionId>`、それ以外は `/strokes/<sessionId>/proposal` |
 | `/projects` | 生成の決着後に「する」 | steering への承認依頼が在れば `/projects/<projectId>/approvals/<approvalId>`、無ければ `/projects/<projectId>/approvals` |
