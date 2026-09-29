@@ -26,12 +26,24 @@ test.afterEach(() => {
 });
 
 test.describe('管理者', () => {
-  test('一覧の上部にユーザー管理の入口が出て、押すと /admin/users が開く', async ({ page }) => {
+  test('タブ bar の右端にユーザー管理の入口が出て、押すと /admin/users が開く', async ({ page }) => {
     await page.goto('/projects');
-    await page.getByTestId('user-management-link').click();
+    const tab = page.getByTestId('tab-user-management');
 
+    // 「通知」「プロジェクト一覧」の右に離して置く
+    const projectsTab = await page.getByTestId('tab-projects').boundingBox();
+    const userTab = await tab.boundingBox();
+    expect(userTab!.x).toBeGreaterThan(projectsTab!.x + projectsTab!.width + 100);
+
+    await tab.click();
     await expect(page).toHaveURL(/\/admin\/users$/);
     await expect(page.getByTestId('user-management')).toBeVisible();
+  });
+
+  test('プロジェクト一覧の上部には入口を出さない', async ({ page }) => {
+    await page.goto('/projects');
+
+    await expect(page.getByTestId('user-management-link')).toHaveCount(0);
   });
 
   test('利用者を足して許可を付け、保存すると access.json に残る', async ({ page }) => {
@@ -60,7 +72,7 @@ test.describe('一般の利用者', () => {
 
     await expect(page.getByTestId('projects-empty')).toBeVisible();
     await expect(page.getByTestId('project-row')).toHaveCount(0);
-    await expect(page.getByTestId('user-management-link')).toHaveCount(0);
+    await expect(page.getByTestId('tab-user-management')).toHaveCount(0);
   });
 
   test('/admin/users は 404', async ({ page }) => {
