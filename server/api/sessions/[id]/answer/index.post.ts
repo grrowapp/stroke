@@ -3,6 +3,7 @@ import { conflict } from '../../../../utils/stroke/conflict'
 import { answerBody, parseBody } from '../../../../utils/stroke/request-schemas'
 import { requireSessionId } from '../../../../utils/stroke/session-param'
 import { isPromotedState, readState } from '../../../../utils/stroke/session-store'
+import { requireSession } from '../../../../utils/access/request'
 
 /**
  * U7: 今の1問に答える。ストロークの問いへの回答も、差し戻しへの問い返しへの回答も
@@ -15,6 +16,8 @@ import { isPromotedState, readState } from '../../../../utils/stroke/session-sto
  * のは記録の側（`handler/answer.ts`）の役目である。
  */
 export default defineEventHandler(async (event) => {
+  // 見られない対象は存在しないものとして 404（access/permission）
+  await requireSession(event, getRouterParam(event, 'id') ?? '')
   const sessionId = await requireSessionId(event)
   const answer = parseBody(answerBody, await readBody(event))
 

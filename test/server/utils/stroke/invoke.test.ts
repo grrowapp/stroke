@@ -639,7 +639,7 @@ describe('buildRun の phase からの導出', () => {
 
       $fetch.mockResolvedValueOnce(undefined);
       expect(await run.recordCompletion!()).toBe(true);
-      expect($fetch).toHaveBeenCalledWith('/api/sessions/project-a/activate', { method: 'POST' });
+      expect($fetch).toHaveBeenCalledWith('/api/sessions/project-a/activate', expect.objectContaining({ method: 'POST' }));
 
       // 409（局面が違う）も不達も「記録できていない」
       $fetch.mockRejectedValueOnce(Object.assign(new Error('まだ昇格していない'), { statusCode: 409 }));
@@ -810,7 +810,7 @@ describe('kick の組み立て方（build）が生成を依頼する', () => {
     const run = await build() as { cwd: string };
 
     expect($fetch).toHaveBeenCalledTimes(1);
-    expect($fetch).toHaveBeenCalledWith('/api/projects', { method: 'POST', body: { projectPath: '/opt/projects/project-a' } });
+    expect($fetch).toHaveBeenCalledWith('/api/projects', expect.objectContaining({ method: 'POST', body: { projectPath: '/opt/projects/project-a' } }));
     expect(run.cwd).toBe('/opt/projects/project-a');
   });
 
@@ -821,7 +821,7 @@ describe('kick の組み立て方（build）が生成を依頼する', () => {
 
     await build();
 
-    expect($fetch).toHaveBeenCalledWith('/api/projects', { method: 'POST', body: { projectPath: '/opt/projects/project-a' } });
+    expect($fetch).toHaveBeenCalledWith('/api/projects', expect.objectContaining({ method: 'POST', body: { projectPath: '/opt/projects/project-a' } }));
   });
 
   it('steering: 依頼が受理されなければ材料を返さず reject する', async () => {

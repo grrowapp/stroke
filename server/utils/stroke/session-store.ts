@@ -56,8 +56,20 @@ export interface ApprovalDecision {
   projectName: string
 }
 
+/**
+ * すべての phase が持つもの。
+ *
+ * `startedBy` はストロークを始めた利用者のメールアドレス（`access/permission`）。token の無い
+ * 接続や CLI から始めたとき、この項目の導入より前のセッションでは null か省略で、管理者に
+ * だけ見える。**すべての分岐に置く**——zod は未知のキーを strip するので、置き忘れた分岐を
+ * 読んで書き戻すと黙って消える。
+ */
+interface CommonFields {
+  startedBy?: string | null
+}
+
 /** `stroking` / `proposed` が共通で持つもの。 */
-interface ActiveFields {
+interface ActiveFields extends CommonFields {
   /** 今ユーザーが答えるべき問い。エージェントの提出（A5）で更新される。まだ無ければ null */
   currentQuestion: Question | null
   /** AI が提案した kebab-case のプロジェクト名候補。取れないことがある */
@@ -83,7 +95,7 @@ export interface ProposedState extends ActiveFields {
 /**
  * 昇格後（プロジェクト）の局面。`approved`（生成中）と `activated`（完成）で形は同じ。
  */
-export interface PromotedState {
+export interface PromotedState extends CommonFields {
   phase: 'approved' | 'activated'
   /** 承認の判断で確定し、昇格の改名に使った名前 */
   projectName: string
@@ -118,8 +130,10 @@ export type ActiveSessionState = Exclude<SessionState, PromotedState>
 const projectNameSchema = z.string().trim().min(1)
 const invocationSchema = z.enum(['running', 'idle', 'failed', 'error'])
 const retriesSchema = z.number().int().min(0).optional()
+const startedBySchema = z.string().nullable().optional()
 
 const activeStateFields = {
+  startedBy: startedBySchema,
   currentQuestion: z.union([z.null(), questionSchema]),
   projectName: projectNameSchema.optional(),
   invocation: invocationSchema,
@@ -128,6 +142,7 @@ const activeStateFields = {
 
 /** 昇格後の2つの局面が共有するフィールド。literal は分岐ごとに要るので、ここには置かない。 */
 const promotedStateFields = {
+  startedBy: startedBySchema,
   projectName: projectNameSchema,
   // 既存の `approved` は `invocation` を持たないので、読めるように既定値を与える
   invocation: invocationSchema.default('idle'),
@@ -204,10 +219,10 @@ const strokesSchema = z.array(strokeSchema)
  * 最初の問いが得られるのを待たない（HTTP はステートレス・design.md）。
  * `state.json` は最初からここで書き、セッションはこの時点で「在る」ものとして扱う。
  */
-export async function createSession(overview: string): Promise<string> {
+export async function createSession(overview: string, startedBy: string | null): Promise<string> {
   // 実体は handler（design.md 決定3: endpoint と script で同じ実装を呼ぶ）。
   try {
-    return await createSessionHandler(shareRoot(), overview, 'idle')
+    return await createSessionHandler(shareRoot(), overview, 'idle', startedBy)
   } catch (error) {
     throw sessionErrorToHttp(error)
   }

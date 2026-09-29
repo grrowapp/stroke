@@ -2,6 +2,7 @@ import type { Phase } from '#shared/stroke'
 import { recordActivation, type ObservedPhase } from '../../../../handler/activate'
 import { conflict } from '../../../../utils/stroke/conflict'
 import { requireSessionId } from '../../../../utils/stroke/session-param'
+import { requireSession } from '../../../../utils/access/request'
 
 /**
  * U15: 昇格したプロジェクトの完成を記録する（openspec/specs/api/session/activate）。
@@ -57,6 +58,8 @@ function refusalMessage(observed: ObservedPhase): string {
 }
 
 export default defineEventHandler(async (event): Promise<Response> => {
+  // 見られない対象は存在しないものとして 404（access/permission）
+  await requireSession(event, getRouterParam(event, 'id') ?? '')
   const name = await requireSessionId(event)
 
   const recorded = await recordActivation(name, ACTIVATABLE)

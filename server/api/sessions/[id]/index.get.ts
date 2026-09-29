@@ -3,9 +3,12 @@ import { readStrokeConfig } from '../../../utils/stroke/config'
 import { sessionDir } from '../../../utils/stroke/paths'
 import { requireSessionId } from '../../../utils/stroke/session-param'
 import { readState } from '../../../utils/stroke/session-store'
+import { requireSession } from '../../../utils/access/request'
 
 /** U2: セッションの状態（phase・呼び出しの実行状態）を見る。リロード時の行き先判定に使う。 */
 export default defineEventHandler(async (event): Promise<SessionStatus> => {
+  // 見られない対象は存在しないものとして 404（access/permission）
+  await requireSession(event, getRouterParam(event, 'id') ?? '')
   const sessionId = await requireSessionId(event)
   const state = await readState(sessionId)
   // `approved` も `invocation` を持つ（openspec/specs/agent/invocation）。

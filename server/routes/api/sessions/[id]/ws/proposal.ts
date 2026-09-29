@@ -1,5 +1,6 @@
 import type { Phase } from '#shared/stroke'
 import { currentProposal } from '../../../../../handler/proposal'
+import { accessUserOfPeer, canViewSession } from '../../../../../utils/access/request'
 import { sessionExists } from '../../../../../utils/stroke/session-store'
 import { proposalChannel, sessionIdFromUrl } from '../../../../../utils/stroke/ws-channels'
 
@@ -19,6 +20,11 @@ export default defineWebSocketHandler({
   async open(peer) {
     const sessionId = sessionIdFromUrl(peer.request.url, 'proposal')
     if (!sessionId || !(await sessionExists(sessionId))) {
+      peer.close()
+      return
+    }
+    // 見られないセッションは、何も送らずに閉じる（access/permission・design D6）
+    if (!(await canViewSession(await accessUserOfPeer(peer), sessionId))) {
       peer.close()
       return
     }

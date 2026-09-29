@@ -5,6 +5,7 @@ import type { Stroke } from '#shared/stroke'
 import { resolveConnection } from '../../utils/mcp/connection-table'
 import { readFetchFailure } from '../../utils/mcp/fetch-failure'
 import { resolveConnectionSessionId } from '../../utils/mcp/require-connection'
+import { internalFetch } from '../../utils/access/request'
 
 /**
  * U3 への代行。specs `mcp/tools/strokes`。
@@ -54,7 +55,7 @@ export default defineStrokeTool({
     }
 
     try {
-      const response = await $fetch.raw<{ strokes: Stroke[] }>(
+      const response = await internalFetch.raw<{ strokes: Stroke[] }>(
         `/api/sessions/${encodeURIComponent(connected.sessionId)}/strokes`,
       )
       return { status: response.status, strokes: response._data?.strokes }

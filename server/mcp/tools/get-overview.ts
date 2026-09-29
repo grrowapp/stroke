@@ -4,6 +4,7 @@ import { defineStrokeTool } from '../../utils/mcp/define-tool'
 import { resolveConnection } from '../../utils/mcp/connection-table'
 import { readFetchFailure } from '../../utils/mcp/fetch-failure'
 import { resolveConnectionSessionId } from '../../utils/mcp/require-connection'
+import { internalFetch } from '../../utils/access/request'
 
 /**
  * A1 への代行。specs `mcp/tools/overview`。
@@ -73,7 +74,7 @@ export default defineStrokeTool({
     }
 
     try {
-      const response = await $fetch.raw<{ overview: string }>(
+      const response = await internalFetch.raw<{ overview: string }>(
         `/api/strokes/${encodeURIComponent(connected.sessionId)}/overview`,
       )
       return { status: response.status, overview: response._data?.overview }

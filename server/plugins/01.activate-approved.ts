@@ -4,6 +4,7 @@ import type { SessionSummary } from '#shared/stroke'
 import { activateApproved, activateResultOf, type ActivateCounts } from '../utils/stroke/activate-approved'
 import { LOG_PREFIX } from '../utils/stroke/log'
 import { activatePath } from '../utils/stroke/submission-path'
+import { internalFetch } from '../utils/access/request'
 
 /**
  * 起動時の書き上げ（openspec/specs/project/generation「既に完成しているプロジェクトは
@@ -32,7 +33,7 @@ export default defineNitroPlugin(() => {
 async function activate(): Promise<void> {
   let sessions: SessionSummary[]
   try {
-    sessions = await $fetch<SessionSummary[]>('/api/sessions')
+    sessions = await internalFetch<SessionSummary[]>('/api/sessions')
   } catch (error) {
     console.warn(`${LOG_PREFIX} 起動時の書き上げ: 一覧を取れない。今回は何もしない`, error)
     return
@@ -41,7 +42,7 @@ async function activate(): Promise<void> {
   const counts = await activateApproved(sessions, {
     activate: async (sessionId) => {
       try {
-        await $fetch(activatePath(sessionId), { method: 'POST' })
+        await internalFetch(activatePath(sessionId), { method: 'POST' })
         return 'activated'
       } catch (error) {
         return activateResultOf(error)

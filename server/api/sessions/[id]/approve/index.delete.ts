@@ -2,6 +2,7 @@ import { withdrawDecision } from '../../../../handler/approve'
 import { conflict } from '../../../../utils/stroke/conflict'
 import { requireSessionId } from '../../../../utils/stroke/session-param'
 import { isPromotedState, readState } from '../../../../utils/stroke/session-store'
+import { requireSession } from '../../../../utils/access/request'
 
 /**
  * U10 の取り消し: 記録された承認の判断を取り下げる（openspec/specs/api/session/approve
@@ -17,6 +18,8 @@ import { isPromotedState, readState } from '../../../../utils/stroke/session-sto
  * なくプロジェクトの削除（`api/project/delete`）である。
  */
 export default defineEventHandler(async (event) => {
+  // 見られない対象は存在しないものとして 404（access/permission）
+  await requireSession(event, getRouterParam(event, 'id') ?? '')
   const sessionId = await requireSessionId(event)
 
   const state = await readState(sessionId)

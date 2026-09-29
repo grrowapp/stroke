@@ -28,7 +28,7 @@ describe('get-send-back', () => {
     const result = await getSendBackHandler({ 'x-stroke-token': token });
 
     expect(result).toEqual({ status: 200, ...PAYLOAD });
-    expect($fetch.raw).toHaveBeenCalledWith('/api/strokes/session-1/send-back');
+    expect($fetch.raw).toHaveBeenCalledWith('/api/strokes/session-1/send-back', expect.anything());
     removeConnection(token);
   });
 

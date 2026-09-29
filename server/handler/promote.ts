@@ -5,6 +5,9 @@ import { beginRun, endRun, sessionRunPath } from '../utils/stroke/running'
 import { writeState } from '../utils/stroke/session-store'
 import { submissionPath } from '../utils/stroke/submission-path'
 import { withdrawConflictedDecision } from './approve'
+import { internalFetch, saveAccessStore } from '../utils/access/request'
+import { readStartedBy } from '../utils/access/started-by'
+import { grantProject } from '../utils/access/store'
 
 /**
  * U14 の実処理——判断のあるセッションをプロジェクトへ昇格させる。
@@ -111,6 +114,11 @@ export async function promote(root: string, sessionId: string, projectName: stri
   }
   const runKey = start.key
 
+  // 始めた利用者は改名の前に読んでおく。昇格後の `state.json` へ引き継ぎ、許可を付ける相手にする
+  // （`access/permission`「昇格したら始めた本人に許可を付ける」）。昇格は内部の呼び出しから
+  // 来ることがあるので、呼び出し元ではなくこの記録を使う（design D8）
+  const startedBy = (await readStartedBy(root, sessionId))?.startedBy ?? null
+
   try {
     // 衝突確認は改名の**前**に通す。既にあれば改名は起こらない。
     // **改名してから phase を書く。** 巻き戻しは対称で、書き込みに失敗したら改名を戻すだけ。
@@ -140,6 +148,7 @@ export async function promote(root: string, sessionId: string, projectName: stri
         projectName,
         invocation: 'idle',
         retries: 0,
+        startedBy,
       })
     } catch (error) {
       // 昇格を確定させない。改名を戻して、セッションを元の名前・`proposed`・判断つきのまま残す。
@@ -154,6 +163,16 @@ export async function promote(root: string, sessionId: string, projectName: stri
     endRun(runKey)
   }
 
+  // 始めた本人に許可を付ける。上層へ知らせる前に済ませ、本人の一覧に生成中の行が出るようにする。
+  // 付けられなくても昇格は巻き戻さない（管理者がユーザー管理画面で付けられる）
+  if (startedBy !== null) {
+    try {
+      await saveAccessStore((store) => grantProject(store, startedBy, projectName))
+    } catch (error) {
+      console.error(`${LOG_PREFIX} 始めた利用者へ許可を付けられなかった（昇格は残す）: ${projectName}`, error)
+    }
+  }
+
   // **昇格した瞬間に上層へ知らせる。** 昇格を要求した本人はこの直後に一覧へ戻る。開いたままの
   // 一覧にも生成中の行が出るようにする（specs/project/generation「生成の進行は、開いている
   // 一覧へ届く」）。判断の記録（U10）では配信しない——その時点でプロジェクトはまだ無い。
@@ -164,7 +183,7 @@ export async function promote(root: string, sessionId: string, projectName: stri
   // path は相対。自分自身を叩くのに外向けの設定値で URL を組むと、待ち受けを変えた瞬間に
   // 届かなくなる（`invoke.ts`）。
   try {
-    await $fetch(submissionPath(projectName), {
+    await internalFetch(submissionPath(projectName), {
       method: 'POST',
       body: { invocation: 'failed' },
     })

@@ -4,6 +4,7 @@ import { conflict } from '../../../../utils/stroke/conflict'
 import { approveBody, parseBody } from '../../../../utils/stroke/request-schemas'
 import { requireSessionId } from '../../../../utils/stroke/session-param'
 import { isPromotedState, readState } from '../../../../utils/stroke/session-store'
+import { requireSession } from '../../../../utils/access/request'
 
 /**
  * U10: 承認の判断を受理して記録する（openspec/specs/api/session/approve）。
@@ -33,6 +34,8 @@ const REFUSAL_MESSAGE: Record<DecisionRefusal, string> = {
 }
 
 export default defineEventHandler(async (event) => {
+  // 見られない対象は存在しないものとして 404（access/permission）
+  await requireSession(event, getRouterParam(event, 'id') ?? '')
   const sessionId = await requireSessionId(event)
   const { projectName } = parseBody(approveBody, await readBody(event))
 

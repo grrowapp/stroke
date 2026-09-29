@@ -5,6 +5,7 @@ import type { SendBackPayload } from '#shared/stroke'
 import { resolveConnection } from '../../utils/mcp/connection-table'
 import { readFetchFailure } from '../../utils/mcp/fetch-failure'
 import { resolveConnectionSessionId } from '../../utils/mcp/require-connection'
+import { internalFetch } from '../../utils/access/request'
 
 /**
  * A4 への代行。specs `mcp/tools/send-back`。
@@ -61,7 +62,7 @@ export default defineStrokeTool({
     }
 
     try {
-      const response = await $fetch.raw<SendBackPayload>(
+      const response = await internalFetch.raw<SendBackPayload>(
         `/api/strokes/${encodeURIComponent(connected.sessionId)}/send-back`,
       )
       // **`status` を後ろに置く。** 前に置くと、A4 の本文に `status` が入っていたとき

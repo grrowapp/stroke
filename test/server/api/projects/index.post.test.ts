@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { stubNitroGlobals, type FakeEvent } from '../support';
+import { ADMIN_USER, stubNitroGlobals, type FakeEvent } from '../support';
 
 /**
  * 対象は `server/api/projects/index.post.ts`（P2）。
@@ -43,7 +43,7 @@ const { default: generateHandler } = await import('../../../../server/api/projec
 const PROJECT_PATH = join(SHARE_ROOT, 'made-app');
 
 function eventWith(body: unknown): FakeEvent {
-  return { params: {}, body, status: undefined };
+  return { params: {}, body, status: undefined, context: { accessUser: Promise.resolve(ADMIN_USER) } };
 }
 
 async function statusOf(body: unknown): Promise<number> {

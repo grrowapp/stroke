@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { stubNitroGlobals } from '../../support';
+import { ADMIN_USER, stubNitroGlobals, type FakeEvent } from '../../support';
 import { deriveProjectId } from '../../../../../server/utils/upstream/project-id';
 
 /**
@@ -38,8 +38,8 @@ const { beginRun, endRun } = await import('../../../../../server/utils/stroke/ru
 const PROJECT_NAME = 'promoted-project';
 
 /** P1 は router param を `projectId` という名前で読む（`fakeEvent` は `id` で作る）。 */
-function eventFor(projectId: string): { params: Record<string, string>, body: unknown, status: number | undefined } {
-  return { params: { projectId }, body: undefined, status: undefined };
+function eventFor(projectId: string): FakeEvent {
+  return { params: { projectId }, body: undefined, status: undefined, context: { accessUser: Promise.resolve(ADMIN_USER) } };
 }
 
 async function exists(path: string): Promise<boolean> {
