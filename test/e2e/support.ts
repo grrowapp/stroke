@@ -253,7 +253,7 @@ export async function resetBoard(
   await stub.reset();
 
   writeFileSync(REGISTRY_PATH, '{}');
-  await page.goto('/');
+  await page.goto('/notifications');
   await expect(page.getByTestId('upstream-connection')).toHaveAttribute('data-connected', 'false', {
     timeout: CONNECTION_TIMEOUT_MS,
   });

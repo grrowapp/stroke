@@ -108,7 +108,7 @@ test.describe('画面は縦いっぱいに組まれる', () => {
   });
 
   test('上層の本文は画面の下まで伸びる', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/notifications');
 
     const { main, viewport } = await page.evaluate(() => {
       const box = document.querySelector('main')!.getBoundingClientRect();

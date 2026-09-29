@@ -39,7 +39,7 @@ test.describe('下層のシェル', () => {
   });
 
   test('上層はタブ、下層はサイドバーで形が違う', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/notifications');
     await expect(page.getByTestId('tab-notifications')).toBeVisible();
     await expect(page.getByTestId('workspace-sidebar')).toHaveCount(0);
 
@@ -52,7 +52,7 @@ test.describe('下層のシェル', () => {
     await page.goto(`/projects/${ALPHA}`);
     await page.getByTestId('back-to-portal').click();
 
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(/\/projects$/);
   });
 
   test('下層にプロジェクト切替の口は無い', async ({ page }) => {

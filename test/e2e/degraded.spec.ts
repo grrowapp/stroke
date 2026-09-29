@@ -36,7 +36,7 @@ test.describe('本家が繋がっていない状態', () => {
 
   test('本家が繋がっていなくても通知画面は出る', async ({ page }) => {
     writeFileSync(REGISTRY_PATH, '{}');
-    await page.goto('/');
+    await page.goto('/notifications');
 
     await expect(page.getByTestId('notifications-empty')).toBeVisible();
     await expect(page.getByTestId('upstream-connection')).toHaveAttribute('data-connected', 'false');
@@ -44,7 +44,7 @@ test.describe('本家が繋がっていない状態', () => {
 
   test('本家が戻れば接続状態も戻る', async ({ page }) => {
     writeFileSync(REGISTRY_PATH, '{}');
-    await page.goto('/');
+    await page.goto('/notifications');
     await expect(page.getByTestId('upstream-connection')).toHaveAttribute('data-connected', 'false');
 
     writeFileSync(REGISTRY_PATH, registryContent());

@@ -2,6 +2,8 @@
 // 概要入力（セッション開始前）。ここにはまだセッションが無い。
 // U1 は id を発行して即返す（最初の問いは待たない）。id が付いたら画面1 へ移る。
 //
+// `/` と `/strokes` の2つの route がこの画面を出す。中身は1つで、違うのは path だけ
+// （`docs/specs/architecture/screen-flow.md`）。
 // 画面を包む部品は route 側の `stroke` レイアウト（fullscreen の UModal・閉じ操作なし）。
 
 const waiting = ref(false)
