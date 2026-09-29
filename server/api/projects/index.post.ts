@@ -2,6 +2,7 @@ import { basename, isAbsolute, join, resolve } from 'node:path'
 import { z } from 'zod'
 
 import { registerProject } from '../../handler/project-directory'
+import { requireProjectName } from '../../utils/access/request'
 import { toHttpError } from '../../utils/control/upstream-proxy'
 import { readStrokeConfig } from '../../utils/stroke/config'
 import { parseBody } from '../../utils/stroke/request-schemas'
@@ -56,6 +57,9 @@ export default defineEventHandler(async (event): Promise<Response> => {
       message: `projectPath は ${shareRoot} の直下のディレクトリの絶対パスでなければならない。`,
     })
   }
+
+  // 見られない対象は存在しないものとして 404（access/permission）。叩くのはサーバー内部で、そこは通る
+  await requireProjectName(event, basename(target))
 
   const result = await registerProject(projectPath)
   if (!result.ok) {

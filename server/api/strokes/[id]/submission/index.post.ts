@@ -1,6 +1,7 @@
 import { parseBody, submissionBody } from '../../../../utils/stroke/request-schemas'
 import { requireSessionId } from '../../../../utils/stroke/session-param'
 import { writeInvocation } from '../../../../utils/stroke/session-store'
+import { requireSession } from '../../../../utils/access/request'
 
 /**
  * A8: 実行の記録（`invocation`）を指定の値に変える。
@@ -20,6 +21,8 @@ import { writeInvocation } from '../../../../utils/stroke/session-store'
  * 戻すのに使う）。存在しない id は `requireSessionId` が 404 にする。
  */
 export default defineEventHandler(async (event): Promise<Response> => {
+  // 見られない対象は存在しないものとして 404（access/permission）
+  await requireSession(event, getRouterParam(event, 'id') ?? '')
   const sessionId = await requireSessionId(event)
   const { invocation, retries } = parseBody(submissionBody, await readBody(event))
 

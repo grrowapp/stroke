@@ -4,6 +4,7 @@ import { resolveProjectName } from '../../../handler/project-directory'
 import { readStrokeConfig } from '../../../utils/stroke/config'
 import { conflict, deleteErrorToHttp } from '../../../utils/stroke/conflict'
 import { readState, type SessionState } from '../../../utils/stroke/session-store'
+import { requireProjectId } from '../../../utils/access/request'
 
 /**
  * プロジェクトを消す（`openspec/specs/api/project/delete`）。
@@ -36,6 +37,8 @@ import { readState, type SessionState } from '../../../utils/stroke/session-stor
 const DELETABLE: readonly Phase[] = ['approved']
 
 export default defineEventHandler(async (event): Promise<Response> => {
+  // 見られない対象は存在しないものとして 404（access/permission）
+  await requireProjectId(event, getRouterParam(event, 'projectId') ?? '')
   const projectId = getRouterParam(event, 'projectId')
   if (projectId === undefined || projectId === '') {
     throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'projectId が無い。' })

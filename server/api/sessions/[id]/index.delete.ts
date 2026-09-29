@@ -4,6 +4,7 @@ import { readStrokeConfig } from '../../../utils/stroke/config'
 import { conflict, deleteErrorToHttp } from '../../../utils/stroke/conflict'
 import { requireSessionId } from '../../../utils/stroke/session-param'
 import { readState, type SessionState } from '../../../utils/stroke/session-store'
+import { requireSession } from '../../../utils/access/request'
 
 /**
  * U11: セッションを消す（`openspec/specs/api/session/delete`）。
@@ -29,6 +30,8 @@ import { readState, type SessionState } from '../../../utils/stroke/session-stor
 const DELETABLE: readonly Phase[] = ['stroking', 'proposed']
 
 export default defineEventHandler(async (event): Promise<Response> => {
+  // 見られない対象は存在しないものとして 404（access/permission）
+  await requireSession(event, getRouterParam(event, 'id') ?? '')
   const sessionId = await requireSessionId(event)
   const root = readStrokeConfig().projectShareRoot
 

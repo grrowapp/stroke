@@ -5,6 +5,7 @@ import { LOG_PREFIX } from '../utils/stroke/log'
 import { listLiveProcesses } from '../utils/stroke/live-processes'
 import { reapRunning, terminateProcess, type ReapCounts } from '../utils/stroke/reap'
 import { submissionPath } from '../utils/stroke/submission-path'
+import { internalFetch } from '../utils/access/request'
 
 /**
  * 起動時の後始末（openspec/specs/bootstrap/system/cleanup-agent-process）。
@@ -30,7 +31,7 @@ export default defineNitroPlugin(() => {
 async function reap(): Promise<void> {
   let sessions: SessionSummary[]
   try {
-    sessions = await $fetch<SessionSummary[]>('/api/sessions')
+    sessions = await internalFetch<SessionSummary[]>('/api/sessions')
   } catch (error) {
     console.warn(`${LOG_PREFIX} 起動時の後始末: 一覧を取れない。今回は何もしない`, error)
     return
@@ -40,7 +41,7 @@ async function reap(): Promise<void> {
     listProcesses: listLiveProcesses,
     terminate: terminateProcess,
     writeInvocation: async (sessionId, invocation) => {
-      await $fetch(submissionPath(sessionId), { method: 'POST', body: { invocation } })
+      await internalFetch(submissionPath(sessionId), { method: 'POST', body: { invocation } })
     },
   })
 

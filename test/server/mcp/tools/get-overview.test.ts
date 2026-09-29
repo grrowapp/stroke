@@ -26,7 +26,7 @@ describe('get-overview', () => {
     const result = await getOverviewHandler({ 'x-stroke-token': token });
 
     expect(result).toEqual({ status: 200, overview: '作りたいシステムの説明' });
-    expect($fetch.raw).toHaveBeenCalledWith('/api/strokes/session-1/overview');
+    expect($fetch.raw).toHaveBeenCalledWith('/api/strokes/session-1/overview', expect.anything());
     removeConnection(token);
   });
 

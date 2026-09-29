@@ -3,6 +3,7 @@ import { readStrokeConfig } from '../../../../utils/stroke/config'
 import { conflict } from '../../../../utils/stroke/conflict'
 import { requireSessionId } from '../../../../utils/stroke/session-param'
 import { isPromotedState, readState } from '../../../../utils/stroke/session-store'
+import { requireSession } from '../../../../utils/access/request'
 
 /**
  * U14: 判断のあるセッションをプロジェクトへ昇格させる（openspec/specs/api/session/promote）。
@@ -21,6 +22,8 @@ import { isPromotedState, readState } from '../../../../utils/stroke/session-sto
  * （昇格してよい局面か・判断が記録されているか）と、判断から名前を取り出して渡すことである。
  */
 export default defineEventHandler(async (event) => {
+  // 見られない対象は存在しないものとして 404（access/permission）
+  await requireSession(event, getRouterParam(event, 'id') ?? '')
   const sessionId = await requireSessionId(event)
 
   const state = await readState(sessionId)

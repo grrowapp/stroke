@@ -3,6 +3,7 @@ import { conflict } from '../../../../utils/stroke/conflict'
 import { parseBody, proposalSubmitBody } from '../../../../utils/stroke/request-schemas'
 import { requireSessionId } from '../../../../utils/stroke/session-param'
 import { isPromotedState, readState } from '../../../../utils/stroke/session-store'
+import { requireSession } from '../../../../utils/access/request'
 
 /**
  * A7: proposal の全文を提出する。初提出なら strokes へマーカー行を追記する。
@@ -17,6 +18,8 @@ import { isPromotedState, readState } from '../../../../utils/stroke/session-sto
  * `handler/proposal.ts` が持つ。
  */
 export default defineEventHandler(async (event) => {
+  // 見られない対象は存在しないものとして 404（access/permission）
+  await requireSession(event, getRouterParam(event, 'id') ?? '')
   const sessionId = await requireSessionId(event)
   const { proposal, projectName } = parseBody(proposalSubmitBody, await readBody(event))
 

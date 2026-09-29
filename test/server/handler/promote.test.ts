@@ -158,6 +158,8 @@ describe('promote', () => {
       projectName: NAME,
       invocation: 'idle',
       retries: 0,
+      // 始めた利用者を引き継ぐ。この test の保存先には `state.json` が無いので null
+      startedBy: null,
     });
     expect(revertPromotion).not.toHaveBeenCalled();
   });
@@ -183,10 +185,11 @@ describe('promote', () => {
   it('昇格の完了時点で invocation を failed にする。A8 を通し、writeState では書かない', async () => {
     await run();
 
-    expect(fetchMock).toHaveBeenCalledWith(submissionPath(NAME), {
+    // 内部 token の header が足されるので、中身は method と body だけを見る
+    expect(fetchMock).toHaveBeenCalledWith(submissionPath(NAME), expect.objectContaining({
       method: 'POST',
       body: { invocation: 'failed' },
-    });
+    }));
     // `writeState` が書いた `invocation` は初期値の `idle` だけ。`failed` は A8 の仕事
     for (const [, state] of writeStateMock.mock.calls) {
       expect(state.invocation).toBe('idle');

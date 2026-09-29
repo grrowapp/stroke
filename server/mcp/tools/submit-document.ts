@@ -6,6 +6,7 @@ import { readFetchFailure } from '../../utils/mcp/fetch-failure'
 import { resolveConnectionProjectPath, resolveConnectionSessionId } from '../../utils/mcp/require-connection'
 import { resolveProjectId } from '../../utils/mcp/resolve-project-id'
 import { classifySteeringFailure, upstreamFetch } from '../../utils/mcp/upstream-fetch'
+import { internalFetch } from '../../utils/access/request'
 
 /** 数値キーの写像なので `Object.prototype` のメンバとは衝突しない（下の 404 の写像を参照）。 */
 const FLONTIER_ERROR_CODE_BY_STATUS: Record<number, string> = {
@@ -143,7 +144,7 @@ export default defineStrokeTool({
       }
 
       try {
-        const response = await $fetch.raw(`/api/strokes/${encodeURIComponent(connected.sessionId)}/proposal`, {
+        const response = await internalFetch.raw(`/api/strokes/${encodeURIComponent(connected.sessionId)}/proposal`, {
           method: 'POST',
           // **接続 token をそのまま転送する。** A7 はこれで「どの起動の提出か」を記録し、
           // invokeAi が実行の決着でそれを読む（openspec/specs/agent/invocation）。ここで

@@ -4,6 +4,7 @@ import { defineStrokeTool } from '../../utils/mcp/define-tool'
 import { resolveConnection } from '../../utils/mcp/connection-table'
 import { readFetchFailure } from '../../utils/mcp/fetch-failure'
 import { resolveConnectionSessionId } from '../../utils/mcp/require-connection'
+import { internalFetch } from '../../utils/access/request'
 
 /** 数値キーの写像なので `Object.prototype` のメンバとは衝突しない（下の 404 の写像を参照）。 */
 const ERROR_CODE_BY_STATUS: Record<number, string> = {
@@ -96,7 +97,7 @@ export default defineStrokeTool({
       // 記録そのものを行わないのは ADR-0014——ツールは代行に徹し、判断も記録も送信先が
       // 持つ。steering の提出だけがツール側で記録するのは、受理するのが代行先（本家）で
       // stroke-board の endpoint を1つも通らないためである。
-      const response = await $fetch.raw(`/api/strokes/${encodeURIComponent(connected.sessionId)}/question`, {
+      const response = await internalFetch.raw(`/api/strokes/${encodeURIComponent(connected.sessionId)}/question`, {
         method: 'POST',
         headers: { 'x-stroke-token': resolved.token },
         body: args,

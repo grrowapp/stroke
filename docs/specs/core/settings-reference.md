@@ -43,6 +43,11 @@ const { projectShareRoot, claude } = config.runtimeConfig
 | `openspec.bin` | `openspec` |
 | `openspec.initArgs` | `init --tools none` |
 | `wsPathPattern` | `/api/sessions/([^/]+)/ws/{channel}(?:$\|[/?#])` |
+| `access.teamDomain` | `royal-frost-b225.cloudflareaccess.com` |
+| `access.aud` | （空） |
+| `access.admins.emails` | `[]` |
+| `access.admins.networks` | `["127.0.0.1/32", "::1/128", "192.168.1.0/24", "100.64.0.0/10"]` |
+| `access.admins.hosts` | `[]` |
 
 ### `projectShareRoot`
 
@@ -125,6 +130,18 @@ AI へ渡す定型。**手順の本文をここに書かない。** 手順は MC
 - 設定したときだけ `--output-format stream-json --verbose` で呼ぶ。`json` は最終結果1件しか出さず、`tool_use` / `tool_result` が残らないため。空のときは `--output-format json` のまま
 - 調査用の複製であり、書き出しの失敗は呼び出しの成否・セッションの状態・画面の挙動に影響しない（サーバーログへ警告1行のみ）
 - ローテーションは無い。調査が終わったら空へ戻し、残ったファイルは手で消す
+
+### `access`
+
+利用者と管理者の判定に使う値（`openspec/specs/access/identity`）。
+
+- **`teamDomain`** — Cloudflare Access の team domain。token の署名を確かめる公開鍵（`https://<teamDomain>/cdn-cgi/access/certs`）と、token の `iss` はここから作る
+- **`aud`** — Access application の AUD tag。token の `aud` と照らす。**空のあいだは token を検証できないので、token を持つリクエストは利用者なしになる**（管理者の接続元からは使える）
+- **`admins`** — 管理者の**初期値**。`access.json` がまだ無いあいだだけ使う
+
+**画面で編集した許可と管理者は設定ではなく、データである。** 置き場は `access.json`（`docs/specs/core/schema.md`「`access.json`」）で、ユーザー管理画面で保存した時点からそちらだけが判定に使われる。初期値も画面から足し引きできる。
+
+サーバーが自分の API を呼ぶ経路（巡回・エージェントの提出・MCP ツール）は、この判定に頼らない。プロセスの起動時に作る内部 token で通す（`server/utils/access/request.ts` の `internalFetch`）。
 
 ### `claude` の起動定義
 

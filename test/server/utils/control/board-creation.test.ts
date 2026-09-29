@@ -1,8 +1,15 @@
 import type { Peer } from 'crossws';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { addPeer, broadcastProjectCreation, removePeer } from '../../../../server/utils/control/board';
+import type { AccessUser } from '../../../../shared/access';
 import type { BoardMessage } from '../../../../shared/types';
+
+// 通知の projectId から名前を引く口は、この test では使わない（通知を流さない）
+vi.mock('../../../../server/utils/access/request', () => ({
+  projectNameOf: vi.fn(async () => null),
+}));
+
+const { addPeer, broadcastProjectCreation, removePeer } = await import('../../../../server/utils/control/board');
 
 /**
  * 生成の配信。
@@ -11,6 +18,8 @@ import type { BoardMessage } from '../../../../shared/types';
  * 「新しい種類の出来事のために配信の口を増やさない」）。ここで見るのはその1本に
  * `project-creation` が乗ることと、行の中身を運ばないことである。
  */
+
+const ADMIN: AccessUser = { email: null, admin: true, projects: [] };
 
 function fakePeer() {
   const sent: BoardMessage[] = [];
@@ -24,18 +33,18 @@ function fakePeer() {
 }
 
 /** 接続時に流れる snapshot を捨てて、以後の配信だけを見る */
-function connect() {
+async function connect(user: AccessUser = ADMIN) {
   const { peer, sent } = fakePeer();
-  addPeer(peer);
+  await addPeer(peer, user);
   sent.length = 0;
   return { peer, sent };
 }
 
 describe('生成の配信', () => {
-  let connected: ReturnType<typeof connect>;
+  let connected: Awaited<ReturnType<typeof connect>>;
 
-  beforeEach(() => {
-    connected = connect();
+  beforeEach(async () => {
+    connected = await connect();
   });
 
   it('接続中のブラウザへ project-creation が流れる', () => {
@@ -72,9 +81,9 @@ describe('生成の配信', () => {
     removePeer(connected.peer);
   });
 
-  it('接続の瞬間に流れるのは snapshot で、生成の出来事ではない', () => {
+  it('接続の瞬間に流れるのは snapshot で、生成の出来事ではない', async () => {
     const { peer, sent } = fakePeer();
-    addPeer(peer);
+    await addPeer(peer, ADMIN);
 
     expect(sent).toHaveLength(1);
     expect(sent[0]!.type).toBe('snapshot');
@@ -89,20 +98,33 @@ describe('生成の配信', () => {
     expect(connected.sent).toEqual([]);
   });
 
-  it('送信で例外を投げる接続は落ちる。以後の配信で踏み続けない', () => {
+  it('許可の無い利用者へは流れない。許可のある利用者へは流れる（access/permission）', async () => {
+    removePeer(connected.peer);
+    const guest = await connect({ email: 'guest@example.com', admin: false, projects: ['memo-app'] });
+
+    broadcastProjectCreation('secret-app', 'in-progress');
+    broadcastProjectCreation('memo-app', 'in-progress');
+
+    expect(guest.sent).toEqual([{ type: 'project-creation', name: 'memo-app', state: 'in-progress' }]);
+
+    removePeer(guest.peer);
+  });
+
+  it('送信で例外を投げる接続は落ちる。以後の配信で踏み続けない', async () => {
     const dead = {
       send: vi.fn(() => {
         throw new Error('already closed');
       }),
     } as unknown as Peer;
 
-    addPeer(dead);
+    await addPeer(dead, ADMIN);
     broadcastProjectCreation('memo-app', 'in-progress');
     broadcastProjectCreation('memo-app', 'done');
 
     // 1回目の snapshot で既に落ちているので、broadcast では呼ばれない
     expect((dead.send as unknown as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(1);
 
+    removePeer(dead);
     removePeer(connected.peer);
   });
 });

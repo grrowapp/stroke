@@ -11,6 +11,7 @@
 | `runId` | `string` | 任意 | steering の会話の続き先。claude が採番した id を覚えて次回 `--resume` に渡す。完成の記録で消えない |
 | `decision` | `object` | 任意 | 承認の判断。記録されている間もセッションは `proposed` のまま（`docs/specs/api/sessions/approve.md`） |
 | `projectName` | `string` | 昇格後は必須、他は任意 | 昇格前は AI が提案した kebab-case の候補、昇格後は確定した名前 |
+| `startedBy` | `string` \| `null` | 任意 | ストロークを始めた利用者のメールアドレス。token の無い接続・CLI から始めたもの、この項目が入る前のものは `null` か省略で、管理者にだけ見える。昇格しても引き継ぐ |
 
 昇格後の2つの局面（`approved` / `activated`）は同じ形で、違うのは `phase` の値だけ。完成の記録（`docs/specs/api/sessions/activate.md`）は `phase` だけを書き換え、他の項目に触れない。
 
@@ -54,6 +55,26 @@
   "invocation": "idle",
   "retries": 0,
   "runId": "8a6e1f4c-2b7d-4e0a-9c31-5d2f7b8e9a10"
+}
+```
+
+## `access.json`
+
+許可と管理者の登録。置き場は `<projectShareRoot>/.stroke-board/access.json`。ユーザー管理画面で編集するデータで、設定ではない（`docs/specs/core/settings-reference.md`「`access`」）。
+
+| 項目 | 型 | 必須 | 中身 |
+|---|---|---|---|
+| `users` | `Record<string, string[]>` | 必須 | メールアドレス（小文字）→ 許可のあるプロジェクトのディレクトリ名 |
+| `admins.emails` | `string[]` | 必須 | 管理者に指名したメールアドレス（小文字） |
+| `admins.networks` | `string[]` | 必須 | token の無い接続を管理者とする接続元ネットワーク（CIDR） |
+| `admins.hosts` | `string[]` | 必須 | token の無い接続を管理者とするホスト名（port を除いた形・小文字） |
+
+ファイルが無いあいだは、`users` は空、`admins` は `runtimeConfig.access.admins` として読む。保存した時点からファイルの内容だけが判定に使われる。
+
+```json
+{
+  "users": { "guest@example.com": ["one-memo"] },
+  "admins": { "emails": ["lead@example.com"], "networks": ["192.168.1.0/24"], "hosts": [] }
 }
 ```
 
