@@ -24,8 +24,11 @@ base2/
 │   ├── app.vue                 アプリの殻（1つ）
 │   ├── assets/css/             スタイル
 │   ├── layouts/                シェル（形が変わる単位で1枚）
+│   ├── middleware/             route middleware。見られない対象の URL を 404 にする（`screen-flow.md`）
+│   ├── plugins/                画面側の利用者を `nuxt-authorization` へ渡す
 │   ├── pages/                  ルーティングのみ。実体は持たない（`page-structure.md`）
 │   │   ├── index.vue           stroke 初期画面（`strokes/index.vue` と同じ画面。`screen-flow.md`）
+│   │   ├── admin/              ユーザー管理（管理者だけ）
 │   │   ├── notifications/      通知
 │   │   ├── projects/
 │   │   │   ├── index.vue       list（プロジェクト一覧）

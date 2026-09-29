@@ -21,6 +21,7 @@ URL と画面の対応、各画面の責務、画面と画面をつなぐ遷移�
 | `/projects` | `app/pages/projects/index.vue` | プロジェクト画面 | プロジェクトの一覧と、そのプロジェクトへの入場 | `portal` |
 | `/notifications` | `app/pages/notifications/index.vue` | 通知 | プロジェクト横断の通知の一覧 | `portal` |
 | `/projects/<projectId>/**` | `app/pages/projects/[projectId]/**` | 下層 | プロジェクトの中（specs / steering / tasks / approvals） | `workspace` |
+| `/admin/users` | `app/pages/admin/users.vue` | ユーザー管理 | 利用者ごとに見せるプロジェクトと、管理者の登録を編集する。管理者だけが開ける | `portal` |
 
 - **1つの URL に2つ以上の責務を持たせない。** `/` はストロークの開始だけ、`/projects` はプロジェクトの一覧と入場だけ、`/notifications` は通知の一覧だけを担う
 - **上層のどの画面も URL を持つ。** 直接開いても、ブックマークから開いても、再読み込みしても、その URL の画面が出る
@@ -45,6 +46,7 @@ flowchart TB
   subgraph portal["portal layout"]
     notifications["/notifications<br>通知"]
     projects["/projects<br>プロジェクト画面"]
+    admin["/admin/users<br>ユーザー管理"]
   end
 
   subgraph stroke["stroke layout（全面モーダル・閉じる操作なし）"]
@@ -58,6 +60,7 @@ flowchart TB
 
   notifications -- "タブ「プロジェクト一覧」" --> projects
   projects -- "タブ「通知」" --> notifications
+  projects -- "ユーザー管理（管理者にだけ出る）" --> admin
   projects -- "作成" --> start
   projects -- "中断したストロークの行" --> s1
   projects -- "中断したストロークの行（proposed 以降）" --> s2
@@ -89,6 +92,7 @@ flowchart TB
 | `portal` layout | タブ「通知」 | `/notifications` |
 | `portal` layout | タブ「プロジェクト一覧」 | `/projects` |
 | `/projects` | 作成 | `/strokes` |
+| `/projects` | 上部の「ユーザー管理」（管理者にだけ出る） | `/admin/users` |
 | `/projects` | アクティブな行 | `/projects/<projectId>` |
 | `/projects` | 中断したストロークの行 | phase が `stroking` なら `/strokes/<sessionId>`、それ以外は `/strokes/<sessionId>/proposal` |
 | `/projects` | 生成の決着後に「する」 | steering への承認依頼が在れば `/projects/<projectId>/approvals/<approvalId>`、無ければ `/projects/<projectId>/approvals` |
@@ -119,6 +123,18 @@ flowchart TB
 | `/strokes/<sessionId>` | phase が `stroking` でない | `/strokes/<sessionId>/proposal` | `proposed` 以降は答える問いが無い。画面2 へ送る |
 | `/strokes/<sessionId>/proposal` | セッションが無い（404） | `/`（履歴を置き換える） | 存在しないセッションの画面は出せない。概要入力へ戻す |
 | `/strokes/<sessionId>/proposal` | phase が `stroking` | `/strokes/<sessionId>` | URL の直打ち・ブックマークで、proposal がまだ無い局面に来た。画面2 には出すものが無いため画面1 へ戻す |
+
+### 見られない対象の URL は 404
+
+見られない対象の URL を開いたときは、**別の URL へ移さず、その URL のまま 404 の画面を出す**（`openspec/specs/access/permission`・`access/user-management`）。判定は `app/middleware/access.global.ts` が持つ。
+
+| URL | 404 になる条件 |
+| --- | --- |
+| `/admin/**` | 管理者でない |
+| `/projects/<projectId>/**` | プロジェクトは在るが、開いた利用者に許可が無い |
+| `/strokes/<sessionId>/**` | ストロークは在るが、開いた利用者が見られない（作成途中なら始めた本人と管理者だけ、昇格後はプロジェクトの許可） |
+
+**対象が無いときは 404 にしない。** 無いときの振る舞いは上の表のまま（`/strokes/<sessionId>` なら `/` へ移す）で、見られないときだけを 404 にする。
 
 ---
 
