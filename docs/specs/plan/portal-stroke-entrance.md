@@ -4,7 +4,9 @@
 
 ## 作成ボタン → 全面モーダルで最後まで
 
-作成を押すと全面モーダルが開き、その中でストローク全体（概要入力 → AI と往復 → 承認）を**最後まで**行う。最初に開くのは概要入力（現 `/strokes` = `app/pages/strokes/index.vue`）。
+作成を押すと全面モーダルが開き、その中でストローク全体（概要入力 → AI と往復 → 承認）を**最後まで**行う。最初に開くのは概要入力（`/strokes`）。
+
+URL と画面の対応・各画面の責務・遷移の正は [`docs/specs/architecture/screen-flow.md`](../architecture/screen-flow.md) にある。作成の飛び先 `/strokes` と `/` が同じ画面を出すことも、そちらが持つ。この資料が扱うのは、作成ボタンからストロークへ入る接合である。
 
 ```mermaid
 flowchart TB

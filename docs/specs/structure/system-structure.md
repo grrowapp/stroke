@@ -25,7 +25,8 @@ base2/
 │   ├── assets/css/             スタイル
 │   ├── layouts/                シェル（形が変わる単位で1枚）
 │   ├── pages/                  ルーティングのみ。実体は持たない（`page-structure.md`）
-│   │   ├── index.vue           通知
+│   │   ├── index.vue           stroke 初期画面（`strokes/index.vue` と同じ画面。`screen-flow.md`）
+│   │   ├── notifications/      通知
 │   │   ├── projects/
 │   │   │   ├── index.vue       list（プロジェクト一覧）
 │   │   │   └── [projectId]/    detail（specs / steering / tasks / approvals）
@@ -60,13 +61,13 @@ base2/
 
 - **pages はただのルーティング。** ページは薄く保ち、画面の実体は components が持つ
 - **components は `page/` ＋ `ui/` ＋ 機能単位で切る。** Route に対応するページの実装は `page/<PageName>/<PageType>/Container.vue`（`page-component-structure.md`）、機能に属さない共通部品は `ui/`、機能の部品は機能のディレクトリ（notification / project / question / proposal / approval）。出自や画面グループの境界では切らない。部品が無い機能のディレクトリは作らない。全数の対応は `file-components.md`
-  - **これは到達点である。** 現状は直下 ＋ `project/` `prototype/` `review/` `shared/` `stroke/` `workspace/` で、`ui/` ＋ 機能単位へ移す作業は `structure-migration.md` が移行課題として持つ
+  - **これは到達点である。** 現状は直下 ＋ `page/` `project/` `prototype/` `review/` `shared/` `stroke/` `workspace/` で（`page/` は現状ストローク開始画面の `Stroke/Start/Container.vue` が1つ）、`ui/` ＋ 機能単位へ移す作業は `structure-migration.md` が移行課題として持つ
   - どの区切りに置くかは**実際の参照範囲**で決める。役割・名前・将来の想定で決めない。判定の物差しは `openspec/specs/app-structure`
   - markdown を描く・直す部品は components ではなく `modules/markdown/` にある（§3）。`app/components/` に同じ実体を重ねて持たない
 - **composables は関心単位の `useXxx` を平置き**にする。境界のディレクトリを作らない。全数の対応は `file-composables.md`
 - **テストは `test/` の下に置く。** 単体は `app/` `modules/` `server/` `shared/` の構造をそのまま写し、E2E は `test/e2e/`（`playwright.config.ts` の `testDir` がここを指す）
 - レイアウトはシェルの形が変わる単位で持つ（横タブの `portal.vue` / 左サイドバーの `workspace.vue`）。プロジェクト間の移動は一覧を経由する
-- セッションへの入口はプロジェクト一覧の **作成** で、専用のトップページを持たない
+- セッションへの入口は `/`（stroke 初期画面）とプロジェクト一覧の **作成**（`/strokes`）の2つで、同じ画面を出す。URL と画面の対応・遷移の正は `docs/specs/architecture/screen-flow.md`
 - データ取得の設計は `docs/specs/architecture/data-fetching.md`
 
 ---
@@ -138,6 +139,7 @@ base2/
 | `docs/specs/structure/file-components.md` / `file-composables.md` / `server-structure.md` | 部品・composable・utils の全数と規範への対応（`modules/` は含まない。§3） |
 | `docs/specs/architecture/data-fetching.md` | データ取得・SSR の設計 |
 | `docs/specs/architecture/invoke-agent.md` | AI の起動と実行の管理（invoke-agent）の仕組みと責務範囲 |
+| `docs/specs/architecture/screen-flow.md` | URL と画面の対応・各画面の責務・画面遷移の正 |
 | `docs/specs/plan/structure-migration.md` | 現状との差分（移行課題） |
 | `.spec-workflow/steering/structure.md` / `tech.md` | コーディング規約（命名・import・テストの置き場・通す門番・書き方の原則） |
 | `docs/adr/0002` / `0005`〜`0008` | 統合・本家の扱いの決定 |
