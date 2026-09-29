@@ -11,14 +11,21 @@ TBD - created by archiving change move-spec-project-directory-capability. Update
 
 システムは、これに加えて、**承認によって昇格したが `.spec-workflow` をまだ持たないディレクトリを、母集合に加えなければならない（SHALL）**。プロジェクトの実体は承認した瞬間に存在しており、走査が拾えるようになるのを待つと、承認した本人が自分の起こした変化を確かめられない時間が生まれるためである。
 
+一覧に並べるのは、母集合のうち**一覧を見ている利用者に許可のあるプロジェクトだけ**とする SHALL（`access/permission`）。管理者には母集合のすべてを並べる SHALL。許可の無いプロジェクトは、行としても件数としても現れてはならない（MUST NOT）。
+
 走査が果たすのは**母集合を作ること**だけとする SHALL。行が生成中か完了かは、`.spec-workflow` の有無からではなく、`state.json` の phase から導く（`project/generation`「生成中か完了かはファイルシステムの事実だけで判定する」）。`.spec-workflow` を持つことを完了の根拠にしてはならない（MUST NOT）——そのディレクトリは生成（`api/project/generate`）の依頼を本家が受理したときに本家が作り、AI が起動する前、成果物が1つも無いうちからできている。
 
 システムは、走査対象を読み取りのみで扱わなければならない（MUST）。プロジェクトのディレクトリにも `.spec-workflow/` にも書き込んではならない（MUST NOT）。
 
 #### Scenario: 親パスの配下にプロジェクトがある
 
-- **WHEN** 設定された親パスの配下に `.spec-workflow` を持つディレクトリが複数ある
+- **WHEN** 設定された親パスの配下に `.spec-workflow` を持つディレクトリが複数あり、管理者が一覧を開く
 - **THEN** それらすべてがプロジェクトとして一覧に並ぶ
+
+#### Scenario: 一般の利用者が一覧を開く
+
+- **WHEN** 親パスの配下にプロジェクト `alpha` と `beta` があり、`alpha` にだけ許可のある利用者が一覧を開く
+- **THEN** `alpha` だけが一覧に並び、`beta` は現れない
 
 #### Scenario: `.spec-workflow` を持たないディレクトリは拾わない
 
@@ -236,7 +243,7 @@ TBD - created by archiving change move-spec-project-directory-capability. Update
 
 システムは、プロジェクト一覧画面に「作成」と「登録」の入口を置く SHALL。独立したメニュー項目として持ってはならない（MUST NOT）——一覧画面の操作として持つ。
 
-「作成」は常に押せる。押したときの挙動（オーバーレイ上のモーダルでストロークを開く）は `stroke/frontier` が規定する。「登録」は非活性で置き、押せないことが見て分かる表示にする。
+「作成」は常に押せる。押したときの挙動（オーバーレイ上のモーダルでストロークを開く）は `stroke/frontier` が規定する。押したときの飛び先は `/` とは別の path とし、`/` へ飛ばしてはならない（MUST NOT）。「登録」は非活性で置き、押せないことが見て分かる表示にする。
 
 システムは、作成・登録の可否をサーバーに問い合わせる仕組みを持ってはならない（MUST NOT）。可否判定は行わない。
 
@@ -248,4 +255,18 @@ TBD - created by archiving change move-spec-project-directory-capability. Update
 #### Scenario: 作成を押す
 
 - **WHEN** 「作成」を押す
-- **THEN** ストロークがオーバーレイ上のモーダルとして開く（`stroke/frontier`）
+- **THEN** ストロークがオーバーレイ上のモーダルとして開く（`stroke/frontier`）。URL は `/` ではなくストローク開始の path になっている
+
+### Requirement: プロジェクト画面は自分の URL に留まる
+
+システムは、`/projects` を、プロジェクトの一覧と入場だけを担う画面として置かなければならない（SHALL）。他の URL から `/projects` へ自動で移してはならない（MUST NOT）。`/projects` へ着くのは、ユーザーがそこへ向かう操作をしたときだけである（SHALL）。
+
+#### Scenario: ルートからプロジェクト画面へ移動する
+
+- **WHEN** `/` を開き、プロジェクト画面へ向かう操作をする
+- **THEN** `/projects` が開き、プロジェクトの一覧が出ている
+
+#### Scenario: ルートを開いただけでプロジェクト画面へ着かない
+
+- **WHEN** `/` を開き、プロジェクト画面へ向かう操作をしない
+- **THEN** `/projects` へは移らず、プロジェクトの一覧は出ていない

@@ -1,5 +1,5 @@
 ---
-status: Planning
+status: Wait-for-archive
 change: update-screen-flow-responsibility
 origin: user
 tags:
@@ -7,6 +7,7 @@ tags:
   - specs
   - design
   - tasks
+  - update-screen-flow-responsibility/8c97e878-597a-495f-8b19-b22fd030913b
 ---
 
 # update-screen-flow-responsibility
