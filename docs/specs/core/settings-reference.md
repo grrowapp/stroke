@@ -44,7 +44,7 @@ const { projectShareRoot, claude } = config.runtimeConfig
 | `openspec.initArgs` | `init --tools none` |
 | `wsPathPattern` | `/api/sessions/([^/]+)/ws/{channel}(?:$\|[/?#])` |
 | `access.teamDomain` | `royal-frost-b225.cloudflareaccess.com` |
-| `access.aud` | （空） |
+| `access.aud` | `9fc18f5d8a25fc21596ff34ad0366d85ee7ef5acb3dbc2405f44ef5171ac474d` |
 | `access.admins.emails` | `[]` |
 | `access.admins.networks` | `["127.0.0.1/32", "::1/128", "192.168.1.0/24", "100.64.0.0/10"]` |
 | `access.admins.hosts` | `[]` |
@@ -136,7 +136,7 @@ AI へ渡す定型。**手順の本文をここに書かない。** 手順は MC
 利用者と管理者の判定に使う値（`openspec/specs/access/identity`）。
 
 - **`teamDomain`** — Cloudflare Access の team domain。token の署名を確かめる公開鍵（`https://<teamDomain>/cdn-cgi/access/certs`）と、token の `iss` はここから作る
-- **`aud`** — Access application の AUD tag。token の `aud` と照らす。**空のあいだは token を検証できないので、token を持つリクエストは利用者なしになる**（管理者の接続元からは使える）
+- **`aud`** — Access application の AUD tag。token の `aud` と照らす。既定値は application `stroke-mc-tool` のもので、この application は `stroke.grrow.app` と `mc-tool.geekport.jp` の2つを対象に持つ。**空のあいだは token を検証できないので、token を持つリクエストは利用者なしになる**（管理者の接続元からは使える）
 - **`admins`** — 管理者の**初期値**。`access.json` がまだ無いあいだだけ使う
 
 **画面で編集した許可と管理者は設定ではなく、データである。** 置き場は `access.json`（`docs/specs/core/schema.md`「`access.json`」）で、ユーザー管理画面で保存した時点からそちらだけが判定に使われる。初期値も画面から足し引きできる。

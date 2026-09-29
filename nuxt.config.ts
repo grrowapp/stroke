@@ -130,8 +130,9 @@ export default defineNuxtConfig({
     access: {
       // Cloudflare Access の team domain。token の公開鍵（/cdn-cgi/access/certs）と iss はここから作る
       teamDomain: 'royal-frost-b225.cloudflareaccess.com',
-      // Access application の AUD tag。空のあいだは token を検証できないので、token を持つリクエストは利用者なしになる
-      aud: '',
+      // Access application（stroke-mc-tool。対象は stroke.grrow.app と mc-tool.geekport.jp）の AUD tag。
+      // 空のあいだは token を検証できないので、token を持つリクエストは利用者なしになる
+      aud: '9fc18f5d8a25fc21596ff34ad0366d85ee7ef5acb3dbc2405f44ef5171ac474d',
       // 管理者の初期値。画面で編集したものは access.json に置き、これと合わせて判定する
       admins: {
         emails: [] as string[],
