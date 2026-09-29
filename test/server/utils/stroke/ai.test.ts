@@ -493,7 +493,7 @@ describe('invokeAi の組み立て失敗', () => {
 
     expect($fetch).toHaveBeenCalledWith(
       `/api/strokes/${SESSION_ID}/submission`,
-      { method: 'POST', body: { invocation: 'failed', retries: 2 } },
+      expect.objectContaining({ method: 'POST', body: { invocation: 'failed', retries: 2 } }),
     )
   })
 
@@ -509,7 +509,7 @@ describe('invokeAi の組み立て失敗', () => {
 
     expect($fetch).toHaveBeenCalledWith(
       `/api/strokes/${SESSION_ID}/submission`,
-      { method: 'POST', body: { invocation: 'error' } },
+      expect.objectContaining({ method: 'POST', body: { invocation: 'error' } }),
     )
   })
 
@@ -521,7 +521,7 @@ describe('invokeAi の組み立て失敗', () => {
 
     expect($fetch).toHaveBeenCalledWith(
       `/api/strokes/${SESSION_ID}/submission`,
-      { method: 'POST', body: { invocation: 'error' } },
+      expect.objectContaining({ method: 'POST', body: { invocation: 'error' } }),
     )
   })
 
@@ -540,7 +540,7 @@ describe('invokeAi の組み立て失敗', () => {
 
     expect($fetch).toHaveBeenCalledWith(
       `/api/strokes/${SESSION_ID}/submission`,
-      { method: 'POST', body: { invocation: 'failed', retries: 2 } },
+      expect.objectContaining({ method: 'POST', body: { invocation: 'failed', retries: 2 } }),
     )
     expect(runClaude).not.toHaveBeenCalled()
   })

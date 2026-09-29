@@ -7,7 +7,7 @@
 
 ### Requirement: 昇格前のセッションを一覧する
 
-システムは、昇格前（`stroking` / `proposed`）のセッションを一覧して返す endpoint を持つ SHALL。各件は id・phase・時点情報・対象のディレクトリ・実行の記録とし、新しいものから並べる SHALL。
+システムは、昇格前（`stroking` / `proposed`）のセッションを一覧して返す endpoint を持つ SHALL。各件は id・phase・時点情報・対象のディレクトリ・実行の記録とし、新しいものから並べる SHALL。返すのは、要求した利用者が見られるセッションだけとする SHALL（`access/permission`）。
 
 昇格した対象（`approved` / `activated`）を返してはならない（MUST NOT）——あれはプロジェクトであり、プロジェクトの一覧が返す。
 

@@ -4,7 +4,7 @@
 
 ## 規範への対応 — 全33本
 
-規範は**関心単位**の4区分。現在の33本をこの区切りへ写すと:
+規範は**関心単位**の5区分（利用者の判定は見出しの全数に含めていない）。現在の33本をこの区切りへ写すと:
 
 | 関心 | モジュール（現在の置き場 →） |
 | --- | --- |
@@ -12,6 +12,7 @@
 | 監視・通知 | `monitor` `diff` `notify` `board` `directory` `creating` `upstream-proxy`（control/） |
 | セッション | `session-store` `session-param` `paths` `ai` `invoke` `claude` `config` `log` `running` `sweep` `reap` `activate-approved` `submission-path` `request-schemas` `question` `conflict` `project` `openspec` `ws-channels`（stroke/） |
 | 設定・起動 | `config` `readiness`（直下） |
+| 利用者の判定 | `source` `token` `identity` `store` `started-by` `request`（access/） |
 
 `server/handler/` はこの棚卸しの対象外（`server/utils/` ではない）。api が呼ぶ実処理の置き場で、規範は `system-structure.md` §1・§4。
 

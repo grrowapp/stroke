@@ -29,6 +29,8 @@ export interface PeerRegistry {
   broadcast(message: unknown): void
   /** 1つの接続だけへ流す。接続時の現在分の配信に使う */
   sendTo(peer: Peer, message: unknown): void
+  /** `select` が true を返す接続だけへ1件流す。利用者ごとの絞り込みに使う（`access/permission`） */
+  broadcastTo(select: (peer: Peer) => boolean, message: unknown): void
 }
 
 export function createKeyedPeerRegistry<K>(): KeyedPeerRegistry<K> {
@@ -84,6 +86,14 @@ export function createPeerRegistry(): PeerRegistry {
 
     sendTo(peer, message) {
       if (!trySend(peer, JSON.stringify(message))) peers.delete(peer)
+    },
+
+    broadcastTo(select, message) {
+      const data = JSON.stringify(message)
+      for (const peer of peers) {
+        if (!select(peer)) continue
+        if (!trySend(peer, data)) peers.delete(peer)
+      }
     },
   }
 }

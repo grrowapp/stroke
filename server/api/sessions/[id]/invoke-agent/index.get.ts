@@ -4,6 +4,7 @@ import { readStrokeConfig } from '../../../../utils/stroke/config'
 import { sessionDir } from '../../../../utils/stroke/paths'
 import { requireSessionId } from '../../../../utils/stroke/session-param'
 import { isPromotedState, readState } from '../../../../utils/stroke/session-store'
+import { requireSession } from '../../../../utils/access/request'
 
 /**
  * U13: AI を起動する唯一の入口（specs/api/invoke-agent）。受理系 endpoint は起動を
@@ -31,6 +32,8 @@ import { isPromotedState, readState } from '../../../../utils/stroke/session-sto
  * （add-activated-phase design D4）。
  */
 export default defineEventHandler(async (event) => {
+  // 見られない対象は存在しないものとして 404（access/permission）
+  await requireSession(event, getRouterParam(event, 'id') ?? '')
   const sessionId = await requireSessionId(event)
 
   // 前提が欠けている間は起動を受け付けない（specs/api/invoke-agent）。判定はここで行い、

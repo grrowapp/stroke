@@ -1,5 +1,7 @@
 import { vi } from 'vitest';
 
+import type { AccessUser } from '../../../shared/access';
+
 /**
  * endpoint（`server/api/**`）を素の vitest から直に呼ぶための最小の足場。
  *
@@ -52,9 +54,24 @@ export interface FakeEvent {
   status: number | undefined;
   /** 小文字のヘッダ名 → 値。`getHeader` が読む（A5・A7 の `x-stroke-token` など） */
   headers?: Record<string, string>;
+  /**
+   * `event.context`。利用者の判定（`server/utils/access/request.ts` の `accessUserOf`）は
+   * ここに求めた結果を置く。既定では管理者を置いておき、判定を見ない test が判定に掛からない
+   * ようにする。
+   */
+  context: { accessUser?: Promise<AccessUser> };
 }
+
+/** 判定を見ない test が置く利用者。管理者なので、どの対象も見られる */
+export const ADMIN_USER: AccessUser = { email: null, admin: true, projects: [] };
 
 /** パスパラメータ `id` と本文を持つ要求を1つ組み立てる。 */
 export function fakeEvent(id: string, body: unknown, headers?: Record<string, string>): FakeEvent {
-  return { params: { id }, body, status: undefined, ...(headers === undefined ? {} : { headers }) };
+  return {
+    params: { id },
+    body,
+    status: undefined,
+    context: { accessUser: Promise.resolve(ADMIN_USER) },
+    ...(headers === undefined ? {} : { headers }),
+  };
 }

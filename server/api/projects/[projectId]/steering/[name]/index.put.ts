@@ -14,12 +14,15 @@ import { z } from 'zod';
 import { saveSteeringDocument } from '../../../../../handler/project-document';
 import { isSteeringDocument } from '../../../../../utils/upstream/rest';
 import { toHttpError } from '../../../../../utils/control/upstream-proxy';
+import { requireProjectId } from '../../../../../utils/access/request';
 
 const bodySchema = z.object({
   content: z.string(),
 });
 
 export default defineEventHandler(async (event) => {
+  // 見られない対象は存在しないものとして 404（access/permission）
+  await requireProjectId(event, getRouterParam(event, 'projectId') ?? '')
   const projectId = getRouterParam(event, 'projectId') ?? '';
   const name = getRouterParam(event, 'name') ?? '';
 

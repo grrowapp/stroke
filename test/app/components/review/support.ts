@@ -307,9 +307,40 @@ export const MarkdownDiagramStub = defineComponent({
   },
 })
 
+/**
+ * `ProsePre`（`@nuxt/ui`）の代わり。実物は `useAppConfig` などの Nuxt の実行環境を要り、
+ * ここでは setup で落ちる。実物（`@nuxt/ui` 4.10.0 の `prose/Pre.vue`）の DOM の形だけを写す。
+ *
+ * **属性は root の `div` と `pre` の両方に付く。** 実物は `inheritAttrs: false` を持たず、
+ * `pre` にも `v-bind="$attrs"` を置いている。位置の印も両方に出るので、位置の口が `div` の
+ * 印を読まないことはこの形のままで検査される。`class` は props なので `pre` にだけ付く。
+ * `copy` は `MarkdownFence` が切っているので、写すボタンは写さない。
+ *
+ * **実物の template が変わったら、ここも直すこと。**
+ */
+export const ProsePreStub = defineComponent({
+  name: 'ProsePre',
+  props: {
+    icon: { type: null, default: undefined },
+    code: { type: String, default: undefined },
+    language: { type: String, default: undefined },
+    filename: { type: String, default: undefined },
+    highlights: { type: Array, default: undefined },
+    hideHeader: { type: Boolean, default: false },
+    meta: { type: String, default: undefined },
+    copy: { type: [Boolean, Object], default: true },
+    class: { type: null, default: undefined },
+    ui: { type: Object, default: undefined },
+  },
+  setup(props, { attrs, slots }) {
+    return () => h('div', [h('pre', { class: props.class, ...attrs }, slots.default?.())])
+  },
+})
+
 /** `MarkdownView` を実物の解析結果で描くための `global.stubs` */
 export const PREVIEW_STUBS = {
   MDC: MdcParsingStub,
   MDCRenderer: MdcRendererStub,
   MarkdownDiagram: MarkdownDiagramStub,
+  ProsePre: ProsePreStub,
 }

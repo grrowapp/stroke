@@ -19,7 +19,7 @@
  *
  * **DOM は実物の経路に合わせて組む。** `./preview.test.ts` の `renderFence` は印が
  * DOM に出ない時代の写しで、既定では `pre` に印を置かない。こちらは印が出るようになった
- * 後（`MarkdownCode.vue` の `v-bind="attrs"`）を写し、`markSourcePosition` が props へ
+ * 後（`MarkdownFence.vue` から `ProsePre` の `v-bind="$attrs"`）を写し、`markSourcePosition` が props へ
  * 載せた印をそのまま `pre` の属性にする。**どちらの経路を通ったかは、この印の有無だけで
  * 決まる。**
  *
@@ -209,16 +209,20 @@ describe('記法ごとに、text ノードの position が記号を含むか', (
 // 面を組む（実物の経路の写し）
 // ---------------------------------------------------------------------------
 
-/** `../render/MarkdownCode.vue` の `LANGUAGE_NAME` のうち、ここで使うぶん */
+/** `../render/MarkdownFence.vue` の `LANGUAGE_NAME` のうち、ここで使うぶん */
 const LANGUAGE_NAME: Record<string, string> = { ts: 'TypeScript', text: 'Plain Text' };
 
 /**
  * フェンスを描く。`../render/MarkdownFence.vue` の振り分けと、その先の写し。
  *
  * **位置の印は `props` から `pre` の属性へそのまま抜ける。** `MDCRenderer` は `node.props`
- * を受け側へ渡し、`MarkdownCode` は `language` と `code` しか props で宣言していないので、
- * `data-src-start` / `data-src-end` は `$attrs` に残って `v-bind="attrs"` で `pre` に付く。
+ * を受け側へ渡し、`ProsePre` は `language` と `code` を props で宣言しているので、
+ * `data-src-start` / `data-src-end` は `$attrs` に残って `v-bind="$attrs"` で `pre` に付く。
  * 印が付かないのは、**`markSourcePosition` が印を打てなかった `pre` だけ**である。
+ *
+ * **同じ印が `pre` を包む入れ物の `div` にも付く。** `ProsePre` は `inheritAttrs: false` を
+ * 持たないので、`$attrs` は root の `div` にも落ちる（`@nuxt/ui` 4.10.0 で実測）。
+ * 位置の口がこの `div` の印を読まないことも、ここで一緒に固定される。
  */
 function renderFence(node: AstNode, doc: Document): Node {
   const language = String(node.props?.language ?? '');
@@ -242,12 +246,15 @@ function renderFence(node: AstNode, doc: Document): Node {
   name.append(doc.createTextNode(LANGUAGE_NAME[language] ?? language));
   toolbar.append(name);
 
+  // `ProsePre` の root。`$attrs` が `pre` と同じく落ちる
+  const root = doc.createElement('div');
   const pre = doc.createElement('pre');
-  pre.setAttribute('class', 'sb-code-body');
-  pre.setAttribute('language', language);
-  for (const key of [SOURCE_START_ATTR, SOURCE_END_ATTR]) {
-    const value = node.props?.[key];
-    if (value !== undefined) pre.setAttribute(key, String(value));
+  for (const element of [root, pre]) {
+    element.setAttribute('data-language', language);
+    for (const key of [SOURCE_START_ATTR, SOURCE_END_ATTR]) {
+      const value = node.props?.[key];
+      if (value !== undefined) element.setAttribute(key, String(value));
+    }
   }
 
   // shiki を通らない場合の枝。`code` を行に割って `span.line` を並べる（末尾は落とす）
@@ -260,8 +267,9 @@ function renderFence(node: AstNode, doc: Document): Node {
     body.append(line);
   });
   pre.append(body);
+  root.append(pre);
 
-  box.append(toolbar, pre);
+  box.append(toolbar, root);
   return box;
 }
 

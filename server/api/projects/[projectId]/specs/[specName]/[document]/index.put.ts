@@ -15,6 +15,7 @@ import { z } from 'zod';
 import { saveSpecDocument } from '../../../../../../handler/project-document';
 import { isSpecDocumentName } from '../../../../../../utils/upstream/schema';
 import { toHttpError } from '../../../../../../utils/control/upstream-proxy';
+import { requireProjectId } from '../../../../../../utils/access/request';
 
 /**
  * 本家は body の `content` をファイルの中身として丸ごと書く。
@@ -26,6 +27,8 @@ const bodySchema = z.object({
 });
 
 export default defineEventHandler(async (event) => {
+  // 見られない対象は存在しないものとして 404（access/permission）
+  await requireProjectId(event, getRouterParam(event, 'projectId') ?? '')
   const projectId = getRouterParam(event, 'projectId') ?? '';
   const specName = getRouterParam(event, 'specName') ?? '';
   const document = getRouterParam(event, 'document') ?? '';

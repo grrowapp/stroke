@@ -3,6 +3,7 @@ import { runClaude, type ClaudeLaunch, type ClaudeMode } from './claude'
 import { readStrokeConfig } from './config'
 import { LOG_PREFIX } from './log'
 import { submissionPath } from './submission-path'
+import { internalFetch } from '../access/request'
 
 /**
  * 1回の呼び出しに要るものすべて。
@@ -222,7 +223,7 @@ async function recordBuildFailure(sessionId: string, retries: number, error: unk
 /** A8 へ書く。組み立てに失敗した経路専用——`AiRun.setInvocation` は組み立てが成功した
  * ときにしか手に入らないので、ここだけ独立した書き手を持つ。 */
 async function writeInvocation(sessionId: string, invocation: Invocation, retries?: number): Promise<void> {
-  await $fetch(submissionPath(sessionId), {
+  await internalFetch(submissionPath(sessionId), {
     method: 'POST',
     body: { invocation, ...(retries === undefined ? {} : { retries }) },
   })

@@ -3,6 +3,7 @@ import { conflict } from '../../../../utils/stroke/conflict'
 import { parseBody, settlementBody } from '../../../../utils/stroke/request-schemas'
 import { requireSessionId } from '../../../../utils/stroke/session-param'
 import { isPromotedState, readState } from '../../../../utils/stroke/session-store'
+import { requireSession } from '../../../../utils/access/request'
 
 /**
  * A9: 実行の決着。その実行で提出されたものに応じて局面を切り替え、画面へ届ける。
@@ -14,6 +15,8 @@ import { isPromotedState, readState } from '../../../../utils/stroke/session-sto
  * 局面か（409）。局面を切り替えることと配信することは `handler/settlement.ts` が持つ。
  */
 export default defineEventHandler(async (event) => {
+  // 見られない対象は存在しないものとして 404（access/permission）
+  await requireSession(event, getRouterParam(event, 'id') ?? '')
   const sessionId = await requireSessionId(event)
   const { submitted } = parseBody(settlementBody, await readBody(event))
 

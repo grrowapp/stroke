@@ -9,7 +9,7 @@
 
 システムは `GET /api/sessions` を公開する SHALL。一覧には実体の揃ったセッション——ディレクトリがあり、openspec ルートがあり、ワークフロースキーマが設定済みのもの——だけが載る SHALL。
 
-一覧の各件には、セッション id・phase・いつのものかが分かる時点情報に加え、**そのディレクトリの path と `invocation`** を載せる SHALL。`agent/invocation` はこの一覧との符合で初回か継続かを判定し、巡回（`portal/batch`）は各件の `invocation` と path をリトライに使う。
+一覧の各件には、セッション id・phase・いつのものかが分かる時点情報に加え、**そのディレクトリの path と `invocation`** を載せる SHALL。載せるのは、要求した利用者が見られるセッションとプロジェクトだけとする SHALL（`access/permission`）。`agent/invocation` はこの一覧との符合で初回か継続かを判定し、巡回（`portal/batch`）は各件の `invocation` と path をリトライに使う。
 
 承認で昇格したプロジェクトも、実体（ディレクトリ・openspec ルート・ワークフロースキーマ）が揃っている限り一覧に載る SHALL。昇格後の実行（steering）の `invocation` が `failed` になったとき、巡回が拾えるのはこの一覧に載っているからである。
 

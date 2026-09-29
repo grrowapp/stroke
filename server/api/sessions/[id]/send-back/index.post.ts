@@ -2,6 +2,7 @@ import { conflict } from '../../../../utils/stroke/conflict'
 import { parseBody, sendBackBody } from '../../../../utils/stroke/request-schemas'
 import { requireSessionId } from '../../../../utils/stroke/session-param'
 import { readState, writeSendBack } from '../../../../utils/stroke/session-store'
+import { requireSession } from '../../../../utils/access/request'
 
 /**
  * U9: proposal を差し戻す。指摘一式はサーバが保存し（A4 が読む）、エージェントは
@@ -10,6 +11,8 @@ import { readState, writeSendBack } from '../../../../utils/stroke/session-store
  * invoke-agent へ要求する。
  */
 export default defineEventHandler(async (event) => {
+  // 見られない対象は存在しないものとして 404（access/permission）
+  await requireSession(event, getRouterParam(event, 'id') ?? '')
   const sessionId = await requireSessionId(event)
   const payload = parseBody(sendBackBody, await readBody(event))
 

@@ -11,8 +11,13 @@ export default defineNuxtConfig({
   // [agent decision] Nitro が本家への接続を持つので SSR を有効にする
   ssr: true,
 
-  // markdown は `modules/markdown/` が自分で `@nuxtjs/mdc` を登録する
-  modules: ['@nuxt/ui', '@nuxtjs/mcp-toolkit'],
+  // markdown は `modules/markdown/` が自分で `@nuxtjs/mdc` を登録する。
+  //
+  // **`@nuxt/ui` より前に並べること。** `modules/` ディレクトリの自動読み込みに任せると
+  // 後回しになり、`@nuxt/ui` の setup 時点で `hasNuxtModule('@nuxtjs/mdc')` が偽になって
+  // Prose 一式が登録されない（`@nuxt/ui/dist/module.mjs:121`）。切り出し後は package 名
+  // `markxdown` がこの位置に並ぶので、これが最終形と同じ並びになる。
+  modules: ['./modules/markdown', '@nuxt/ui', '@nuxtjs/mcp-toolkit', 'nuxt-authorization'],
 
   // [agent decision] inline SVG で描く。パスが DOM に出るので prototype / 本家との一致をテストで比較できる
   icon: {
@@ -120,5 +125,22 @@ export default defineNuxtConfig({
     // WS の URL からセッション id を抜くパターン。`{channel}` はチャネル名に置き換わる。
     // サブパスで配信する構成にするときはここを合わせる
     wsPathPattern: '/api/sessions/([^/]+)/ws/{channel}(?:$|[/?#])',
+
+    // 利用者の判定（docs/specs/core/settings-reference.md「access」）。読むのは server/utils/access/config.ts の1本
+    access: {
+      // Cloudflare Access の team domain。token の公開鍵（/cdn-cgi/access/certs）と iss はここから作る
+      teamDomain: 'royal-frost-b225.cloudflareaccess.com',
+      // Access application（stroke-mc-tool。対象は stroke.grrow.app と mc-tool.geekport.jp）の AUD tag。
+      // 空のあいだは token を検証できないので、token を持つリクエストは利用者なしになる
+      aud: '9fc18f5d8a25fc21596ff34ad0366d85ee7ef5acb3dbc2405f44ef5171ac474d',
+      // 管理者の初期値。画面で編集したものは access.json に置き、これと合わせて判定する
+      admins: {
+        emails: [] as string[],
+        // token が無い接続を管理者として通す接続元（CIDR）。Tailscale は 100.64.0.0/10
+        networks: ['127.0.0.1/32', '::1/128', '192.168.1.0/24', '100.64.0.0/10'],
+        // token が無い接続を管理者として通すホスト名（port を除いた形）
+        hosts: [] as string[],
+      },
+    },
   },
 });

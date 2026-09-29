@@ -48,13 +48,15 @@ export async function createSession(
   root: string,
   overview: string,
   invocation: Invocation,
+  /** 始めた利用者のメールアドレス。token の無い接続や CLI から始めたときは null（`access/permission`） */
+  startedBy: string | null = null,
 ): Promise<string> {
   const sessionId = randomUUID()
   try {
     await mkdir(sessionDir(root, sessionId), { recursive: true })
     await writeAtomic(root, sessionId, SESSION_FILES.overview, overview)
     await writeAtomic(root, sessionId, SESSION_FILES.strokes, `${JSON.stringify([], null, 2)}\n`)
-    const state = { phase: 'stroking', currentQuestion: null, invocation }
+    const state = { phase: 'stroking', currentQuestion: null, invocation, startedBy }
     await writeAtomic(root, sessionId, SESSION_FILES.state, `${JSON.stringify(state, null, 2)}\n`)
     return sessionId
   } catch (error) {

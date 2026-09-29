@@ -113,7 +113,7 @@ URL を `computed` で組み、`typeof window === 'undefined'` なら空文字�
 
 **stroke-board のサーバー（`server/routes/ws.ts`）だけ。本家 WebSocket には繋がない**（`specs/upstream-connection`）。ブラウザから本家へ直接触らせないという境界による。
 
-**参照元**（8）— `components/shared/NotificationToaster.vue`（`onNotification`）、`components/workspace/WorkspaceShell.vue`（`upstreamConnected`。`layouts/workspace.vue` から移った）、`layouts/portal.vue`、`pages/index.vue`、`pages/projects/index.vue`、`pages/projects/[projectId]/approvals/[approvalId].vue`、`pages/projects/[projectId]/specs/[specName]/[document].vue`、`pages/projects/[projectId]/steering/[name].vue`
+**参照元**（8）— `components/shared/NotificationToaster.vue`（`onNotification`）、`components/workspace/WorkspaceShell.vue`（`upstreamConnected`。`layouts/workspace.vue` から移った）、`layouts/portal.vue`、`pages/notifications/index.vue`、`pages/projects/index.vue`、`pages/projects/[projectId]/approvals/[approvalId].vue`、`pages/projects/[projectId]/specs/[specName]/[document].vue`、`pages/projects/[projectId]/steering/[name].vue`
 
 ※ 下層3ページは `upstreamConnected` だけを取る。`app.vue` と `components/review/ApprovalAnnotator.vue` は呼ばずにコメントで触れているだけ。
 

@@ -24,8 +24,12 @@ base2/
 │   ├── app.vue                 アプリの殻（1つ）
 │   ├── assets/css/             スタイル
 │   ├── layouts/                シェル（形が変わる単位で1枚）
+│   ├── middleware/             route middleware。見られない対象の URL を 404 にする（`screen-flow.md`）
+│   ├── plugins/                画面側の利用者を `nuxt-authorization` へ渡す
 │   ├── pages/                  ルーティングのみ。実体は持たない（`page-structure.md`）
-│   │   ├── index.vue           通知
+│   │   ├── index.vue           stroke 初期画面（`strokes/index.vue` と同じ画面。`screen-flow.md`）
+│   │   ├── admin/              ユーザー管理（管理者だけ）
+│   │   ├── notifications/      通知
 │   │   ├── projects/
 │   │   │   ├── index.vue       list（プロジェクト一覧）
 │   │   │   └── [projectId]/    detail（specs / steering / tasks / approvals）
@@ -60,13 +64,13 @@ base2/
 
 - **pages はただのルーティング。** ページは薄く保ち、画面の実体は components が持つ
 - **components は `page/` ＋ `ui/` ＋ 機能単位で切る。** Route に対応するページの実装は `page/<PageName>/<PageType>/Container.vue`（`page-component-structure.md`）、機能に属さない共通部品は `ui/`、機能の部品は機能のディレクトリ（notification / project / question / proposal / approval）。出自や画面グループの境界では切らない。部品が無い機能のディレクトリは作らない。全数の対応は `file-components.md`
-  - **これは到達点である。** 現状は直下 ＋ `project/` `prototype/` `review/` `shared/` `stroke/` `workspace/` で、`ui/` ＋ 機能単位へ移す作業は `structure-migration.md` が移行課題として持つ
+  - **これは到達点である。** 現状は直下 ＋ `page/` `project/` `prototype/` `review/` `shared/` `stroke/` `workspace/` で（`page/` は現状ストローク開始画面の `Stroke/Start/Container.vue` が1つ）、`ui/` ＋ 機能単位へ移す作業は `structure-migration.md` が移行課題として持つ
   - どの区切りに置くかは**実際の参照範囲**で決める。役割・名前・将来の想定で決めない。判定の物差しは `openspec/specs/app-structure`
   - markdown を描く・直す部品は components ではなく `modules/markdown/` にある（§3）。`app/components/` に同じ実体を重ねて持たない
 - **composables は関心単位の `useXxx` を平置き**にする。境界のディレクトリを作らない。全数の対応は `file-composables.md`
 - **テストは `test/` の下に置く。** 単体は `app/` `modules/` `server/` `shared/` の構造をそのまま写し、E2E は `test/e2e/`（`playwright.config.ts` の `testDir` がここを指す）
 - レイアウトはシェルの形が変わる単位で持つ（横タブの `portal.vue` / 左サイドバーの `workspace.vue`）。プロジェクト間の移動は一覧を経由する
-- セッションへの入口はプロジェクト一覧の **作成** で、専用のトップページを持たない
+- セッションへの入口は `/`（stroke 初期画面）とプロジェクト一覧の **作成**（`/strokes`）の2つで、同じ画面を出す。URL と画面の対応・遷移の正は `docs/specs/architecture/screen-flow.md`
 - データ取得の設計は `docs/specs/architecture/data-fetching.md`
 
 ---
@@ -106,7 +110,7 @@ base2/
 
 **api は契約が正。** ファイルの置き方（Endpoint はディレクトリ、Method は `index.<method>.ts`）は `docs/specs/api/server.md`。セッション系（`/api/sessions/**`、WS を含む）は `docs/specs/api/overview.md` の番号どおり。**エージェントが叩く endpoint は `/api/strokes/**` に分かれている**（`docs/specs/api/overview.md` の `strokes/` 5本）。プロジェクト系（`/api/projects/**`）は本家の読み取り10本と書き込み3本（承認応答・仕様書保存・ステアリング保存）で、`read-only.test.ts` が範囲を機械的に固定している。api の handler ファイルは HTTP 固有の準備（読み取り・検証・id の解決）と後始末（status・エラーの HTTP 化）だけを持ち、実処理は `handler/` を呼ぶ。どの局面を許すかの判定は api が持ち、handler は持たない。
 
-**utils は関心単位で切る。** 区分は4つ — **本家接続 / 監視・通知 / セッション / 設定・起動**。全数の対応は `server-structure.md`。
+**utils は関心単位で切る。** 区分は5つ — **本家接続 / 監視・通知 / セッション / 設定・起動 / 利用者の判定**。全数の対応は `server-structure.md`。利用者の判定（`access/`）はリクエストの利用者と管理者を求め、api が対象ごとに見られるかを確かめる口を持つ（`openspec/specs/access/identity`・`access/permission`）。
 
 守る制約は3つ。
 
@@ -138,6 +142,7 @@ base2/
 | `docs/specs/structure/file-components.md` / `file-composables.md` / `server-structure.md` | 部品・composable・utils の全数と規範への対応（`modules/` は含まない。§3） |
 | `docs/specs/architecture/data-fetching.md` | データ取得・SSR の設計 |
 | `docs/specs/architecture/invoke-agent.md` | AI の起動と実行の管理（invoke-agent）の仕組みと責務範囲 |
+| `docs/specs/architecture/screen-flow.md` | URL と画面の対応・各画面の責務・画面遷移の正 |
 | `docs/specs/plan/structure-migration.md` | 現状との差分（移行課題） |
 | `.spec-workflow/steering/structure.md` / `tech.md` | コーディング規約（命名・import・テストの置き場・通す門番・書き方の原則） |
 | `docs/adr/0002` / `0005`〜`0008` | 統合・本家の扱いの決定 |

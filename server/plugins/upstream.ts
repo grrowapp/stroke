@@ -29,7 +29,7 @@ export default defineNitroPlugin((nitro) => {
 
   const monitor = new UpstreamMonitor({
     upstreamBaseUrl: config.upstreamBaseUrl,
-    onNotification: broadcastNotification,
+    onNotification: (notification) => void broadcastNotification(notification),
     onConnectionChange: broadcastConnection,
     onMalformed: (projectId, reason) => {
       // 形が変わったときに黙って通さない（tech.md の Security Practices）
@@ -53,7 +53,7 @@ export default defineNitroPlugin((nitro) => {
     const changed = monitor.sync(directory.status === 'ok' ? directory.projects : []);
 
     // 監視対象が入れ替わったら、開いているブラウザの一覧も揃え直す
-    if (changed) broadcastSnapshot();
+    if (changed) await broadcastSnapshot();
   };
 
   void sync();

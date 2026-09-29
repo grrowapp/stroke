@@ -28,7 +28,7 @@ describe('get-strokes', () => {
     const result = await getStrokesHandler({ 'x-stroke-token': token });
 
     expect(result).toEqual({ status: 200, strokes: STROKES });
-    expect($fetch.raw).toHaveBeenCalledWith('/api/sessions/session-1/strokes');
+    expect($fetch.raw).toHaveBeenCalledWith('/api/sessions/session-1/strokes', expect.anything());
     removeConnection(token);
   });
 

@@ -4,6 +4,7 @@ import type { SessionSummary } from '#shared/stroke'
 import { invokePath } from '../utils/stroke/invoke'
 import { LOG_PREFIX } from '../utils/stroke/log'
 import { shouldRetry } from '../utils/stroke/sweep'
+import { internalFetch } from '../utils/access/request'
 
 /**
  * 起こし直す対象を拾う巡回（openspec/specs/portal/batch）。
@@ -43,7 +44,7 @@ export default defineNitroPlugin((nitro) => {
   const sweep = async (): Promise<void> => {
     let sessions: SessionSummary[]
     try {
-      sessions = await $fetch<SessionSummary[]>('/api/sessions')
+      sessions = await internalFetch<SessionSummary[]>('/api/sessions')
     } catch (error) {
       // 取れなければ次の巡回で拾う。
       console.warn(`${LOG_PREFIX} 一覧を取れなかった。次の巡回で拾う`, error)
@@ -54,7 +55,7 @@ export default defineNitroPlugin((nitro) => {
       if (!shouldRetry(session.invocation)) continue
 
       try {
-        await $fetch(invokePath(session.id, session.path))
+        await internalFetch(invokePath(session.id, session.path))
       } catch (error) {
         // 起こし直せなかった件は次の巡回で拾う。1件で全体を止めない。
         console.warn(`${LOG_PREFIX} 再キックに失敗: ${session.id}`, error)

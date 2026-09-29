@@ -14,6 +14,7 @@ import { resolveProjectId } from '../mcp/resolve-project-id'
 import { upstreamClient } from '../control/upstream-proxy'
 import { STEERING_DOCUMENTS, type SteeringDocument, type UpstreamFailure } from '../upstream/rest'
 import { currentApiBaseUrl } from './listen-address'
+import { internalFetch } from '../access/request'
 
 /**
  * 起動の材料を設定から組み立てる端。
@@ -62,7 +63,7 @@ export function invokePath(sessionId: string, cwd: string): string {
  */
 function invocationWriter(sessionId: string) {
   return async (invocation: Invocation, retries?: number): Promise<void> => {
-    await $fetch(submissionPath(sessionId), {
+    await internalFetch(submissionPath(sessionId), {
       method: 'POST',
       body: { invocation, ...(retries === undefined ? {} : { retries }) },
     })
@@ -209,7 +210,7 @@ function settlement(sessionId: string, token: string): () => Promise<boolean> {
     if (submitted === null) return true
 
     try {
-      await $fetch(settlementPath(sessionId), { method: 'POST', body: { submitted } })
+      await internalFetch(settlementPath(sessionId), { method: 'POST', body: { submitted } })
       return true
     } catch (error) {
       console.warn(
@@ -258,7 +259,7 @@ function conversationWriter(sessionId: string) {
 function completionRecorder(sessionId: string) {
   return async (): Promise<boolean> => {
     try {
-      await $fetch(activatePath(sessionId), { method: 'POST' })
+      await internalFetch(activatePath(sessionId), { method: 'POST' })
       return true
     } catch (error) {
       if (await isAlreadyActivated(sessionId)) return true
@@ -392,7 +393,7 @@ export function buildRun(options: {
     // 一覧に載っていれば、初回の起動を済ませている = 続き先が在る。
     // **参照は API の応答から得る**（openspec/specs/agent/invocation）。
     hasConversation: async () =>
-      (await $fetch<SessionSummary[]>('/api/sessions')).some(s => s.id === sessionId),
+      (await internalFetch<SessionSummary[]>('/api/sessions')).some(s => s.id === sessionId),
     setInvocation: invocationWriter(sessionId),
     // ストロークの1回の実行は必ず提出（A5・A7）で終わる。プロセスが正常終了しても
     // 提出が1つも無ければ、作業をせずに終わったということなので起動し直す。単位は起動
@@ -506,7 +507,7 @@ function mcpConfigFor(cwd: string, token: string, apiBaseUrl: string): string {
  * 組み立てるたびに生成を依頼する」）。
  */
 async function generateProject(cwd: string): Promise<void> {
-  await $fetch('/api/projects', { method: 'POST', body: { projectPath: cwd } })
+  await internalFetch('/api/projects', { method: 'POST', body: { projectPath: cwd } })
 }
 
 /**

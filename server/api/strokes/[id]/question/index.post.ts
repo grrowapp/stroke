@@ -3,6 +3,7 @@ import { conflict } from '../../../../utils/stroke/conflict'
 import { parseQuestion } from '../../../../utils/stroke/question'
 import { requireSessionId } from '../../../../utils/stroke/session-param'
 import { isPromotedState, readState } from '../../../../utils/stroke/session-store'
+import { requireSession } from '../../../../utils/access/request'
 
 /**
  * A5: 今の1問を提出する。ストロークの問いも差し戻しへの問い返しも、この endpoint で受け、
@@ -16,6 +17,8 @@ import { isPromotedState, readState } from '../../../../utils/stroke/session-sto
  * 提出してよい局面か（409）。残すことは `handler/question.ts` が持つ。
  */
 export default defineEventHandler(async (event) => {
+  // 見られない対象は存在しないものとして 404（access/permission）
+  await requireSession(event, getRouterParam(event, 'id') ?? '')
   const sessionId = await requireSessionId(event)
   const body = await readBody(event)
 

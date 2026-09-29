@@ -23,6 +23,7 @@ import {
   restartSteering,
 } from '~/composables/useProjectApi';
 import { useRelativeTime } from '~/composables/useRelativeTime';
+import { manageAccess } from '#shared/access';
 import type { SessionSummary } from '#shared/stroke';
 import type { ProjectDirectoryResponse, ProjectSummary } from '#shared/types';
 
@@ -306,6 +307,15 @@ function unread(project: ProjectSummary): number | null {
     <div class="mb-3 flex items-center">
       <h1 class="sb-page-title mb-0">プロジェクト</h1>
       <div class="ml-auto flex gap-2">
+        <!--
+          ユーザー管理への入口。管理者にだけ出す（access/user-management・
+          docs/specs/architecture/screen-flow.md）。
+        -->
+        <Can :ability="manageAccess">
+          <NuxtLink to="/admin/users" class="sb-btn" data-testid="user-management-link">
+            ユーザー管理
+          </NuxtLink>
+        </Can>
         <!--
           登録・作成は一覧画面の操作として持つ。独立したメニュー項目にはしない。
           登録は中身が未決のため非活性固定。作成は常に押せる（ADR 0010）。

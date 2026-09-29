@@ -113,7 +113,7 @@ socket.addEventListener('close', () => {
 
 `createSharedComposable` は参照カウント式で、**最後の購読 scope が破棄されると state ごと破棄し、次の呼び出しで再生成する**。現行のモジュール変数はアプリ生存中不変であり、設計要件「接続はアプリ全体で1本だけ張り、画面遷移で張り替えない」（design.md 決定7、ファイル冒頭コメント）がある。
 
-参照元は5箇所（`layouts/portal.vue`、`layouts/workspace.vue`、`pages/index.vue`、`pages/projects/index.vue`、`components/shared/NotificationToaster.vue`）に散在するため、レイアウト切替で購読者ゼロ区間が生じると切断・`notifications` 消失が起き得る。**そのままの `createSharedComposable` 単独では要件を満たさない。**
+参照元は5箇所（`layouts/portal.vue`、`layouts/workspace.vue`、`pages/notifications/index.vue`、`pages/projects/index.vue`、`components/shared/NotificationToaster.vue`）に散在するため、レイアウト切替で購読者ゼロ区間が生じると切断・`notifications` 消失が起き得る。**そのままの `createSharedComposable` 単独では要件を満たさない。**
 
 **実装で判明（上の数の訂正）**: 参照元は5箇所ではなく**8箇所**である（`grep -rn "useBoardSocket()" app/` で確認）。上の5箇所に加えて、**下層3ページ**（`pages/projects/[projectId]/approvals/[approvalId].vue`・`pages/projects/[projectId]/specs/[specName]/[document].vue`・`pages/projects/[projectId]/steering/[name].vue`）が `upstreamConnected` を取っている。`grep -rl` はこれにコメントで言及するだけのファイル（`app.vue`・`components/workspace/DocumentEditor.vue`）も拾うので、ファイル数と呼び出し数は一致しない。**散在の度合いが前提より大きい**ぶん、購読者ゼロ区間の懸念は弱まらない。
 

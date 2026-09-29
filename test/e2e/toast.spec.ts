@@ -145,7 +145,7 @@ test.describe('通知トースト', () => {
 
     await toasts(page).locator('[data-slot="title"]').click();
 
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(/\/notifications$/);
     await expect(toasts(page)).toHaveCount(1);
   });
 
